@@ -83,7 +83,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			.toString(36)
 			.substr(2, 9)}`;
 
-		const ptyProcess = spawn('claude', [], {
+		// Parse Claude command arguments from environment variable
+		const claudeArgs = process.env['CCMANAGER_CLAUDE_ARGS']
+			? process.env['CCMANAGER_CLAUDE_ARGS'].split(' ')
+			: [];
+
+		const ptyProcess = spawn('claude', claudeArgs, {
 			name: 'xterm-color',
 			cols: process.stdout.columns || 80,
 			rows: process.stdout.rows || 24,
