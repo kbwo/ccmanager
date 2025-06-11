@@ -1,4 +1,4 @@
-# CCManager - Claude Code Worktree Manager
+# CCManager - Claude Code Session Manager
 
 CCManager is a TUI application for managing multiple Claude Code sessions across Git worktrees.
 
@@ -47,6 +47,23 @@ $ npm start
 ```bash
 $ npx ccmanager
 ```
+
+## Environment Variables
+
+### CCMANAGER_CLAUDE_ARGS
+
+You can pass additional arguments to Claude Code sessions by setting the `CCMANAGER_CLAUDE_ARGS` environment variable:
+
+```bash
+# Start Claude Code with specific arguments for all sessions
+export CCMANAGER_CLAUDE_ARGS="--resume"
+npx ccmanager
+
+# Or set it inline
+CCMANAGER_CLAUDE_ARGS="--resume" npx ccmanager
+```
+
+The arguments are applied to all Claude Code sessions started by CCManager.
 
 ## Keyboard Shortcuts
 
