@@ -1,6 +1,6 @@
 {
 	"name": "ccmanager",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "TUI application for managing multiple Claude Code sessions across Git worktrees",
 	"license": "MIT",
 	"author": "Kodai Kabasawa",
