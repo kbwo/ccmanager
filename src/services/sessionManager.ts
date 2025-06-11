@@ -60,17 +60,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		} else if (
 			currentState === 'waiting_input' &&
 			hasBottomBorder &&
-			!hasWaitingPrompt
+			!hasWaitingPrompt &&
+			!wasWaitingWithBottomBorder
 		) {
-			if (wasWaitingWithBottomBorder) {
-				// We've already seen the bottom border, transition to idle
-				newState = 'idle';
-				this.waitingWithBottomBorder.set(sessionId, false);
-			} else {
-				// First time seeing bottom border, keep waiting state
-				newState = 'waiting_input';
-				this.waitingWithBottomBorder.set(sessionId, true);
-			}
+			// Keep the waiting state and mark that we've seen the bottom border
+			newState = 'waiting_input';
+			this.waitingWithBottomBorder.set(sessionId, true);
 			// Clear any pending busy timer
 			const existingTimer = this.busyTimers.get(sessionId);
 			if (existingTimer) {
@@ -104,13 +99,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 			// Keep current busy state for now
 			newState = 'busy';
-		} else if (!hasWaitingPrompt && !hasEscToInterrupt && !hasBottomBorder) {
-			// No special prompts or indicators, transition to idle
-			newState = 'idle';
-			// Clear the waiting flag when transitioning to idle
-			if (currentState === 'waiting_input') {
-				this.waitingWithBottomBorder.set(sessionId, false);
-			}
 		}
 
 		return newState;
