@@ -10,6 +10,7 @@ import {includesPromptBoxBottomBorder} from '../utils/promptDetector.js';
 export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
+	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 
 	private stripAnsi(str: string): string {
 		// Remove all ANSI escape sequences including cursor movement, color codes, etc.
@@ -35,6 +36,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		const hasWaitingPrompt = cleanData.includes('│ Do you want');
 		const wasWaitingWithBottomBorder =
 			this.waitingWithBottomBorder.get(sessionId) || false;
+		const hasEscToInterrupt = cleanData
+			.toLowerCase()
+			.includes('esc to interrupt');
 
 		let newState = currentState;
 
@@ -47,6 +51,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			} else {
 				this.waitingWithBottomBorder.set(sessionId, false);
 			}
+			// Clear any pending busy timer
+			const existingTimer = this.busyTimers.get(sessionId);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+				this.busyTimers.delete(sessionId);
+			}
 		} else if (
 			currentState === 'waiting_input' &&
 			hasBottomBorder &&
@@ -56,12 +66,39 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			// Keep the waiting state and mark that we've seen the bottom border
 			newState = 'waiting_input';
 			this.waitingWithBottomBorder.set(sessionId, true);
-		} else if (cleanData.toLowerCase().includes('esc to interrupt')) {
+			// Clear any pending busy timer
+			const existingTimer = this.busyTimers.get(sessionId);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+				this.busyTimers.delete(sessionId);
+			}
+		} else if (hasEscToInterrupt) {
+			// If "esc to interrupt" is present, set state to busy
 			newState = 'busy';
 			this.waitingWithBottomBorder.set(sessionId, false);
-		} else {
-			newState = 'idle';
-			this.waitingWithBottomBorder.set(sessionId, false);
+			// Clear any pending timer since we're confirming busy state
+			const existingTimer = this.busyTimers.get(sessionId);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+				this.busyTimers.delete(sessionId);
+			}
+		} else if (currentState === 'busy' && !hasEscToInterrupt) {
+			// If we were busy but no "esc to interrupt" in current data,
+			// start a timer to switch to idle after 500ms
+			if (!this.busyTimers.has(sessionId)) {
+				const timer = setTimeout(() => {
+					// sessionId is actually the worktreePath
+					const session = this.sessions.get(sessionId);
+					if (session && session.state === 'busy') {
+						session.state = 'idle';
+						this.emit('sessionStateChanged', session);
+					}
+					this.busyTimers.delete(sessionId);
+				}, 500);
+				this.busyTimers.set(sessionId, timer);
+			}
+			// Keep current busy state for now
+			newState = 'busy';
 		}
 
 		return newState;
@@ -155,7 +192,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			// Detect state based on the new data
 			const oldState = session.state;
-			const newState = this.detectSessionState(cleanData, oldState, session.id);
+			const newState = this.detectSessionState(
+				cleanData,
+				oldState,
+				session.worktreePath,
+			);
 
 			// Update state if changed
 			if (newState !== oldState) {
@@ -201,6 +242,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				session.process.kill();
 			} catch (_error) {
 				// Process might already be dead
+			}
+			// Clean up any pending timer
+			const timer = this.busyTimers.get(worktreePath);
+			if (timer) {
+				clearTimeout(timer);
+				this.busyTimers.delete(worktreePath);
 			}
 			this.sessions.delete(worktreePath);
 			this.waitingWithBottomBorder.delete(session.id);

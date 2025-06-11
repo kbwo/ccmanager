@@ -86,7 +86,7 @@ describe('SessionManager', () => {
 			expect(newState).toBe('busy');
 		});
 
-		it('should detect idle state when no specific patterns are found', () => {
+		it('should maintain busy state when transitioning from busy without "esc to interrupt"', () => {
 			const cleanData = 'Some regular output text';
 			const currentState: SessionState = 'busy';
 			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
@@ -97,7 +97,8 @@ describe('SessionManager', () => {
 				mockSessionId,
 			);
 
-			expect(newState).toBe('idle');
+			// With the new logic, it should remain busy and start a timer
+			expect(newState).toBe('busy');
 		});
 
 		it('should handle case-insensitive "esc to interrupt" detection', () => {
@@ -182,6 +183,95 @@ describe('SessionManager', () => {
 			);
 
 			expect(newState).toBe('idle');
+		});
+
+		it('should transition from busy to idle after 500ms timer when no "esc to interrupt"', async () => {
+			// Create a mock session for the timer test
+			const mockWorktreePath = '/test/worktree';
+			const mockSession = {
+				id: mockSessionId,
+				worktreePath: mockWorktreePath,
+				state: 'busy' as SessionState,
+				process: {} as any,
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+			};
+
+			// Add the session to the manager
+			sessionManager.sessions.set(mockWorktreePath, mockSession);
+
+			// Mock the EventEmitter emit method
+			const emitSpy = vi.spyOn(sessionManager, 'emit');
+
+			// First call with no esc to interrupt should maintain busy state
+			const cleanData = 'Some regular output text';
+			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+
+			const newState = sessionManager.detectSessionState(
+				cleanData,
+				'busy',
+				mockWorktreePath,
+			);
+
+			expect(newState).toBe('busy');
+
+			// Wait for timer to fire (500ms + buffer)
+			await new Promise(resolve => setTimeout(resolve, 600));
+
+			// Check that the session state was changed to idle
+			expect(mockSession.state).toBe('idle');
+			expect(emitSpy).toHaveBeenCalledWith('sessionStateChanged', mockSession);
+		});
+
+		it('should cancel timer when "esc to interrupt" appears again', async () => {
+			// Create a mock session for the timer test
+			const mockWorktreePath = '/test/worktree';
+			const mockSession = {
+				id: mockSessionId,
+				worktreePath: mockWorktreePath,
+				state: 'busy' as SessionState,
+				process: {} as any,
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+			};
+
+			// Add the session to the manager
+			sessionManager.sessions.set(mockWorktreePath, mockSession);
+
+			// First call with no esc to interrupt should maintain busy state and start timer
+			const cleanData1 = 'Some regular output text';
+			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+
+			const newState1 = sessionManager.detectSessionState(
+				cleanData1,
+				'busy',
+				mockWorktreePath,
+			);
+
+			expect(newState1).toBe('busy');
+
+			// Wait 200ms (less than timer duration)
+			await new Promise(resolve => setTimeout(resolve, 200));
+
+			// Second call with esc to interrupt should cancel timer and keep busy
+			const cleanData2 = 'Running... Press ESC to interrupt';
+			const newState2 = sessionManager.detectSessionState(
+				cleanData2,
+				'busy',
+				mockWorktreePath,
+			);
+
+			expect(newState2).toBe('busy');
+
+			// Wait another 400ms (total 600ms, more than timer duration)
+			await new Promise(resolve => setTimeout(resolve, 400));
+
+			// State should still be busy because timer was cancelled
+			expect(mockSession.state).toBe('busy');
 		});
 	});
 });
