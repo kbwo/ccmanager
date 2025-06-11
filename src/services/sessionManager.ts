@@ -72,6 +72,22 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				clearTimeout(existingTimer);
 				this.busyTimers.delete(sessionId);
 			}
+		} else if (
+			currentState === 'waiting_input' &&
+			hasBottomBorder &&
+			!hasWaitingPrompt &&
+			wasWaitingWithBottomBorder
+		) {
+			// We've already seen the bottom border for this waiting prompt,
+			// so transition to idle
+			newState = 'idle';
+			this.waitingWithBottomBorder.set(sessionId, false);
+			// Clear any pending busy timer
+			const existingTimer = this.busyTimers.get(sessionId);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+				this.busyTimers.delete(sessionId);
+			}
 		} else if (hasEscToInterrupt) {
 			// If "esc to interrupt" is present, set state to busy
 			newState = 'busy';
@@ -99,6 +115,17 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 			// Keep current busy state for now
 			newState = 'busy';
+		} else if (currentState === 'waiting_input') {
+			// If we're in waiting_input but no special patterns detected,
+			// transition to idle and clear the flag
+			newState = 'idle';
+			this.waitingWithBottomBorder.set(sessionId, false);
+			// Clear any pending busy timer
+			const existingTimer = this.busyTimers.get(sessionId);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+				this.busyTimers.delete(sessionId);
+			}
 		}
 
 		return newState;
