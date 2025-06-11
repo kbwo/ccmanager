@@ -192,6 +192,7 @@ describe('SessionManager', () => {
 				id: mockSessionId,
 				worktreePath: mockWorktreePath,
 				state: 'busy' as SessionState,
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				process: {} as any,
 				output: [],
 				outputHistory: [],
@@ -232,6 +233,7 @@ describe('SessionManager', () => {
 				id: mockSessionId,
 				worktreePath: mockWorktreePath,
 				state: 'busy' as SessionState,
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				process: {} as any,
 				output: [],
 				outputHistory: [],
