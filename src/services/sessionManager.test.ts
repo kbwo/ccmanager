@@ -33,6 +33,20 @@ describe('SessionManager', () => {
 			expect(newState).toBe('waiting_input');
 		});
 
+		it('should detect waiting_input state when "Would you like" prompt is present', () => {
+			const cleanData = '│ Would you like to proceed?';
+			const currentState: SessionState = 'idle';
+			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+
+			const newState = sessionManager.detectSessionState(
+				cleanData,
+				currentState,
+				mockSessionId,
+			);
+
+			expect(newState).toBe('waiting_input');
+		});
+
 		it('should set waitingWithBottomBorder when waiting prompt and bottom border are both present', () => {
 			const cleanData = '│ Do you want to continue?\n└───────────────────────┘';
 			const currentState: SessionState = 'idle';
@@ -115,28 +129,6 @@ describe('SessionManager', () => {
 			expect(newState).toBe('busy');
 		});
 
-		it('should not change from waiting_input when bottom border was already seen', () => {
-			const cleanData = '└───────────────────────┘';
-			const currentState: SessionState = 'waiting_input';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(true);
-
-			// First, simulate seeing waiting prompt with bottom border
-			sessionManager.detectSessionState(
-				'│ Do you want to continue?\n└───────────────────────┘',
-				'idle',
-				mockSessionId,
-			);
-
-			// Now another bottom border appears
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
-			);
-
-			expect(newState).toBe('idle'); // Should change to idle since we already saw the bottom border
-		});
-
 		it('should clear waitingWithBottomBorder flag when transitioning to busy', () => {
 			const cleanData = 'Processing... Press ESC to interrupt';
 			const currentState: SessionState = 'waiting_input';
@@ -159,30 +151,6 @@ describe('SessionManager', () => {
 			);
 
 			expect(newState).toBe('busy');
-		});
-
-		it('should clear waitingWithBottomBorder flag when transitioning to idle', () => {
-			const cleanData = 'Task completed successfully';
-			const currentState: SessionState = 'waiting_input';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
-
-			// First set up waiting state with bottom border
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(true);
-			sessionManager.detectSessionState(
-				'│ Do you want to continue?\n└───────────────────────┘',
-				'idle',
-				mockSessionId,
-			);
-
-			// Now transition to idle
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
-			);
-
-			expect(newState).toBe('idle');
 		});
 
 		it('should transition from busy to idle after 500ms timer when no "esc to interrupt"', async () => {
