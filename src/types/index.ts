@@ -18,6 +18,8 @@ export interface Session {
 	outputHistory: Buffer[]; // Full output history as buffers
 	lastActivity: Date;
 	isActive: boolean;
+	terminal: any; // Virtual terminal for state detection (xterm Terminal instance)
+	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
 }
 
 export interface SessionManager {

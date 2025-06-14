@@ -39,6 +39,7 @@
 		"dist"
 	],
 	"dependencies": {
+		"@xterm/headless": "^5.5.0",
 		"ink": "^4.1.0",
 		"ink-select-input": "^5.0.0",
 		"ink-text-input": "^5.0.1",
