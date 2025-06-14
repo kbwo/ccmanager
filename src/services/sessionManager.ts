@@ -5,7 +5,8 @@ import {
 	SessionState,
 } from '../types/index.js';
 import {EventEmitter} from 'events';
-import {includesPromptBoxBottomBorder} from '../utils/promptDetector.js';
+import pkg from '@xterm/headless';
+const {Terminal} = pkg;
 
 export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
@@ -27,83 +28,42 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			.replace(/[0-9]+;[0-9]+;[0-9;]+m/g, ''); // Orphaned 24-bit color codes
 	}
 
-	detectSessionState(
-		cleanData: string,
-		currentState: SessionState,
-		sessionId: string,
-	): SessionState {
-		const hasBottomBorder = includesPromptBoxBottomBorder(cleanData);
-		const hasWaitingPrompt =
-			cleanData.includes('│ Do you want') ||
-			cleanData.includes('│ Would you like');
-		const wasWaitingWithBottomBorder =
-			this.waitingWithBottomBorder.get(sessionId) || false;
-		const hasEscToInterrupt = cleanData
-			.toLowerCase()
-			.includes('esc to interrupt');
+	detectTerminalState(terminal: InstanceType<typeof Terminal>): SessionState {
+		// Get the last 30 lines from the terminal buffer
+		const buffer = terminal.buffer.active;
+		const lines: string[] = [];
 
-		let newState = currentState;
-
-		// Check if current state is waiting and this is just a prompt box bottom border
-		if (hasWaitingPrompt) {
-			newState = 'waiting_input';
-			// Check if this same data also contains the bottom border
-			if (hasBottomBorder) {
-				this.waitingWithBottomBorder.set(sessionId, true);
-			} else {
-				this.waitingWithBottomBorder.set(sessionId, false);
+		// Start from the bottom and work our way up
+		for (let i = buffer.length - 1; i >= 0 && lines.length < 30; i--) {
+			const line = buffer.getLine(i);
+			if (line) {
+				const text = line.translateToString(true);
+				// Skip empty lines at the bottom
+				if (lines.length > 0 || text.trim() !== '') {
+					lines.unshift(text);
+				}
 			}
-			// Clear any pending busy timer
-			const existingTimer = this.busyTimers.get(sessionId);
-			if (existingTimer) {
-				clearTimeout(existingTimer);
-				this.busyTimers.delete(sessionId);
-			}
-		} else if (
-			currentState === 'waiting_input' &&
-			hasBottomBorder &&
-			!hasWaitingPrompt &&
-			!wasWaitingWithBottomBorder
-		) {
-			// Keep the waiting state and mark that we've seen the bottom border
-			newState = 'waiting_input';
-			this.waitingWithBottomBorder.set(sessionId, true);
-			// Clear any pending busy timer
-			const existingTimer = this.busyTimers.get(sessionId);
-			if (existingTimer) {
-				clearTimeout(existingTimer);
-				this.busyTimers.delete(sessionId);
-			}
-		} else if (hasEscToInterrupt) {
-			// If "esc to interrupt" is present, set state to busy
-			newState = 'busy';
-			this.waitingWithBottomBorder.set(sessionId, false);
-			// Clear any pending timer since we're confirming busy state
-			const existingTimer = this.busyTimers.get(sessionId);
-			if (existingTimer) {
-				clearTimeout(existingTimer);
-				this.busyTimers.delete(sessionId);
-			}
-		} else if (currentState === 'busy' && !hasEscToInterrupt) {
-			// If we were busy but no "esc to interrupt" in current data,
-			// start a timer to switch to idle after 500ms
-			if (!this.busyTimers.has(sessionId)) {
-				const timer = setTimeout(() => {
-					// sessionId is actually the worktreePath
-					const session = this.sessions.get(sessionId);
-					if (session && session.state === 'busy') {
-						session.state = 'idle';
-						this.emit('sessionStateChanged', session);
-					}
-					this.busyTimers.delete(sessionId);
-				}, 500);
-				this.busyTimers.set(sessionId, timer);
-			}
-			// Keep current busy state for now
-			newState = 'busy';
 		}
 
-		return newState;
+		// Join lines and check for patterns
+		const content = lines.join('\n');
+		const lowerContent = content.toLowerCase();
+
+		// Check for waiting prompts with box character
+		if (
+			content.includes('│ Do you want') ||
+			content.includes('│ Would you like')
+		) {
+			return 'waiting_input';
+		}
+
+		// Check for busy state
+		if (lowerContent.includes('esc to interrupt')) {
+			return 'busy';
+		}
+
+		// Otherwise idle
+		return 'idle';
 	}
 
 	constructor() {
@@ -135,6 +95,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			env: process.env,
 		});
 
+		// Create virtual terminal for state detection
+		const terminal = new Terminal({
+			cols: process.stdout.columns || 80,
+			rows: process.stdout.rows || 24,
+			allowProposedApi: true,
+		});
+
 		const session: Session = {
 			id,
 			worktreePath,
@@ -144,6 +111,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			outputHistory: [],
 			lastActivity: new Date(),
 			isActive: false,
+			terminal,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -159,6 +127,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private setupBackgroundHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
+			// Write data to virtual terminal
+			session.terminal.write(data);
+
 			// Store in output history as Buffer
 			const buffer = Buffer.from(data, 'utf8');
 			session.outputHistory.push(buffer);
@@ -176,40 +147,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 			}
 
-			// Also store for state detection
-			session.output.push(data);
-			// Keep only last 100 chunks for state detection
-			if (session.output.length > 100) {
-				session.output.shift();
-			}
-
 			session.lastActivity = new Date();
-
-			// Strip ANSI codes for pattern matching
-			const cleanData = this.stripAnsi(data);
-
-			// Skip state monitoring if cleanData is empty
-			if (!cleanData.trim()) {
-				// Only emit data events when session is active
-				if (session.isActive) {
-					this.emit('sessionData', session, data);
-				}
-				return;
-			}
-
-			// Detect state based on the new data
-			const oldState = session.state;
-			const newState = this.detectSessionState(
-				cleanData,
-				oldState,
-				session.worktreePath,
-			);
-
-			// Update state if changed
-			if (newState !== oldState) {
-				session.state = newState;
-				this.emit('sessionStateChanged', session);
-			}
 
 			// Only emit data events when session is active
 			if (session.isActive) {
@@ -217,7 +155,22 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 		});
 
+		// Set up interval-based state detection
+		session.stateCheckInterval = setInterval(() => {
+			const oldState = session.state;
+			const newState = this.detectTerminalState(session.terminal);
+
+			if (newState !== oldState) {
+				session.state = newState;
+				this.emit('sessionStateChanged', session);
+			}
+		}, 100); // Check every 100ms
+
 		session.process.onExit(() => {
+			// Clear the state check interval
+			if (session.stateCheckInterval) {
+				clearInterval(session.stateCheckInterval);
+			}
 			// Update state to idle before destroying
 			session.state = 'idle';
 			this.emit('sessionStateChanged', session);
@@ -245,6 +198,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	destroySession(worktreePath: string): void {
 		const session = this.sessions.get(worktreePath);
 		if (session) {
+			// Clear the state check interval
+			if (session.stateCheckInterval) {
+				clearInterval(session.stateCheckInterval);
+			}
 			try {
 				session.process.kill();
 			} catch (_error) {
