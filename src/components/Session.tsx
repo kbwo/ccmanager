@@ -76,10 +76,13 @@ const Session: React.FC<SessionProps> = ({
 
 		// Handle terminal resize
 		const handleResize = () => {
-			session.process.resize(
-				process.stdout.columns || 80,
-				process.stdout.rows || 24,
-			);
+			const cols = process.stdout.columns || 80;
+			const rows = process.stdout.rows || 24;
+			session.process.resize(cols, rows);
+			// Also resize the virtual terminal
+			if (session.terminal) {
+				session.terminal.resize(cols, rows);
+			}
 		};
 
 		stdout.on('resize', handleResize);
