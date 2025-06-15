@@ -1,4 +1,7 @@
 import {IPty} from 'node-pty';
+import type pkg from '@xterm/headless';
+
+export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
@@ -18,7 +21,7 @@ export interface Session {
 	outputHistory: Buffer[]; // Full output history as buffers
 	lastActivity: Date;
 	isActive: boolean;
-	terminal: any; // Virtual terminal for state detection (xterm Terminal instance)
+	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
 }
 
@@ -58,7 +61,18 @@ export interface StatusHookConfig {
 	waiting_input?: StatusHook;
 }
 
+export interface TerminalPadding {
+	top: number;
+	bottom: number;
+}
+
+export const DEFAULT_TERMINAL_PADDING: TerminalPadding = {
+	top: 1,
+	bottom: 1,
+};
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
+	terminalPadding?: TerminalPadding;
 }
