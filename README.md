@@ -11,6 +11,7 @@ https://github.com/user-attachments/assets/a6d80e73-dc06-4ef8-849d-e3857f6c7024
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
 - Configurable keyboard shortcuts
+- Status change hooks for automation and notifications
 
 ## Why CCManager over Claude Squad?
 
@@ -76,25 +77,37 @@ The arguments are applied to all Claude Code sessions started by CCManager.
 
 You can customize keyboard shortcuts in two ways:
 
-1. **Through the UI**: Select "Configure Shortcuts" from the main menu
-2. **Configuration file**: Edit `~/.config/ccmanager/shortcuts.json`
+1. **Through the UI**: Select "Configuration" → "Configure Shortcuts" from the main menu
+2. **Configuration file**: Edit `~/.config/ccmanager/config.json` (or legacy `~/.config/ccmanager/shortcuts.json`)
 
 Example configuration:
 ```json
+// config.json (new format)
+{
+  "shortcuts": {
+    "returnToMenu": {
+      "ctrl": true,
+      "key": "r"
+    },
+    "cancel": {
+      "key": "escape"
+    }
+  }
+}
+
+// shortcuts.json (legacy format, still supported)
 {
   "returnToMenu": {
     "ctrl": true,
     "key": "r"
-  },
-  "exitApp": {
-    "ctrl": true,
-    "key": "x"
   },
   "cancel": {
     "key": "escape"
   }
 }
 ```
+
+Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.json` on first use.
 
 ### Restrictions
 
@@ -103,6 +116,20 @@ Example configuration:
   - Ctrl+C
   - Ctrl+D
   - Ctrl+[ (equivalent to Escape)
+
+## Status Change Hooks
+
+CCManager can execute custom commands when Claude Code session status changes. This enables powerful automation workflows like desktop notifications, logging, or integration with other tools.
+
+### Overview
+
+Status hooks allow you to:
+- Get notified when Claude needs your input
+- Track time spent in different states
+- Trigger automations based on session activity
+- Integrate with notification systems like [noti](https://github.com/variadico/noti)
+
+For detailed setup instructions, see [docs/state-hooks.md](docs/state-hooks.md).
 
 ## Development
 

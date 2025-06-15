@@ -97,8 +97,8 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			value: 'delete-worktree',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.CONFIGURE_SHORTCUTS} Configure Shortcuts`,
-			value: 'configure-shortcuts',
+			label: `${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
+			value: 'configuration',
 		});
 		menuItems.push({
 			label: `${MENU_ICONS.EXIT} Exit`,
@@ -134,10 +134,10 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 				isMainWorktree: false,
 				hasSession: false,
 			});
-		} else if (item.value === 'configure-shortcuts') {
+		} else if (item.value === 'configuration') {
 			// Handle in parent component - use special marker
 			onSelectWorktree({
-				path: 'CONFIGURE_SHORTCUTS',
+				path: 'CONFIGURATION',
 				branch: '',
 				isMainWorktree: false,
 				hasSession: false,

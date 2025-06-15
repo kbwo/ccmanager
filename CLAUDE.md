@@ -113,7 +113,7 @@ Claude Code states are detected by advanced output analysis in `promptDetector.t
 
 ### Keyboard Shortcuts
 
-- Fully configurable shortcuts stored in `~/.config/ccmanager/shortcuts.json`
+- Fully configurable shortcuts stored in `~/.config/ccmanager/config.json`
 - Platform-aware configuration paths (Windows uses `%APPDATA%`)
 - Default shortcuts for common actions (back, quit, refresh, etc.)
 - Visual configuration UI accessible from main menu

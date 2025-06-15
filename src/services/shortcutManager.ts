@@ -1,16 +1,8 @@
-import {
-	ShortcutKey,
-	ShortcutConfig,
-	DEFAULT_SHORTCUTS,
-} from '../types/index.js';
+import {ShortcutKey, ShortcutConfig} from '../types/index.js';
 import {Key} from 'ink';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import {configurationManager} from './configurationManager.js';
 
 export class ShortcutManager {
-	private shortcuts: ShortcutConfig;
-	private configPath: string;
 	private reservedKeys: ShortcutKey[] = [
 		{ctrl: true, key: 'c'},
 		{ctrl: true, key: 'd'},
@@ -18,37 +10,7 @@ export class ShortcutManager {
 		{ctrl: true, key: '['},
 	];
 
-	constructor() {
-		// Use platform-specific config directory
-		const configDir =
-			process.platform === 'win32'
-				? path.join(process.env['APPDATA'] || os.homedir(), 'ccmanager')
-				: path.join(os.homedir(), '.config', 'ccmanager');
-
-		this.configPath = path.join(configDir, 'shortcuts.json');
-		this.shortcuts = this.loadShortcuts();
-	}
-
-	private loadShortcuts(): ShortcutConfig {
-		try {
-			if (fs.existsSync(this.configPath)) {
-				const data = fs.readFileSync(this.configPath, 'utf8');
-				const loaded = JSON.parse(data);
-				// Validate loaded shortcuts
-				const validated: ShortcutConfig = {
-					returnToMenu:
-						this.validateShortcut(loaded.returnToMenu) ||
-						DEFAULT_SHORTCUTS.returnToMenu,
-					cancel:
-						this.validateShortcut(loaded.cancel) || DEFAULT_SHORTCUTS.cancel,
-				};
-				return validated;
-			}
-		} catch (error) {
-			console.error('Failed to load shortcuts:', error);
-		}
-		return {...DEFAULT_SHORTCUTS};
-	}
+	constructor() {}
 
 	private validateShortcut(shortcut: unknown): ShortcutKey | null {
 		if (!shortcut || typeof shortcut !== 'object') {
@@ -97,29 +59,21 @@ export class ShortcutManager {
 
 	public saveShortcuts(shortcuts: ShortcutConfig): boolean {
 		// Validate all shortcuts
+		const currentShortcuts = configurationManager.getShortcuts();
 		const validated: ShortcutConfig = {
 			returnToMenu:
 				this.validateShortcut(shortcuts.returnToMenu) ||
-				this.shortcuts.returnToMenu,
-			cancel: this.validateShortcut(shortcuts.cancel) || this.shortcuts.cancel,
+				currentShortcuts.returnToMenu,
+			cancel:
+				this.validateShortcut(shortcuts.cancel) || currentShortcuts.cancel,
 		};
 
-		try {
-			const dir = path.dirname(this.configPath);
-			if (!fs.existsSync(dir)) {
-				fs.mkdirSync(dir, {recursive: true});
-			}
-			fs.writeFileSync(this.configPath, JSON.stringify(validated, null, 2));
-			this.shortcuts = validated;
-			return true;
-		} catch (error) {
-			console.error('Failed to save shortcuts:', error);
-			return false;
-		}
+		configurationManager.setShortcuts(validated);
+		return true;
 	}
 
 	public getShortcuts(): ShortcutConfig {
-		return {...this.shortcuts};
+		return configurationManager.getShortcuts();
 	}
 
 	public matchesShortcut(
@@ -127,7 +81,8 @@ export class ShortcutManager {
 		input: string,
 		key: Key,
 	): boolean {
-		const shortcut = this.shortcuts[shortcutName];
+		const shortcuts = configurationManager.getShortcuts();
+		const shortcut = shortcuts[shortcutName];
 		if (!shortcut) return false;
 
 		// Handle escape key specially
@@ -146,7 +101,8 @@ export class ShortcutManager {
 	}
 
 	public getShortcutDisplay(shortcutName: keyof ShortcutConfig): string {
-		const shortcut = this.shortcuts[shortcutName];
+		const shortcuts = configurationManager.getShortcuts();
+		const shortcut = shortcuts[shortcutName];
 		if (!shortcut) return '';
 
 		const parts: string[] = [];

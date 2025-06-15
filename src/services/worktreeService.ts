@@ -33,7 +33,12 @@ export class WorktreeService {
 						hasSession: false,
 					};
 				} else if (line.startsWith('branch ')) {
-					currentWorktree.branch = line.substring(7);
+					let branch = line.substring(7);
+					// Remove refs/heads/ prefix if present
+					if (branch.startsWith('refs/heads/')) {
+						branch = branch.substring(11);
+					}
+					currentWorktree.branch = branch;
 				} else if (line === 'bare') {
 					currentWorktree.isMainWorktree = true;
 				}
