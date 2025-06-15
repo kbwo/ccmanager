@@ -115,33 +115,7 @@ Status hooks allow you to:
 - Trigger automations based on session activity
 - Integrate with notification systems like [noti](https://github.com/variadico/noti)
 
-### Configuration
-
-Configure hooks through the UI:
-1. Select "Configuration" from the main menu
-2. Choose "Configure Status Hooks"
-3. Set commands for each state (idle, busy, waiting_input)
-
-### Available Environment Variables
-
-Your hook commands have access to these environment variables:
-- `CCMANAGER_OLD_STATE`: Previous state
-- `CCMANAGER_NEW_STATE`: New state (idle, busy, or waiting_input)
-- `CCMANAGER_WORKTREE`: Path to the worktree
-- `CCMANAGER_WORKTREE_BRANCH`: Git branch name
-- `CCMANAGER_SESSION_ID`: Unique session identifier
-
-### Example: Desktop Notifications
-
-```bash
-# Notify when Claude needs input
-noti -t "Claude Code" -m "Needs your input on $CCMANAGER_WORKTREE_BRANCH"
-
-# Alert when task completes
-[ "$CCMANAGER_OLD_STATE" = "busy" ] && noti -t "Claude Done" -m "Task complete!"
-```
-
-For more examples and detailed setup instructions, see [docs/state-hooks.md](docs/state-hooks.md).
+For detailed setup instructions, see [docs/state-hooks.md](docs/state-hooks.md).
 
 ## Development
 
