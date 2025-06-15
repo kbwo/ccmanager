@@ -1,5 +1,5 @@
-import pkg from '@xterm/headless';
-type Terminal = typeof pkg.Terminal;
+import type {Terminal} from '../types/index.js';
+import type {IBufferCell, IBufferLine} from '@xterm/headless';
 
 // Constants from xterm.js source code
 const Attributes = {
@@ -111,7 +111,7 @@ export class TerminalSerializer {
 	/**
 	 * Generate style attributes (bold, italic, underline, etc.) as ANSI codes
 	 */
-	private static getStyleCodes(cell: any): string {
+	private static getStyleCodes(cell: IBufferCell): string {
 		const codes: string[] = [];
 
 		if (cell.isBold()) codes.push(`${this.ESC}1m`);
@@ -126,7 +126,7 @@ export class TerminalSerializer {
 	 * Serialize a single line from the terminal buffer with ANSI escape sequences
 	 */
 	private static serializeLine(
-		line: any,
+		line: IBufferLine,
 		cols: number,
 		trimRight: boolean = true,
 	): string {
@@ -201,10 +201,10 @@ export class TerminalSerializer {
 
 			// Handle style changes
 			const currentStyles = {
-				bold: cell.isBold(),
-				italic: cell.isItalic(),
-				underline: cell.isUnderline(),
-				strikethrough: cell.isStrikethrough(),
+				bold: !!cell.isBold(),
+				italic: !!cell.isItalic(),
+				underline: !!cell.isUnderline(),
+				strikethrough: !!cell.isStrikethrough(),
 			};
 
 			// If any style changed, we need to reset and reapply all styles
@@ -236,7 +236,7 @@ export class TerminalSerializer {
 	 * Serialize the entire terminal buffer or a range of lines with ANSI escape sequences
 	 */
 	static serialize(
-		terminal: InstanceType<Terminal>,
+		terminal: Terminal,
 		options: {
 			startLine?: number;
 			endLine?: number;
@@ -292,7 +292,7 @@ export class TerminalSerializer {
 	 * Get the last N lines from the terminal buffer with ANSI escape sequences
 	 */
 	static getLastLines(
-		terminal: InstanceType<Terminal>,
+		terminal: Terminal,
 		lineCount: number,
 		options: {trimRight?: boolean; includeEmptyLines?: boolean} = {},
 	): string {

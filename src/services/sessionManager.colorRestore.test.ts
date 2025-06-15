@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {SessionManager} from './sessionManager.js';
-import {spawn} from 'node-pty';
+import {spawn, IPty} from 'node-pty';
 
 // Create mock pty process
 const createMockPtyProcess = () => {
@@ -49,7 +49,7 @@ describe('SessionManager - Color Restoration', () => {
 	it('should preserve ANSI colors when switching between sessions', async () => {
 		// Create a mock PTY process
 		const mockProcess = createMockPtyProcess();
-		vi.mocked(spawn).mockReturnValue(mockProcess as any);
+		vi.mocked(spawn).mockReturnValue(mockProcess as unknown as IPty);
 
 		sessionManager.createSession(mockWorktreePath);
 		const session = sessionManager.sessions.get(mockWorktreePath);
@@ -119,7 +119,7 @@ describe('SessionManager - Color Restoration', () => {
 	it('should handle complex color sequences during restoration', async () => {
 		// Create a mock PTY process
 		const mockProcess = createMockPtyProcess();
-		vi.mocked(spawn).mockReturnValue(mockProcess as any);
+		vi.mocked(spawn).mockReturnValue(mockProcess as unknown as IPty);
 
 		sessionManager.createSession(mockWorktreePath);
 		const session = sessionManager.sessions.get(mockWorktreePath);
