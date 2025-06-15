@@ -206,6 +206,12 @@ export class WorktreeService {
 					cwd: sourceWorktree.path,
 					encoding: 'utf8',
 				});
+
+				// After rebase, merge the rebased source branch into target branch
+				execSync(`git merge --ff-only "${sourceBranch}"`, {
+					cwd: targetWorktree.path,
+					encoding: 'utf8',
+				});
 			} else {
 				// Regular merge
 				execSync(`git merge --no-ff "${sourceBranch}"`, {
