@@ -18,7 +18,9 @@ interface MenuItem {
 
 const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	const worktreeConfig = configurationManager.getWorktreeConfig();
-	const [autoDirectory, setAutoDirectory] = useState(worktreeConfig.autoDirectory);
+	const [autoDirectory, setAutoDirectory] = useState(
+		worktreeConfig.autoDirectory,
+	);
 	const [pattern, setPattern] = useState(
 		worktreeConfig.autoDirectoryPattern || '../{branch}',
 	);
@@ -93,9 +95,7 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 				</Box>
 
 				<Box marginBottom={1}>
-					<Text>
-						Enter the pattern for automatic directory generation:
-					</Text>
+					<Text>Enter the pattern for automatic directory generation:</Text>
 				</Box>
 
 				<Box marginBottom={1}>
@@ -130,24 +130,28 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			</Box>
 
 			<Box marginBottom={1}>
-				<Text dimColor>
-					Configure automatic worktree directory generation
-				</Text>
+				<Text dimColor>Configure automatic worktree directory generation</Text>
 			</Box>
 
 			{autoDirectory && (
 				<Box marginBottom={1}>
 					<Text>
-						Example: branch "feature/my-feature" → directory "{pattern.replace('{branch}', 'feature-my-feature')}"
+						Example: branch &quot;feature/my-feature&quot; → directory &quot;
+						{pattern.replace('{branch}', 'feature-my-feature')}&quot;
 					</Text>
 				</Box>
 			)}
 
-			<SelectInput items={menuItems} onSelect={handleMenuSelect} isFocused={true} />
+			<SelectInput
+				items={menuItems}
+				onSelect={handleMenuSelect}
+				isFocused={true}
+			/>
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel without saving
+					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel without
+					saving
 				</Text>
 			</Box>
 		</Box>

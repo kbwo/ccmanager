@@ -120,7 +120,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					{generatedPath && (
 						<Box marginTop={1}>
 							<Text dimColor>
-								Worktree will be created at: <Text color="green">{generatedPath}</Text>
+								Worktree will be created at:{' '}
+								<Text color="green">{generatedPath}</Text>
 							</Text>
 						</Box>
 					)}
