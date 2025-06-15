@@ -5,6 +5,7 @@ import {
 	ConfigurationData,
 	StatusHookConfig,
 	ShortcutConfig,
+	WorktreeConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
 
@@ -62,6 +63,11 @@ export class ConfigurationManager {
 		if (!this.config.statusHooks) {
 			this.config.statusHooks = {};
 		}
+		if (!this.config.worktree) {
+			this.config.worktree = {
+				autoDirectory: false,
+			};
+		}
 	}
 
 	private migrateLegacyShortcuts(): void {
@@ -117,6 +123,19 @@ export class ConfigurationManager {
 
 	setConfiguration(config: ConfigurationData): void {
 		this.config = config;
+		this.saveConfig();
+	}
+
+	getWorktreeConfig(): WorktreeConfig {
+		return (
+			this.config.worktree || {
+				autoDirectory: false,
+			}
+		);
+	}
+
+	setWorktreeConfig(worktreeConfig: WorktreeConfig): void {
+		this.config.worktree = worktreeConfig;
 		this.saveConfig();
 	}
 }
