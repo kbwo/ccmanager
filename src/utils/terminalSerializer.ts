@@ -1,20 +1,20 @@
 import type {Terminal} from '../types/index.js';
-import type {IBufferCell, IBufferLine} from '@xterm/headless';
+import type {IBufferLine} from '@xterm/headless';
 
 /**
  * Constants for decoding color information stored in terminal cells.
  * Terminal colors are packed into a single number where different bits represent different information.
  * Think of it like a compressed file - multiple pieces of data stored in one number.
- * 
+ *
  * These constants are based on xterm.js internal implementation:
  * Source: https://github.com/xtermjs/xterm.js/blob/master/src/common/buffer/Constants.ts
- * 
+ *
  * The color storage format uses bit packing where:
  * - Bits 1-8: Blue component (also used for palette color indices)
  * - Bits 9-16: Green component (RGB mode only)
  * - Bits 17-24: Red component (RGB mode only)
  * - Bits 25-26: Color mode indicator
- * 
+ *
  * Reference implementation:
  * https://github.com/xtermjs/xterm.js/blob/master/src/common/buffer/AttributeData.ts
  */
@@ -43,20 +43,20 @@ const Attributes = {
 	/**
 	 * CM_MASK: Used to determine which color system is being used (bits 25-26)
 	 * Like a label that says "this is 16-color" or "this is RGB"
-	 * 
+	 *
 	 * Color modes from xterm.js:
 	 * https://github.com/xtermjs/xterm.js/blob/master/src/common/Types.d.ts#L33
 	 */
 	CM_MASK: 0x3000000,
-	CM_DEFAULT: 0,         // Default terminal colors (usually white text on black background)
-	CM_P16: 0x1000000,    // 16-color palette (basic colors like red, blue, green)
-	CM_P256: 0x2000000,   // 256-color palette (more shades and colors)
-	CM_RGB: 0x3000000,    // RGB/true color (millions of colors, like in photos)
+	CM_DEFAULT: 0, // Default terminal colors (usually white text on black background)
+	CM_P16: 0x1000000, // 16-color palette (basic colors like red, blue, green)
+	CM_P256: 0x2000000, // 256-color palette (more shades and colors)
+	CM_RGB: 0x3000000, // RGB/true color (millions of colors, like in photos)
 };
 
 /**
  * TerminalSerializer: Converts terminal screen content to text while preserving colors and formatting.
- * 
+ *
  * Imagine taking a screenshot of your terminal, but instead of an image, you get text that
  * can recreate the exact same appearance with all colors and styles when displayed again.
  */
@@ -74,13 +74,13 @@ export class TerminalSerializer {
 
 	/**
 	 * Determines which color system is being used for a given color value.
-	 * 
+	 *
 	 * Terminal supports different color systems:
 	 * - Mode 0 (DEFAULT): Basic terminal colors (like white text on black background)
 	 * - Mode 1 (P16): 16 basic colors (8 normal + 8 bright versions)
 	 * - Mode 2 (P256): 256 colors (used for more variety)
 	 * - Mode 3 (RGB): True color with Red, Green, Blue values (16.7 million colors)
-	 * 
+	 *
 	 * @param colorValue - The packed color information from the terminal
 	 * @returns 0, 1, 2, or 3 indicating which color system to use
 	 */
@@ -94,13 +94,13 @@ export class TerminalSerializer {
 
 	/**
 	 * Extracts the actual color value from the packed color information.
-	 * 
+	 *
 	 * The extraction method depends on the color mode:
 	 * - For RGB mode: Extracts all three color components (R, G, B)
 	 * - For palette modes: Extracts just the color index number
-	 * 
+	 *
 	 * Think of it like unpacking a suitcase - different items are packed differently
-	 * 
+	 *
 	 * @param colorValue - The packed color information from the terminal
 	 * @returns The actual color value (either RGB values or palette index)
 	 */
@@ -116,15 +116,15 @@ export class TerminalSerializer {
 
 	/**
 	 * Converts a color value into the special text codes that terminals understand.
-	 * 
+	 *
 	 * Terminals use "ANSI escape sequences" - special character combinations that control
 	 * how text appears. It's like HTML tags, but for terminals.
-	 * 
+	 *
 	 * Examples of what this function produces:
 	 * - Red text: "\x1b[31m" (tells terminal "make the following text red")
 	 * - Blue background: "\x1b[44m" (tells terminal "make the background blue")
 	 * - RGB color: "\x1b[38;2;255;128;0m" (orange text using RGB values)
-	 * 
+	 *
 	 * @param colorValue - The color to convert (packed number with mode and color data)
 	 * @param isBackground - true for background color, false for text color
 	 * @returns ANSI escape sequence string that terminals can interpret
@@ -167,9 +167,9 @@ export class TerminalSerializer {
 			case 3: {
 				// RGB - True color (24-bit, millions of colors)
 				// Extract individual Red, Green, Blue components from the packed color
-				const r = (color >> 16) & 0xff;  // Red: bits 17-24
-				const g = (color >> 8) & 0xff;   // Green: bits 9-16
-				const b = color & 0xff;          // Blue: bits 1-8
+				const r = (color >> 16) & 0xff; // Red: bits 17-24
+				const g = (color >> 8) & 0xff; // Green: bits 9-16
+				const b = color & 0xff; // Blue: bits 1-8
 				// Format: ESC[38;2;{r};{g};{b}m for foreground
 				// The ;2; tells terminal "the next three numbers are RGB values"
 				return `${this.ESC}${prefix};2;${r};${g};${b}m`;
@@ -182,16 +182,16 @@ export class TerminalSerializer {
 
 	/**
 	 * Converts a single line of terminal content into text with color/style codes.
-	 * 
+	 *
 	 * This function processes each character in a line and:
 	 * 1. Extracts the character itself
 	 * 2. Checks its color (text and background)
 	 * 3. Checks its style (bold, italic, underline, etc.)
 	 * 4. Adds the necessary codes to recreate that appearance
-	 * 
+	 *
 	 * It's like going through a line character by character and noting:
 	 * "This letter is red, this one is bold, this one has blue background..."
-	 * 
+	 *
 	 * @param line - One line from the terminal screen
 	 * @param cols - Number of columns (width) of the terminal
 	 * @param trimRight - Whether to remove trailing spaces (like right-trim in text editors)
@@ -279,8 +279,8 @@ export class TerminalSerializer {
 
 			// STEP 3: Check text styles (bold, italic, etc.)
 			const currentStyles = {
-				bold: !!cell.isBold(),         // Is this character bold?
-				italic: !!cell.isItalic(),     // Is it italicized?
+				bold: !!cell.isBold(), // Is this character bold?
+				italic: !!cell.isItalic(), // Is it italicized?
 				underline: !!cell.isUnderline(), // Is it underlined?
 				strikethrough: !!cell.isStrikethrough(), // Is it crossed out?
 			};
@@ -315,11 +315,11 @@ export class TerminalSerializer {
 
 	/**
 	 * Converts the entire terminal screen (or part of it) into text with colors preserved.
-	 * 
+	 *
 	 * This is the main function that processes multiple lines of terminal content.
 	 * It's like taking a "text screenshot" of your terminal that can be replayed later
 	 * with all the colors and formatting intact.
-	 * 
+	 *
 	 * @param terminal - The terminal object containing the screen buffer
 	 * @param options - Configuration options:
 	 *   - startLine: First line to include (default: 0, the top)
@@ -391,14 +391,14 @@ export class TerminalSerializer {
 
 	/**
 	 * Convenience function to get just the last few lines from the terminal.
-	 * 
+	 *
 	 * Useful when you only need recent output, like:
 	 * - Getting the last error message
 	 * - Showing recent command output
 	 * - Displaying the current prompt
-	 * 
+	 *
 	 * Example: getLastLines(terminal, 10) gets the last 10 lines
-	 * 
+	 *
 	 * @param terminal - The terminal object containing the screen buffer
 	 * @param lineCount - How many lines from the bottom to include
 	 * @param options - Same options as serialize() for controlling output format
