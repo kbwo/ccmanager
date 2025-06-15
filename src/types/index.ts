@@ -1,7 +1,4 @@
 import {IPty} from 'node-pty';
-import type pkg from '@xterm/headless';
-
-export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
@@ -21,7 +18,7 @@ export interface Session {
 	outputHistory: Buffer[]; // Full output history as buffers
 	lastActivity: Date;
 	isActive: boolean;
-	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
+	terminal: any; // Virtual terminal for state detection (xterm Terminal instance)
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
 }
 
