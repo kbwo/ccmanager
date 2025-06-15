@@ -49,3 +49,19 @@ export const DEFAULT_SHORTCUTS: ShortcutConfig = {
 	returnToMenu: {ctrl: true, key: 'e'},
 	cancel: {key: 'escape'},
 };
+
+export interface StatusHook {
+	command: string;
+	enabled: boolean;
+}
+
+export interface StatusHookConfig {
+	idle?: StatusHook;
+	busy?: StatusHook;
+	waiting_input?: StatusHook;
+}
+
+export interface ConfigurationData {
+	shortcuts?: ShortcutConfig;
+	statusHooks?: StatusHookConfig;
+}
