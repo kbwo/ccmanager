@@ -1,5 +1,8 @@
 import {describe, it, expect} from 'vitest';
-import {generateWorktreeDirectory, extractBranchParts} from './worktreeUtils.js';
+import {
+	generateWorktreeDirectory,
+	extractBranchParts,
+} from './worktreeUtils.js';
 
 describe('generateWorktreeDirectory', () => {
 	describe('with default pattern', () => {
@@ -43,11 +46,14 @@ describe('generateWorktreeDirectory', () => {
 	describe('with custom patterns', () => {
 		it('should use custom pattern with {branch} placeholder', () => {
 			expect(
-				generateWorktreeDirectory('feature/my-feature', '../worktrees/{branch}'),
+				generateWorktreeDirectory(
+					'feature/my-feature',
+					'../worktrees/{branch}',
+				),
 			).toBe('../worktrees/feature-my-feature');
-			expect(
-				generateWorktreeDirectory('bugfix/123', '/tmp/{branch}-wt'),
-			).toBe('/tmp/bugfix-123-wt');
+			expect(generateWorktreeDirectory('bugfix/123', '/tmp/{branch}-wt')).toBe(
+				'/tmp/bugfix-123-wt',
+			);
 		});
 
 		it('should handle patterns without placeholders', () => {
