@@ -78,10 +78,11 @@ The arguments are applied to all Claude Code sessions started by CCManager.
 You can customize keyboard shortcuts in two ways:
 
 1. **Through the UI**: Select "Configuration" → "Configure Shortcuts" from the main menu
-2. **Configuration file**: Edit `~/.config/ccmanager/config.json`
+2. **Configuration file**: Edit `~/.config/ccmanager/config.json` (or legacy `~/.config/ccmanager/shortcuts.json`)
 
 Example configuration:
 ```json
+// config.json (new format)
 {
   "shortcuts": {
     "returnToMenu": {
@@ -93,7 +94,20 @@ Example configuration:
     }
   }
 }
+
+// shortcuts.json (legacy format, still supported)
+{
+  "returnToMenu": {
+    "ctrl": true,
+    "key": "r"
+  },
+  "cancel": {
+    "key": "escape"
+  }
+}
 ```
+
+Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.json` on first use.
 
 ### Restrictions
 
