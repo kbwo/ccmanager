@@ -11,6 +11,7 @@ https://github.com/user-attachments/assets/a6d80e73-dc06-4ef8-849d-e3857f6c7024
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
 - Configurable keyboard shortcuts
+- Status change hooks for automation and notifications
 
 ## Why CCManager over Claude Squad?
 
@@ -76,22 +77,20 @@ The arguments are applied to all Claude Code sessions started by CCManager.
 
 You can customize keyboard shortcuts in two ways:
 
-1. **Through the UI**: Select "Configure Shortcuts" from the main menu
-2. **Configuration file**: Edit `~/.config/ccmanager/shortcuts.json`
+1. **Through the UI**: Select "Configuration" → "Configure Shortcuts" from the main menu
+2. **Configuration file**: Edit `~/.config/ccmanager/config.json`
 
 Example configuration:
 ```json
 {
-  "returnToMenu": {
-    "ctrl": true,
-    "key": "r"
-  },
-  "exitApp": {
-    "ctrl": true,
-    "key": "x"
-  },
-  "cancel": {
-    "key": "escape"
+  "shortcuts": {
+    "returnToMenu": {
+      "ctrl": true,
+      "key": "r"
+    },
+    "cancel": {
+      "key": "escape"
+    }
   }
 }
 ```
@@ -103,6 +102,46 @@ Example configuration:
   - Ctrl+C
   - Ctrl+D
   - Ctrl+[ (equivalent to Escape)
+
+## Status Change Hooks
+
+CCManager can execute custom commands when Claude Code session status changes. This enables powerful automation workflows like desktop notifications, logging, or integration with other tools.
+
+### Overview
+
+Status hooks allow you to:
+- Get notified when Claude needs your input
+- Track time spent in different states
+- Trigger automations based on session activity
+- Integrate with notification systems like [noti](https://github.com/variadico/noti)
+
+### Configuration
+
+Configure hooks through the UI:
+1. Select "Configuration" from the main menu
+2. Choose "Configure Status Hooks"
+3. Set commands for each state (idle, busy, waiting_input)
+
+### Available Environment Variables
+
+Your hook commands have access to these environment variables:
+- `CCMANAGER_OLD_STATE`: Previous state
+- `CCMANAGER_NEW_STATE`: New state (idle, busy, or waiting_input)
+- `CCMANAGER_WORKTREE`: Path to the worktree
+- `CCMANAGER_WORKTREE_BRANCH`: Git branch name
+- `CCMANAGER_SESSION_ID`: Unique session identifier
+
+### Example: Desktop Notifications
+
+```bash
+# Notify when Claude needs input
+noti -t "Claude Code" -m "Needs your input on $CCMANAGER_WORKTREE_BRANCH"
+
+# Alert when task completes
+[ "$CCMANAGER_OLD_STATE" = "busy" ] && noti -t "Claude Done" -m "Task complete!"
+```
+
+For more examples and detailed setup instructions, see [docs/state-hooks.md](docs/state-hooks.md).
 
 ## Development
 
