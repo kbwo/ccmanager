@@ -3,7 +3,6 @@ import {useStdout} from 'ink';
 import {Session as SessionType} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
-import {TerminalSerializer} from '../utils/terminalSerializer.js';
 
 interface SessionProps {
 	session: SessionType;
@@ -28,27 +27,24 @@ const Session: React.FC<SessionProps> = ({
 		// Handle session restoration
 		const handleSessionRestore = (restoredSession: SessionType) => {
 			if (restoredSession.id === session.id) {
-				// Instead of replaying all history, use the virtual terminal's current buffer
-				// This avoids duplicate content issues
-				const terminal = restoredSession.terminal;
-				if (terminal) {
-					// Use the TerminalSerializer to preserve ANSI escape sequences (colors, styles)
-					const serializedOutput = TerminalSerializer.serialize(terminal, {
-						trimRight: true,
-						includeEmptyLines: true,
-					});
+				// Replay all buffered output, but skip the initial clear if present
+				for (let i = 0; i < restoredSession.outputHistory.length; i++) {
+					const buffer = restoredSession.outputHistory[i];
+					if (!buffer) continue;
 
-					// Write the serialized terminal state with preserved formatting
-					if (serializedOutput) {
-						stdout.write(serializedOutput);
+					const str = buffer.toString('utf8');
 
-						// Position cursor at the correct location
-						const buffer = terminal.buffer.active;
-						const cursorY = buffer.cursorY;
-						const cursorX = buffer.cursorX;
-
-						// Move cursor to the saved position
-						stdout.write(`\x1B[${cursorY + 1};${cursorX + 1}H`);
+					// Skip clear screen sequences at the beginning
+					if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
+						// Skip this buffer or remove the clear sequence
+						const cleaned = str
+							.replace(/\x1B\[2J/g, '')
+							.replace(/\x1B\[H/g, '');
+						if (cleaned.length > 0) {
+							stdout.write(Buffer.from(cleaned, 'utf8'));
+						}
+					} else {
+						stdout.write(buffer);
 					}
 				}
 			}

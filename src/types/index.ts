@@ -61,7 +61,18 @@ export interface StatusHookConfig {
 	waiting_input?: StatusHook;
 }
 
+export interface TerminalPadding {
+	top: number;
+	bottom: number;
+}
+
+export const DEFAULT_TERMINAL_PADDING: TerminalPadding = {
+	top: 1,
+	bottom: 1,
+};
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
+	terminalPadding?: TerminalPadding;
 }
