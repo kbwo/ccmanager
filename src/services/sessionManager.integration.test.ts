@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {SessionManager} from './sessionManager.js';
-import {spawn} from 'node-pty';
+import {spawn, IPty} from 'node-pty';
 
 // Create mock pty process
 const createMockPtyProcess = () => {
@@ -66,7 +66,7 @@ describe('SessionManager - Partial TUI Update Integration', () => {
 	it('should not accumulate duplicate content in output history', () => {
 		// Create a mock PTY process
 		const mockProcess = createMockPtyProcess();
-		vi.mocked(spawn).mockReturnValue(mockProcess as any);
+		vi.mocked(spawn).mockReturnValue(mockProcess as unknown as IPty);
 
 		// Create a session
 		sessionManager.createSession(mockWorktreePath);
@@ -98,12 +98,13 @@ describe('SessionManager - Partial TUI Update Integration', () => {
 	it('should use virtual terminal buffer for session restoration', () => {
 		// Create a mock PTY process
 		const mockProcess = createMockPtyProcess();
-		vi.mocked(spawn).mockReturnValue(mockProcess as any);
+		vi.mocked(spawn).mockReturnValue(mockProcess as unknown as IPty);
 
 		sessionManager.createSession(mockWorktreePath);
 		const session = sessionManager.sessions.get(mockWorktreePath);
 
 		// Mock the terminal buffer to contain the final state
+		// Type cast is acceptable for test mocks
 		const mockTerminal = session!.terminal as any;
 		mockTerminal.buffer.active.getLine = vi.fn((index: number) => {
 			const lines = [
@@ -135,7 +136,7 @@ describe('SessionManager - Partial TUI Update Integration', () => {
 	it('should handle ANSI escape sequences correctly in virtual terminal', () => {
 		// Create a mock PTY process
 		const mockProcess = createMockPtyProcess();
-		vi.mocked(spawn).mockReturnValue(mockProcess as any);
+		vi.mocked(spawn).mockReturnValue(mockProcess as unknown as IPty);
 
 		sessionManager.createSession(mockWorktreePath);
 		const session = sessionManager.sessions.get(mockWorktreePath);
@@ -163,7 +164,7 @@ describe('SessionManager - Partial TUI Update Integration', () => {
 	it('should emit sessionData events for active sessions only', () => {
 		// Create a mock PTY process
 		const mockProcess = createMockPtyProcess();
-		vi.mocked(spawn).mockReturnValue(mockProcess as any);
+		vi.mocked(spawn).mockReturnValue(mockProcess as unknown as IPty);
 
 		const dataHandler = vi.fn();
 		sessionManager.on('sessionData', dataHandler);
@@ -188,7 +189,7 @@ describe('SessionManager - Partial TUI Update Integration', () => {
 	it('should restore session without replaying output history', () => {
 		// Create a mock PTY process
 		const mockProcess = createMockPtyProcess();
-		vi.mocked(spawn).mockReturnValue(mockProcess as any);
+		vi.mocked(spawn).mockReturnValue(mockProcess as unknown as IPty);
 
 		const restoreHandler = vi.fn();
 		sessionManager.on('sessionRestore', restoreHandler);
