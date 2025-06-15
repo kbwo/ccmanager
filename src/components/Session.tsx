@@ -60,6 +60,16 @@ const Session: React.FC<SessionProps> = ({
 		// Mark session as active (this will trigger the restore event)
 		sessionManager.setSessionActive(session.worktreePath, true);
 
+		// Immediately resize the PTY and terminal to current dimensions
+		// This fixes rendering issues when terminal width changed while in menu
+		// https://github.com/kbwo/ccmanager/issues/2
+		const currentCols = process.stdout.columns || 80;
+		const currentRows = process.stdout.rows || 24;
+		session.process.resize(currentCols, currentRows);
+		if (session.terminal) {
+			session.terminal.resize(currentCols, currentRows);
+		}
+
 		// Listen for session data events
 		const handleSessionData = (activeSession: SessionType, data: string) => {
 			// Only handle data for our session
