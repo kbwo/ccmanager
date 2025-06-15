@@ -1,4 +1,4 @@
-# Status Change Hooks Example with Noti
+# Status Change Hooks Guide
 
 This example demonstrates how to use [noti](https://github.com/variadico/noti) to receive desktop notifications when Claude Code session status changes.
 
