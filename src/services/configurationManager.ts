@@ -69,13 +69,15 @@ export class ConfigurationManager {
 			try {
 				const shortcutsData = readFileSync(this.legacyShortcutsPath, 'utf-8');
 				const shortcuts = JSON.parse(shortcutsData);
-				
+
 				// Validate that it's a valid shortcuts config
 				if (shortcuts && typeof shortcuts === 'object') {
 					this.config.shortcuts = shortcuts;
 					// Save to new config format
 					this.saveConfig();
-					console.log('Migrated shortcuts from legacy shortcuts.json to config.json');
+					console.log(
+						'Migrated shortcuts from legacy shortcuts.json to config.json',
+					);
 				}
 			} catch (error) {
 				console.error('Failed to migrate legacy shortcuts:', error);
