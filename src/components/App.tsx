@@ -5,7 +5,7 @@ import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
 import MergeWorktree from './MergeWorktree.js';
-import ConfigureShortcuts from './ConfigureShortcuts.js';
+import Configuration from './Configuration.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {Worktree, Session as SessionType} from '../types/index.js';
@@ -20,7 +20,7 @@ type View =
 	| 'deleting-worktree'
 	| 'merge-worktree'
 	| 'merging-worktree'
-	| 'configure-shortcuts';
+	| 'configuration';
 
 const App: React.FC = () => {
 	const {exit} = useApp();
@@ -82,9 +82,9 @@ const App: React.FC = () => {
 			return;
 		}
 
-		// Check if this is the configure shortcuts option
-		if (worktree.path === 'CONFIGURE_SHORTCUTS') {
-			setView('configure-shortcuts');
+		// Check if this is the configuration option
+		if (worktree.path === 'CONFIGURATION') {
+			setView('configuration');
 			return;
 		}
 
@@ -321,8 +321,8 @@ const App: React.FC = () => {
 		);
 	}
 
-	if (view === 'configure-shortcuts') {
-		return <ConfigureShortcuts onComplete={handleReturnToMenu} />;
+	if (view === 'configuration') {
+		return <Configuration onComplete={handleReturnToMenu} />;
 	}
 
 	return null;
