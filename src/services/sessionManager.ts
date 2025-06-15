@@ -111,7 +111,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			process: ptyProcess,
 			state: 'busy', // Session starts as busy when created
 			output: [],
-			outputHistory: [], // Kept for backward compatibility but no longer used
+			outputHistory: [],
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
@@ -130,11 +130,26 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private setupBackgroundHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
-			// Write data to virtual terminal - this maintains the proper rendered state
+			// Write data to virtual terminal
 			session.terminal.write(data);
 
-			// We no longer need to maintain outputHistory since we use the virtual terminal buffer
-			// This prevents duplicate content issues and reduces memory usage
+			// Store in output history as Buffer
+			const buffer = Buffer.from(data, 'utf8');
+			session.outputHistory.push(buffer);
+
+			// Limit memory usage - keep max 10MB of output history
+			const MAX_HISTORY_SIZE = 10 * 1024 * 1024; // 10MB
+			let totalSize = session.outputHistory.reduce(
+				(sum, buf) => sum + buf.length,
+				0,
+			);
+			while (totalSize > MAX_HISTORY_SIZE && session.outputHistory.length > 0) {
+				const removed = session.outputHistory.shift();
+				if (removed) {
+					totalSize -= removed.length;
+				}
+			}
+
 			session.lastActivity = new Date();
 
 			// Only emit data events when session is active
@@ -177,9 +192,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (session) {
 			session.isActive = active;
 
-			// If becoming active, emit a restore event
-			// The Session component will use the virtual terminal buffer instead of outputHistory
-			if (active) {
+			// If becoming active, emit a restore event with the output history
+			if (active && session.outputHistory.length > 0) {
 				this.emit('sessionRestore', session);
 			}
 		}
