@@ -140,9 +140,13 @@ const App: React.FC = () => {
 
 		if (result.success && result.absolutePath) {
 			// Success - create session with the absolute path
-			const session = sessionManager.createSession(result.absolutePath);
-			setActiveSession(session);
-			setView('session');
+
+			// Small delay to ensure worktree is fully created
+			setTimeout(() => {
+				const session = sessionManager.createSession(result.absolutePath!);
+				setActiveSession(session);
+				setView('session');
+			}, 100);
 		} else if (result.success && !result.absolutePath) {
 			// Worktree created but path not found, fallback to menu
 			handleReturnToMenu();

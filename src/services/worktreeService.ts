@@ -112,6 +112,7 @@ export class WorktreeService {
 
 			// Get the absolute path of the created worktree
 			const worktrees = this.getWorktrees();
+
 			const newWorktree = worktrees.find(
 				wt => wt.branch.replace('refs/heads/', '') === branch,
 			);

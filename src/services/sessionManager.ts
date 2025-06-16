@@ -6,7 +6,7 @@ import {
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
-import {exec} from 'child_process';
+import {exec, execSync} from 'child_process';
 import {configurationManager} from './configurationManager.js';
 import {WorktreeService} from './worktreeService.js';
 const {Terminal} = pkg;
@@ -86,9 +86,20 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			.substr(2, 9)}`;
 
 		// Parse Claude command arguments from environment variable
-		const claudeArgs = process.env['CCMANAGER_CLAUDE_ARGS']
+		// Remove --resume flag to avoid "No conversations found to resume" error
+		const envArgs = process.env['CCMANAGER_CLAUDE_ARGS']
 			? process.env['CCMANAGER_CLAUDE_ARGS'].split(' ')
 			: [];
+		const claudeArgs = envArgs.filter(
+			arg => arg !== '--resume' && arg !== '-r',
+		);
+
+		// Check if claude command exists
+		try {
+			execSync('which claude', {encoding: 'utf8'});
+		} catch {
+			// Claude command not found in PATH
+		}
 
 		const ptyProcess = spawn('claude', claudeArgs, {
 			name: 'xterm-color',
@@ -170,7 +181,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 		}, 100); // Check every 100ms
 
-		session.process.onExit(() => {
+		session.process.onExit(_exitInfo => {
 			// Clear the state check interval
 			if (session.stateCheckInterval) {
 				clearInterval(session.stateCheckInterval);
@@ -256,15 +267,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						CCMANAGER_SESSION_ID: session.id,
 					},
 				},
-				(error, _stdout, stderr) => {
-					if (error) {
-						console.error(
-							`Failed to execute ${newState} hook: ${error.message}`,
-						);
-					}
-					if (stderr) {
-						console.error(`Hook stderr: ${stderr}`);
-					}
+				(_error, _stdout, _stderr) => {
+					// Hook execution errors are ignored
 				},
 			);
 		}

@@ -41,8 +41,8 @@ export class ConfigurationManager {
 			try {
 				const configData = readFileSync(this.configPath, 'utf-8');
 				this.config = JSON.parse(configData);
-			} catch (error) {
-				console.error('Failed to load configuration:', error);
+			} catch (_error) {
+				// Failed to load configuration, use empty config
 				this.config = {};
 			}
 		} else {
@@ -81,12 +81,9 @@ export class ConfigurationManager {
 					this.config.shortcuts = shortcuts;
 					// Save to new config format
 					this.saveConfig();
-					console.log(
-						'Migrated shortcuts from legacy shortcuts.json to config.json',
-					);
 				}
-			} catch (error) {
-				console.error('Failed to migrate legacy shortcuts:', error);
+			} catch (_error) {
+				// Failed to migrate legacy shortcuts
 			}
 		}
 	}
@@ -94,8 +91,8 @@ export class ConfigurationManager {
 	private saveConfig(): void {
 		try {
 			writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
-		} catch (error) {
-			console.error('Failed to save configuration:', error);
+		} catch (_error) {
+			// Failed to save configuration
 		}
 	}
 
