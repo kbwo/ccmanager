@@ -5,9 +5,28 @@ import {Worktree} from '../types/index.js';
 
 export class WorktreeService {
 	private rootPath: string;
+	private gitRootPath: string;
 
 	constructor(rootPath?: string) {
 		this.rootPath = rootPath || process.cwd();
+		// Get the actual git repository root for worktree operations
+		this.gitRootPath = this.getGitRepositoryRoot();
+	}
+
+	private getGitRepositoryRoot(): string {
+		try {
+			// Get the common git directory
+			const gitCommonDir = execSync('git rev-parse --git-common-dir', {
+				cwd: this.rootPath,
+				encoding: 'utf8',
+			}).trim();
+
+			// The parent of .git is the actual repository root
+			return path.dirname(gitCommonDir);
+		} catch {
+			// Fallback to current directory if command fails
+			return this.rootPath;
+		}
 	}
 
 	getWorktrees(): Worktree[] {
@@ -83,11 +102,84 @@ export class WorktreeService {
 		return existsSync(path.join(this.rootPath, '.git'));
 	}
 
+	getDefaultBranch(): string {
+		try {
+			// Try to get the default branch from origin
+			const defaultBranch = execSync(
+				"git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'",
+				{
+					cwd: this.rootPath,
+					encoding: 'utf8',
+					shell: '/bin/bash',
+				},
+			).trim();
+			return defaultBranch || 'main';
+		} catch {
+			// Fallback to common default branch names
+			try {
+				execSync('git rev-parse --verify main', {
+					cwd: this.rootPath,
+					encoding: 'utf8',
+				});
+				return 'main';
+			} catch {
+				try {
+					execSync('git rev-parse --verify master', {
+						cwd: this.rootPath,
+						encoding: 'utf8',
+					});
+					return 'master';
+				} catch {
+					return 'main';
+				}
+			}
+		}
+	}
+
+	getAllBranches(): string[] {
+		try {
+			const output = execSync(
+				"git branch -a --format='%(refname:short)' | grep -v HEAD | sort -u",
+				{
+					cwd: this.rootPath,
+					encoding: 'utf8',
+					shell: '/bin/bash',
+				},
+			);
+
+			const branches = output
+				.trim()
+				.split('\n')
+				.filter(branch => branch && !branch.startsWith('origin/'))
+				.map(branch => branch.trim());
+
+			// Also include remote branches without origin/ prefix
+			const remoteBranches = output
+				.trim()
+				.split('\n')
+				.filter(branch => branch.startsWith('origin/'))
+				.map(branch => branch.replace('origin/', ''));
+
+			// Merge and deduplicate
+			const allBranches = [...new Set([...branches, ...remoteBranches])];
+
+			return allBranches.filter(branch => branch);
+		} catch {
+			return [];
+		}
+	}
+
 	createWorktree(
 		worktreePath: string,
 		branch: string,
+		baseBranch: string,
 	): {success: boolean; error?: string} {
 		try {
+			// Resolve the worktree path relative to the git repository root
+			const resolvedPath = path.isAbsolute(worktreePath)
+				? worktreePath
+				: path.join(this.gitRootPath, worktreePath);
+
 			// Check if branch exists
 			let branchExists = false;
 			try {
@@ -101,12 +193,16 @@ export class WorktreeService {
 			}
 
 			// Create the worktree
-			const command = branchExists
-				? `git worktree add "${worktreePath}" "${branch}"`
-				: `git worktree add -b "${branch}" "${worktreePath}"`;
+			let command: string;
+			if (branchExists) {
+				command = `git worktree add "${resolvedPath}" "${branch}"`;
+			} else {
+				// Create new branch from specified base branch
+				command = `git worktree add -b "${branch}" "${resolvedPath}" "${baseBranch}"`;
+			}
 
 			execSync(command, {
-				cwd: this.rootPath,
+				cwd: this.gitRootPath, // Execute from git root to ensure proper resolution
 				encoding: 'utf8',
 			});
 
