@@ -131,12 +131,16 @@ const App: React.FC = () => {
 		}, 50); // Small delay to ensure proper cleanup
 	};
 
-	const handleCreateWorktree = async (path: string, branch: string) => {
+	const handleCreateWorktree = async (
+		path: string,
+		branch: string,
+		baseBranch?: string,
+	) => {
 		setView('creating-worktree');
 		setError(null);
 
 		// Create the worktree
-		const result = worktreeService.createWorktree(path, branch);
+		const result = worktreeService.createWorktree(path, branch, baseBranch);
 
 		if (result.success) {
 			// Success - return to menu
