@@ -27,38 +27,26 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const [step, setStep] = useState<Step>(isAutoDirectory ? 'branch' : 'path');
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
-	const [, setBaseBranch] = useState<string | undefined>();
 	const [generatedPath, setGeneratedPath] = useState('');
-	const [branchItems, setBranchItems] = useState<BranchItem[]>([]);
+
+	// Initialize worktree service and load branches
+	const worktreeService = new WorktreeService();
+	const branches = worktreeService.getAllBranches();
+	const defaultBranch = worktreeService.getDefaultBranch();
+
+	// Create branch items with default branch first
+	const branchItems: BranchItem[] = [
+		{label: `${defaultBranch} (default)`, value: defaultBranch},
+		...branches
+			.filter(br => br !== defaultBranch)
+			.map(br => ({label: br, value: br})),
+	];
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
 		}
 	});
-
-	// Load available branches when component mounts
-	useEffect(() => {
-		const worktreeService = new WorktreeService();
-		const branches = worktreeService.getAllBranches();
-		const defaultBr = worktreeService.getDefaultBranch();
-
-		setBaseBranch(defaultBr);
-
-		// Create branch items with default branch first
-		const items: BranchItem[] = [
-			{label: `${defaultBr} (default)`, value: defaultBr},
-		];
-
-		// Add other branches
-		branches
-			.filter(br => br !== defaultBr)
-			.forEach(br => {
-				items.push({label: br, value: br});
-			});
-
-		setBranchItems(items);
-	}, []);
 
 	const handlePathSubmit = (value: string) => {
 		if (value.trim()) {
@@ -75,7 +63,6 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	};
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
-		setBaseBranch(item.value);
 		if (isAutoDirectory) {
 			// Generate path from branch name
 			const autoPath = generateWorktreeDirectory(
