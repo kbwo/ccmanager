@@ -139,8 +139,10 @@ const App: React.FC = () => {
 		const result = worktreeService.createWorktree(path, branch);
 
 		if (result.success) {
-			// Success - return to menu
-			handleReturnToMenu();
+			// Success - create session for the new worktree and switch to it
+			const session = sessionManager.createSession(path);
+			setActiveSession(session);
+			setView('session');
 		} else {
 			// Show error
 			setError(result.error || 'Failed to create worktree');
