@@ -56,9 +56,21 @@ const App: React.FC = () => {
 
 		sessionManager.on('sessionExit', handleSessionExit);
 
+		// Listen for session restarts (when --resume fails and restarts without it)
+		const handleSessionRestart = (
+			_oldSession: SessionType,
+			newSession: SessionType,
+		) => {
+			setActiveSession(newSession);
+			// No need to change view, stay in session view
+		};
+
+		sessionManager.on('sessionRestart', handleSessionRestart);
+
 		// Cleanup on unmount
 		return () => {
 			sessionManager.off('sessionExit', handleSessionExit);
+			sessionManager.off('sessionRestart', handleSessionRestart);
 			sessionManager.destroy();
 		};
 	}, [sessionManager]);
@@ -139,10 +151,8 @@ const App: React.FC = () => {
 		const result = worktreeService.createWorktree(path, branch);
 
 		if (result.success) {
-			// Success - create session for the new worktree
-			const session = sessionManager.createSession(path);
-			setActiveSession(session);
-			setView('session');
+			// Success - return to menu
+			handleReturnToMenu();
 		} else {
 			// Show error
 			setError(result.error || 'Failed to create worktree');

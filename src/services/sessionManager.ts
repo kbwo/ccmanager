@@ -81,14 +81,21 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			return existing;
 		}
 
-		const id = `session-${Date.now()}-${Math.random()
-			.toString(36)
-			.substr(2, 9)}`;
-
 		// Parse Claude command arguments from environment variable
 		const claudeArgs = process.env['CCMANAGER_CLAUDE_ARGS']
 			? process.env['CCMANAGER_CLAUDE_ARGS'].split(' ')
 			: [];
+
+		return this.createSessionWithArgs(worktreePath, claudeArgs);
+	}
+
+	private createSessionWithArgs(
+		worktreePath: string,
+		claudeArgs: string[],
+	): Session {
+		const id = `session-${Date.now()}-${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
 
 		const ptyProcess = spawn('claude', claudeArgs, {
 			name: 'xterm-color',
@@ -128,8 +135,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	private setupBackgroundHandler(session: Session): void {
+		// Track if "No conversations found to resume" error occurred
+		let noConversationsError = false;
+
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
+			// Check for "No conversations found to resume" error
+			if (data.includes('No conversations found to resume')) {
+				noConversationsError = true;
+			}
+
 			// Write data to virtual terminal
 			session.terminal.write(data);
 
@@ -170,16 +185,40 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 		}, 100); // Check every 100ms
 
-		session.process.onExit(() => {
+		session.process.onExit(exitInfo => {
 			// Clear the state check interval
 			if (session.stateCheckInterval) {
 				clearInterval(session.stateCheckInterval);
 			}
-			// Update state to idle before destroying
-			session.state = 'idle';
-			this.emit('sessionStateChanged', session);
-			this.destroySession(session.worktreePath);
-			this.emit('sessionExit', session);
+
+			// Check if this is a --resume error (exit code 1 with "No conversations found to resume")
+			if (exitInfo.exitCode === 1 && noConversationsError) {
+				// Remove session but don't emit sessionExit to prevent returning to menu
+				this.sessions.delete(session.worktreePath);
+
+				// Get current Claude args and remove --resume flag
+				const claudeArgs = process.env['CCMANAGER_CLAUDE_ARGS']
+					? process.env['CCMANAGER_CLAUDE_ARGS'].split(' ')
+					: [];
+				const argsWithoutResume = claudeArgs.filter(
+					arg => arg !== '--resume' && arg !== '-r',
+				);
+
+				// Create new session without --resume flag
+				const newSession = this.createSessionWithArgs(
+					session.worktreePath,
+					argsWithoutResume,
+				);
+
+				// Emit sessionRestart event to notify UI
+				this.emit('sessionRestart', session, newSession);
+			} else {
+				// Normal exit behavior
+				session.state = 'idle';
+				this.emit('sessionStateChanged', session);
+				this.destroySession(session.worktreePath);
+				this.emit('sessionExit', session);
+			}
 		});
 	}
 
