@@ -139,10 +139,22 @@ const App: React.FC = () => {
 		const result = worktreeService.createWorktree(path, branch);
 
 		if (result.success) {
-			// Success - create session for the new worktree and switch to it
-			const session = sessionManager.createSession(path);
-			setActiveSession(session);
-			setView('session');
+			// Success - get the newly created worktree and create session
+			// Refresh worktrees to get the absolute path
+			const worktrees = worktreeService.getWorktrees();
+			const newWorktree = worktrees.find(wt => 
+				wt.branch.replace('refs/heads/', '') === branch
+			);
+			
+			if (newWorktree) {
+				// Create session with the absolute path
+				const session = sessionManager.createSession(newWorktree.path);
+				setActiveSession(session);
+				setView('session');
+			} else {
+				// Fallback to menu if worktree not found
+				handleReturnToMenu();
+			}
 		} else {
 			// Show error
 			setError(result.error || 'Failed to create worktree');
