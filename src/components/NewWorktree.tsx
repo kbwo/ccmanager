@@ -1,16 +1,23 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
+import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
+import {WorktreeService} from '../services/worktreeService.js';
 
 interface NewWorktreeProps {
-	onComplete: (path: string, branch: string) => void;
+	onComplete: (path: string, branch: string, baseBranch: string) => void;
 	onCancel: () => void;
 }
 
-type Step = 'path' | 'branch';
+type Step = 'path' | 'branch' | 'base-branch';
+
+interface BranchItem {
+	label: string;
+	value: string;
+}
 
 const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const worktreeConfig = configurationManager.getWorktreeConfig();
@@ -21,6 +28,19 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
 	const [generatedPath, setGeneratedPath] = useState('');
+
+	// Initialize worktree service and load branches
+	const worktreeService = new WorktreeService();
+	const branches = worktreeService.getAllBranches();
+	const defaultBranch = worktreeService.getDefaultBranch();
+
+	// Create branch items with default branch first
+	const branchItems: BranchItem[] = [
+		{label: `${defaultBranch} (default)`, value: defaultBranch},
+		...branches
+			.filter(br => br !== defaultBranch)
+			.map(br => ({label: br, value: br})),
+	];
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
@@ -38,16 +58,20 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const handleBranchSubmit = (value: string) => {
 		if (value.trim()) {
 			setBranch(value.trim());
-			if (isAutoDirectory) {
-				// Generate path from branch name
-				const autoPath = generateWorktreeDirectory(
-					value.trim(),
-					worktreeConfig.autoDirectoryPattern,
-				);
-				onComplete(autoPath, value.trim());
-			} else {
-				onComplete(path, value.trim());
-			}
+			setStep('base-branch');
+		}
+	};
+
+	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
+		if (isAutoDirectory) {
+			// Generate path from branch name
+			const autoPath = generateWorktreeDirectory(
+				branch,
+				worktreeConfig.autoDirectoryPattern,
+			);
+			onComplete(autoPath, branch, item.value);
+		} else {
+			onComplete(path, branch, item.value);
 		}
 	};
 
@@ -125,6 +149,21 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 							</Text>
 						</Box>
 					)}
+				</Box>
+			)}
+
+			{step === 'base-branch' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>
+							Select base branch for <Text color="cyan">{branch}</Text>:
+						</Text>
+					</Box>
+					<SelectInput
+						items={branchItems}
+						onSelect={handleBaseBranchSelect}
+						initialIndex={0}
+					/>
 				</Box>
 			)}
 
