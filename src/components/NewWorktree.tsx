@@ -8,7 +8,7 @@ import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 
 interface NewWorktreeProps {
-	onComplete: (path: string, branch: string, baseBranch?: string) => void;
+	onComplete: (path: string, branch: string, baseBranch: string) => void;
 	onCancel: () => void;
 }
 

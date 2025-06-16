@@ -134,7 +134,7 @@ const App: React.FC = () => {
 	const handleCreateWorktree = async (
 		path: string,
 		branch: string,
-		baseBranch?: string,
+		baseBranch: string,
 	) => {
 		setView('creating-worktree');
 		setError(null);
