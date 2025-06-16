@@ -5,14 +5,17 @@ import {execSync} from 'child_process';
 // Mock child_process module
 vi.mock('child_process');
 
+// Get the mocked function with proper typing
+const mockedExecSync = vi.mocked(execSync);
+
 describe('WorktreeService', () => {
 	let service: WorktreeService;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
 		// Mock git rev-parse --git-common-dir to return a predictable path
-		(execSync as any).mockImplementation((cmd: string) => {
-			if (cmd === 'git rev-parse --git-common-dir') {
+		mockedExecSync.mockImplementation((cmd, _options) => {
+			if (typeof cmd === 'string' && cmd === 'git rev-parse --git-common-dir') {
 				return '/fake/path/.git\n';
 			}
 			throw new Error('Command not mocked: ' + cmd);
@@ -22,12 +25,14 @@ describe('WorktreeService', () => {
 
 	describe('getDefaultBranch', () => {
 		it('should return default branch from origin', () => {
-			(execSync as any).mockImplementation((cmd: string) => {
-				if (cmd === 'git rev-parse --git-common-dir') {
-					return '/fake/path/.git\n';
-				}
-				if (cmd.includes('symbolic-ref')) {
-					return 'main\n';
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('symbolic-ref')) {
+						return 'main\n';
+					}
 				}
 				throw new Error('Command not mocked: ' + cmd);
 			});
@@ -46,15 +51,17 @@ describe('WorktreeService', () => {
 		});
 
 		it('should fallback to main if origin HEAD fails', () => {
-			(execSync as any).mockImplementation((cmd: string) => {
-				if (cmd === 'git rev-parse --git-common-dir') {
-					return '/fake/path/.git\n';
-				}
-				if (cmd.includes('symbolic-ref')) {
-					throw new Error('No origin');
-				}
-				if (cmd.includes('rev-parse --verify main')) {
-					return 'hash';
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('symbolic-ref')) {
+						throw new Error('No origin');
+					}
+					if (cmd.includes('rev-parse --verify main')) {
+						return 'hash';
+					}
 				}
 				throw new Error('Not found');
 			});
@@ -67,17 +74,19 @@ describe('WorktreeService', () => {
 
 	describe('getAllBranches', () => {
 		it('should return all branches without duplicates', () => {
-			(execSync as any).mockImplementation((cmd: string) => {
-				if (cmd === 'git rev-parse --git-common-dir') {
-					return '/fake/path/.git\n';
-				}
-				if (cmd.includes('branch -a')) {
-					return `main
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('branch -a')) {
+						return `main
 feature/test
 origin/main
 origin/feature/remote
 origin/feature/test
 `;
+					}
 				}
 				throw new Error('Command not mocked: ' + cmd);
 			});
@@ -88,8 +97,11 @@ origin/feature/test
 		});
 
 		it('should return empty array on error', () => {
-			(execSync as any).mockImplementation((cmd: string) => {
-				if (cmd === 'git rev-parse --git-common-dir') {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --git-common-dir'
+				) {
 					return '/fake/path/.git\n';
 				}
 				throw new Error('Git error');
@@ -103,14 +115,17 @@ origin/feature/test
 
 	describe('createWorktree', () => {
 		it('should create worktree with base branch when branch does not exist', () => {
-			(execSync as any).mockImplementation((cmd: string) => {
-				if (cmd === 'git rev-parse --git-common-dir') {
-					return '/fake/path/.git\n';
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+					return '';
 				}
-				if (cmd.includes('rev-parse --verify')) {
-					throw new Error('Branch not found');
-				}
-				return '';
+				throw new Error('Unexpected command');
 			});
 
 			const result = service.createWorktree(
@@ -127,14 +142,17 @@ origin/feature/test
 		});
 
 		it('should create worktree without base branch when branch exists', () => {
-			(execSync as any).mockImplementation((cmd: string) => {
-				if (cmd === 'git rev-parse --git-common-dir') {
-					return '/fake/path/.git\n';
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify')) {
+						return 'hash';
+					}
+					return '';
 				}
-				if (cmd.includes('rev-parse --verify')) {
-					return 'hash';
-				}
-				return '';
+				throw new Error('Unexpected command');
 			});
 
 			const result = service.createWorktree(
@@ -150,14 +168,17 @@ origin/feature/test
 		});
 
 		it('should create worktree from HEAD when no base branch specified', () => {
-			(execSync as any).mockImplementation((cmd: string) => {
-				if (cmd === 'git rev-parse --git-common-dir') {
-					return '/fake/path/.git\n';
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+					return '';
 				}
-				if (cmd.includes('rev-parse --verify')) {
-					throw new Error('Branch not found');
-				}
-				return '';
+				throw new Error('Unexpected command');
 			});
 
 			const result = service.createWorktree('/path/to/worktree', 'new-feature');
