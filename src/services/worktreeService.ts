@@ -172,7 +172,7 @@ export class WorktreeService {
 	createWorktree(
 		worktreePath: string,
 		branch: string,
-		baseBranch?: string,
+		baseBranch: string,
 	): {success: boolean; error?: string} {
 		try {
 			// Resolve the worktree path relative to the git repository root
@@ -196,12 +196,9 @@ export class WorktreeService {
 			let command: string;
 			if (branchExists) {
 				command = `git worktree add "${resolvedPath}" "${branch}"`;
-			} else if (baseBranch) {
+			} else {
 				// Create new branch from specified base branch
 				command = `git worktree add -b "${branch}" "${resolvedPath}" "${baseBranch}"`;
-			} else {
-				// Create new branch from current HEAD
-				command = `git worktree add -b "${branch}" "${resolvedPath}"`;
 			}
 
 			execSync(command, {

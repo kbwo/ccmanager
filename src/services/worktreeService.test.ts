@@ -158,6 +158,7 @@ origin/feature/test
 			const result = service.createWorktree(
 				'/path/to/worktree',
 				'existing-feature',
+				'main', // Base branch is required but not used when branch exists
 			);
 
 			expect(result).toEqual({success: true});
@@ -167,7 +168,7 @@ origin/feature/test
 			);
 		});
 
-		it('should create worktree from HEAD when no base branch specified', () => {
+		it('should create worktree from specified base branch when branch does not exist', () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -181,11 +182,15 @@ origin/feature/test
 				throw new Error('Unexpected command');
 			});
 
-			const result = service.createWorktree('/path/to/worktree', 'new-feature');
+			const result = service.createWorktree(
+				'/path/to/worktree',
+				'new-feature',
+				'main',
+			);
 
 			expect(result).toEqual({success: true});
 			expect(execSync).toHaveBeenCalledWith(
-				'git worktree add -b "new-feature" "/path/to/worktree"',
+				'git worktree add -b "new-feature" "/path/to/worktree" "main"',
 				expect.any(Object),
 			);
 		});
