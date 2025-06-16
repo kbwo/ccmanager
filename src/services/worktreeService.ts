@@ -86,7 +86,7 @@ export class WorktreeService {
 	createWorktree(
 		worktreePath: string,
 		branch: string,
-	): {success: boolean; error?: string; absolutePath?: string} {
+	): {success: boolean; error?: string} {
 		try {
 			// Check if branch exists
 			let branchExists = false;
@@ -110,16 +110,7 @@ export class WorktreeService {
 				encoding: 'utf8',
 			});
 
-			// Get the absolute path of the created worktree
-			const worktrees = this.getWorktrees();
-			const newWorktree = worktrees.find(
-				wt => wt.branch.replace('refs/heads/', '') === branch,
-			);
-
-			return {
-				success: true,
-				absolutePath: newWorktree?.path,
-			};
+			return {success: true};
 		} catch (error) {
 			return {
 				success: false,
