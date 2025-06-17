@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useMemo} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
@@ -27,20 +27,28 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const [step, setStep] = useState<Step>(isAutoDirectory ? 'branch' : 'path');
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
-	const [generatedPath, setGeneratedPath] = useState('');
 
-	// Initialize worktree service and load branches
-	const worktreeService = new WorktreeService();
-	const branches = worktreeService.getAllBranches();
-	const defaultBranch = worktreeService.getDefaultBranch();
+	// Initialize worktree service and load branches (memoized to avoid re-initialization)
+	const {branches, defaultBranch} = useMemo(() => {
+		const service = new WorktreeService();
+		const allBranches = service.getAllBranches();
+		const defaultBr = service.getDefaultBranch();
+		return {
+			branches: allBranches,
+			defaultBranch: defaultBr,
+		};
+	}, []); // Empty deps array - only initialize once
 
-	// Create branch items with default branch first
-	const branchItems: BranchItem[] = [
-		{label: `${defaultBranch} (default)`, value: defaultBranch},
-		...branches
-			.filter(br => br !== defaultBranch)
-			.map(br => ({label: br, value: br})),
-	];
+	// Create branch items with default branch first (memoized)
+	const branchItems: BranchItem[] = useMemo(
+		() => [
+			{label: `${defaultBranch} (default)`, value: defaultBranch},
+			...branches
+				.filter(br => br !== defaultBranch)
+				.map(br => ({label: br, value: br})),
+		],
+		[branches, defaultBranch],
+	);
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
@@ -75,16 +83,12 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 		}
 	};
 
-	// Update generated path preview when branch changes in auto mode
-	useEffect(() => {
-		if (isAutoDirectory && branch) {
-			const autoPath = generateWorktreeDirectory(
-				branch,
-				worktreeConfig.autoDirectoryPattern,
-			);
-			setGeneratedPath(autoPath);
-		}
-	}, [branch, isAutoDirectory, worktreeConfig.autoDirectoryPattern]);
+	// Calculate generated path for preview (memoized to avoid expensive recalculations)
+	const generatedPath = useMemo(() => {
+		return isAutoDirectory && branch
+			? generateWorktreeDirectory(branch, worktreeConfig.autoDirectoryPattern)
+			: '';
+	}, [isAutoDirectory, branch, worktreeConfig.autoDirectoryPattern]);
 
 	return (
 		<Box flexDirection="column">
