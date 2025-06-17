@@ -4,10 +4,10 @@ import {render} from 'ink';
 import meow from 'meow';
 import App from './components/App.js';
 
-meow(
+const cli = meow(
 	`
 	Usage
-	  $ ccmanager
+	  $ ccmanager [worktree-path]
 
 	Options
 	  --help     Show help
@@ -15,9 +15,21 @@ meow(
 
 	Examples
 	  $ ccmanager
+	  $ ccmanager /path/to/worktree
+	  $ ccmanager ../feature-branch
 `,
 	{
 		importMeta: import.meta,
+		flags: {
+			help: {
+				type: 'boolean',
+				shortFlag: 'h',
+			},
+			version: {
+				type: 'boolean',
+				shortFlag: 'v',
+			},
+		},
 	},
 );
 
@@ -29,4 +41,7 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
 	process.exit(1);
 }
 
-render(<App />);
+// Extract worktree path from arguments
+const worktreePath = cli.input[0];
+
+render(<App initialWorktreePath={worktreePath} />);

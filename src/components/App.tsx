@@ -10,6 +10,8 @@ import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {Worktree, Session as SessionType} from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import path from 'path';
+import fs from 'fs';
 
 type View =
 	| 'menu'
@@ -22,7 +24,11 @@ type View =
 	| 'merging-worktree'
 	| 'configuration';
 
-const App: React.FC = () => {
+interface AppProps {
+	initialWorktreePath?: string;
+}
+
+const App: React.FC<AppProps> = ({initialWorktreePath}) => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>('menu');
 	const [sessionManager] = useState(() => new SessionManager());
@@ -62,6 +68,35 @@ const App: React.FC = () => {
 			sessionManager.destroy();
 		};
 	}, [sessionManager]);
+
+	// Handle initial worktree path from CLI arguments
+	useEffect(() => {
+		if (initialWorktreePath) {
+			// Resolve the path to absolute
+			const resolvedPath = path.resolve(initialWorktreePath);
+
+			// Check if the path exists and is a directory
+			try {
+				const stat = fs.statSync(resolvedPath);
+				if (stat.isDirectory()) {
+					// Check if it's a git worktree by looking for .git file or directory
+					const gitPath = path.join(resolvedPath, '.git');
+					if (fs.existsSync(gitPath)) {
+						// Valid worktree, create session and open it
+						const session = sessionManager.createSession(resolvedPath);
+						setActiveSession(session);
+						setView('session');
+						return;
+					}
+				}
+			} catch (_error) {
+				// Path doesn't exist or is not accessible
+			}
+
+			// Invalid path, show error and stay in menu
+			setError(`Invalid worktree path: ${initialWorktreePath}`);
+		}
+	}, [initialWorktreePath, sessionManager]);
 
 	const handleSelectWorktree = (worktree: Worktree) => {
 		// Check if this is the new worktree option
@@ -226,11 +261,18 @@ const App: React.FC = () => {
 
 	if (view === 'menu') {
 		return (
-			<Menu
-				key={menuKey}
-				sessionManager={sessionManager}
-				onSelectWorktree={handleSelectWorktree}
-			/>
+			<Box flexDirection="column">
+				{error && (
+					<Box marginBottom={1}>
+						<Text color="red">Error: {error}</Text>
+					</Box>
+				)}
+				<Menu
+					key={menuKey}
+					sessionManager={sessionManager}
+					onSelectWorktree={handleSelectWorktree}
+				/>
+			</Box>
 		);
 	}
 
