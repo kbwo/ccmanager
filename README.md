@@ -79,7 +79,6 @@ CCManager automatically creates and uses `~/.ccmanager/worktrees` as the default
 - **Leave path empty**: Uses `~/.ccmanager/worktrees/{sanitized-branch-name}`
 - **Specify custom path**: Uses your custom path
 - **Override default location**: Set `CCMANAGER_DEFAULT_WORKTREE_DIR` environment variable
-
 ## Environment Variables
 
 ### CCMANAGER_CLAUDE_ARGS
@@ -161,7 +160,6 @@ This setup provides:
 - Custom worktree directory location
 - Optimized window size for the TUI
 - Consistent working directory
-
 ## Keyboard Shortcuts
 
 ### Default Shortcuts
