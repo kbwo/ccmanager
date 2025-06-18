@@ -1,4 +1,4 @@
-import {spawn} from 'node-pty';
+import {spawn, IPty} from 'node-pty';
 import {
 	Session,
 	SessionManager as ISessionManager,
@@ -16,19 +16,20 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 
-	private stripAnsi(str: string): string {
-		// Remove all ANSI escape sequences including cursor movement, color codes, etc.
-		return str
-			.replace(/\x1b\[[0-9;]*m/g, '') // Color codes (including 24-bit)
-			.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // CSI sequences
-			.replace(/\x1b\][^\x07]*\x07/g, '') // OSC sequences
-			.replace(/\x1b[PX^_].*?\x1b\\/g, '') // DCS/PM/APC/SOS sequences
-			.replace(/\x1b\[\?[0-9;]*[hl]/g, '') // Private mode sequences
-			.replace(/\x1b[>=]/g, '') // Other escape sequences
-			.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '') // Control characters except newline (\x0A)
-			.replace(/\r/g, '') // Carriage returns
-			.replace(/^[0-9;]+m/gm, '') // Orphaned color codes at line start
-			.replace(/[0-9]+;[0-9]+;[0-9;]+m/g, ''); // Orphaned 24-bit color codes
+	private async spawn(
+		command: string,
+		args: string[],
+		worktreePath: string,
+	): Promise<IPty> {
+		const spawnOptions = {
+			name: 'xterm-color',
+			cols: process.stdout.columns || 80,
+			rows: process.stdout.rows || 24,
+			cwd: worktreePath,
+			env: process.env,
+		};
+
+		return spawn(command, args, spawnOptions);
 	}
 
 	detectTerminalState(terminal: InstanceType<typeof Terminal>): SessionState {
@@ -74,7 +75,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions = new Map();
 	}
 
-	createSession(worktreePath: string): Session {
+	async createSession(worktreePath: string): Promise<Session> {
 		// Check if session already exists
 		const existing = this.sessions.get(worktreePath);
 		if (existing) {
@@ -85,18 +86,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			.toString(36)
 			.substr(2, 9)}`;
 
-		// Parse Claude command arguments from environment variable
-		const claudeArgs = process.env['CCMANAGER_CLAUDE_ARGS']
-			? process.env['CCMANAGER_CLAUDE_ARGS'].split(' ')
-			: [];
+		// Get command configuration
+		const commandConfig = configurationManager.getCommandConfig();
+		const command = commandConfig.command || 'claude';
+		const args = commandConfig.args || [];
 
-		const ptyProcess = spawn('claude', claudeArgs, {
-			name: 'xterm-color',
-			cols: process.stdout.columns || 80,
-			rows: process.stdout.rows || 24,
-			cwd: worktreePath,
-			env: process.env,
-		});
+		// Spawn the process with fallback support
+		const ptyProcess = await this.spawn(command, args, worktreePath);
 
 		// Create virtual terminal for state detection
 		const terminal = new Terminal({
@@ -115,6 +111,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
+			isPrimaryCommand: true,
+			commandConfig,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -127,7 +125,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return session;
 	}
 
-	private setupBackgroundHandler(session: Session): void {
+	private setupDataHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
 			// Write data to virtual terminal
@@ -157,6 +155,44 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				this.emit('sessionData', session, data);
 			}
 		});
+	}
+
+	private setupExitHandler(session: Session): void {
+		session.process.onExit(async (e: {exitCode: number; signal?: number}) => {
+			// Check if we should attempt fallback
+			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
+				try {
+					// Spawn fallback process
+					const fallbackProcess = await this.spawn(
+						session.commandConfig?.command || 'claude',
+						session.commandConfig?.fallbackArgs || [],
+						session.worktreePath,
+					);
+
+					// Replace the process
+					session.process = fallbackProcess;
+					session.isPrimaryCommand = false;
+
+					// Setup handlers for the new process (data and exit only)
+					this.setupDataHandler(session);
+					this.setupExitHandler(session);
+
+					// Emit event to notify process replacement
+					this.emit('sessionProcessReplaced', session);
+				} catch (_error) {
+					// Fallback failed, proceed with cleanup
+					this.cleanupSession(session);
+				}
+			} else {
+				// No fallback needed or possible, cleanup
+				this.cleanupSession(session);
+			}
+		});
+	}
+
+	private setupBackgroundHandler(session: Session): void {
+		// Setup data handler
+		this.setupDataHandler(session);
 
 		// Set up interval-based state detection
 		session.stateCheckInterval = setInterval(() => {
@@ -170,17 +206,20 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 		}, 100); // Check every 100ms
 
-		session.process.onExit(() => {
-			// Clear the state check interval
-			if (session.stateCheckInterval) {
-				clearInterval(session.stateCheckInterval);
-			}
-			// Update state to idle before destroying
-			session.state = 'idle';
-			this.emit('sessionStateChanged', session);
-			this.destroySession(session.worktreePath);
-			this.emit('sessionExit', session);
-		});
+		// Setup exit handler
+		this.setupExitHandler(session);
+	}
+
+	private cleanupSession(session: Session): void {
+		// Clear the state check interval
+		if (session.stateCheckInterval) {
+			clearInterval(session.stateCheckInterval);
+		}
+		// Update state to idle before destroying
+		session.state = 'idle';
+		this.emit('sessionStateChanged', session);
+		this.destroySession(session.worktreePath);
+		this.emit('sessionExit', session);
 	}
 
 	getSession(worktreePath: string): Session | undefined {

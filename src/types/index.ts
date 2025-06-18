@@ -23,11 +23,13 @@ export interface Session {
 	isActive: boolean;
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
+	isPrimaryCommand?: boolean; // Track if process was started with main command args
+	commandConfig?: CommandConfig; // Store command config for fallback
 }
 
 export interface SessionManager {
 	sessions: Map<string, Session>;
-	createSession(worktreePath: string): Session;
+	createSession(worktreePath: string): Promise<Session>;
 	getSession(worktreePath: string): Session | undefined;
 	destroySession(worktreePath: string): void;
 	getAllSessions(): Session[];
@@ -66,8 +68,15 @@ export interface WorktreeConfig {
 	autoDirectoryPattern?: string; // Optional pattern for directory generation
 }
 
+export interface CommandConfig {
+	command: string; // The main command to execute (default: 'claude')
+	args?: string[]; // Arguments to pass to the command
+	fallbackArgs?: string[]; // Fallback arguments if main command fails
+}
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
 	worktree?: WorktreeConfig;
+	command?: CommandConfig;
 }

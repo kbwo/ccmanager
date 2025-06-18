@@ -1,256 +1,317 @@
-import {describe, it, expect, beforeEach, vi} from 'vitest';
+import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {SessionManager} from './sessionManager.js';
+import {configurationManager} from './configurationManager.js';
+import {spawn, IPty} from 'node-pty';
+import {EventEmitter} from 'events';
+import {Session} from '../types/index.js';
+
+// Mock node-pty
+vi.mock('node-pty');
+
+// Mock configuration manager
+vi.mock('./configurationManager.js', () => ({
+	configurationManager: {
+		getCommandConfig: vi.fn(),
+		getStatusHooks: vi.fn(() => ({})),
+	},
+}));
+
+// Mock Terminal
+vi.mock('@xterm/headless', () => ({
+	default: {
+		Terminal: vi.fn().mockImplementation(() => ({
+			buffer: {
+				active: {
+					length: 0,
+					getLine: vi.fn(),
+				},
+			},
+			write: vi.fn(),
+		})),
+	},
+}));
+
+// Create a mock IPty class
+class MockPty extends EventEmitter {
+	kill = vi.fn();
+	resize = vi.fn();
+	write = vi.fn();
+	onData = vi.fn((callback: (data: string) => void) => {
+		this.on('data', callback);
+	});
+	onExit = vi.fn(
+		(callback: (e: {exitCode: number; signal?: number}) => void) => {
+			this.on('exit', callback);
+		},
+	);
+}
 
 describe('SessionManager', () => {
 	let sessionManager: SessionManager;
+	let mockPty: MockPty;
 
 	beforeEach(() => {
-		sessionManager = new SessionManager();
 		vi.clearAllMocks();
-	});
-
-	// TODO: Update tests for new xterm-based state detection
-	it('should create session manager', () => {
-		expect(sessionManager).toBeDefined();
-		expect(sessionManager.sessions).toBeDefined();
-	});
-});
-
-/*
-describe('SessionManager', () => {
-	let sessionManager: SessionManager;
-	const mockSessionId = 'test-session-123';
-
-	beforeEach(() => {
 		sessionManager = new SessionManager();
-		vi.clearAllMocks();
+		mockPty = new MockPty();
 	});
 
-	describe.skip('detectSessionState', () => {
-		it('should detect waiting_input state when "Do you want" prompt is present', () => {
-			const cleanData = '│ Do you want to continue?';
-			const currentState: SessionState = 'idle';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+	afterEach(() => {
+		sessionManager.destroy();
+	});
 
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
-			);
+	describe('createSession with command configuration', () => {
+		it('should create session with default command when no args configured', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
 
-			expect(newState).toBe('waiting_input');
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session
+			await sessionManager.createSession('/test/worktree');
+
+			// Verify spawn was called with correct arguments
+			expect(spawn).toHaveBeenCalledWith('claude', [], {
+				name: 'xterm-color',
+				cols: expect.any(Number),
+				rows: expect.any(Number),
+				cwd: '/test/worktree',
+				env: process.env,
+			});
+
+			// Session creation verified by spawn being called
 		});
 
-		it('should detect waiting_input state when "Would you like" prompt is present', () => {
-			const cleanData = '│ Would you like to proceed?';
-			const currentState: SessionState = 'idle';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+		it('should create session with configured arguments', async () => {
+			// Setup mock configuration with args
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+				args: ['--resume', '--model', 'opus'],
+			});
 
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session
+			await sessionManager.createSession('/test/worktree');
+
+			// Verify spawn was called with configured arguments
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--resume', '--model', 'opus'],
+				expect.objectContaining({
+					cwd: '/test/worktree',
+				}),
 			);
 
-			expect(newState).toBe('waiting_input');
+			// Session creation verified by spawn being called
 		});
 
-		it('should set waitingWithBottomBorder when waiting prompt and bottom border are both present', () => {
-			const cleanData = '│ Do you want to continue?\n└───────────────────────┘';
-			const currentState: SessionState = 'idle';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(true);
+		it('should use fallback args when main command exits with code 1', async () => {
+			// Setup mock configuration with fallback
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+				args: ['--invalid-flag'],
+				fallbackArgs: ['--resume'],
+			});
 
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
+			// First spawn attempt - will exit with code 1
+			const firstMockPty = new MockPty();
+			// Second spawn attempt - succeeds
+			const secondMockPty = new MockPty();
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(firstMockPty as unknown as IPty)
+				.mockReturnValueOnce(secondMockPty as unknown as IPty);
+
+			// Create session
+			const session = await sessionManager.createSession('/test/worktree');
+
+			// Verify initial spawn
+			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--invalid-flag'],
+				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
-			expect(newState).toBe('waiting_input');
-			// The internal map should have been set to true
+			// Simulate exit with code 1 on first attempt
+			firstMockPty.emit('exit', {exitCode: 1});
+
+			// Wait for fallback to occur
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Verify fallback spawn was called
+			expect(spawn).toHaveBeenCalledTimes(2);
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				'claude',
+				['--resume'],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Verify session process was replaced
+			expect(session.process).toBe(secondMockPty);
+			expect(session.isPrimaryCommand).toBe(false);
 		});
 
-		it('should maintain waiting_input state when bottom border appears after waiting prompt', () => {
-			const cleanData = '└───────────────────────┘';
-			const currentState: SessionState = 'waiting_input';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(true);
+		it('should throw error when spawn fails and no fallback configured', async () => {
+			// Setup mock configuration without fallback
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+				args: ['--invalid-flag'],
+			});
 
-			// First call to set up the waiting state without bottom border
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
-			sessionManager.detectSessionState(
-				'│ Do you want to continue?',
-				'idle',
-				mockSessionId,
-			);
+			// Mock spawn to throw error
+			vi.mocked(spawn).mockImplementation(() => {
+				throw new Error('spawn failed');
+			});
 
-			// Now test the bottom border appearing
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(true);
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
-			);
-
-			expect(newState).toBe('waiting_input');
+			// Expect createSession to throw
+			await expect(
+				sessionManager.createSession('/test/worktree'),
+			).rejects.toThrow('spawn failed');
 		});
 
-		it('should detect busy state when "esc to interrupt" is present', () => {
-			const cleanData = 'Processing... Press ESC to interrupt';
-			const currentState: SessionState = 'idle';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+		it('should handle custom command configuration', async () => {
+			// Setup mock configuration with custom command
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'my-custom-claude',
+				args: ['--config', '/path/to/config'],
+			});
 
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session
+			await sessionManager.createSession('/test/worktree');
+
+			// Verify spawn was called with custom command
+			expect(spawn).toHaveBeenCalledWith(
+				'my-custom-claude',
+				['--config', '/path/to/config'],
+				expect.objectContaining({
+					cwd: '/test/worktree',
+				}),
 			);
 
-			expect(newState).toBe('busy');
+			// Session creation verified by spawn being called
 		});
 
-		it('should maintain busy state when transitioning from busy without "esc to interrupt"', () => {
-			const cleanData = 'Some regular output text';
-			const currentState: SessionState = 'busy';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+		it('should not use fallback if main command succeeds', async () => {
+			// Setup mock configuration with fallback
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+				args: ['--resume'],
+				fallbackArgs: ['--other-flag'],
+			});
 
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
-			);
+			// Setup spawn mock - process doesn't exit early
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			// With the new logic, it should remain busy and start a timer
-			expect(newState).toBe('busy');
-		});
+			// Create session
+			await sessionManager.createSession('/test/worktree');
 
-		it('should handle case-insensitive "esc to interrupt" detection', () => {
-			const cleanData = 'Running task... PRESS ESC TO INTERRUPT';
-			const currentState: SessionState = 'idle';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
-
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
-			);
-
-			expect(newState).toBe('busy');
-		});
-
-		it('should clear waitingWithBottomBorder flag when transitioning to busy', () => {
-			const cleanData = 'Processing... Press ESC to interrupt';
-			const currentState: SessionState = 'waiting_input';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
-
-			// First set up waiting state with bottom border
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(true);
-			sessionManager.detectSessionState(
-				'│ Do you want to continue?\n└───────────────────────┘',
-				'idle',
-				mockSessionId,
-			);
-
-			// Now transition to busy
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				currentState,
-				mockSessionId,
-			);
-
-			expect(newState).toBe('busy');
-		});
-
-		it('should transition from busy to idle after 500ms timer when no "esc to interrupt"', async () => {
-			// Create a mock session for the timer test
-			const mockWorktreePath = '/test/worktree';
-			const mockSession = {
-				id: mockSessionId,
-				worktreePath: mockWorktreePath,
-				state: 'busy' as SessionState,
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				process: {} as any,
-				output: [],
-				outputHistory: [],
-				lastActivity: new Date(),
-				isActive: false,
-			};
-
-			// Add the session to the manager
-			sessionManager.sessions.set(mockWorktreePath, mockSession);
-
-			// Mock the EventEmitter emit method
-			const emitSpy = vi.spyOn(sessionManager, 'emit');
-
-			// First call with no esc to interrupt should maintain busy state
-			const cleanData = 'Some regular output text';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
-
-			const newState = sessionManager.detectSessionState(
-				cleanData,
-				'busy',
-				mockWorktreePath,
-			);
-
-			expect(newState).toBe('busy');
-
-			// Wait for timer to fire (500ms + buffer)
+			// Wait a bit to ensure no early exit
 			await new Promise(resolve => setTimeout(resolve, 600));
 
-			// Check that the session state was changed to idle
-			expect(mockSession.state).toBe('idle');
-			expect(emitSpy).toHaveBeenCalledWith('sessionStateChanged', mockSession);
+			// Verify only one spawn attempt
+			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--resume'],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Session creation verified by spawn being called
 		});
 
-		it('should cancel timer when "esc to interrupt" appears again', async () => {
-			// Create a mock session for the timer test
-			const mockWorktreePath = '/test/worktree';
-			const mockSession = {
-				id: mockSessionId,
-				worktreePath: mockWorktreePath,
-				state: 'busy' as SessionState,
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				process: {} as any,
-				output: [],
-				outputHistory: [],
-				lastActivity: new Date(),
-				isActive: false,
-			};
+		it('should return existing session if already created', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
 
-			// Add the session to the manager
-			sessionManager.sessions.set(mockWorktreePath, mockSession);
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			// First call with no esc to interrupt should maintain busy state and start timer
-			const cleanData1 = 'Some regular output text';
-			vi.mocked(includesPromptBoxBottomBorder).mockReturnValue(false);
+			// Create session twice
+			const session1 = await sessionManager.createSession('/test/worktree');
+			const session2 = await sessionManager.createSession('/test/worktree');
 
-			const newState1 = sessionManager.detectSessionState(
-				cleanData1,
-				'busy',
-				mockWorktreePath,
-			);
+			// Should return the same session
+			expect(session1).toBe(session2);
+			// Spawn should only be called once
+			expect(spawn).toHaveBeenCalledTimes(1);
+		});
 
-			expect(newState1).toBe('busy');
+		it('should throw error when spawn fails with fallback args', async () => {
+			// Setup mock configuration with fallback
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'nonexistent-command',
+				args: ['--flag1'],
+				fallbackArgs: ['--flag2'],
+			});
 
-			// Wait 200ms (less than timer duration)
-			await new Promise(resolve => setTimeout(resolve, 200));
+			// Mock spawn to always throw error
+			vi.mocked(spawn).mockImplementation(() => {
+				throw new Error('Command not found');
+			});
 
-			// Second call with esc to interrupt should cancel timer and keep busy
-			const cleanData2 = 'Running... Press ESC to interrupt';
-			const newState2 = sessionManager.detectSessionState(
-				cleanData2,
-				'busy',
-				mockWorktreePath,
-			);
+			// Expect createSession to throw the original error
+			await expect(
+				sessionManager.createSession('/test/worktree'),
+			).rejects.toThrow('Command not found');
+		});
+	});
 
-			expect(newState2).toBe('busy');
+	describe('session lifecycle', () => {
+		it('should destroy session and clean up resources', async () => {
+			// Setup
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			// Wait another 400ms (total 600ms, more than timer duration)
-			await new Promise(resolve => setTimeout(resolve, 400));
+			// Create and destroy session
+			await sessionManager.createSession('/test/worktree');
+			sessionManager.destroySession('/test/worktree');
 
-			// State should still be busy because timer was cancelled
-			expect(mockSession.state).toBe('busy');
+			// Verify cleanup
+			expect(mockPty.kill).toHaveBeenCalled();
+			expect(sessionManager.getSession('/test/worktree')).toBeUndefined();
+		});
+
+		it('should handle session exit event', async () => {
+			// Setup
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Track session exit event
+			let exitedSession: Session | null = null;
+			sessionManager.on('sessionExit', (session: Session) => {
+				exitedSession = session;
+			});
+
+			// Create session
+			const createdSession =
+				await sessionManager.createSession('/test/worktree');
+
+			// Simulate process exit after successful creation
+			setTimeout(() => {
+				mockPty.emit('exit', {exitCode: 0});
+			}, 600); // After early exit timeout
+
+			// Wait for exit event
+			await new Promise(resolve => setTimeout(resolve, 700));
+
+			expect(exitedSession).toBe(createdSession);
+			expect(sessionManager.getSession('/test/worktree')).toBeUndefined();
 		});
 	});
 });
-*/

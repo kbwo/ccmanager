@@ -4,12 +4,13 @@ import SelectInput from 'ink-select-input';
 import ConfigureShortcuts from './ConfigureShortcuts.js';
 import ConfigureHooks from './ConfigureHooks.js';
 import ConfigureWorktree from './ConfigureWorktree.js';
+import ConfigureCommand from './ConfigureCommand.js';
 
 interface ConfigurationProps {
 	onComplete: () => void;
 }
 
-type ConfigView = 'menu' | 'shortcuts' | 'hooks' | 'worktree';
+type ConfigView = 'menu' | 'shortcuts' | 'hooks' | 'worktree' | 'command';
 
 interface MenuItem {
 	label: string;
@@ -33,6 +34,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			value: 'worktree',
 		},
 		{
+			label: '🚀  Configure Command',
+			value: 'command',
+		},
+		{
 			label: '← Back to Main Menu',
 			value: 'back',
 		},
@@ -47,6 +52,8 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			setView('hooks');
 		} else if (item.value === 'worktree') {
 			setView('worktree');
+		} else if (item.value === 'command') {
+			setView('command');
 		}
 	};
 
@@ -64,6 +71,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 
 	if (view === 'worktree') {
 		return <ConfigureWorktree onComplete={handleSubMenuComplete} />;
+	}
+
+	if (view === 'command') {
+		return <ConfigureCommand onComplete={handleSubMenuComplete} />;
 	}
 
 	return (

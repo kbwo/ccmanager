@@ -11,6 +11,7 @@ https://github.com/user-attachments/assets/a6d80e73-dc06-4ef8-849d-e3857f6c7024
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
 - Configurable keyboard shortcuts
+- Command configuration with automatic fallback support
 - Status change hooks for automation and notifications
 
 ## Why CCManager over Claude Squad?
@@ -116,6 +117,31 @@ Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.
   - Ctrl+C
   - Ctrl+D
   - Ctrl+[ (equivalent to Escape)
+
+
+## Command Configuration
+
+![Screenshot From 2025-06-18 16-43-27](https://github.com/user-attachments/assets/47d62483-ce81-4340-8687-8afcae93d5db)
+
+
+CCManager supports configuring the command and arguments used to run Claude Code sessions, with automatic fallback options for reliability.
+
+### Features
+
+- Configure the main command (default: `claude`)
+- Set primary arguments (e.g., `--resume`)
+- Define fallback arguments if the primary configuration fails
+- Automatic retry with no arguments as final fallback
+
+### Quick Start
+
+1. Navigate to **Configuration** → **Configure Command**
+2. Set your desired arguments (e.g., `--resume` for resuming sessions)
+3. Optionally set fallback arguments
+4. Save changes
+
+For detailed configuration options and examples, see [docs/command-config.md](docs/command-config.md).
+
 
 ## Status Change Hooks
 
