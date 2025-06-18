@@ -15,7 +15,7 @@ The main command to execute (default: `claude`)
 Arguments to pass to the command. These are the primary arguments that will be tried first.
 
 ### Fallback Arguments
-Alternative arguments to use if the command fails with the main arguments. This provides a safety net to ensure sessions can still be created even if the primary configuration doesn't work. An empty array `[]` means the command will be retried without any arguments.
+Alternative arguments to use if the command fails with the main arguments. This provides a safety net to ensure sessions can still be created even if the primary configuration doesn't work. We recommend not passing arguments that may cause errors as fallback arguments. The fallback should be a safe, minimal configuration that reliably starts the session
 
 ## Configuration Examples
 
@@ -27,8 +27,8 @@ Configure CCManager to use the `--resume` flag with automatic fallback:
 2. Navigate to **Configuration** → **Configure Command**
 3. Set up the following:
 
-**Command:** `claude`  
-**Arguments:** `--resume`  
+**Command:** `claude`
+**Arguments:** `--resume`
 **Fallback Arguments:** (leave empty)
 
 This configuration will:
@@ -37,8 +37,8 @@ This configuration will:
 
 ### Multiple Arguments Configuration
 
-**Command:** `claude`  
-**Arguments:** `--resume --model opus`  
+**Command:** `claude`
+**Arguments:** `--resume --model opus`
 **Fallback Arguments:** `--model opus`
 
 This configuration will:
@@ -56,8 +56,8 @@ The ability to change the command is primarily intended for:
 
 Example of custom command (not recommended for general use):
 
-**Command:** `my-custom-wrapper`  
-**Arguments:** `--config /path/to/config`  
+**Command:** `my-custom-wrapper`
+**Arguments:** `--config /path/to/config`
 **Fallback Arguments:** `--default-config`
 
 **Note:** Changing from `claude` may result in unexpected behavior as CCManager is optimized for Claude Code's specific output patterns and behaviors.
@@ -66,7 +66,7 @@ Example of custom command (not recommended for general use):
 
 The command configuration is stored in the CCManager config file:
 
-**Linux/macOS:** `~/.config/ccmanager/config.json`  
+**Linux/macOS:** `~/.config/ccmanager/config.json`
 **Windows:** `%APPDATA%\ccmanager\config.json`
 
 Example configuration:
@@ -79,32 +79,3 @@ Example configuration:
   }
 }
 ```
-
-## Troubleshooting
-
-### Command Fails Immediately
-
-If your command fails immediately:
-1. Test the command manually in terminal first
-2. Ensure the command is in your PATH
-3. Check that arguments are correctly formatted (space-separated in the UI)
-
-### Fallback Not Working
-
-If fallback doesn't seem to work:
-1. The primary command might be hanging instead of exiting
-2. Check that fallback arguments are valid
-
-### Arguments Not Applied
-
-If arguments don't seem to be applied:
-1. Make sure you clicked "Save Changes"
-2. Exit and restart the session for changes to take effect
-3. Check the config file to verify settings were saved
-
-## Best Practices
-
-1. **Test commands first**: Always test your command and arguments in a terminal before configuring
-2. **Use meaningful fallbacks**: Set fallback arguments that provide a working baseline
-3. **Document your configuration**: Keep notes on why specific arguments are used
-4. **Start simple**: Begin with no arguments and add complexity gradually
