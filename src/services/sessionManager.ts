@@ -166,6 +166,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (newState !== oldState) {
 				session.state = newState;
 				this.executeStatusHook(oldState, newState, session);
+				this.sendNotification(newState);
 				this.emit('sessionStateChanged', session);
 			}
 		}, 100); // Check every 100ms
@@ -225,6 +226,24 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	getAllSessions(): Session[] {
 		return Array.from(this.sessions.values());
+	}
+
+	private sendNotification(state: SessionState): void {
+		const notifications = configurationManager.getNotifications();
+
+		if (!notifications.enabled) {
+			return;
+		}
+
+		// Check if notification should be sent for this state
+		if (
+			(state === 'idle' && notifications.onIdle !== false) ||
+			(state === 'waiting_input' && notifications.onWaitingInput !== false) ||
+			(state === 'busy' && notifications.onBusy === true)
+		) {
+			// Send terminal bell
+			process.stdout.write('\x07');
+		}
 	}
 
 	private executeStatusHook(

@@ -66,8 +66,16 @@ export interface WorktreeConfig {
 	autoDirectoryPattern?: string; // Optional pattern for directory generation
 }
 
+export interface NotificationConfig {
+	enabled: boolean;
+	onIdle?: boolean;
+	onWaitingInput?: boolean;
+	onBusy?: boolean;
+}
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
 	worktree?: WorktreeConfig;
+	notifications?: NotificationConfig;
 }

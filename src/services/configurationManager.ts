@@ -6,6 +6,7 @@ import {
 	StatusHookConfig,
 	ShortcutConfig,
 	WorktreeConfig,
+	NotificationConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
 
@@ -66,6 +67,14 @@ export class ConfigurationManager {
 		if (!this.config.worktree) {
 			this.config.worktree = {
 				autoDirectory: false,
+			};
+		}
+		if (!this.config.notifications) {
+			this.config.notifications = {
+				enabled: true,
+				onIdle: true,
+				onWaitingInput: true,
+				onBusy: false,
 			};
 		}
 	}
@@ -136,6 +145,22 @@ export class ConfigurationManager {
 
 	setWorktreeConfig(worktreeConfig: WorktreeConfig): void {
 		this.config.worktree = worktreeConfig;
+		this.saveConfig();
+	}
+
+	getNotifications(): NotificationConfig {
+		return (
+			this.config.notifications || {
+				enabled: true,
+				onIdle: true,
+				onWaitingInput: true,
+				onBusy: false,
+			}
+		);
+	}
+
+	setNotifications(notifications: NotificationConfig): void {
+		this.config.notifications = notifications;
 		this.saveConfig();
 	}
 }
