@@ -23,6 +23,8 @@ export interface Session {
 	isActive: boolean;
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
+	isPrimaryCommand?: boolean; // Track if process was started with main command args
+	commandConfig?: CommandConfig; // Store command config for fallback
 }
 
 export interface SessionManager {

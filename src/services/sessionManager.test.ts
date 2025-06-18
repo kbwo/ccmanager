@@ -39,9 +39,11 @@ class MockPty extends EventEmitter {
 	onData = vi.fn((callback: (data: string) => void) => {
 		this.on('data', callback);
 	});
-	onExit = vi.fn((callback: () => void) => {
-		this.on('exit', callback);
-	});
+	onExit = vi.fn(
+		(callback: (e: {exitCode: number; signal?: number}) => void) => {
+			this.on('exit', callback);
+		},
+	);
 }
 
 describe('SessionManager', () => {
@@ -108,7 +110,7 @@ describe('SessionManager', () => {
 			// Session creation verified by spawn being called
 		});
 
-		it('should use fallback args when main command exits early', async () => {
+		it('should use fallback args when main command exits with code 1', async () => {
 			// Setup mock configuration with fallback
 			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
 				command: 'claude',
@@ -116,7 +118,7 @@ describe('SessionManager', () => {
 				fallbackArgs: ['--resume'],
 			});
 
-			// First spawn attempt - exits early
+			// First spawn attempt - will exit with code 1
 			const firstMockPty = new MockPty();
 			// Second spawn attempt - succeeds
 			const secondMockPty = new MockPty();
@@ -125,25 +127,25 @@ describe('SessionManager', () => {
 				.mockReturnValueOnce(firstMockPty as unknown as IPty)
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
-			// Start creating session
-			const sessionPromise = sessionManager.createSession('/test/worktree');
+			// Create session
+			const session = await sessionManager.createSession('/test/worktree');
 
-			// Simulate early exit on first attempt
-			setTimeout(() => {
-				firstMockPty.emit('exit');
-			}, 100);
-
-			// Wait for session creation
-			await sessionPromise;
-
-			// Verify both spawn attempts
-			expect(spawn).toHaveBeenCalledTimes(2);
-			expect(spawn).toHaveBeenNthCalledWith(
-				1,
+			// Verify initial spawn
+			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledWith(
 				'claude',
 				['--invalid-flag'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
+
+			// Simulate exit with code 1 on first attempt
+			firstMockPty.emit('exit', {exitCode: 1});
+
+			// Wait for fallback to occur
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Verify fallback spawn was called
+			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
@@ -151,8 +153,9 @@ describe('SessionManager', () => {
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
-			// Session creation verified by spawn being called
-			expect(firstMockPty.kill).toHaveBeenCalled();
+			// Verify session process was replaced
+			expect(session.process).toBe(secondMockPty);
+			expect(session.isPrimaryCommand).toBe(false);
 		});
 
 		it('should throw error when spawn fails and no fallback configured', async () => {
@@ -170,7 +173,7 @@ describe('SessionManager', () => {
 			// Expect createSession to throw
 			await expect(
 				sessionManager.createSession('/test/worktree'),
-			).rejects.toThrow('Failed to spawn claude');
+			).rejects.toThrow('spawn failed');
 		});
 
 		it('should handle custom command configuration', async () => {
@@ -304,7 +307,7 @@ describe('SessionManager', () => {
 
 			// Simulate process exit after successful creation
 			setTimeout(() => {
-				mockPty.emit('exit');
+				mockPty.emit('exit', {exitCode: 0});
 			}, 600); // After early exit timeout
 
 			// Wait for exit event

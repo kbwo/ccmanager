@@ -16,30 +16,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 
-	private checkEarlyExit(
-		ptyProcess: IPty,
-		timeoutMs: number = 500,
-	): Promise<boolean> {
-		return new Promise<boolean>(resolve => {
-			let exited = false;
-			const earlyExitHandler = () => {
-				exited = true;
-				resolve(false);
-			};
-			ptyProcess.onExit(earlyExitHandler);
-
-			// Give it a short time to see if it exits immediately
-			setTimeout(() => {
-				if (!exited) {
-					resolve(true);
-				}
-			}, timeoutMs);
-		});
-	}
-
-	private async spawnWithFallback(
+	private async spawnFallbackProcess(
 		command: string,
-		args: string[],
 		fallbackArgs: string[],
 		worktreePath: string,
 	): Promise<IPty> {
@@ -51,41 +29,32 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			env: process.env,
 		};
 
+		return spawn(command, fallbackArgs, spawnOptions);
+	}
+
+	private async spawnWithFallback(
+		command: string,
+		args: string[],
+		fallbackArgs: string[],
+		worktreePath: string,
+	): Promise<{process: IPty; isPrimaryCommand: boolean}> {
+		const spawnOptions = {
+			name: 'xterm-color',
+			cols: process.stdout.columns || 80,
+			rows: process.stdout.rows || 24,
+			cwd: worktreePath,
+			env: process.env,
+		};
+
 		// Try to spawn with main arguments
-		let ptyProcess: IPty | null = null;
-		let spawnSuccess = false;
-
 		try {
-			ptyProcess = spawn(command, args, spawnOptions);
-
-			// Check if the process exits early
-			spawnSuccess = await this.checkEarlyExit(ptyProcess);
-
-			if (!spawnSuccess && ptyProcess) {
-				// Process exited early, kill it and try fallback
-				try {
-					ptyProcess.kill();
-				} catch (_error) {
-					// Process might already be dead
-				}
-				ptyProcess = null;
-			}
+			const ptyProcess = spawn(command, args, spawnOptions);
+			return {process: ptyProcess, isPrimaryCommand: true};
 		} catch (_error) {
-			spawnSuccess = false;
+			// If spawn fails, try with fallback arguments
+			const ptyProcess = spawn(command, fallbackArgs, spawnOptions);
+			return {process: ptyProcess, isPrimaryCommand: false};
 		}
-
-		// If main command failed, try fallback
-		if (!spawnSuccess) {
-			// Try with fallback arguments (empty array means no args)
-			ptyProcess = spawn(command, fallbackArgs, spawnOptions);
-		}
-
-		// Ensure we have a ptyProcess
-		if (!ptyProcess) {
-			throw new Error(`Failed to spawn ${command}`);
-		}
-
-		return ptyProcess;
 	}
 
 	detectTerminalState(terminal: InstanceType<typeof Terminal>): SessionState {
@@ -148,12 +117,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		const args = commandConfig.args || [];
 
 		// Spawn the process with fallback support
-		const ptyProcess = await this.spawnWithFallback(
-			command,
-			args,
-			commandConfig.fallbackArgs || [],
-			worktreePath,
-		);
+		const {process: ptyProcess, isPrimaryCommand} =
+			await this.spawnWithFallback(
+				command,
+				args,
+				commandConfig.fallbackArgs || [],
+				worktreePath,
+			);
 
 		// Create virtual terminal for state detection
 		const terminal = new Terminal({
@@ -172,6 +142,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
+			isPrimaryCommand,
+			commandConfig,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -227,17 +199,47 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 		}, 100); // Check every 100ms
 
-		session.process.onExit(() => {
-			// Clear the state check interval
-			if (session.stateCheckInterval) {
-				clearInterval(session.stateCheckInterval);
+		session.process.onExit(async (e: {exitCode: number; signal?: number}) => {
+			// Check if we should attempt fallback
+			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
+				try {
+					// Spawn fallback process
+					const fallbackProcess = await this.spawnFallbackProcess(
+						session.commandConfig?.command || 'claude',
+						session.commandConfig?.fallbackArgs || [],
+						session.worktreePath,
+					);
+
+					// Replace the process
+					session.process = fallbackProcess;
+					session.isPrimaryCommand = false;
+
+					// Re-setup handlers for the new process
+					this.setupBackgroundHandler(session);
+
+					// Emit event to notify process replacement
+					this.emit('sessionProcessReplaced', session);
+				} catch (_error) {
+					// Fallback failed, proceed with cleanup
+					this.cleanupSession(session);
+				}
+			} else {
+				// No fallback needed or possible, cleanup
+				this.cleanupSession(session);
 			}
-			// Update state to idle before destroying
-			session.state = 'idle';
-			this.emit('sessionStateChanged', session);
-			this.destroySession(session.worktreePath);
-			this.emit('sessionExit', session);
 		});
+	}
+
+	private cleanupSession(session: Session): void {
+		// Clear the state check interval
+		if (session.stateCheckInterval) {
+			clearInterval(session.stateCheckInterval);
+		}
+		// Update state to idle before destroying
+		session.state = 'idle';
+		this.emit('sessionStateChanged', session);
+		this.destroySession(session.worktreePath);
+		this.emit('sessionExit', session);
 	}
 
 	getSession(worktreePath: string): Session | undefined {
