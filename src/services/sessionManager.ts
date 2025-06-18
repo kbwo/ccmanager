@@ -40,7 +40,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private async spawnWithFallback(
 		command: string,
 		args: string[],
-		fallbackArgs: string[] | undefined,
+		fallbackArgs: string[],
 		worktreePath: string,
 	): Promise<IPty> {
 		const spawnOptions = {
@@ -75,8 +75,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 
 		// If main command failed, try fallback
-		if (!spawnSuccess && fallbackArgs) {
-			// Try with fallback arguments
+		if (!spawnSuccess) {
+			// Try with fallback arguments (empty array means no args)
 			ptyProcess = spawn(command, fallbackArgs, spawnOptions);
 		}
 
@@ -151,7 +151,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		const ptyProcess = await this.spawnWithFallback(
 			command,
 			args,
-			commandConfig.fallbackArgs,
+			commandConfig.fallbackArgs || [],
 			worktreePath,
 		);
 

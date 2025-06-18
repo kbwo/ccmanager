@@ -15,7 +15,7 @@ The main command to execute (default: `claude`)
 Arguments to pass to the command. These are the primary arguments that will be tried first.
 
 ### Fallback Arguments
-Alternative arguments to use if the command fails with the main arguments. This provides a safety net to ensure sessions can still be created even if the primary configuration doesn't work.
+Alternative arguments to use if the command fails with the main arguments. This provides a safety net to ensure sessions can still be created even if the primary configuration doesn't work. An empty array `[]` means the command will be retried without any arguments.
 
 ## Configuration Examples
 
@@ -44,7 +44,6 @@ This configuration will:
 This configuration will:
 - First try: `claude --resume --model opus`
 - If that fails: `claude --model opus`
-- If that also fails: `claude` (with no arguments)
 
 ### Custom Command Configuration
 
@@ -95,7 +94,6 @@ If your command fails immediately:
 If fallback doesn't seem to work:
 1. The primary command might be hanging instead of exiting
 2. Check that fallback arguments are valid
-3. Remember that the final fallback is always no arguments
 
 ### Arguments Not Applied
 
