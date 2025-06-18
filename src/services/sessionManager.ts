@@ -156,7 +156,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return session;
 	}
 
-	private setupBackgroundHandler(session: Session): void {
+	private setupDataHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
 			// Write data to virtual terminal
@@ -186,19 +186,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				this.emit('sessionData', session, data);
 			}
 		});
+	}
 
-		// Set up interval-based state detection
-		session.stateCheckInterval = setInterval(() => {
-			const oldState = session.state;
-			const newState = this.detectTerminalState(session.terminal);
-
-			if (newState !== oldState) {
-				session.state = newState;
-				this.executeStatusHook(oldState, newState, session);
-				this.emit('sessionStateChanged', session);
-			}
-		}, 100); // Check every 100ms
-
+	private setupExitHandler(session: Session): void {
 		session.process.onExit(async (e: {exitCode: number; signal?: number}) => {
 			// Check if we should attempt fallback
 			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
@@ -214,8 +204,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					session.process = fallbackProcess;
 					session.isPrimaryCommand = false;
 
-					// Re-setup handlers for the new process
-					this.setupBackgroundHandler(session);
+					// Setup handlers for the new process (data and exit only)
+					this.setupDataHandler(session);
+					this.setupExitHandler(session);
 
 					// Emit event to notify process replacement
 					this.emit('sessionProcessReplaced', session);
@@ -228,6 +219,26 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				this.cleanupSession(session);
 			}
 		});
+	}
+
+	private setupBackgroundHandler(session: Session): void {
+		// Setup data handler
+		this.setupDataHandler(session);
+
+		// Set up interval-based state detection
+		session.stateCheckInterval = setInterval(() => {
+			const oldState = session.state;
+			const newState = this.detectTerminalState(session.terminal);
+
+			if (newState !== oldState) {
+				session.state = newState;
+				this.executeStatusHook(oldState, newState, session);
+				this.emit('sessionStateChanged', session);
+			}
+		}, 100); // Check every 100ms
+
+		// Setup exit handler
+		this.setupExitHandler(session);
 	}
 
 	private cleanupSession(session: Session): void {
