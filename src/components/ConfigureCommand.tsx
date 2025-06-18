@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Box, Text, useInput} from 'ink';
+import {Box, Text, useInput, Key} from 'ink';
 import TextInput from 'ink-text-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
@@ -60,43 +60,64 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		},
 	];
 
-	useInput((input, key) => {
-		if (editMode === 'menu') {
-			if (key.upArrow) {
-				setSelectedIndex(prev => (prev > 0 ? prev - 1 : menuItems.length - 1));
-			} else if (key.downArrow) {
-				setSelectedIndex(prev => (prev < menuItems.length - 1 ? prev + 1 : 0));
-			} else if (key.return) {
-				const selectedItem = menuItems[selectedIndex];
-				if (selectedItem && !selectedItem.disabled) {
-					if (selectedItem.key === 'save') {
-						// Save configuration
-						configurationManager.setCommandConfig(config);
-						onComplete();
-					} else if (selectedItem.key === 'exit') {
-						// Exit without saving
-						onComplete();
-					} else if (!selectedItem.isButton) {
-						setEditMode(selectedItem.key as EditMode);
-						// Set initial input value
-						if (selectedItem.key === 'command') {
-							setInputValue(config.command);
-						} else if (selectedItem.key === 'args') {
-							setInputValue(config.args?.join(' ') || '');
-						} else if (selectedItem.key === 'fallbackArgs') {
-							setInputValue(config.fallbackArgs?.join(' ') || '');
-						}
-					}
-				}
-			} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
-				// Exit without saving
+	const handleMenuNavigation = (key: Key) => {
+		if (key.upArrow) {
+			setSelectedIndex(prev => (prev > 0 ? prev - 1 : menuItems.length - 1));
+		} else if (key.downArrow) {
+			setSelectedIndex(prev => (prev < menuItems.length - 1 ? prev + 1 : 0));
+		}
+	};
+
+	const getInitialInputValue = (key: string): string => {
+		switch (key) {
+			case 'command':
+				return config.command;
+			case 'args':
+				return config.args?.join(' ') || '';
+			case 'fallbackArgs':
+				return config.fallbackArgs?.join(' ') || '';
+			default:
+				return '';
+		}
+	};
+
+	const handleMenuItemSelect = () => {
+		const selectedItem = menuItems[selectedIndex];
+		if (!selectedItem || selectedItem.disabled) return;
+
+		switch (selectedItem.key) {
+			case 'save':
+				configurationManager.setCommandConfig(config);
 				onComplete();
-			}
-		} else {
-			// In edit mode, handle escape to cancel
-			if (shortcutManager.matchesShortcut('cancel', input, key)) {
+				break;
+			case 'exit':
+				onComplete();
+				break;
+			default:
+				if (!selectedItem.isButton) {
+					setEditMode(selectedItem.key as EditMode);
+					setInputValue(getInitialInputValue(selectedItem.key));
+				}
+		}
+	};
+
+	useInput((input, key) => {
+		// Handle cancel shortcut in any mode
+		if (shortcutManager.matchesShortcut('cancel', input, key)) {
+			if (editMode === 'menu') {
+				onComplete(); // Exit without saving
+			} else {
 				setEditMode('menu');
 				setInputValue('');
+			}
+			return;
+		}
+
+		// Handle menu mode inputs
+		if (editMode === 'menu') {
+			handleMenuNavigation(key);
+			if (key.return) {
+				handleMenuItemSelect();
 			}
 		}
 	});
