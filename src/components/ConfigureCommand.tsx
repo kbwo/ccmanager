@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import {configurationManager} from '../services/configurationManager.js';
@@ -12,24 +12,15 @@ interface ConfigureCommandProps {
 type EditMode = 'menu' | 'command' | 'args' | 'fallbackArgs';
 
 const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
-	const [originalConfig, setOriginalConfig] = useState<CommandConfig>({
-		command: 'claude',
-	});
-	const [config, setConfig] = useState<CommandConfig>({
-		command: 'claude',
-	});
+	// Load current configuration once
+	const currentConfig = configurationManager.getCommandConfig();
+
+	const [originalConfig] = useState<CommandConfig>(currentConfig);
+	const [config, setConfig] = useState<CommandConfig>(currentConfig);
 	const [editMode, setEditMode] = useState<EditMode>('menu');
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [inputValue, setInputValue] = useState('');
 	const [hasChanges, setHasChanges] = useState(false);
-
-	useEffect(() => {
-		// Load current configuration
-		const currentConfig = configurationManager.getCommandConfig();
-		setOriginalConfig(currentConfig);
-		setConfig(currentConfig);
-		setHasChanges(false);
-	}, []);
 
 	const menuItems = [
 		{

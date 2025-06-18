@@ -16,19 +16,76 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 
-	private stripAnsi(str: string): string {
-		// Remove all ANSI escape sequences including cursor movement, color codes, etc.
-		return str
-			.replace(/\x1b\[[0-9;]*m/g, '') // Color codes (including 24-bit)
-			.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // CSI sequences
-			.replace(/\x1b\][^\x07]*\x07/g, '') // OSC sequences
-			.replace(/\x1b[PX^_].*?\x1b\\/g, '') // DCS/PM/APC/SOS sequences
-			.replace(/\x1b\[\?[0-9;]*[hl]/g, '') // Private mode sequences
-			.replace(/\x1b[>=]/g, '') // Other escape sequences
-			.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '') // Control characters except newline (\x0A)
-			.replace(/\r/g, '') // Carriage returns
-			.replace(/^[0-9;]+m/gm, '') // Orphaned color codes at line start
-			.replace(/[0-9]+;[0-9]+;[0-9;]+m/g, ''); // Orphaned 24-bit color codes
+	private checkEarlyExit(
+		ptyProcess: IPty,
+		timeoutMs: number = 500,
+	): Promise<boolean> {
+		return new Promise<boolean>(resolve => {
+			let exited = false;
+			const earlyExitHandler = () => {
+				exited = true;
+				resolve(false);
+			};
+			ptyProcess.onExit(earlyExitHandler);
+
+			// Give it a short time to see if it exits immediately
+			setTimeout(() => {
+				if (!exited) {
+					resolve(true);
+				}
+			}, timeoutMs);
+		});
+	}
+
+	private async spawnWithFallback(
+		command: string,
+		args: string[],
+		fallbackArgs: string[] | undefined,
+		worktreePath: string,
+	): Promise<IPty> {
+		const spawnOptions = {
+			name: 'xterm-color',
+			cols: process.stdout.columns || 80,
+			rows: process.stdout.rows || 24,
+			cwd: worktreePath,
+			env: process.env,
+		};
+
+		// Try to spawn with main arguments
+		let ptyProcess: IPty | null = null;
+		let spawnSuccess = false;
+
+		try {
+			ptyProcess = spawn(command, args, spawnOptions);
+
+			// Check if the process exits early
+			spawnSuccess = await this.checkEarlyExit(ptyProcess);
+
+			if (!spawnSuccess && ptyProcess) {
+				// Process exited early, kill it and try fallback
+				try {
+					ptyProcess.kill();
+				} catch (_error) {
+					// Process might already be dead
+				}
+				ptyProcess = null;
+			}
+		} catch (_error) {
+			spawnSuccess = false;
+		}
+
+		// If main command failed, try fallback
+		if (!spawnSuccess && fallbackArgs) {
+			// Try with fallback arguments
+			ptyProcess = spawn(command, fallbackArgs, spawnOptions);
+		}
+
+		// Ensure we have a ptyProcess
+		if (!ptyProcess) {
+			throw new Error(`Failed to spawn ${command}`);
+		}
+
+		return ptyProcess;
 	}
 
 	detectTerminalState(terminal: InstanceType<typeof Terminal>): SessionState {
@@ -90,84 +147,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		const command = commandConfig.command || 'claude';
 		const args = commandConfig.args || [];
 
-		// Try to spawn with main arguments
-		let ptyProcess: IPty | null = null;
-		let spawnSuccess = false;
-
-		try {
-			ptyProcess = spawn(command, args, {
-				name: 'xterm-color',
-				cols: process.stdout.columns || 80,
-				rows: process.stdout.rows || 24,
-				cwd: worktreePath,
-				env: process.env,
-			});
-
-			// Set up a listener to detect early exit
-			const exitPromise = new Promise<boolean>(resolve => {
-				let exited = false;
-				const earlyExitHandler = () => {
-					exited = true;
-					resolve(false);
-				};
-				ptyProcess!.onExit(earlyExitHandler);
-
-				// Give it a short time to see if it exits immediately
-				setTimeout(() => {
-					if (!exited) {
-						resolve(true);
-					}
-				}, 500);
-			});
-
-			spawnSuccess = await exitPromise;
-
-			if (!spawnSuccess && ptyProcess) {
-				// Process exited early, kill it and try fallback
-				try {
-					ptyProcess.kill();
-				} catch (_error) {
-					// Process might already be dead
-				}
-				ptyProcess = null;
-			}
-		} catch (_error) {
-			spawnSuccess = false;
-		}
-
-		// If main command failed, try fallback
-		if (!spawnSuccess) {
-			const fallbackArgs = commandConfig.fallbackArgs || [];
-
-			try {
-				ptyProcess = spawn(command, fallbackArgs, {
-					name: 'xterm-color',
-					cols: process.stdout.columns || 80,
-					rows: process.stdout.rows || 24,
-					cwd: worktreePath,
-					env: process.env,
-				});
-			} catch (_fallbackError) {
-				// If fallback also fails, try with no arguments
-				try {
-					ptyProcess = spawn(command, [], {
-						name: 'xterm-color',
-						cols: process.stdout.columns || 80,
-						rows: process.stdout.rows || 24,
-						cwd: worktreePath,
-						env: process.env,
-					});
-				} catch (finalError) {
-					// If everything fails, throw the error
-					throw new Error(`Failed to spawn ${command}: ${finalError}`);
-				}
-			}
-		}
-
-		// Ensure we have a ptyProcess
-		if (!ptyProcess) {
-			throw new Error(`Failed to spawn ${command}`);
-		}
+		// Spawn the process with fallback support
+		const ptyProcess = await this.spawnWithFallback(
+			command,
+			args,
+			commandConfig.fallbackArgs,
+			worktreePath,
+		);
 
 		// Create virtual terminal for state detection
 		const terminal = new Terminal({
