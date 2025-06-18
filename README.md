@@ -116,50 +116,6 @@ When this variable is set:
 
 If not set, defaults to `~/.ccmanager/worktrees`.
 
-## Terminal Integration
-
-### Ghostty Profile
-
-For Ghostty users, you can create a dedicated profile for CCManager with custom worktree directories. Here's a suggested profile configuration:
-
-**Profile name suggestion**: `ccmanager-dev` or `claude-worktrees`
-
-Add this to your Ghostty configuration:
-
-```toml
-# ~/.config/ghostty/config
-[profile.ccmanager-dev]
-command = ["npx", "ccmanager"]
-title = "CCManager - Claude Code Worktrees"
-
-# Set custom default worktree directory
-env = [
-    "CCMANAGER_DEFAULT_WORKTREE_DIR=~/dev/claude-worktrees"
-]
-
-# Optional: Custom appearance for CCManager sessions
-theme = "dark"
-window-height = 40
-window-width = 120
-
-# Optional: Auto-start in a specific directory
-working-directory = "~/dev"
-```
-
-Usage:
-```bash
-# Launch CCManager with the profile
-ghostty --profile=ccmanager-dev
-
-# Or create an alias
-alias ccm="ghostty --profile=ccmanager-dev"
-```
-
-This setup provides:
-- Dedicated CCManager environment
-- Custom worktree directory location
-- Optimized window size for the TUI
-- Consistent working directory
 ## Keyboard Shortcuts
 
 ### Default Shortcuts
