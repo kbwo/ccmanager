@@ -54,18 +54,8 @@ $ npx ccmanager
 
 ### CCMANAGER_CLAUDE_ARGS
 
-You can pass additional arguments to Claude Code sessions by setting the `CCMANAGER_CLAUDE_ARGS` environment variable:
+⚠️ **Deprecated in v0.1.9**: `CCMANAGER_CLAUDE_ARGS` is no longer supported. Please use the [Command Configuration](#command-configuration) feature instead.
 
-```bash
-# Start Claude Code with specific arguments for all sessions
-export CCMANAGER_CLAUDE_ARGS="--resume"
-npx ccmanager
-
-# Or set it inline
-CCMANAGER_CLAUDE_ARGS="--resume" npx ccmanager
-```
-
-The arguments are applied to all Claude Code sessions started by CCManager.
 
 ## Keyboard Shortcuts
 
