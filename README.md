@@ -118,21 +118,11 @@ Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.
   - Ctrl+D
   - Ctrl+[ (equivalent to Escape)
 
-## Status Change Hooks
-
-CCManager can execute custom commands when Claude Code session status changes. This enables powerful automation workflows like desktop notifications, logging, or integration with other tools.
-
-### Overview
-
-Status hooks allow you to:
-- Get notified when Claude needs your input
-- Track time spent in different states
-- Trigger automations based on session activity
-- Integrate with notification systems like [noti](https://github.com/variadico/noti)
-
-For detailed setup instructions, see [docs/state-hooks.md](docs/state-hooks.md).
 
 ## Command Configuration
+
+![Screenshot From 2025-06-18 16-43-27](https://github.com/user-attachments/assets/47d62483-ce81-4340-8687-8afcae93d5db)
+
 
 CCManager supports configuring the command and arguments used to run Claude Code sessions, with automatic fallback options for reliability.
 
@@ -151,6 +141,21 @@ CCManager supports configuring the command and arguments used to run Claude Code
 4. Save changes
 
 For detailed configuration options and examples, see [docs/command-config.md](docs/command-config.md).
+
+
+## Status Change Hooks
+
+CCManager can execute custom commands when Claude Code session status changes. This enables powerful automation workflows like desktop notifications, logging, or integration with other tools.
+
+### Overview
+
+Status hooks allow you to:
+- Get notified when Claude needs your input
+- Track time spent in different states
+- Trigger automations based on session activity
+- Integrate with notification systems like [noti](https://github.com/variadico/noti)
+
+For detailed setup instructions, see [docs/state-hooks.md](docs/state-hooks.md).
 
 ## Development
 
