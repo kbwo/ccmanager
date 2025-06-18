@@ -1,4 +1,4 @@
-import {spawn} from 'node-pty';
+import {spawn, IPty} from 'node-pty';
 import {
 	Session,
 	SessionManager as ISessionManager,
@@ -74,7 +74,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions = new Map();
 	}
 
-	createSession(worktreePath: string): Session {
+	async createSession(worktreePath: string): Promise<Session> {
 		// Check if session already exists
 		const existing = this.sessions.get(worktreePath);
 		if (existing) {
@@ -85,18 +85,89 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			.toString(36)
 			.substr(2, 9)}`;
 
-		// Parse Claude command arguments from environment variable
-		const claudeArgs = process.env['CCMANAGER_CLAUDE_ARGS']
-			? process.env['CCMANAGER_CLAUDE_ARGS'].split(' ')
-			: [];
+		// Get command configuration
+		const commandConfig = configurationManager.getCommandConfig();
+		const command = commandConfig.command || 'claude';
+		const args = commandConfig.args || [];
 
-		const ptyProcess = spawn('claude', claudeArgs, {
-			name: 'xterm-color',
-			cols: process.stdout.columns || 80,
-			rows: process.stdout.rows || 24,
-			cwd: worktreePath,
-			env: process.env,
-		});
+		// Try to spawn with main arguments
+		let ptyProcess: IPty | null = null;
+		let spawnSuccess = false;
+
+		try {
+			ptyProcess = spawn(command, args, {
+				name: 'xterm-color',
+				cols: process.stdout.columns || 80,
+				rows: process.stdout.rows || 24,
+				cwd: worktreePath,
+				env: process.env,
+			});
+
+			// Set up a listener to detect early exit
+			const exitPromise = new Promise<boolean>(resolve => {
+				let exited = false;
+				const earlyExitHandler = () => {
+					exited = true;
+					resolve(false);
+				};
+				ptyProcess!.onExit(earlyExitHandler);
+
+				// Give it a short time to see if it exits immediately
+				setTimeout(() => {
+					if (!exited) {
+						resolve(true);
+					}
+				}, 500);
+			});
+
+			spawnSuccess = await exitPromise;
+
+			if (!spawnSuccess && ptyProcess) {
+				// Process exited early, kill it and try fallback
+				try {
+					ptyProcess.kill();
+				} catch (_error) {
+					// Process might already be dead
+				}
+				ptyProcess = null;
+			}
+		} catch (_error) {
+			spawnSuccess = false;
+		}
+
+		// If main command failed, try fallback
+		if (!spawnSuccess) {
+			const fallbackArgs = commandConfig.fallbackArgs || [];
+
+			try {
+				ptyProcess = spawn(command, fallbackArgs, {
+					name: 'xterm-color',
+					cols: process.stdout.columns || 80,
+					rows: process.stdout.rows || 24,
+					cwd: worktreePath,
+					env: process.env,
+				});
+			} catch (_fallbackError) {
+				// If fallback also fails, try with no arguments
+				try {
+					ptyProcess = spawn(command, [], {
+						name: 'xterm-color',
+						cols: process.stdout.columns || 80,
+						rows: process.stdout.rows || 24,
+						cwd: worktreePath,
+						env: process.env,
+					});
+				} catch (finalError) {
+					// If everything fails, throw the error
+					throw new Error(`Failed to spawn ${command}: ${finalError}`);
+				}
+			}
+		}
+
+		// Ensure we have a ptyProcess
+		if (!ptyProcess) {
+			throw new Error(`Failed to spawn ${command}`);
+		}
 
 		// Create virtual terminal for state detection
 		const terminal = new Terminal({

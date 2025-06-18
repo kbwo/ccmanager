@@ -63,7 +63,7 @@ const App: React.FC = () => {
 		};
 	}, [sessionManager]);
 
-	const handleSelectWorktree = (worktree: Worktree) => {
+	const handleSelectWorktree = async (worktree: Worktree) => {
 		// Check if this is the new worktree option
 		if (worktree.path === '') {
 			setView('new-worktree');
@@ -99,7 +99,12 @@ const App: React.FC = () => {
 		let session = sessionManager.getSession(worktree.path);
 
 		if (!session) {
-			session = sessionManager.createSession(worktree.path);
+			try {
+				session = await sessionManager.createSession(worktree.path);
+			} catch (error) {
+				setError(`Failed to create session: ${error}`);
+				return;
+			}
 		}
 
 		setActiveSession(session);
