@@ -10,6 +10,7 @@ import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {Worktree, Session as SessionType} from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {getDefaultWorktreesDir} from '../utils/defaultPaths.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -26,9 +27,15 @@ type View =
 
 interface AppProps {
 	initialWorktreePath?: string;
+	initialBranchName?: string;
+	initialFromBranch?: string;
 }
 
-const App: React.FC<AppProps> = ({initialWorktreePath}) => {
+const App: React.FC<AppProps> = ({
+	initialWorktreePath,
+	initialBranchName,
+	initialFromBranch,
+}) => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>('menu');
 	const [sessionManager] = useState(() => new SessionManager());
@@ -69,34 +76,128 @@ const App: React.FC<AppProps> = ({initialWorktreePath}) => {
 		};
 	}, [sessionManager]);
 
-	// Handle initial worktree path from CLI arguments
+	// Handle initial worktree path and branch from CLI arguments
 	useEffect(() => {
-		if (initialWorktreePath) {
-			// Resolve the path to absolute
-			const resolvedPath = path.resolve(initialWorktreePath);
+		if (initialWorktreePath || initialBranchName) {
+			// Get all available worktrees
+			const worktrees = worktreeService.getWorktrees();
 
-			// Check if the path exists and is a directory
-			try {
-				const stat = fs.statSync(resolvedPath);
-				if (stat.isDirectory()) {
-					// Check if it's a git worktree by looking for .git file or directory
-					const gitPath = path.join(resolvedPath, '.git');
-					if (fs.existsSync(gitPath)) {
-						// Valid worktree, create session and open it
-						const session = sessionManager.createSession(resolvedPath);
-						setActiveSession(session);
-						setView('session');
-						return;
-					}
+			let targetWorktree: Worktree | undefined;
+
+			if (initialWorktreePath && initialBranchName) {
+				// Both path and branch provided - find worktree that matches both
+				const resolvedPath = path.resolve(initialWorktreePath);
+				targetWorktree = worktrees.find(
+					wt => wt.path === resolvedPath && wt.branch === initialBranchName,
+				);
+				if (!targetWorktree) {
+					setError(
+						`No worktree found at path '${initialWorktreePath}' with branch '${initialBranchName}'`,
+					);
+					return;
 				}
-			} catch (_error) {
-				// Path doesn't exist or is not accessible
+			} else if (initialWorktreePath) {
+				// Only path provided - validate and use the worktree at that path
+				const resolvedPath = path.resolve(initialWorktreePath);
+				targetWorktree = worktrees.find(wt => wt.path === resolvedPath);
+				if (!targetWorktree) {
+					// Path not in worktree list, but check if it's a valid git directory
+					try {
+						const stat = fs.statSync(resolvedPath);
+						if (stat.isDirectory()) {
+							const gitPath = path.join(resolvedPath, '.git');
+							if (fs.existsSync(gitPath)) {
+								// Valid git directory, create session directly
+								const session = sessionManager.createSession(resolvedPath);
+								setActiveSession(session);
+								setView('session');
+								return;
+							}
+						}
+					} catch (_error) {
+						// Path doesn't exist or is not accessible
+					}
+					setError(`Invalid worktree path: ${initialWorktreePath}`);
+					return;
+				}
+			} else if (initialBranchName) {
+				// Only branch provided - treat as new branch name to create
+				// First check if a worktree with this branch already exists
+				targetWorktree = worktrees.find(wt => wt.branch === initialBranchName);
+				if (targetWorktree) {
+					// Worktree already exists for this branch, open it
+					const session = sessionManager.createSession(targetWorktree.path);
+					setActiveSession(session);
+					setView('session');
+					return;
+				}
+
+				// Check if branch already exists in repository
+				const allBranches = worktreeService.getAllBranches();
+				if (allBranches.includes(initialBranchName)) {
+					setError(
+						`Branch '${initialBranchName}' already exists. Use --worktree to specify existing worktree path, or choose a different branch name.`,
+					);
+					return;
+				}
+
+				// Branch doesn't exist - create new branch and worktree
+				const sanitizedBranch = initialBranchName
+					.replace(/\//g, '-')
+					.replace(/[^a-zA-Z0-9-_.]/g, '')
+					.replace(/^-+|-+$/g, '')
+					.toLowerCase();
+				const worktreePath = path.join(
+					getDefaultWorktreesDir(),
+					sanitizedBranch,
+				);
+
+				// Use specified base branch or default
+				const baseBranch =
+					initialFromBranch || worktreeService.getDefaultBranch();
+
+				// Validate that the base branch exists
+				if (initialFromBranch && !allBranches.includes(initialFromBranch)) {
+					setError(
+						`Base branch '${initialFromBranch}' does not exist. Available branches: ${allBranches.join(', ')}`,
+					);
+					return;
+				}
+
+				// Create the worktree with new branch
+				const result = worktreeService.createWorktree(
+					worktreePath,
+					initialBranchName,
+					baseBranch,
+				);
+				if (result.success) {
+					// Successfully created, open session for it
+					const session = sessionManager.createSession(worktreePath);
+					setActiveSession(session);
+					setView('session');
+					return;
+				} else {
+					setError(
+						`Failed to create worktree for new branch '${initialBranchName}': ${result.error}`,
+					);
+					return;
+				}
 			}
 
-			// Invalid path, show error and stay in menu
-			setError(`Invalid worktree path: ${initialWorktreePath}`);
+			if (targetWorktree) {
+				// Valid worktree found, create session and open it
+				const session = sessionManager.createSession(targetWorktree.path);
+				setActiveSession(session);
+				setView('session');
+			}
 		}
-	}, [initialWorktreePath, sessionManager]);
+	}, [
+		initialWorktreePath,
+		initialBranchName,
+		initialFromBranch,
+		sessionManager,
+		worktreeService,
+	]);
 
 	const handleSelectWorktree = (worktree: Worktree) => {
 		// Check if this is the new worktree option

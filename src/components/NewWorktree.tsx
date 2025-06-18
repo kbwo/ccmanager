@@ -6,6 +6,8 @@ import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {getDefaultWorktreesDir, isEmptyPath} from '../utils/defaultPaths.js';
+import * as nodePath from 'path';
 
 interface NewWorktreeProps {
 	onComplete: (path: string, branch: string, baseBranch: string) => void;
@@ -57,8 +59,13 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	});
 
 	const handlePathSubmit = (value: string) => {
-		if (value.trim()) {
-			setPath(value.trim());
+		const trimmedValue = value.trim();
+		if (isEmptyPath(trimmedValue)) {
+			// Use default directory when path is empty
+			setPath(''); // Keep empty to indicate default usage
+			setStep('branch');
+		} else {
+			setPath(trimmedValue);
 			setStep('branch');
 		}
 	};
@@ -71,16 +78,27 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	};
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
+		let finalPath: string;
+
 		if (isAutoDirectory) {
 			// Generate path from branch name
-			const autoPath = generateWorktreeDirectory(
+			finalPath = generateWorktreeDirectory(
 				branch,
 				worktreeConfig.autoDirectoryPattern,
 			);
-			onComplete(autoPath, branch, item.value);
+		} else if (isEmptyPath(path)) {
+			// Use default directory with branch name as subdirectory
+			const sanitizedBranch = branch
+				.replace(/\//g, '-')
+				.replace(/[^a-zA-Z0-9-_.]/g, '')
+				.replace(/^-+|-+$/g, '')
+				.toLowerCase();
+			finalPath = nodePath.join(getDefaultWorktreesDir(), sanitizedBranch);
 		} else {
-			onComplete(path, branch, item.value);
+			finalPath = path;
 		}
+
+		onComplete(finalPath, branch, item.value);
 	};
 
 	// Calculate generated path for preview (memoized to avoid expensive recalculations)
@@ -101,7 +119,14 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 			{step === 'path' && !isAutoDirectory ? (
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
-						<Text>Enter worktree path (relative to repository root):</Text>
+						<Text>
+							Enter worktree path (leave empty for default directory):
+						</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text dimColor>
+							Default: <Text color="green">{getDefaultWorktreesDir()}</Text>
+						</Text>
 					</Box>
 					<Box>
 						<Text color="cyan">{'> '}</Text>
@@ -109,17 +134,14 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 							value={path}
 							onChange={setPath}
 							onSubmit={handlePathSubmit}
-							placeholder="e.g., ../myproject-feature"
+							placeholder="Press Enter for default or type custom path"
 						/>
 					</Box>
 				</Box>
 			) : step === 'branch' && !isAutoDirectory ? (
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
-						<Text>
-							Enter branch name for worktree at <Text color="cyan">{path}</Text>
-							:
-						</Text>
+						<Text>Enter branch name:</Text>
 					</Box>
 					<Box>
 						<Text color="cyan">{'> '}</Text>
