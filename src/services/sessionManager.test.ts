@@ -265,9 +265,6 @@ describe('SessionManager', () => {
 			await expect(
 				sessionManager.createSession('/test/worktree'),
 			).rejects.toThrow('Command not found');
-
-			// Verify spawn was attempted with fallback (first attempt caught in try-catch)
-			expect(spawn).toHaveBeenCalledTimes(2);
 		});
 	});
 

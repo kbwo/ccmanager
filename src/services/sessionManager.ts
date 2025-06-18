@@ -16,9 +16,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 
-	private async spawnFallbackProcess(
+	private async spawn(
 		command: string,
-		fallbackArgs: string[],
+		args: string[],
 		worktreePath: string,
 	): Promise<IPty> {
 		const spawnOptions = {
@@ -29,32 +29,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			env: process.env,
 		};
 
-		return spawn(command, fallbackArgs, spawnOptions);
-	}
-
-	private async spawnWithFallback(
-		command: string,
-		args: string[],
-		fallbackArgs: string[],
-		worktreePath: string,
-	): Promise<{process: IPty; isPrimaryCommand: boolean}> {
-		const spawnOptions = {
-			name: 'xterm-color',
-			cols: process.stdout.columns || 80,
-			rows: process.stdout.rows || 24,
-			cwd: worktreePath,
-			env: process.env,
-		};
-
-		// Try to spawn with main arguments
-		try {
-			const ptyProcess = spawn(command, args, spawnOptions);
-			return {process: ptyProcess, isPrimaryCommand: true};
-		} catch (_error) {
-			// If spawn fails, try with fallback arguments
-			const ptyProcess = spawn(command, fallbackArgs, spawnOptions);
-			return {process: ptyProcess, isPrimaryCommand: false};
-		}
+		return spawn(command, args, spawnOptions);
 	}
 
 	detectTerminalState(terminal: InstanceType<typeof Terminal>): SessionState {
@@ -117,13 +92,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		const args = commandConfig.args || [];
 
 		// Spawn the process with fallback support
-		const {process: ptyProcess, isPrimaryCommand} =
-			await this.spawnWithFallback(
-				command,
-				args,
-				commandConfig.fallbackArgs || [],
-				worktreePath,
-			);
+		const ptyProcess = await this.spawn(command, args, worktreePath);
 
 		// Create virtual terminal for state detection
 		const terminal = new Terminal({
@@ -142,7 +111,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
-			isPrimaryCommand,
+			isPrimaryCommand: true,
 			commandConfig,
 		};
 
@@ -194,7 +163,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
 				try {
 					// Spawn fallback process
-					const fallbackProcess = await this.spawnFallbackProcess(
+					const fallbackProcess = await this.spawn(
 						session.commandConfig?.command || 'claude',
 						session.commandConfig?.fallbackArgs || [],
 						session.worktreePath,
