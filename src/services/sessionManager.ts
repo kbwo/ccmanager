@@ -8,6 +8,7 @@ import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {configurationManager} from './configurationManager.js';
+import {parseCommandArgs} from '../utils/argParser.js';
 import {WorktreeService} from './worktreeService.js';
 const {Terminal} = pkg;
 
@@ -87,7 +88,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		// Parse Claude command arguments from environment variable
 		const claudeArgs = process.env['CCMANAGER_CLAUDE_ARGS']
-			? process.env['CCMANAGER_CLAUDE_ARGS'].split(' ')
+			? parseCommandArgs(process.env['CCMANAGER_CLAUDE_ARGS'])
 			: [];
 
 		const ptyProcess = spawn('claude', claudeArgs, {

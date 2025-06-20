@@ -25,16 +25,17 @@ export const ConfigureNotifications: React.FC<ConfigureNotificationsProps> = ({
 
 	useEffect(() => {
 		const conf = configurationManager.getConfiguration();
-		setConfig(conf.notifications || {
-			enabled: false,
-			onIdle: false,
-			onWaitingInput: false,
-			onBusy: false,
-		});
+		setConfig(
+			conf.notifications || {
+				enabled: false,
+				onIdle: false,
+				onWaitingInput: false,
+				onBusy: false,
+			},
+		);
 	}, []);
 
 	useInput((input, key) => {
-		const shortcuts = shortcutManager.getShortcuts();
 		if (shortcutManager.matchesShortcut('returnToMenu', input, key)) {
 			onBack();
 		}

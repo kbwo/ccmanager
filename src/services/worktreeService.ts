@@ -1,7 +1,8 @@
-import {execSync} from 'child_process';
+import {execFileSync} from 'child_process';
 import {existsSync} from 'fs';
 import path from 'path';
 import {Worktree} from '../types/index.js';
+import {isValidBranchName, isValidWorktreePath} from '../utils/validation.js';
 
 export class WorktreeService {
 	private rootPath: string;
@@ -16,10 +17,14 @@ export class WorktreeService {
 	private getGitRepositoryRoot(): string {
 		try {
 			// Get the common git directory
-			const gitCommonDir = execSync('git rev-parse --git-common-dir', {
-				cwd: this.rootPath,
-				encoding: 'utf8',
-			}).trim();
+			const gitCommonDir = execFileSync(
+				'git',
+				['rev-parse', '--git-common-dir'],
+				{
+					cwd: this.rootPath,
+					encoding: 'utf8',
+				},
+			).trim();
 
 			// The parent of .git is the actual repository root
 			return path.dirname(gitCommonDir);
@@ -31,7 +36,7 @@ export class WorktreeService {
 
 	getWorktrees(): Worktree[] {
 		try {
-			const output = execSync('git worktree list --porcelain', {
+			const output = execFileSync('git', ['worktree', 'list', '--porcelain'], {
 				cwd: this.rootPath,
 				encoding: 'utf8',
 			});
@@ -88,10 +93,14 @@ export class WorktreeService {
 
 	private getCurrentBranch(): string {
 		try {
-			const branch = execSync('git rev-parse --abbrev-ref HEAD', {
-				cwd: this.rootPath,
-				encoding: 'utf8',
-			}).trim();
+			const branch = execFileSync(
+				'git',
+				['rev-parse', '--abbrev-ref', 'HEAD'],
+				{
+					cwd: this.rootPath,
+					encoding: 'utf8',
+				},
+			).trim();
 			return branch;
 		} catch {
 			return 'unknown';
@@ -105,26 +114,28 @@ export class WorktreeService {
 	getDefaultBranch(): string {
 		try {
 			// Try to get the default branch from origin
-			const defaultBranch = execSync(
-				"git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'",
+			const fullRef = execFileSync(
+				'git',
+				['symbolic-ref', 'refs/remotes/origin/HEAD'],
 				{
 					cwd: this.rootPath,
 					encoding: 'utf8',
-					shell: '/bin/bash',
 				},
 			).trim();
+			// Extract branch name from refs/remotes/origin/branch
+			const defaultBranch = fullRef.replace(/^refs\/remotes\/origin\//, '');
 			return defaultBranch || 'main';
 		} catch {
 			// Fallback to common default branch names
 			try {
-				execSync('git rev-parse --verify main', {
+				execFileSync('git', ['rev-parse', '--verify', 'main'], {
 					cwd: this.rootPath,
 					encoding: 'utf8',
 				});
 				return 'main';
 			} catch {
 				try {
-					execSync('git rev-parse --verify master', {
+					execFileSync('git', ['rev-parse', '--verify', 'master'], {
 						cwd: this.rootPath,
 						encoding: 'utf8',
 					});
@@ -138,32 +149,31 @@ export class WorktreeService {
 
 	getAllBranches(): string[] {
 		try {
-			const output = execSync(
-				"git branch -a --format='%(refname:short)' | grep -v HEAD | sort -u",
+			const output = execFileSync(
+				'git',
+				['branch', '-a', '--format=%(refname:short)'],
 				{
 					cwd: this.rootPath,
 					encoding: 'utf8',
-					shell: '/bin/bash',
 				},
 			);
 
-			const branches = output
+			const allBranches = output
 				.trim()
 				.split('\n')
-				.filter(branch => branch && !branch.startsWith('origin/'))
-				.map(branch => branch.trim());
+				.filter(branch => branch && branch !== 'HEAD')
+				.map(branch => {
+					// Remove origin/ prefix from remote branches
+					if (branch.startsWith('origin/')) {
+						return branch.replace('origin/', '');
+					}
+					return branch.trim();
+				});
 
-			// Also include remote branches without origin/ prefix
-			const remoteBranches = output
-				.trim()
-				.split('\n')
-				.filter(branch => branch.startsWith('origin/'))
-				.map(branch => branch.replace('origin/', ''));
+			// Deduplicate and sort
+			const uniqueBranches = [...new Set(allBranches)].sort();
 
-			// Merge and deduplicate
-			const allBranches = [...new Set([...branches, ...remoteBranches])];
-
-			return allBranches.filter(branch => branch);
+			return uniqueBranches.filter(branch => branch);
 		} catch {
 			return [];
 		}
@@ -175,15 +185,56 @@ export class WorktreeService {
 		baseBranch: string,
 	): {success: boolean; error?: string} {
 		try {
+			// Validate branch names
+			if (!isValidBranchName(branch)) {
+				return {
+					success: false,
+					error:
+						'Invalid branch name. Branch names cannot contain special characters or control characters.',
+				};
+			}
+
+			if (!isValidBranchName(baseBranch)) {
+				return {
+					success: false,
+					error:
+						'Invalid base branch name. Branch names cannot contain special characters or control characters.',
+				};
+			}
+
+			// Validate worktree path
+			if (!isValidWorktreePath(worktreePath)) {
+				return {
+					success: false,
+					error:
+						'Invalid worktree path. Paths cannot contain ".." or shell special characters.',
+				};
+			}
+
 			// Resolve the worktree path relative to the git repository root
 			const resolvedPath = path.isAbsolute(worktreePath)
 				? worktreePath
 				: path.join(this.gitRootPath, worktreePath);
 
+			// Ensure the resolved path is still within or relative to the git root
+			// This prevents absolute paths from escaping
+			const normalizedResolvedPath = path.normalize(resolvedPath);
+			const normalizedGitRoot = path.normalize(this.gitRootPath);
+
+			if (
+				path.isAbsolute(worktreePath) &&
+				!normalizedResolvedPath.startsWith(normalizedGitRoot)
+			) {
+				return {
+					success: false,
+					error: 'Worktree path must be within the git repository',
+				};
+			}
+
 			// Check if branch exists
 			let branchExists = false;
 			try {
-				execSync(`git rev-parse --verify ${branch}`, {
+				execFileSync('git', ['rev-parse', '--verify', branch], {
 					cwd: this.rootPath,
 					encoding: 'utf8',
 				});
@@ -193,18 +244,22 @@ export class WorktreeService {
 			}
 
 			// Create the worktree
-			let command: string;
 			if (branchExists) {
-				command = `git worktree add "${resolvedPath}" "${branch}"`;
+				execFileSync('git', ['worktree', 'add', resolvedPath, branch], {
+					cwd: this.gitRootPath, // Execute from git root to ensure proper resolution
+					encoding: 'utf8',
+				});
 			} else {
 				// Create new branch from specified base branch
-				command = `git worktree add -b "${branch}" "${resolvedPath}" "${baseBranch}"`;
+				execFileSync(
+					'git',
+					['worktree', 'add', '-b', branch, resolvedPath, baseBranch],
+					{
+						cwd: this.gitRootPath,
+						encoding: 'utf8',
+					},
+				);
 			}
-
-			execSync(command, {
-				cwd: this.gitRootPath, // Execute from git root to ensure proper resolution
-				encoding: 'utf8',
-			});
 
 			return {success: true};
 		} catch (error) {
@@ -237,7 +292,7 @@ export class WorktreeService {
 			}
 
 			// Remove the worktree
-			execSync(`git worktree remove "${worktreePath}" --force`, {
+			execFileSync('git', ['worktree', 'remove', worktreePath, '--force'], {
 				cwd: this.rootPath,
 				encoding: 'utf8',
 			});
@@ -245,7 +300,7 @@ export class WorktreeService {
 			// Delete the branch if it exists
 			const branchName = worktree.branch.replace('refs/heads/', '');
 			try {
-				execSync(`git branch -D "${branchName}"`, {
+				execFileSync('git', ['branch', '-D', branchName], {
 					cwd: this.rootPath,
 					encoding: 'utf8',
 				});
@@ -270,6 +325,20 @@ export class WorktreeService {
 		useRebase: boolean = false,
 	): {success: boolean; error?: string} {
 		try {
+			// Validate branch names
+			if (!isValidBranchName(sourceBranch)) {
+				return {
+					success: false,
+					error: 'Invalid source branch name',
+				};
+			}
+
+			if (!isValidBranchName(targetBranch)) {
+				return {
+					success: false,
+					error: 'Invalid target branch name',
+				};
+			}
 			// Get worktrees to find the target worktree path
 			const worktrees = this.getWorktrees();
 			const targetWorktree = worktrees.find(
@@ -298,19 +367,19 @@ export class WorktreeService {
 				}
 
 				// Rebase source branch onto target branch
-				execSync(`git rebase "${targetBranch}"`, {
+				execFileSync('git', ['rebase', targetBranch], {
 					cwd: sourceWorktree.path,
 					encoding: 'utf8',
 				});
 
 				// After rebase, merge the rebased source branch into target branch
-				execSync(`git merge --ff-only "${sourceBranch}"`, {
+				execFileSync('git', ['merge', '--ff-only', sourceBranch], {
 					cwd: targetWorktree.path,
 					encoding: 'utf8',
 				});
 			} else {
 				// Regular merge
-				execSync(`git merge --no-ff "${sourceBranch}"`, {
+				execFileSync('git', ['merge', '--no-ff', sourceBranch], {
 					cwd: targetWorktree.path,
 					encoding: 'utf8',
 				});

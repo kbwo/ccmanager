@@ -6,6 +6,7 @@ import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {isValidBranchName, isValidWorktreePath} from '../utils/validation.js';
 
 interface NewWorktreeProps {
 	onComplete: (path: string, branch: string, baseBranch: string) => void;
@@ -27,6 +28,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const [step, setStep] = useState<Step>(isAutoDirectory ? 'branch' : 'path');
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
+	const [error, setError] = useState<string | null>(null);
 
 	// Initialize worktree service and load branches (memoized to avoid re-initialization)
 	const {branches, defaultBranch} = useMemo(() => {
@@ -57,15 +59,31 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	});
 
 	const handlePathSubmit = (value: string) => {
-		if (value.trim()) {
-			setPath(value.trim());
+		const trimmedPath = value.trim();
+		if (trimmedPath) {
+			if (!isValidWorktreePath(trimmedPath)) {
+				setError(
+					'Invalid path: cannot contain ".." or shell special characters',
+				);
+				return;
+			}
+			setError(null);
+			setPath(trimmedPath);
 			setStep('branch');
 		}
 	};
 
 	const handleBranchSubmit = (value: string) => {
-		if (value.trim()) {
-			setBranch(value.trim());
+		const trimmedBranch = value.trim();
+		if (trimmedBranch) {
+			if (!isValidBranchName(trimmedBranch)) {
+				setError(
+					'Invalid branch name: cannot contain special characters like ~ ^ : ? * [ ] \\ or spaces',
+				);
+				return;
+			}
+			setError(null);
+			setBranch(trimmedBranch);
 			setStep('base-branch');
 		}
 	};
@@ -97,6 +115,12 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					Create New Worktree
 				</Text>
 			</Box>
+
+			{error && (
+				<Box marginBottom={1}>
+					<Text color="red">Error: {error}</Text>
+				</Box>
+			)}
 
 			{step === 'path' && !isAutoDirectory ? (
 				<Box flexDirection="column">
