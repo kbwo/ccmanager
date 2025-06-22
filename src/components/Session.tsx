@@ -70,10 +70,11 @@ const Session: React.FC<SessionProps> = ({
 	// Display mode indicator
 	const displayModeIndicator = useCallback(
 		(mode: TerminalMode) => {
+			const toggleShortcut = shortcutManager.getShortcutDisplay('toggleMode');
 			const indicator =
 				mode === 'claude'
-					? '\x1b[44m Claude \x1b[0m \x1b[90m(Ctrl+T: Bash)\x1b[0m'
-					: '\x1b[42m Bash \x1b[0m \x1b[90m(Ctrl+T: Claude)\x1b[0m';
+					? `\x1b[44m Claude \x1b[0m \x1b[90m(${toggleShortcut}: Bash)\x1b[0m`
+					: `\x1b[42m Bash \x1b[0m \x1b[90m(${toggleShortcut}: Claude)\x1b[0m`;
 
 			// Display in status line at top of terminal
 			stdout.write(`\x1b[s\x1b[1;1H${indicator}\x1b[u`);
@@ -290,7 +291,7 @@ const Session: React.FC<SessionProps> = ({
 				return;
 			}
 
-			// Check for mode toggle shortcut (Ctrl+T)
+			// Check for mode toggle shortcut
 			const toggleModeCode = shortcutManager.getShortcutCode(
 				shortcuts.toggleMode,
 			);
