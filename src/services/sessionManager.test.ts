@@ -317,6 +317,7 @@ describe('SessionManager', () => {
 		});
 	});
 
+<<<<<<< HEAD
 	describe('createSession with presets', () => {
 		it('should use default preset when no preset ID specified', async () => {
 			// Setup mock preset
@@ -450,6 +451,89 @@ describe('SessionManager', () => {
 				['--legacy'],
 				expect.any(Object),
 			);
+=======
+	describe('Bash Session Restoration Events', () => {
+		it('should emit bashSessionRestore event when bash session becomes active with history', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session and set up bash mode with history
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.bashHistory = [
+				Buffer.from('$ ls\n'),
+				Buffer.from('file1.txt file2.txt\n'),
+				Buffer.from('$ pwd\n')
+			];
+
+			// Set up event listener spy
+			const bashRestoreEventSpy = vi.fn();
+			sessionManager.on('bashSessionRestore', bashRestoreEventSpy);
+
+			// Test: Activate session in bash mode
+			sessionManager.setSessionActive('/test/worktree', true);
+
+			// Verify: bashSessionRestore event is emitted
+			expect(bashRestoreEventSpy).toHaveBeenCalledWith(session);
+			expect(bashRestoreEventSpy).toHaveBeenCalledTimes(1);
+		});
+
+		it('should emit sessionRestore event when claude session becomes active with history', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session and set up claude mode with history
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'claude';
+			session.outputHistory = [
+				Buffer.from('Claude response 1\n'),
+				Buffer.from('Claude response 2\n')
+			];
+
+			// Set up event listener spy
+			const claudeRestoreEventSpy = vi.fn();
+			sessionManager.on('sessionRestore', claudeRestoreEventSpy);
+
+			// Test: Activate session in claude mode
+			sessionManager.setSessionActive('/test/worktree', true);
+
+			// Verify: sessionRestore event is emitted
+			expect(claudeRestoreEventSpy).toHaveBeenCalledWith(session);
+			expect(claudeRestoreEventSpy).toHaveBeenCalledTimes(1);
+		});
+
+		it('should not emit restore events when session has no history', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session with empty histories
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.bashHistory = [];
+			session.outputHistory = [];
+
+			// Set up event listener spies
+			const bashRestoreEventSpy = vi.fn();
+			const claudeRestoreEventSpy = vi.fn();
+			sessionManager.on('bashSessionRestore', bashRestoreEventSpy);
+			sessionManager.on('sessionRestore', claudeRestoreEventSpy);
+
+			// Test: Activate session with empty histories
+			sessionManager.setSessionActive('/test/worktree', true);
+
+			// Verify: No restore events are emitted
+			expect(bashRestoreEventSpy).not.toHaveBeenCalled();
+			expect(claudeRestoreEventSpy).not.toHaveBeenCalled();
+>>>>>>> a57a09d (test: add comprehensive unit tests for bash session restoration events)
 		});
 	});
 });
