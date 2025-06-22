@@ -113,6 +113,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			isPrimaryCommand: true,
 			commandConfig,
+
+			// Dual-mode properties initialization
+			currentMode: 'claude', // Always start in Claude mode
+			bashHistory: [],
+			bashState: 'idle',
 		};
 
 		// Set up persistent background data handler for state detection
@@ -250,6 +255,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			} catch (_error) {
 				// Process might already be dead
 			}
+
+			// Clean up bash PTY if it exists
+			if (session.bashProcess) {
+				try {
+					session.bashProcess.kill();
+				} catch (_error) {
+					// Bash process might already be dead
+				}
+			}
+
 			// Clean up any pending timer
 			const timer = this.busyTimers.get(worktreePath);
 			if (timer) {

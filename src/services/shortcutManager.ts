@@ -66,6 +66,9 @@ export class ShortcutManager {
 				currentShortcuts.returnToMenu,
 			cancel:
 				this.validateShortcut(shortcuts.cancel) || currentShortcuts.cancel,
+			toggleMode:
+				this.validateShortcut(shortcuts.toggleMode) ||
+				currentShortcuts.toggleMode,
 		};
 
 		configurationManager.setShortcuts(validated);
