@@ -87,19 +87,25 @@ const Session: React.FC<SessionProps> = ({
 			// Switching to bash mode
 			createBashProcess();
 
-			// Clear screen for mode switch
-			stdout.write('\x1B[2J\x1B[H');
-
-			// Restore bash history
-			session.bashHistory.forEach(buffer => {
-				stdout.write(buffer);
-			});
-
+			// Set current mode first
 			setCurrentMode('bash');
 			session.currentMode = 'bash';
 
-			// Display mode indicator
+			// Clear screen and prepare for bash
+			stdout.write('\x1B[2J\x1B[H');
+
+			// Display mode indicator first
 			displayModeIndicator('bash');
+
+			// If bash history exists, restore it
+			if (session.bashHistory.length > 0) {
+				session.bashHistory.forEach(buffer => {
+					stdout.write(buffer);
+				});
+			} else {
+				// First time switching to bash - let the PTY send its initial prompt
+				// The bash prompt will appear naturally from the PTY data handler
+			}
 		} else {
 			// Switching to claude mode
 			setCurrentMode('claude');
@@ -108,11 +114,11 @@ const Session: React.FC<SessionProps> = ({
 			// Clear screen for mode switch
 			stdout.write('\x1B[2J\x1B[H');
 
+			// Display mode indicator first
+			displayModeIndicator('claude');
+
 			// Trigger Claude history restoration
 			sessionManager.emit('sessionRestore', session);
-
-			// Display mode indicator
-			displayModeIndicator('claude');
 		}
 	}, [
 		currentMode,
