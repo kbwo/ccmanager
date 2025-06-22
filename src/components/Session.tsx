@@ -97,15 +97,9 @@ const Session: React.FC<SessionProps> = ({
 			// Display mode indicator first
 			displayModeIndicator('bash');
 
-			// If bash history exists, restore it
-			if (session.bashHistory.length > 0) {
-				session.bashHistory.forEach(buffer => {
-					stdout.write(buffer);
-				});
-			} else {
-				// First time switching to bash - let the PTY send its initial prompt
-				// The bash prompt will appear naturally from the PTY data handler
-			}
+			// Bash history restoration will be triggered automatically by setSessionActive
+			// using the same robust system as Claude mode
+			sessionManager.setSessionActive(session.worktreePath, true);
 		} else {
 			// Switching to claude mode
 			setCurrentMode('claude');
@@ -119,6 +113,7 @@ const Session: React.FC<SessionProps> = ({
 
 			// Claude history restoration will be triggered automatically by setSessionActive
 			// when useEffect re-runs due to mode change
+			sessionManager.setSessionActive(session.worktreePath, true);
 		}
 	}, [
 		currentMode,
@@ -161,8 +156,35 @@ const Session: React.FC<SessionProps> = ({
 			}
 		};
 
-		// Listen for restore event first
+		// Handle bash session restoration
+		const handleBashSessionRestore = (restoredSession: SessionType) => {
+			if (restoredSession.id === session.id) {
+				// Replay all bash buffered output, using the same robust logic as Claude
+				for (let i = 0; i < restoredSession.bashHistory.length; i++) {
+					const buffer = restoredSession.bashHistory[i];
+					if (!buffer) continue;
+
+					const str = buffer.toString('utf8');
+
+					// Skip clear screen sequences at the beginning
+					if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
+						// Skip this buffer or remove the clear sequence
+						const cleaned = str
+							.replace(/\x1B\[2J/g, '')
+							.replace(/\x1B\[H/g, '');
+						if (cleaned.length > 0) {
+							stdout.write(Buffer.from(cleaned, 'utf8'));
+						}
+					} else {
+						stdout.write(buffer);
+					}
+				}
+			}
+		};
+
+		// Listen for restore events first
 		sessionManager.on('sessionRestore', handleSessionRestore);
+		sessionManager.on('bashSessionRestore', handleBashSessionRestore);
 
 		// Mark session as active (this will trigger the restore event)
 		sessionManager.setSessionActive(session.worktreePath, true);
@@ -313,6 +335,7 @@ const Session: React.FC<SessionProps> = ({
 
 			// Remove event listeners
 			sessionManager.off('sessionRestore', handleSessionRestore);
+			sessionManager.off('bashSessionRestore', handleBashSessionRestore);
 			sessionManager.off('sessionData', handleSessionData);
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);

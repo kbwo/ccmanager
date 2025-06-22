@@ -321,14 +321,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (session) {
 			session.isActive = active;
 
-			// If becoming active, emit a restore event with the output history
-			// Only restore Claude history if in Claude mode (dual-mode compatibility)
-			if (
-				active &&
-				session.outputHistory.length > 0 &&
-				session.currentMode === 'claude'
-			) {
-				this.emit('sessionRestore', session);
+			// If becoming active, emit a restore event with the appropriate history
+			if (active) {
+				// Restore Claude history if in Claude mode and has history
+				if (session.outputHistory.length > 0 && session.currentMode === 'claude') {
+					this.emit('sessionRestore', session);
+				}
+				// Restore bash history if in bash mode and has history
+				else if (session.bashHistory.length > 0 && session.currentMode === 'bash') {
+					this.emit('bashSessionRestore', session);
+				}
 			}
 		}
 	}
