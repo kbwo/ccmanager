@@ -1,0 +1,97 @@
+workflow:
+  id: greenfield-service
+  name: Greenfield Service/API Development
+  description: >-
+    Agent workflow for building backend services from concept to development.
+    Supports both comprehensive planning for complex services and rapid prototyping for simple APIs.
+  type: greenfield
+  project_types:
+    - rest-api
+    - graphql-api
+    - microservice
+    - backend-service
+    - api-prototype
+    - simple-service
+
+  sequence:
+    - agent: analyst
+      creates: project-brief.md
+      optional_steps:
+        - brainstorming_session
+        - market_research_prompt
+      notes: "Can do brainstorming first, then optional deep research before creating project brief. SAVE OUTPUT: Copy final project-brief.md to your project's docs/ folder."
+
+    - agent: pm
+      creates: prd.md
+      requires: project-brief.md
+      notes: "Creates PRD from project brief using prd-tmpl, focused on API/service requirements. SAVE OUTPUT: Copy final prd.md to your project's docs/ folder."
+
+    - agent: architect
+      creates: architecture.md
+      requires: prd.md
+      optional_steps:
+        - technical_research_prompt
+      notes: "Creates backend/service architecture using architecture-tmpl. May suggest changes to PRD stories or new stories. SAVE OUTPUT: Copy final architecture.md to your project's docs/ folder."
+
+    - agent: pm
+      updates: prd.md (if needed)
+      requires: architecture.md
+      condition: architecture_suggests_prd_changes
+      notes: "If architect suggests story changes, update PRD and re-export the complete unredacted prd.md to docs/ folder."
+
+    - agent: po
+      validates: all_artifacts
+      uses: po-master-checklist
+      notes: "Validates all documents for consistency and completeness. May require updates to any document."
+
+    - agent: various
+      updates: any_flagged_documents
+      condition: po_checklist_issues
+      notes: "If PO finds issues, return to relevant agent to fix and re-export updated documents to docs/ folder."
+
+    - workflow_end:
+      action: move_to_ide
+      notes: "All planning artifacts complete. Move to IDE environment to begin development. Explain to the user the IDE Development Workflow next steps: data#bmad-kb:IDE Development Workflow"
+
+  flow_diagram: |
+    ```mermaid
+    graph TD
+        A[Start: Service Development] --> B[analyst: project-brief.md]
+        B --> C[pm: prd.md]
+        C --> D[architect: architecture.md]
+        D --> E{Architecture suggests PRD changes?}
+        E -->|Yes| F[pm: update prd.md]
+        E -->|No| G[po: validate all artifacts]
+        F --> G
+        G --> H{PO finds issues?}
+        H -->|Yes| I[Return to relevant agent for fixes]
+        H -->|No| J[Move to IDE Environment]
+        I --> G
+
+        B -.-> B1[Optional: brainstorming]
+        B -.-> B2[Optional: market research]
+        D -.-> D1[Optional: technical research]
+
+        style J fill:#90EE90
+        style B fill:#FFE4B5
+        style C fill:#FFE4B5
+        style D fill:#FFE4B5
+    ```
+
+  decision_guidance:
+    when_to_use:
+      - Building production APIs or microservices
+      - Multiple endpoints and complex business logic
+      - Need comprehensive documentation and testing
+      - Multiple team members will be involved
+      - Long-term maintenance expected
+      - Enterprise or external-facing APIs
+
+  handoff_prompts:
+    analyst_to_pm: "Project brief is complete. Save it as docs/project-brief.md in your project, then create the PRD."
+    pm_to_architect: "PRD is ready. Save it as docs/prd.md in your project, then create the service architecture."
+    architect_review: "Architecture complete. Save it as docs/architecture.md. Do you suggest any changes to the PRD stories or need new stories added?"
+    architect_to_pm: "Please update the PRD with the suggested story changes, then re-export the complete prd.md to docs/."
+    updated_to_po: "All documents ready in docs/ folder. Please validate all artifacts for consistency."
+    po_issues: "PO found issues with [document]. Please return to [agent] to fix and re-save the updated document."
+    complete: "All planning artifacts validated and saved in docs/ folder. Move to IDE environment to begin development."

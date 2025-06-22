@@ -1,0 +1,45 @@
+name: bmad-2d-phaser-game-dev
+version: 1.0.0
+description: 2D Game Development expansion pack for BMAD Method - Phaser 3 & TypeScript focused
+author: BMAD Team
+files:
+  - source: agents/game-designer.md
+    destination: .bmad-core/agents/game-designer.md
+  - source: agents/game-developer.md
+    destination: .bmad-core/agents/game-developer.md
+  - source: agents/game-sm.md
+    destination: .bmad-core/agents/game-sm.md
+  - source: team-game-dev.yml
+    destination: .bmad-core/agent-teams/team-game-dev.yml
+  - source: templates/game-design-doc-tmpl.md
+    destination: .bmad-core/templates/game-design-doc-tmpl.md
+  - source: templates/game-architecture-tmpl.md
+    destination: .bmad-core/templates/game-architecture-tmpl.md
+  - source: templates/level-design-doc-tmpl.md
+    destination: .bmad-core/templates/level-design-doc-tmpl.md
+  - source: templates/game-story-tmpl.md
+    destination: .bmad-core/templates/game-story-tmpl.md
+  - source: templates/game-brief-tmpl.md
+    destination: .bmad-core/templates/game-brief-tmpl.md
+  - source: tasks/create-game-story.md
+    destination: .bmad-core/tasks/create-game-story.md
+  - source: tasks/game-design-brainstorming.md
+    destination: .bmad-core/tasks/game-design-brainstorming.md
+  - source: tasks/advanced-elicitation.md
+    destination: .bmad-core/tasks/advanced-elicitation.md
+  - source: checklists/game-story-dod-checklist.md
+    destination: .bmad-core/checklists/game-story-dod-checklist.md
+  - source: checklists/game-design-checklist.md
+    destination: .bmad-core/checklists/game-design-checklist.md
+  - source: data/bmad-kb.md
+    destination: .bmad-core/data/bmad-kb.md
+  - source: data/development-guidelines.md
+    destination: .bmad-core/data/development-guidelines.md
+  - source: workflows/game-dev-greenfield.yml
+    destination: .bmad-core/workflows/game-dev-greenfield.yml
+  - source: workflows/game-prototype.yml
+    destination: .bmad-core/workflows/game-prototype.yml
+dependencies:
+  - architect
+  - developer
+  - sm
