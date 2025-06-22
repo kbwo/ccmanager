@@ -113,6 +113,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			isPrimaryCommand: true,
 			commandConfig,
+
+			// Dual-mode properties initialization
+			currentMode: 'claude', // Always start in Claude mode
+			bashHistory: [],
+			bashState: 'idle',
 		};
 
 		// Set up persistent background data handler for state detection
@@ -231,9 +236,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (session) {
 			session.isActive = active;
 
-			// If becoming active, emit a restore event with the output history
-			if (active && session.outputHistory.length > 0) {
-				this.emit('sessionRestore', session);
+			// If becoming active, emit a restore event with the appropriate history
+			if (active) {
+				// Restore Claude history if in Claude mode and has history
+				if (session.outputHistory.length > 0 && session.currentMode === 'claude') {
+					this.emit('sessionRestore', session);
+				}
+				// Restore bash history if in bash mode and has history
+				else if (session.bashHistory.length > 0 && session.currentMode === 'bash') {
+					this.emit('bashSessionRestore', session);
+				}
 			}
 		}
 	}
@@ -250,6 +262,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			} catch (_error) {
 				// Process might already be dead
 			}
+
+			// Clean up bash PTY if it exists
+			if (session.bashProcess) {
+				try {
+					session.bashProcess.kill();
+				} catch (_error) {
+					// Bash process might already be dead
+				}
+			}
+
 			// Clean up any pending timer
 			const timer = this.busyTimers.get(worktreePath);
 			if (timer) {

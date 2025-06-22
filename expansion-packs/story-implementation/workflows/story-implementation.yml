@@ -11,6 +11,29 @@ workflow:
     Phase 6: PR Creation and Epic Progress (Delivery + Tracking)
     Phase 7: Epic Retrospective (MANDATORY when epic reaches 100% completion)
   type: story-implementation
+
+  shard_configuration:
+    base_path: "docs/stories/"
+    naming_pattern: "epic{epic_number}.story{story_number}.{shard_type}.md"
+    main_story_pattern: "epic{epic_number}.story{story_number}.story.md"
+    max_lines_per_shard: 400
+    shard_types:
+      architecture_review: "arch-review"
+      business_review: "biz-review"
+      process_review: "proc-review"
+      qa_review: "qa-review"
+      ux_review: "ux-review"
+      consolidation: "consolidated"
+      implementation: "implementation"
+      validation: "validation"
+      learning_triage: "learning"
+      learning_review: "review"
+      pr_context: "pr-context"
+      pr_information: "pr-info"
+    auto_shard_triggers:
+      - content_exceeds_max_lines: true
+      - section_exceeds_lines: 150
+      - parallel_agent_writes: true
   
   visualization: |
     ```mermaid
@@ -119,7 +142,7 @@ workflow:
       action: execute-checklist
       inputs:
         - epic_number
-      checklist: epic-readiness-checklist.md
+      checklist: po-master-checklist.md
       notes: "REQUIRED: Use Task tool for execution - Validate epic business readiness and dependencies before story creation"
       story_status_update: "N/A - No story exists yet"
       
@@ -189,8 +212,10 @@ workflow:
       requires: pre_review_validation
       inputs:
         - story_file
+      outputs:
+        - arch_review_shard  # Direct to shard: epic{N}.story{N}.arch-review.md
       checklist: story-dod-checklist.md
-      notes: "REQUIRED: Use Task tool for execution - Round 1 - Architect validates technical design and architecture"
+      notes: "REQUIRED: Use Task tool for execution - Round 1 - Architect validates technical design and architecture. Write results directly to architecture review shard for parallel processing."
       checklist_completion_tracking: true
       
     - step: round1_business_review
@@ -199,8 +224,10 @@ workflow:
       requires: pre_review_validation
       inputs:
         - story_file
+      outputs:
+        - biz_review_shard  # Direct to shard: epic{N}.story{N}.biz-review.md
       checklist: story-dod-checklist.md
-      notes: "REQUIRED: Use Task tool for execution - Round 1 - Product Owner validates business alignment and value"
+      notes: "REQUIRED: Use Task tool for execution - Round 1 - Product Owner validates business alignment and value. Write results directly to business review shard for parallel processing."
       checklist_completion_tracking: true
       
     - step: round1_process_review
@@ -209,8 +236,10 @@ workflow:
       requires: pre_review_validation
       inputs:
         - story_file
+      outputs:
+        - proc_review_shard  # Direct to shard: epic{N}.story{N}.proc-review.md
       checklist: story-dod-checklist.md
-      notes: "REQUIRED: Use Task tool for execution - Round 1 - Scrum Master validates process compliance and DoD"
+      notes: "REQUIRED: Use Task tool for execution - Round 1 - Scrum Master validates process compliance and DoD. Write results directly to process review shard for parallel processing."
       checklist_completion_tracking: true
       
     - step: round1_qa_review
@@ -219,8 +248,10 @@ workflow:
       requires: pre_review_validation
       inputs:
         - story_file
+      outputs:
+        - qa_review_shard  # Direct to shard: epic{N}.story{N}.qa-review.md
       checklist: story-dod-checklist.md
-      notes: "REQUIRED: Use Task tool for execution - Round 1 - QA validates implementation quality and completeness"
+      notes: "REQUIRED: Use Task tool for execution - Round 1 - QA validates implementation quality and completeness. Write results directly to QA review shard for parallel processing."
       checklist_completion_tracking: true
       
     - step: round1_ux_review
@@ -229,31 +260,37 @@ workflow:
       requires: pre_review_validation
       inputs:
         - story_file
+      outputs:
+        - ux_review_shard  # Direct to shard: epic{N}.story{N}.ux-review.md
       checklist: story-dod-checklist.md
-      notes: "REQUIRED: Use Task tool for execution - Round 1 - UX Expert validates user experience and accessibility"
+      notes: "REQUIRED: Use Task tool for execution - Round 1 - UX Expert validates user experience and accessibility. Write results directly to UX review shard for parallel processing."
       checklist_completion_tracking: true
       
     - step: consolidate_feedback
-      agent: architect
+      agent: sm
       action: consolidate-review-feedback
       requires: [round1_architecture_review, round1_business_review, round1_process_review, round1_qa_review, round1_ux_review]
       inputs:
-        - story_file
-        - architecture_feedback
-        - business_feedback
-        - process_feedback
-        - qa_feedback
-        - ux_feedback
-      notes: "REQUIRED: Use Task tool for execution - Architect consolidates all review feedback with REQUIRED-FOR-COMPLETION/QUALITY-STANDARD/IMPROVEMENT classification"
+        - story_file  # Main story context
+        - arch_review_shard  # From architect review
+        - biz_review_shard      # From PO review
+        - proc_review_shard       # From SM review
+        - qa_review_shard           # From QA review
+        - ux_review_shard           # From UX review
+      outputs:
+        - consolidated_shard  # Direct to shard: epic{N}.story{N}.consolidated.md
+      notes: "REQUIRED: Use Task tool for execution - Scrum Master consolidates all review feedback from individual review shards with REQUIRED-FOR-COMPLETION/QUALITY-STANDARD/IMPROVEMENT/SCOPE-CREEP classification. Compare ALL feedback against original acceptance criteria to identify scope creep. Write consolidated results to dedicated shard."
       
     - step: implement_fixes
       agent: dev
       action: implement-consolidated-fixes
       requires: consolidate_feedback
       inputs:
-        - story_file
-        - consolidated_feedback
-      notes: "REQUIRED: Use Task tool for execution - Dev implements consolidated fixes and documents in story"
+        - story_file  # Main story context
+        - consolidated_shard  # From consolidation step
+      outputs:
+        - implementation_shard  # Direct to shard: epic{N}.story{N}.implementation.md
+      notes: "REQUIRED: Use Task tool for execution - Dev implements consolidated fixes from consolidated feedback shard and documents results in implementation fixes shard. Read consolidated feedback from dedicated shard."
       
     - step: verify_quality_gates
       agent: dev
@@ -262,41 +299,47 @@ workflow:
       inputs:
         - story_file
       checklist: story-dod-checklist.md
-      notes: "REQUIRED: Use Task tool for execution - Dev verifies all quality gates pass before architect review"
+      notes: "REQUIRED: Use Task tool for execution - Dev verifies all quality gates pass before SM validation"
       checklist_completion_tracking: true
       
     - step: validate_fixes
-      agent: architect
+      agent: sm
       action: validate-consolidated-fixes
       requires: verify_quality_gates
       inputs:
-        - story_file
-        - original_feedback
-        - implemented_fixes
-      notes: "REQUIRED: Use Task tool for execution - Architect validates fixes using story docs + browser MCP for UX changes"
+        - story_file  # Main story context
+        - consolidated_shard  # Original feedback from SM consolidation
+        - implementation_shard   # Implemented fixes
+      outputs:
+        - validation_shard  # Direct to shard: epic{N}.story{N}.validation.md
+      notes: "REQUIRED: Use Task tool for execution - SM validates that implemented fixes address consolidated feedback priorities and classification. Process compliance validation, not technical deep-dive."
       story_status_update: "Implementation Validated"
       
     - step: capture_learning_triage
-      agent: architect
+      agent: sm
       action: capture-learning-triage
       requires: validate_fixes
       inputs:
-        - story_file
-        - review_feedback
-        - implementation_fixes
-        - quality_metrics
-      notes: "REQUIRED: Use Task tool for execution - Extract and triage learnings into structured categories with priorities"
+        - story_file  # Main story context
+        - consolidated_shard  # Original consolidated feedback
+        - implementation_shard   # Implementation details
+        - validation_shard     # SM validation results
+      outputs:
+        - learning_shard  # Direct to shard: epic{N}.story{N}.learning.md
+      notes: "REQUIRED: Use Task tool for execution - SM extracts learnings from entire story implementation process with neutral perspective across all domains. Triage into structured categories with priorities."
       story_status_update: "Learning Extracted"
       
     - step: party_mode_review
-      agent: architect
+      agent: sm
       action: party-mode-learning-review
       requires: capture_learning_triage
       inputs:
-        - story_file
-        - learning_triage_items
-      collaborators: [po, sm, dev]
-      notes: "REQUIRED: Use Task tool for execution - Architect-led collaborative team review of learning items with technical categorization consensus"
+        - story_file  # Main story context
+        - learning_shard  # Learning items from SM triage
+      outputs:
+        - review_shard  # Direct to shard: epic{N}.story{N}.review.md
+      collaborators: [architect, po, dev]
+      notes: "REQUIRED: Use Task tool for execution - SM-facilitated collaborative team review of learning items with neutral facilitation. Architect provides key technical input. Build consensus on learning priorities and categorization."
       story_status_update: "Learning Reviewed"
       
     - step: commit_and_prepare_pr
@@ -304,10 +347,12 @@ workflow:
       action: commit-and-prepare-pr
       requires: party_mode_review
       inputs:
-        - story_file
-        - learning_review_results
-        - implementation_changes
-      notes: "REQUIRED: Use Task tool for execution - Commit implementation with comprehensive context and prepare PR materials"
+        - story_file  # Main story context
+        - review_shard  # Learning review results
+        - implementation_shard  # Implementation changes
+      outputs:
+        - pr_context_shard  # Direct to shard: epic{N}.story{N}.pr-context.md
+      notes: "REQUIRED: Use Task tool for execution - Commit implementation and create PR context shard with comprehensive context. Read from dedicated shards for complete context."
       story_status_update: "Changes Committed"
       
     - step: create_comprehensive_pr
@@ -315,10 +360,12 @@ workflow:
       action: create-comprehensive-pr
       requires: commit_and_prepare_pr
       inputs:
-        - story_file
-        - commit_information
-        - pr_context
-      notes: "REQUIRED: Use Task tool for execution - Create PR with business summary, technical changes, and learning extraction"
+        - story_file  # Main story context
+        - pr_context_shard  # PR context from commit step
+        - review_shard  # Learning insights
+      outputs:
+        - pr_info_shard  # Direct to shard: epic{N}.story{N}.pr-info.md
+      notes: "REQUIRED: Use Task tool for execution - Create PR from PR context shard with business summary, technical changes, and learning extraction. Write PR details to dedicated shard."
       story_status_update: "PR Created"
       
     - step: update_epic_progress
@@ -326,11 +373,12 @@ workflow:
       action: update-epic-progress
       requires: create_comprehensive_pr
       inputs:
-        - story_file
-        - epic_number
-        - pr_information
-        - learning_items
-      notes: "REQUIRED: Use Task tool for execution - Update epic progress tracking and schedule learning integration"
+        - story_file  # Main story context with epic number
+        - pr_info_shard  # PR details
+        - review_shard  # Learning items for integration
+      outputs:
+        - epic_file  # Updated with story progress
+      notes: "REQUIRED: Use Task tool for execution - Update epic progress tracking from story and dedicated shards. Schedule learning integration from learning review shard."
       story_status_update: "Done - Delivered"
       
     - step: epic_retrospective
@@ -491,9 +539,7 @@ workflow:
       - create-comprehensive-pr
       - update-epic-progress
       - epic-party-mode-retrospective
-    expansion_checklists:
-      - story-approval-checklist.md
-      - epic-readiness-checklist.md
+    expansion_checklists: []
 
   handoff_prompts:
     po_validate_epic: "Validate epic {epic_number} readiness for story creation - check approval status, dependencies, and business context"
@@ -506,10 +552,10 @@ workflow:
     round1_reviews: "Pre-review passed. Conduct comprehensive Round 1 reviews (architecture, business, process, QA, UX)"
     consolidate: "Round 1 reviews complete. Consolidate all feedback with REQUIRED-FOR-COMPLETION/QUALITY-STANDARD/IMPROVEMENT classification"
     implement_fixes: "Feedback consolidated. Implement fixes and document changes in story"
-    verify_gates: "Fixes implemented. Verify all quality gates pass before architect review"
-    validate_fixes: "Quality gates passed. Validate fixes using story docs + browser MCP for UX changes"
-    capture_learning: "Implementation validated. Extract learnings into structured categories with priorities and ownership"
-    party_review: "Learning triage complete. Architect facilitates collaborative team review to achieve technical categorization consensus"
+    verify_gates: "Fixes implemented. Verify all quality gates pass before SM validation"
+    validate_fixes: "Quality gates passed. SM validates that fixes address consolidated feedback priorities and completion criteria"
+    capture_learning: "Implementation validated. SM extracts learnings from entire story process with neutral perspective across all domains"
+    party_review: "Learning triage complete. SM facilitates collaborative team review with architect providing key technical input to achieve consensus"
     commit_prepare: "Learning review complete. Commit implementation changes and prepare comprehensive PR context"
     create_pr: "Implementation committed. Create PR with business summary, technical changes, and learning extraction"
     update_epic: "PR created. Update epic progress tracking and schedule learning integration. Checking epic completion status for MANDATORY epic retrospective."

@@ -28,9 +28,7 @@ files:
     - update-epic-progress.md
     - epic-party-mode-retrospective.md
 
-  checklists:
-    - story-approval-checklist.md
-    - epic-readiness-checklist.md
+  checklists: []
 
 # Dependencies on core BMAD components
 dependencies:
@@ -51,6 +49,7 @@ dependencies:
     - architect-checklist.md
     - po-master-checklist.md
     - story-dod-checklist.md
+    - pm-checklist.md
   core_templates:
     - story-tmpl.md
 
@@ -74,7 +73,7 @@ post_install_message: |
   - Epic validation before story creation
   - Project-agnostic code generation and build tool integration
   - Round 1: Comprehensive reviews (Architecture, Business, Process, QA, UX)
-  - Feedback consolidation with REQUIRED-FOR-COMPLETION/QUALITY-STANDARD/IMPROVEMENT classification
+  - Feedback consolidation with REQUIRED-FOR-COMPLETION/QUALITY-STANDARD/IMPROVEMENT/SCOPE-CREEP classification
   - Round 2+: Efficient architect-only validation with browser MCP testing
   - Story status tracking throughout workflow (Draft → Approved → In Progress → Verified → Review → Done → Delivered)
   - Story-based documentation for evidence and tracking

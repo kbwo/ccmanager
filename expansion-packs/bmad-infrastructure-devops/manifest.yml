@@ -1,0 +1,23 @@
+name: bmad-infrastructure-devops
+version: 1.0.0
+description: Infrastructure & DevOps expansion pack for BMAD Method - Platform engineering and cloud infrastructure focused
+author: BMAD Team
+files:
+  - source: agents/infra-devops-platform.md
+    destination: .bmad-core/agents/infra-devops-platform.md
+  - source: templates/infrastructure-architecture-tmpl.md
+    destination: .bmad-core/templates/infrastructure-architecture-tmpl.md
+  - source: templates/infrastructure-platform-from-arch-tmpl.md
+    destination: .bmad-core/templates/infrastructure-platform-from-arch-tmpl.md
+  - source: tasks/create-doc.md
+    destination: .bmad-core/tasks/create-doc.md
+  - source: tasks/review-infrastructure.md
+    destination: .bmad-core/tasks/review-infrastructure.md
+  - source: tasks/validate-infrastructure.md
+    destination: .bmad-core/tasks/validate-infrastructure.md
+  - source: checklists/infrastructure-checklist.md
+    destination: .bmad-core/checklists/infrastructure-checklist.md
+dependencies:
+  - architect
+  - operations-specialist
+  - security-specialist
