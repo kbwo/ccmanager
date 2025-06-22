@@ -38,8 +38,8 @@ const Session: React.FC<SessionProps> = ({
 
 		// Set up bash data handler for history management
 		bashPty.onData((data: string) => {
-			// Only write to stdout if we're in bash mode
-			if (currentMode === 'bash' && !isExiting) {
+			// Only write to stdout if we're in bash mode (check session state directly)
+			if (session.currentMode === 'bash' && !isExiting) {
 				stdout.write(data);
 			}
 
@@ -65,7 +65,7 @@ const Session: React.FC<SessionProps> = ({
 
 		session.bashProcess = bashPty;
 		return bashPty;
-	}, [session, currentMode, isExiting, stdout]);
+	}, [session, isExiting, stdout]);
 
 	// Display mode indicator
 	const displayModeIndicator = useCallback(
@@ -117,8 +117,8 @@ const Session: React.FC<SessionProps> = ({
 			// Display mode indicator first
 			displayModeIndicator('claude');
 
-			// Trigger Claude history restoration
-			sessionManager.emit('sessionRestore', session);
+			// Claude history restoration will be triggered automatically by setSessionActive
+			// when useEffect re-runs due to mode change
 		}
 	}, [
 		currentMode,
@@ -324,7 +324,6 @@ const Session: React.FC<SessionProps> = ({
 		onReturnToMenu,
 		isExiting,
 		createBashProcess,
-		currentMode,
 		displayModeIndicator,
 		toggleMode,
 	]);
