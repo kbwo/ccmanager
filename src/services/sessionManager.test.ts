@@ -329,7 +329,7 @@ describe('SessionManager', () => {
 			session.bashHistory = [
 				Buffer.from('$ ls\n'),
 				Buffer.from('file1.txt file2.txt\n'),
-				Buffer.from('$ pwd\n')
+				Buffer.from('$ pwd\n'),
 			];
 
 			// Set up event listener spy
@@ -356,7 +356,7 @@ describe('SessionManager', () => {
 			session.currentMode = 'claude';
 			session.outputHistory = [
 				Buffer.from('Claude response 1\n'),
-				Buffer.from('Claude response 2\n')
+				Buffer.from('Claude response 2\n'),
 			];
 
 			// Set up event listener spy

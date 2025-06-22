@@ -20,6 +20,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	);
 	const [focusedIndex, setFocusedIndex] = useState(0);
 	const [confirmMode, setConfirmMode] = useState(false);
+	const [forceDelete, setForceDelete] = useState(false);
 
 	useEffect(() => {
 		const worktreeService = new WorktreeService();
@@ -40,6 +41,38 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			return;
 		}
 
+		// Handle escape key
+		if (shortcutManager.matchesShortcut('cancel', input, key)) {
+			onCancel();
+			return;
+		}
+
+		// Handle hotkeys
+		const keyPressed = input.toLowerCase();
+
+		if (key.ctrl && keyPressed === 'd') {
+			// Ctrl+D - proceed with deletion (skip selection step if any selected)
+			if (selectedIndices.size > 0) {
+				setConfirmMode(true);
+			}
+			return;
+		}
+
+		if (keyPressed === 'f') {
+			// F - toggle force deletion option
+			setForceDelete(prev => !prev);
+			return;
+		}
+
+		if (key.return) {
+			// Enter - confirm selected worktree for deletion
+			if (selectedIndices.size > 0) {
+				setConfirmMode(true);
+			}
+			return;
+		}
+
+		// Navigation and selection
 		if (key.upArrow) {
 			setFocusedIndex(prev => Math.max(0, prev - 1));
 		} else if (key.downArrow) {
@@ -55,12 +88,6 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				}
 				return newSet;
 			});
-		} else if (key.return) {
-			if (selectedIndices.size > 0) {
-				setConfirmMode(true);
-			}
-		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
-			onCancel();
 		}
 	});
 
@@ -68,9 +95,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		return (
 			<Box flexDirection="column">
 				<Text color="yellow">No worktrees available to delete.</Text>
-				<Text dimColor>
-					Press {shortcutManager.getShortcutDisplay('cancel')} to return to menu
-				</Text>
+				<Text dimColor>Hotkeys: Esc-Cancel</Text>
 			</Box>
 		);
 	}
@@ -125,10 +150,11 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				</Text>
 			</Box>
 
-			<Box marginBottom={1}>
+			<Box marginBottom={1} flexDirection="column">
 				<Text dimColor>
 					Select worktrees to delete (Space to select, Enter to confirm):
 				</Text>
+				{forceDelete && <Text color="red">Force deletion mode enabled</Text>}
 			</Box>
 
 			{worktrees.map((worktree, index) => {
@@ -150,14 +176,14 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			})}
 
 			<Box marginTop={1} flexDirection="column">
+				<Text dimColor>Controls: ↑↓ Navigate, Space Select, Enter Confirm</Text>
 				<Text dimColor>
-					Controls: ↑↓ Navigate, Space Select, Enter Confirm,{' '}
-					{shortcutManager.getShortcutDisplay('cancel')} Cancel
+					Hotkeys: Esc-Cancel Ctrl+D-Delete F-Force Enter-Confirm
 				</Text>
 				{selectedIndices.size > 0 && (
 					<Text color="yellow">
 						{selectedIndices.size} worktree{selectedIndices.size > 1 ? 's' : ''}{' '}
-						selected
+						selected{forceDelete ? ' (force mode)' : ''}
 					</Text>
 				)}
 			</Box>

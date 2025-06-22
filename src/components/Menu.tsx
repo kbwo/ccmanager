@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {Box, Text} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Worktree, Session} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -26,6 +26,11 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 	const [worktrees, setWorktrees] = useState<Worktree[]>([]);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
+	const [refreshKey, setRefreshKey] = useState<number>(0);
+
+	const refreshWorktrees = () => {
+		setRefreshKey(prev => prev + 1);
+	};
 
 	useEffect(() => {
 		// Load worktrees
@@ -57,7 +62,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager]);
+	}, [sessionManager, refreshKey]);
 
 	useEffect(() => {
 		// Build menu items
@@ -106,6 +111,64 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 		});
 		setItems(menuItems);
 	}, [worktrees, sessions]);
+
+	// Handle hotkeys
+	useInput((input, _key) => {
+		const keyPressed = input.toLowerCase();
+
+		switch (keyPressed) {
+			case 'n':
+				// Trigger new worktree action
+				onSelectWorktree({
+					path: '',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'm':
+				// Trigger merge worktree action
+				onSelectWorktree({
+					path: 'MERGE_WORKTREE',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'd':
+				// Trigger delete worktree action
+				onSelectWorktree({
+					path: 'DELETE_WORKTREE',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'c':
+				// Trigger configuration action
+				onSelectWorktree({
+					path: 'CONFIGURATION',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'q':
+			case 'x':
+				// Trigger exit action
+				onSelectWorktree({
+					path: 'EXIT_APPLICATION',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'r':
+				// Trigger refresh
+				refreshWorktrees();
+				break;
+		}
+	});
 
 	const handleSelect = (item: MenuItem) => {
 		if (item.value === 'separator') {
@@ -178,6 +241,9 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_LABELS.IDLE}
 				</Text>
 				<Text dimColor>Controls: ↑↓ Navigate Enter Select</Text>
+				<Text dimColor>
+					Hotkeys: N-New M-Merge D-Delete C-Config Q-Quit R-Refresh
+				</Text>
 			</Box>
 		</Box>
 	);
