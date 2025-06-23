@@ -23,23 +23,23 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 
 	const menuItems: MenuItem[] = [
 		{
-			label: '⌨  Configure Shortcuts',
+			label: 'S ⌨  Configure Shortcuts',
 			value: 'shortcuts',
 		},
 		{
-			label: '🔧  Configure Status Hooks',
+			label: 'H 🔧  Configure Status Hooks',
 			value: 'hooks',
 		},
 		{
-			label: '📁  Configure Worktree Settings',
+			label: 'W 📁  Configure Worktree Settings',
 			value: 'worktree',
 		},
 		{
-			label: '🚀  Configure Command',
+			label: 'C 🚀  Configure Command',
 			value: 'command',
 		},
 		{
-			label: '← Back to Main Menu',
+			label: 'B ← Back to Main Menu',
 			value: 'back',
 		},
 	];
@@ -121,12 +121,6 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			</Box>
 
 			<SelectInput items={menuItems} onSelect={handleSelect} isFocused={true} />
-
-			<Box marginTop={1}>
-				<Text dimColor>
-					Hotkeys: S-Shortcuts H-Hooks W-Worktree C-Command B-Back
-				</Text>
-			</Box>
 		</Box>
 	);
 };

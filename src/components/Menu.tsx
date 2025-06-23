@@ -66,7 +66,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 
 	useEffect(() => {
 		// Build menu items
-		const menuItems: MenuItem[] = worktrees.map(wt => {
+		const menuItems: MenuItem[] = worktrees.map((wt, index) => {
 			const session = sessions.find(s => s.worktreePath === wt.path);
 			let status = '';
 
@@ -78,7 +78,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			const isMain = wt.isMainWorktree ? ' (main)' : '';
 
 			return {
-				label: `${branchName}${isMain}${status}`,
+				label: `${index} ❯ ${branchName}${isMain}${status}`,
 				value: wt.path,
 				worktree: wt,
 			};
@@ -90,23 +90,23 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			value: 'separator',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.NEW_WORKTREE} New Worktree`,
+			label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
 			value: 'new-worktree',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
+			label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
 			value: 'merge-worktree',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
+			label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
 			value: 'delete-worktree',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
+			label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
 			value: 'configuration',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.EXIT} Exit`,
+			label: `Q ${MENU_ICONS.EXIT} Exit`,
 			value: 'exit',
 		});
 		setItems(menuItems);
@@ -115,6 +115,15 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 	// Handle hotkeys
 	useInput((input, _key) => {
 		const keyPressed = input.toLowerCase();
+
+		// Handle number keys 0-9 for worktree selection
+		if (/^[0-9]$/.test(keyPressed)) {
+			const index = parseInt(keyPressed);
+			if (index < worktrees.length && worktrees[index]) {
+				onSelectWorktree(worktrees[index]);
+			}
+			return;
+		}
 
 		switch (keyPressed) {
 			case 'n':
@@ -240,9 +249,8 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_ICONS.WAITING} {STATUS_LABELS.WAITING} {STATUS_ICONS.IDLE}{' '}
 					{STATUS_LABELS.IDLE}
 				</Text>
-				<Text dimColor>Controls: ↑↓ Navigate Enter Select</Text>
 				<Text dimColor>
-					Hotkeys: N-New M-Merge D-Delete C-Config Q-Quit R-Refresh
+					Controls: ↑↓ Navigate Enter Select 0-9 Quick Select R Refresh
 				</Text>
 			</Box>
 		</Box>
