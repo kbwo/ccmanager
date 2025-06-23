@@ -53,18 +53,44 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	}, []);
 
 	useInput((input, key) => {
+		// Handle escape key
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
 			return;
 		}
 
+		// Handle hotkeys
+		const keyPressed = input.toLowerCase();
+
+		// Ctrl+M - proceed with merge (skip to confirmation if possible)
+		if (key.ctrl && keyPressed === 'm') {
+			if (sourceBranch && targetBranch) {
+				setStep('confirm-merge');
+			}
+			return;
+		}
+
+		// T - cycle through target branch options (only in operation selection)
+		if (keyPressed === 't' && step === 'select-operation') {
+			setOperationFocused(!operationFocused);
+			setUseRebase(!operationFocused);
+			return;
+		}
+
+		// Enter - confirm selected option
+		if (key.return) {
+			if (step === 'select-operation') {
+				setStep('confirm-merge');
+			}
+			return;
+		}
+
+		// Navigation for operation selection
 		if (step === 'select-operation') {
 			if (key.leftArrow || key.rightArrow) {
 				const newOperationFocused = !operationFocused;
 				setOperationFocused(newOperationFocused);
 				setUseRebase(newOperationFocused);
-			} else if (key.return) {
-				setStep('confirm-merge');
 			}
 		}
 	});
@@ -185,7 +211,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 
 				<Box marginTop={1}>
 					<Text dimColor>
-						Use ← → to navigate, Enter to select,{' '}
+						Use ← → to navigate, Enter to select, T to change target,{' '}
 						{shortcutManager.getShortcutDisplay('cancel')} to cancel
 					</Text>
 				</Box>

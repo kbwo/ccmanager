@@ -20,6 +20,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	);
 	const [focusedIndex, setFocusedIndex] = useState(0);
 	const [confirmMode, setConfirmMode] = useState(false);
+	const [forceDelete, setForceDelete] = useState(false);
 	const VIEWPORT_SIZE = 10; // Maximum number of items to display at once
 
 	useEffect(() => {
@@ -41,6 +42,38 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			return;
 		}
 
+		// Handle escape key
+		if (shortcutManager.matchesShortcut('cancel', input, key)) {
+			onCancel();
+			return;
+		}
+
+		// Handle hotkeys
+		const keyPressed = input.toLowerCase();
+
+		if (key.ctrl && keyPressed === 'd') {
+			// Ctrl+D - proceed with deletion (skip selection step if any selected)
+			if (selectedIndices.size > 0) {
+				setConfirmMode(true);
+			}
+			return;
+		}
+
+		if (keyPressed === 'f') {
+			// F - toggle force deletion option
+			setForceDelete(prev => !prev);
+			return;
+		}
+
+		if (key.return) {
+			// Enter - confirm selected worktree for deletion
+			if (selectedIndices.size > 0) {
+				setConfirmMode(true);
+			}
+			return;
+		}
+
+		// Navigation and selection
 		if (key.upArrow) {
 			setFocusedIndex(prev => Math.max(0, prev - 1));
 		} else if (key.downArrow) {
@@ -56,12 +89,6 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				}
 				return newSet;
 			});
-		} else if (key.return) {
-			if (selectedIndices.size > 0) {
-				setConfirmMode(true);
-			}
-		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
-			onCancel();
 		}
 	});
 
@@ -167,10 +194,11 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 					Controls: ↑↓ Navigate, Space Select, Enter Confirm,{' '}
 					{shortcutManager.getShortcutDisplay('cancel')} Cancel
 				</Text>
+				<Text dimColor>Hotkeys: Ctrl+D-Delete F-Force</Text>
 				{selectedIndices.size > 0 && (
 					<Text color="yellow">
 						{selectedIndices.size} worktree{selectedIndices.size > 1 ? 's' : ''}{' '}
-						selected
+						selected{forceDelete ? ' (force deletion)' : ''}
 					</Text>
 				)}
 			</Box>

@@ -24,16 +24,40 @@ const Confirmation: React.FC<ConfirmationProps> = ({
 	const [focused, setFocused] = useState(true); // true = confirm, false = cancel
 
 	useInput((input, key) => {
-		if (key.leftArrow || key.rightArrow) {
-			setFocused(!focused);
-		} else if (key.return) {
+		// Handle Y/N hotkeys
+		const keyPressed = input.toLowerCase();
+
+		if (keyPressed === 'y') {
+			// Y - confirm action
+			onConfirm();
+			return;
+		}
+
+		if (keyPressed === 'n') {
+			// N - cancel action
+			onCancel();
+			return;
+		}
+
+		// Handle escape key
+		if (shortcutManager.matchesShortcut('cancel', input, key)) {
+			onCancel();
+			return;
+		}
+
+		// Handle enter key
+		if (key.return) {
 			if (focused) {
 				onConfirm();
 			} else {
 				onCancel();
 			}
-		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
-			onCancel();
+			return;
+		}
+
+		// Handle navigation
+		if (key.leftArrow || key.rightArrow) {
+			setFocused(!focused);
 		}
 	});
 
@@ -58,7 +82,7 @@ const Confirmation: React.FC<ConfirmationProps> = ({
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Use ← → to navigate, Enter to select,{' '}
+					Use ← → to navigate, Enter to select, Y-Yes N-No{' '}
 					{shortcutManager.getShortcutDisplay('cancel')} to cancel
 				</Text>
 			</Box>

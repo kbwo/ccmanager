@@ -51,8 +51,38 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	);
 
 	useInput((input, key) => {
+		// Handle cancel
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
+			return;
+		}
+
+		// Handle Ctrl+N - Next step
+		if (key.ctrl && input.toLowerCase() === 'n') {
+			if (step === 'path' && path.trim()) {
+				setStep('branch');
+			} else if (step === 'branch' && branch.trim()) {
+				setStep('base-branch');
+			}
+			return;
+		}
+
+		// Handle Ctrl+B - Back step
+		if (key.ctrl && input.toLowerCase() === 'b') {
+			if (step === 'base-branch') {
+				setStep('branch');
+			} else if (step === 'branch' && !isAutoDirectory) {
+				setStep('path');
+			}
+			return;
+		}
+
+		// Handle Tab - Auto-complete (for branch field)
+		// Note: Tab handling for autocomplete would require implementing branch suggestions
+		// For now, we'll just document that this could be enhanced in the future
+		if (key.tab && step === 'branch') {
+			// Future enhancement: implement branch autocomplete
+			return;
 		}
 	});
 
@@ -174,7 +204,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel
+					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel |
+					Hotkeys: Ctrl+N-Next Ctrl+B-Back
 				</Text>
 			</Box>
 		</Box>
