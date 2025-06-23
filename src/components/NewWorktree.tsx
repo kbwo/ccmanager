@@ -203,7 +203,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Hotkeys: Esc-Cancel Ctrl+N-Next Ctrl+B-Back Tab-Autocomplete
+					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel |
+					Hotkeys: Ctrl+N-Next Ctrl+B-Back
 				</Text>
 			</Box>
 		</Box>

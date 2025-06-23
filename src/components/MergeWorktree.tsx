@@ -128,7 +128,9 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 				/>
 
 				<Box marginTop={1}>
-					<Text dimColor>Hotkeys: Esc-Cancel Ctrl+M-Merge Enter-Confirm</Text>
+					<Text dimColor>
+						Press {shortcutManager.getShortcutDisplay('cancel')} to cancel
+					</Text>
 				</Box>
 			</Box>
 		);
@@ -160,7 +162,9 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 				/>
 
 				<Box marginTop={1}>
-					<Text dimColor>Hotkeys: Esc-Cancel Ctrl+M-Merge Enter-Confirm</Text>
+					<Text dimColor>
+						Press {shortcutManager.getShortcutDisplay('cancel')} to cancel
+					</Text>
 				</Box>
 			</Box>
 		);
@@ -205,7 +209,8 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 
 				<Box marginTop={1}>
 					<Text dimColor>
-						Hotkeys: Esc-Cancel Ctrl+M-Merge T-Target Enter-Confirm
+						Use ← → to navigate, Enter to select, T to change target,{' '}
+						{shortcutManager.getShortcutDisplay('cancel')} to cancel
 					</Text>
 				</Box>
 			</Box>

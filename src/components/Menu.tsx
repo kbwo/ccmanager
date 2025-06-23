@@ -26,11 +26,6 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 	const [worktrees, setWorktrees] = useState<Worktree[]>([]);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
-	const [refreshKey, setRefreshKey] = useState<number>(0);
-
-	const refreshWorktrees = () => {
-		setRefreshKey(prev => prev + 1);
-	};
 
 	useEffect(() => {
 		// Load worktrees
@@ -62,7 +57,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager, refreshKey]);
+	}, [sessionManager]);
 
 	useEffect(() => {
 		// Build menu items
@@ -172,10 +167,6 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					hasSession: false,
 				});
 				break;
-			case 'r':
-				// Trigger refresh
-				refreshWorktrees();
-				break;
 		}
 	});
 
@@ -250,7 +241,8 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_LABELS.IDLE}
 				</Text>
 				<Text dimColor>
-					Controls: ↑↓ Navigate Enter Select 0-9 Quick Select R Refresh
+					Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select N-New
+					M-Merge D-Delete C-Config Q-Quit
 				</Text>
 			</Box>
 		</Box>

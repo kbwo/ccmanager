@@ -81,7 +81,10 @@ const Confirmation: React.FC<ConfirmationProps> = ({
 			</Box>
 
 			<Box marginTop={1}>
-				<Text dimColor>Hotkeys: Y-Yes N/Esc-No Enter-Select</Text>
+				<Text dimColor>
+					Use ← → to navigate, Enter to select, Y-Yes N-No{' '}
+					{shortcutManager.getShortcutDisplay('cancel')} to cancel
+				</Text>
 			</Box>
 		</Box>
 	);
