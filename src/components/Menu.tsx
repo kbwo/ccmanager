@@ -69,7 +69,9 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 				status = ` [${getStatusDisplay(session.state)}]`;
 			}
 
-			const branchName = wt.branch.replace('refs/heads/', '');
+			const branchName = wt.branch
+				? wt.branch.replace('refs/heads/', '')
+				: 'detached';
 			const isMain = wt.isMainWorktree ? ' (main)' : '';
 
 			return {

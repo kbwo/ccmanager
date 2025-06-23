@@ -39,32 +39,49 @@ export class WorktreeService {
 			const worktrees: Worktree[] = [];
 			const lines = output.trim().split('\n');
 
-			let currentWorktree: Partial<Worktree> = {};
-
-			for (const line of lines) {
-				if (line.startsWith('worktree ')) {
-					if (currentWorktree.path) {
-						worktrees.push(currentWorktree as Worktree);
-					}
-					currentWorktree = {
-						path: line.substring(9),
-						isMainWorktree: false,
-						hasSession: false,
-					};
-				} else if (line.startsWith('branch ')) {
-					let branch = line.substring(7);
-					// Remove refs/heads/ prefix if present
-					if (branch.startsWith('refs/heads/')) {
-						branch = branch.substring(11);
-					}
-					currentWorktree.branch = branch;
-				} else if (line === 'bare') {
-					currentWorktree.isMainWorktree = true;
+			const parseWorktree = (
+				lines: string[],
+				startIndex: number,
+			): [Worktree | null, number] => {
+				const worktreeLine = lines[startIndex];
+				if (!worktreeLine?.startsWith('worktree ')) {
+					return [null, startIndex];
 				}
-			}
 
-			if (currentWorktree.path) {
-				worktrees.push(currentWorktree as Worktree);
+				const worktree: Worktree = {
+					path: worktreeLine.substring(9),
+					isMainWorktree: false,
+					hasSession: false,
+				};
+
+				let i = startIndex + 1;
+				while (
+					i < lines.length &&
+					lines[i] &&
+					!lines[i]!.startsWith('worktree ')
+				) {
+					const line = lines[i];
+					if (line && line.startsWith('branch ')) {
+						const branch = line.substring(7);
+						worktree.branch = branch.startsWith('refs/heads/')
+							? branch.substring(11)
+							: branch;
+					} else if (line === 'bare') {
+						worktree.isMainWorktree = true;
+					}
+					i++;
+				}
+
+				return [worktree, i];
+			};
+
+			let index = 0;
+			while (index < lines.length) {
+				const [worktree, nextIndex] = parseWorktree(lines, index);
+				if (worktree) {
+					worktrees.push(worktree);
+				}
+				index = nextIndex > index ? nextIndex : index + 1;
 			}
 
 			// Mark the first worktree as main if none are marked
@@ -243,7 +260,9 @@ export class WorktreeService {
 			});
 
 			// Delete the branch if it exists
-			const branchName = worktree.branch.replace('refs/heads/', '');
+			const branchName = worktree.branch
+				? worktree.branch.replace('refs/heads/', '')
+				: 'detached';
 			try {
 				execSync(`git branch -D "${branchName}"`, {
 					cwd: this.rootPath,
@@ -273,7 +292,8 @@ export class WorktreeService {
 			// Get worktrees to find the target worktree path
 			const worktrees = this.getWorktrees();
 			const targetWorktree = worktrees.find(
-				wt => wt.branch.replace('refs/heads/', '') === targetBranch,
+				wt =>
+					wt.branch && wt.branch.replace('refs/heads/', '') === targetBranch,
 			);
 
 			if (!targetWorktree) {
@@ -287,7 +307,8 @@ export class WorktreeService {
 			if (useRebase) {
 				// For rebase, we need to checkout source branch and rebase it onto target
 				const sourceWorktree = worktrees.find(
-					wt => wt.branch.replace('refs/heads/', '') === sourceBranch,
+					wt =>
+						wt.branch && wt.branch.replace('refs/heads/', '') === sourceBranch,
 				);
 
 				if (!sourceWorktree) {
@@ -335,7 +356,7 @@ export class WorktreeService {
 			// Get worktrees to find the worktree by branch
 			const worktrees = this.getWorktrees();
 			const worktree = worktrees.find(
-				wt => wt.branch.replace('refs/heads/', '') === branch,
+				wt => wt.branch && wt.branch.replace('refs/heads/', '') === branch,
 			);
 
 			if (!worktree) {

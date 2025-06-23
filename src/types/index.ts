@@ -9,7 +9,7 @@ export type TerminalMode = 'claude' | 'bash';
 
 export interface Worktree {
 	path: string;
-	branch: string;
+	branch?: string;
 	isMainWorktree: boolean;
 	hasSession: boolean;
 }
