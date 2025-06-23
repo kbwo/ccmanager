@@ -90,19 +90,6 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			});
 		}
 
-		// Handle escape key
-		if (shortcutManager.matchesShortcut('cancel', input, key)) {
-			onCancel();
-			return;
-		}
-
-		// Handle return key
-		if (key.return) {
-			if (selectedIndices.size > 0) {
-				setConfirmMode(true);
-			}
-			return;
-		}
 	});
 
 	if (worktrees.length === 0) {
