@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {Box, Text} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Worktree, Session} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -109,6 +109,53 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 		setItems(menuItems);
 	}, [worktrees, sessions]);
 
+	useInput((input, _key) => {
+		const keyPressed = input.toLowerCase();
+
+		switch (keyPressed) {
+			case 'n':
+				onSelectWorktree({
+					path: '',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'm':
+				onSelectWorktree({
+					path: 'MERGE_WORKTREE',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'd':
+				onSelectWorktree({
+					path: 'DELETE_WORKTREE',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'c':
+				onSelectWorktree({
+					path: 'CONFIGURATION',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'q':
+				onSelectWorktree({
+					path: 'EXIT_APPLICATION',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+		}
+	});
+
 	const handleSelect = (item: MenuItem) => {
 		if (item.value === 'separator') {
 			// Do nothing for separator
@@ -180,6 +227,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_LABELS.IDLE}
 				</Text>
 				<Text dimColor>Controls: ↑↓ Navigate Enter Select</Text>
+				<Text dimColor>Hotkeys: N-New M-Merge D-Delete C-Config Q-Quit</Text>
 			</Box>
 		</Box>
 	);
