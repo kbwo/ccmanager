@@ -59,6 +59,17 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			if (selectedIndices.size > 0) {
 				setConfirmMode(true);
 			}
+		} else if (key.ctrl && input === 'd') {
+			// Ctrl+D for quick delete (if items selected)
+			if (selectedIndices.size > 0) {
+				setConfirmMode(true);
+			}
+		} else if (input.toLowerCase() === 'f' && selectedIndices.size > 0) {
+			// F for force delete - directly execute
+			const selectedPaths = Array.from(selectedIndices).map(
+				index => worktrees[index]!.path,
+			);
+			onComplete(selectedPaths);
 		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
 		}
@@ -155,7 +166,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			<Box marginTop={1} flexDirection="column">
 				<Text dimColor>
 					Controls: ↑↓ Navigate, Space Select, Enter Confirm,{' '}
-					{shortcutManager.getShortcutDisplay('cancel')} Cancel
+					{shortcutManager.getShortcutDisplay('cancel')} Cancel | Hotkeys: Ctrl+D Delete F Force
 				</Text>
 				{selectedIndices.size > 0 && (
 					<Text color="yellow">

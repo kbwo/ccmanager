@@ -53,6 +53,20 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
+		} else if (key.ctrl && input === 'n') {
+			// Ctrl+N for next step
+			if (step === 'path' && path.trim()) {
+				handlePathSubmit(path);
+			} else if (step === 'branch' && branch.trim()) {
+				handleBranchSubmit(branch);
+			}
+		} else if (key.ctrl && input === 'b') {
+			// Ctrl+B for back step
+			if (step === 'branch' && !isAutoDirectory) {
+				setStep('path');
+			} else if (step === 'base-branch') {
+				setStep(isAutoDirectory ? 'branch' : 'branch');
+			}
 		}
 	});
 
@@ -173,7 +187,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel
+					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel | Hotkeys: Ctrl+N Next Ctrl+B Back
 				</Text>
 			</Box>
 		</Box>

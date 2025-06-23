@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {Box, Text} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Worktree, Session} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -26,6 +26,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 	const [worktrees, setWorktrees] = useState<Worktree[]>([]);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
+	const [selectedIndex, setSelectedIndex] = useState(0);
 
 	useEffect(() => {
 		// Load worktrees
@@ -107,7 +108,62 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			value: 'exit',
 		});
 		setItems(menuItems);
-	}, [worktrees, sessions]);
+		// Reset selection if it's out of bounds
+		if (selectedIndex >= menuItems.length) {
+			setSelectedIndex(0);
+		}
+	}, [worktrees, sessions, selectedIndex]);
+
+	useInput((input, key) => {
+		// Handle number keys for direct worktree selection (0-9)
+		if (input >= '0' && input <= '9') {
+			const index = parseInt(input);
+			const worktreeItems = items.filter(item => item.worktree && item.value !== 'separator');
+			if (index < worktreeItems.length) {
+				handleSelect(worktreeItems[index]!);
+				return;
+			}
+		}
+
+		// Handle letter shortcuts for menu actions
+		switch (input.toLowerCase()) {
+			case 'n':
+				// New Worktree
+				handleSelect({
+					label: `${MENU_ICONS.NEW_WORKTREE} New Worktree`,
+					value: 'new-worktree',
+				});
+				break;
+			case 'm':
+				// Merge Worktree
+				handleSelect({
+					label: `${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
+					value: 'merge-worktree',
+				});
+				break;
+			case 'd':
+				// Delete Worktree
+				handleSelect({
+					label: `${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
+					value: 'delete-worktree',
+				});
+				break;
+			case 'c':
+				// Configuration
+				handleSelect({
+					label: `${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
+					value: 'configuration',
+				});
+				break;
+			case 'q':
+				// Exit
+				handleSelect({
+					label: `${MENU_ICONS.EXIT} Exit`,
+					value: 'exit',
+				});
+				break;
+		}
+	});
 
 	const handleSelect = (item: MenuItem) => {
 		if (item.value === 'separator') {
@@ -179,7 +235,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_ICONS.WAITING} {STATUS_LABELS.WAITING} {STATUS_ICONS.IDLE}{' '}
 					{STATUS_LABELS.IDLE}
 				</Text>
-				<Text dimColor>Controls: ↑↓ Navigate Enter Select</Text>
+				<Text dimColor>Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Worktree N New M Merge D Delete C Config Q Quit</Text>
 			</Box>
 		</Box>
 	);

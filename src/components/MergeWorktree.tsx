@@ -65,6 +65,14 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 				setUseRebase(newOperationFocused);
 			} else if (key.return) {
 				setStep('confirm-merge');
+			} else if (key.ctrl && input === 'm') {
+				// Ctrl+M for quick merge proceed
+				setStep('confirm-merge');
+			} else if (input.toLowerCase() === 't') {
+				// T for toggle operation
+				const newOperationFocused = !operationFocused;
+				setOperationFocused(newOperationFocused);
+				setUseRebase(newOperationFocused);
 			}
 		}
 	});
@@ -184,7 +192,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 				<Box marginTop={1}>
 					<Text dimColor>
 						Use ← → to navigate, Enter to select,{' '}
-						{shortcutManager.getShortcutDisplay('cancel')} to cancel
+						{shortcutManager.getShortcutDisplay('cancel')} to cancel | Hotkeys: Ctrl+M Merge T Toggle
 					</Text>
 				</Box>
 			</Box>

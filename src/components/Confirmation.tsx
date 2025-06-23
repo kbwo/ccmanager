@@ -34,6 +34,12 @@ const Confirmation: React.FC<ConfirmationProps> = ({
 			}
 		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
+		} else if (input.toLowerCase() === 'y') {
+			// Y for Yes/Confirm
+			onConfirm();
+		} else if (input.toLowerCase() === 'n') {
+			// N for No/Cancel
+			onCancel();
 		}
 	});
 
@@ -59,7 +65,7 @@ const Confirmation: React.FC<ConfirmationProps> = ({
 			<Box marginTop={1}>
 				<Text dimColor>
 					Use ← → to navigate, Enter to select,{' '}
-					{shortcutManager.getShortcutDisplay('cancel')} to cancel
+					{shortcutManager.getShortcutDisplay('cancel')} to cancel | Hotkeys: Y Yes N No
 				</Text>
 			</Box>
 		</Box>

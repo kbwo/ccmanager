@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Box, Text} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import ConfigureShortcuts from './ConfigureShortcuts.js';
 import ConfigureHooks from './ConfigureHooks.js';
@@ -42,6 +42,47 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			value: 'back',
 		},
 	];
+
+	useInput((input, key) => {
+		// Handle letter shortcuts for configuration menu
+		switch (input.toLowerCase()) {
+			case 's':
+				// Shortcuts
+				handleSelect({
+					label: '⌨  Configure Shortcuts',
+					value: 'shortcuts',
+				});
+				break;
+			case 'h':
+				// Hooks
+				handleSelect({
+					label: '🔧  Configure Status Hooks',
+					value: 'hooks',
+				});
+				break;
+			case 'w':
+				// Worktree
+				handleSelect({
+					label: '📁  Configure Worktree Settings',
+					value: 'worktree',
+				});
+				break;
+			case 'c':
+				// Command
+				handleSelect({
+					label: '🚀  Configure Command',
+					value: 'command',
+				});
+				break;
+			case 'b':
+				// Back
+				handleSelect({
+					label: '← Back to Main Menu',
+					value: 'back',
+				});
+				break;
+		}
+	});
 
 	const handleSelect = (item: MenuItem) => {
 		if (item.value === 'back') {
@@ -90,6 +131,12 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			</Box>
 
 			<SelectInput items={menuItems} onSelect={handleSelect} isFocused={true} />
+
+			<Box marginTop={1}>
+				<Text dimColor>
+					Hotkeys: S Shortcuts H Hooks W Worktree C Command B Back
+				</Text>
+			</Box>
 		</Box>
 	);
 };
