@@ -1,5 +1,6 @@
 import {IPty} from 'node-pty';
 import type pkg from '@xterm/headless';
+import {GitStatus} from '../utils/gitStatus.js';
 
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
@@ -10,6 +11,8 @@ export interface Worktree {
 	branch: string;
 	isMainWorktree: boolean;
 	hasSession: boolean;
+	gitStatus?: GitStatus;
+	gitStatusError?: string;
 }
 
 export interface Session {

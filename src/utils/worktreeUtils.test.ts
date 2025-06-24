@@ -2,7 +2,12 @@ import {describe, it, expect} from 'vitest';
 import {
 	generateWorktreeDirectory,
 	extractBranchParts,
+	truncateString,
+	prepareWorktreeItems,
+	calculateColumnPositions,
+	assembleWorktreeLabel,
 } from './worktreeUtils.js';
+import {Worktree, Session} from '../types/index.js';
 
 describe('generateWorktreeDirectory', () => {
 	describe('with default pattern', () => {
@@ -109,5 +114,124 @@ describe('extractBranchParts', () => {
 		expect(extractBranchParts('')).toEqual({
 			name: '',
 		});
+	});
+});
+
+describe('truncateString', () => {
+	it('should return original string if shorter than max length', () => {
+		expect(truncateString('hello', 10)).toBe('hello');
+		expect(truncateString('test', 4)).toBe('test');
+	});
+
+	it('should truncate and add ellipsis if longer than max length', () => {
+		expect(truncateString('hello world', 8)).toBe('hello...');
+		expect(truncateString('this is a long string', 10)).toBe('this is...');
+	});
+
+	it('should handle edge cases', () => {
+		expect(truncateString('', 5)).toBe('');
+		expect(truncateString('abc', 3)).toBe('abc');
+		expect(truncateString('abcd', 3)).toBe('...');
+	});
+});
+
+describe('prepareWorktreeItems', () => {
+	const mockWorktree: Worktree = {
+		path: '/path/to/worktree',
+		branch: 'feature/test-branch',
+		isMainWorktree: false,
+		hasSession: false,
+	};
+
+	// Simplified mock
+	const mockSession: Session = {
+		id: 'test-session',
+		worktreePath: '/path/to/worktree',
+		state: 'idle',
+		process: {} as Session['process'],
+		output: [],
+		outputHistory: [],
+		lastActivity: new Date(),
+		isActive: true,
+		terminal: {} as Session['terminal'],
+	};
+
+	it('should prepare basic worktree without git status', () => {
+		const items = prepareWorktreeItems([mockWorktree], []);
+		expect(items).toHaveLength(1);
+		expect(items[0]?.baseLabel).toBe('feature/test-branch');
+	});
+
+	it('should include session status in label', () => {
+		const items = prepareWorktreeItems([mockWorktree], [mockSession]);
+		expect(items[0]?.baseLabel).toContain('[○ Idle]');
+	});
+
+	it('should mark main worktree', () => {
+		const mainWorktree = {...mockWorktree, isMainWorktree: true};
+		const items = prepareWorktreeItems([mainWorktree], []);
+		expect(items[0]?.baseLabel).toContain('(main)');
+	});
+
+	it('should truncate long branch names', () => {
+		const longBranch = {
+			...mockWorktree,
+			branch:
+				'feature/this-is-a-very-long-branch-name-that-should-be-truncated',
+		};
+		const items = prepareWorktreeItems([longBranch], []);
+		expect(items[0]?.baseLabel.length).toBeLessThanOrEqual(50); // 40 + status + default
+	});
+});
+
+describe('column alignment', () => {
+	const mockItems = [
+		{
+			worktree: {} as Worktree,
+			baseLabel: 'feature/test-branch',
+			fileChanges: '\x1b[32m+10\x1b[0m \x1b[31m-5\x1b[0m',
+			aheadBehind: '\x1b[33m↑2 ↓3\x1b[0m',
+			parentBranch: '',
+			lengths: {
+				base: 19, // 'feature/test-branch'.length
+				fileChanges: 6, // '+10 -5'.length
+				aheadBehind: 5, // '↑2 ↓3'.length
+				parentBranch: 0,
+			},
+		},
+		{
+			worktree: {} as Worktree,
+			baseLabel: 'main',
+			fileChanges: '\x1b[32m+2\x1b[0m \x1b[31m-1\x1b[0m',
+			aheadBehind: '\x1b[33m↑1\x1b[0m',
+			parentBranch: '',
+			lengths: {
+				base: 4, // 'main'.length
+				fileChanges: 5, // '+2 -1'.length
+				aheadBehind: 2, // '↑1'.length
+				parentBranch: 0,
+			},
+		},
+	];
+
+	it('should calculate column positions from items', () => {
+		const positions = calculateColumnPositions(mockItems);
+		expect(positions.fileChanges).toBe(21); // 19 + 2 padding
+		expect(positions.aheadBehind).toBeGreaterThan(positions.fileChanges);
+		expect(positions.parentBranch).toBeGreaterThan(positions.aheadBehind);
+	});
+
+	it('should assemble label with proper alignment', () => {
+		const item = mockItems[0]!;
+		const columns = calculateColumnPositions(mockItems);
+		const result = assembleWorktreeLabel(item, columns);
+
+		expect(result).toContain('feature/test-branch');
+		expect(result).toContain('\x1b[32m+10\x1b[0m');
+		expect(result).toContain('\x1b[33m↑2 ↓3\x1b[0m');
+
+		// Check alignment by stripping ANSI codes
+		const plain = result.replace(/\x1b\[[0-9;]*m/g, '');
+		expect(plain.indexOf('+10 -5')).toBe(21); // Should start at column 21
 	});
 });
