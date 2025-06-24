@@ -2,11 +2,11 @@ import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import {Worktree} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import Confirmation from './Confirmation.js';
+import DeleteConfirmation from './DeleteConfirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface DeleteWorktreeProps {
-	onComplete: (worktreePaths: string[]) => void;
+	onComplete: (worktreePaths: string[], deleteBranch: boolean) => void;
 	onCancel: () => void;
 }
 
@@ -80,37 +80,20 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			index => worktrees[index]!,
 		);
 
-		const handleConfirm = () => {
+		const handleConfirm = (deleteBranch: boolean) => {
 			const selectedPaths = Array.from(selectedIndices).map(
 				index => worktrees[index]!.path,
 			);
-			onComplete(selectedPaths);
+			onComplete(selectedPaths, deleteBranch);
 		};
 
 		const handleCancel = () => {
 			setConfirmMode(false);
 		};
 
-		const confirmMessage = (
-			<Box flexDirection="column">
-				<Text bold color="red">
-					⚠️ Delete Confirmation
-				</Text>
-				<Box marginTop={1} marginBottom={1} flexDirection="column">
-					<Text>You are about to delete the following worktrees:</Text>
-					{selectedWorktrees.map(wt => (
-						<Text key={wt.path} color="red">
-							• {wt.branch.replace('refs/heads/', '')} ({wt.path})
-						</Text>
-					))}
-				</Box>
-				<Text bold>This will also delete their branches. Are you sure?</Text>
-			</Box>
-		);
-
 		return (
-			<Confirmation
-				message={confirmMessage}
+			<DeleteConfirmation
+				worktrees={selectedWorktrees}
 				onConfirm={handleConfirm}
 				onCancel={handleCancel}
 			/>

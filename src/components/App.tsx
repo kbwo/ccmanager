@@ -161,14 +161,17 @@ const App: React.FC = () => {
 		handleReturnToMenu();
 	};
 
-	const handleDeleteWorktrees = async (worktreePaths: string[]) => {
+	const handleDeleteWorktrees = async (
+		worktreePaths: string[],
+		deleteBranch: boolean,
+	) => {
 		setView('deleting-worktree');
 		setError(null);
 
 		// Delete the worktrees
 		let hasError = false;
 		for (const path of worktreePaths) {
-			const result = worktreeService.deleteWorktree(path);
+			const result = worktreeService.deleteWorktree(path, {deleteBranch});
 			if (!result.success) {
 				hasError = true;
 				setError(result.error || 'Failed to delete worktree');

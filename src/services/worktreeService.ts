@@ -216,7 +216,10 @@ export class WorktreeService {
 		}
 	}
 
-	deleteWorktree(worktreePath: string): {success: boolean; error?: string} {
+	deleteWorktree(
+		worktreePath: string,
+		options?: {deleteBranch?: boolean},
+	): {success: boolean; error?: string} {
 		try {
 			// Get the worktree info to find the branch
 			const worktrees = this.getWorktrees();
@@ -242,16 +245,19 @@ export class WorktreeService {
 				encoding: 'utf8',
 			});
 
-			// Delete the branch if it exists
-			const branchName = worktree.branch.replace('refs/heads/', '');
-			try {
-				execSync(`git branch -D "${branchName}"`, {
-					cwd: this.rootPath,
-					encoding: 'utf8',
-				});
-			} catch {
-				// Branch might not exist or might be checked out elsewhere
-				// This is not a fatal error
+			// Delete the branch if requested (default to true for backward compatibility)
+			const deleteBranch = options?.deleteBranch ?? true;
+			if (deleteBranch) {
+				const branchName = worktree.branch.replace('refs/heads/', '');
+				try {
+					execSync(`git branch -D "${branchName}"`, {
+						cwd: this.rootPath,
+						encoding: 'utf8',
+					});
+				} catch {
+					// Branch might not exist or might be checked out elsewhere
+					// This is not a fatal error
+				}
 			}
 
 			return {success: true};
