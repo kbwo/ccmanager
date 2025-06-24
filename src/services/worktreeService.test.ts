@@ -5,6 +5,15 @@ import {execSync} from 'child_process';
 // Mock child_process module
 vi.mock('child_process');
 
+// Mock worktreeConfigManager
+vi.mock('./worktreeConfigManager.js', () => ({
+	worktreeConfigManager: {
+		initialize: vi.fn(),
+		isAvailable: vi.fn(() => true),
+		reset: vi.fn(),
+	},
+}));
+
 // Get the mocked function with proper typing
 const mockedExecSync = vi.mocked(execSync);
 

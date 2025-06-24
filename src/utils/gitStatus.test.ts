@@ -1,4 +1,4 @@
-import {describe, it, expect} from 'vitest';
+import {describe, it, expect, vi} from 'vitest';
 import {
 	formatGitStatus,
 	formatGitFileChanges,
@@ -12,6 +12,15 @@ import {promisify} from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+
+// Mock worktreeConfigManager
+vi.mock('../services/worktreeConfigManager.js', () => ({
+	worktreeConfigManager: {
+		initialize: vi.fn(),
+		isAvailable: vi.fn(() => true),
+		reset: vi.fn(),
+	},
+}));
 
 const execAsync = promisify(exec);
 
