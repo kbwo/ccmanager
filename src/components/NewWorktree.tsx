@@ -131,7 +131,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 						/>
 					</Box>
 				</Box>
-			) : (
+			) : step === 'branch' ? (
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
 						<Text>Enter branch name (directory will be auto-generated):</Text>
@@ -154,7 +154,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 						</Box>
 					)}
 				</Box>
-			)}
+			) : null}
 
 			{step === 'base-branch' && (
 				<Box flexDirection="column">
