@@ -104,7 +104,8 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 				<Text>You are about to delete the following worktrees:</Text>
 				{worktrees.map(wt => (
 					<Text key={wt.path} color="red">
-						• {wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'} ({wt.path})
+						• {wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'} (
+						{wt.path})
 					</Text>
 				))}
 			</Box>
