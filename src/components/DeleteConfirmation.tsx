@@ -105,9 +105,8 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 				{worktrees.length <= 10 ? (
 					worktrees.map(wt => (
 						<Text key={wt.path} color="red">
-							•{' '}
-							{wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'} (
-							{wt.path})
+							• {wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'}{' '}
+							({wt.path})
 						</Text>
 					))
 				) : (
@@ -115,8 +114,8 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 						{worktrees.slice(0, 8).map(wt => (
 							<Text key={wt.path} color="red">
 								•{' '}
-								{wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'} (
-								{wt.path})
+								{wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'}{' '}
+								({wt.path})
 							</Text>
 						))}
 						<Text color="red" dimColor>
