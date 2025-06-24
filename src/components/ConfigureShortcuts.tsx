@@ -176,6 +176,7 @@ const ConfigureShortcuts: React.FC<ConfigureShortcutsProps> = ({
 				items={shortcutItems}
 				onSelect={handleSelect}
 				isFocused={true}
+				limit={10}
 			/>
 
 			<Box marginTop={1}>

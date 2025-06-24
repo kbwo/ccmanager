@@ -99,6 +99,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 					items={branchItems}
 					onSelect={handleSelectSource}
 					isFocused={true}
+					limit={10}
 				/>
 
 				<Box marginTop={1}>
@@ -133,6 +134,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 					items={branchItems}
 					onSelect={handleSelectTarget}
 					isFocused={true}
+					limit={10}
 				/>
 
 				<Box marginTop={1}>

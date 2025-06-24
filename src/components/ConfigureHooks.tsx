@@ -190,6 +190,7 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 				items={getMenuItems()}
 				onSelect={handleMenuSelect}
 				isFocused={true}
+				limit={10}
 			/>
 
 			<Box marginTop={1}>
