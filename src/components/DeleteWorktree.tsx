@@ -20,6 +20,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	);
 	const [focusedIndex, setFocusedIndex] = useState(0);
 	const [confirmMode, setConfirmMode] = useState(false);
+	const VIEWPORT_SIZE = 10; // Maximum number of items to display at once
 
 	useEffect(() => {
 		const worktreeService = new WorktreeService();
@@ -114,25 +115,52 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				</Text>
 			</Box>
 
-			{worktrees.map((worktree, index) => {
-				const isSelected = selectedIndices.has(index);
-				const isFocused = index === focusedIndex;
-				const branchName = worktree.branch
-					? worktree.branch.replace('refs/heads/', '')
-					: 'detached';
+			{(() => {
+				// Calculate viewport window
+				const viewportStart = Math.max(
+					0,
+					Math.min(
+						focusedIndex - Math.floor(VIEWPORT_SIZE / 2),
+						worktrees.length - VIEWPORT_SIZE,
+					),
+				);
+				const viewportEnd = Math.min(
+					viewportStart + VIEWPORT_SIZE,
+					worktrees.length,
+				);
+				const visibleWorktrees = worktrees.slice(viewportStart, viewportEnd);
 
 				return (
-					<Box key={worktree.path}>
-						<Text
-							color={isFocused ? 'green' : undefined}
-							inverse={isFocused}
-							dimColor={!isFocused && !isSelected}
-						>
-							{isSelected ? '[✓]' : '[ ]'} {branchName} ({worktree.path})
-						</Text>
-					</Box>
+					<>
+						{viewportStart > 0 && (
+							<Text dimColor>↑ {viewportStart} more...</Text>
+						)}
+						{visibleWorktrees.map((worktree, relativeIndex) => {
+							const actualIndex = viewportStart + relativeIndex;
+							const isSelected = selectedIndices.has(actualIndex);
+							const isFocused = actualIndex === focusedIndex;
+							const branchName = worktree.branch
+								? worktree.branch.replace('refs/heads/', '')
+								: 'detached';
+
+							return (
+								<Box key={worktree.path}>
+									<Text
+										color={isFocused ? 'green' : undefined}
+										inverse={isFocused}
+										dimColor={!isFocused && !isSelected}
+									>
+										{isSelected ? '[✓]' : '[ ]'} {branchName} ({worktree.path})
+									</Text>
+								</Box>
+							);
+						})}
+						{viewportEnd < worktrees.length && (
+							<Text dimColor>↓ {worktrees.length - viewportEnd} more...</Text>
+						)}
+					</>
 				);
-			})}
+			})()}
 
 			<Box marginTop={1} flexDirection="column">
 				<Text dimColor>

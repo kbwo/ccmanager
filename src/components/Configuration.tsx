@@ -89,7 +89,12 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 				<Text dimColor>Select a configuration option:</Text>
 			</Box>
 
-			<SelectInput items={menuItems} onSelect={handleSelect} isFocused={true} />
+			<SelectInput
+				items={menuItems}
+				onSelect={handleSelect}
+				isFocused={true}
+				limit={10}
+			/>
 		</Box>
 	);
 };

@@ -167,6 +167,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 						items={branchItems}
 						onSelect={handleBaseBranchSelect}
 						initialIndex={0}
+						limit={10}
 					/>
 				</Box>
 			)}
