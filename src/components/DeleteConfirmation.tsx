@@ -3,7 +3,7 @@ import {Box, Text, useInput} from 'ink';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface DeleteConfirmationProps {
-	worktrees: Array<{path: string; branch: string}>;
+	worktrees: Array<{path: string; branch?: string}>;
 	onConfirm: (deleteBranch: boolean) => void;
 	onCancel: () => void;
 }
@@ -13,10 +13,13 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	onConfirm,
 	onCancel,
 }) => {
+	// Check if any worktrees have branches
+	const hasAnyBranches = worktrees.some(wt => wt.branch);
+
 	const [deleteBranch, setDeleteBranch] = useState(true);
 	const [focusedOption, setFocusedOption] = useState<
 		'deleteBranch' | 'keepBranch' | 'confirm' | 'cancel'
-	>('deleteBranch');
+	>(hasAnyBranches ? 'deleteBranch' : 'confirm');
 
 	// Helper functions for navigation
 	const isRadioOption = (option: typeof focusedOption) =>
@@ -26,6 +29,11 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 		option === 'confirm' || option === 'cancel';
 
 	const handleUpArrow = () => {
+		if (!hasAnyBranches) {
+			if (focusedOption === 'cancel') setFocusedOption('confirm');
+			return;
+		}
+
 		const navigationMap = {
 			keepBranch: 'deleteBranch',
 			confirm: 'keepBranch',
@@ -37,6 +45,11 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	};
 
 	const handleDownArrow = () => {
+		if (!hasAnyBranches) {
+			if (focusedOption === 'confirm') setFocusedOption('cancel');
+			return;
+		}
+
 		const navigationMap = {
 			deleteBranch: 'keepBranch',
 			keepBranch: 'confirm',
@@ -91,32 +104,34 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 				<Text>You are about to delete the following worktrees:</Text>
 				{worktrees.map(wt => (
 					<Text key={wt.path} color="red">
-						• {wt.branch.replace('refs/heads/', '')} ({wt.path})
+						• {wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'} ({wt.path})
 					</Text>
 				))}
 			</Box>
 
-			<Box marginBottom={1} flexDirection="column">
-				<Text bold>What do you want to do with the associated branches?</Text>
-				<Box marginTop={1} flexDirection="column">
-					<Box>
-						<Text
-							color={focusedOption === 'deleteBranch' ? 'red' : undefined}
-							inverse={focusedOption === 'deleteBranch'}
-						>
-							{deleteBranch ? '(•)' : '( )'} Delete the branches too
-						</Text>
-					</Box>
-					<Box>
-						<Text
-							color={focusedOption === 'keepBranch' ? 'green' : undefined}
-							inverse={focusedOption === 'keepBranch'}
-						>
-							{!deleteBranch ? '(•)' : '( )'} Keep the branches
-						</Text>
+			{hasAnyBranches && (
+				<Box marginBottom={1} flexDirection="column">
+					<Text bold>What do you want to do with the associated branches?</Text>
+					<Box marginTop={1} flexDirection="column">
+						<Box>
+							<Text
+								color={focusedOption === 'deleteBranch' ? 'red' : undefined}
+								inverse={focusedOption === 'deleteBranch'}
+							>
+								{deleteBranch ? '(•)' : '( )'} Delete the branches too
+							</Text>
+						</Box>
+						<Box>
+							<Text
+								color={focusedOption === 'keepBranch' ? 'green' : undefined}
+								inverse={focusedOption === 'keepBranch'}
+							>
+								{!deleteBranch ? '(•)' : '( )'} Keep the branches
+							</Text>
+						</Box>
 					</Box>
 				</Box>
-			</Box>
+			)}
 
 			<Box marginTop={1}>
 				<Box marginRight={2}>

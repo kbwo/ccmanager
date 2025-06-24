@@ -7,7 +7,7 @@ export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
 export interface Worktree {
 	path: string;
-	branch: string;
+	branch?: string;
 	isMainWorktree: boolean;
 	hasSession: boolean;
 }
