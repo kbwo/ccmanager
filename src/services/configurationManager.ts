@@ -6,6 +6,7 @@ import {
 	StatusHookConfig,
 	ShortcutConfig,
 	WorktreeConfig,
+	CommandConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
 
@@ -66,6 +67,11 @@ export class ConfigurationManager {
 		if (!this.config.worktree) {
 			this.config.worktree = {
 				autoDirectory: false,
+			};
+		}
+		if (!this.config.command) {
+			this.config.command = {
+				command: 'claude',
 			};
 		}
 	}
@@ -136,6 +142,19 @@ export class ConfigurationManager {
 
 	setWorktreeConfig(worktreeConfig: WorktreeConfig): void {
 		this.config.worktree = worktreeConfig;
+		this.saveConfig();
+	}
+
+	getCommandConfig(): CommandConfig {
+		return (
+			this.config.command || {
+				command: 'claude',
+			}
+		);
+	}
+
+	setCommandConfig(commandConfig: CommandConfig): void {
+		this.config.command = commandConfig;
 		this.saveConfig();
 	}
 }

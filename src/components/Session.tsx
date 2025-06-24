@@ -61,9 +61,16 @@ const Session: React.FC<SessionProps> = ({
 		// https://github.com/kbwo/ccmanager/issues/2
 		const currentCols = process.stdout.columns || 80;
 		const currentRows = process.stdout.rows || 24;
-		session.process.resize(currentCols, currentRows);
-		if (session.terminal) {
-			session.terminal.resize(currentCols, currentRows);
+
+		// Do not delete try-catch
+		// Prevent ccmanager from exiting when claude process has already exited
+		try {
+			session.process.resize(currentCols, currentRows);
+			if (session.terminal) {
+				session.terminal.resize(currentCols, currentRows);
+			}
+		} catch {
+			/* empty */
 		}
 
 		// Listen for session data events

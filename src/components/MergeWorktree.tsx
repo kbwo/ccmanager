@@ -45,9 +45,9 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		// Create branch items for selection
 		const items = loadedWorktrees.map(wt => ({
 			label:
-				wt.branch.replace('refs/heads/', '') +
+				(wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached') +
 				(wt.isMainWorktree ? ' (main)' : ''),
-			value: wt.branch.replace('refs/heads/', ''),
+			value: wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached',
 		}));
 		setBranchItems(items);
 	}, []);

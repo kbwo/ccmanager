@@ -100,7 +100,8 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 					<Text>You are about to delete the following worktrees:</Text>
 					{selectedWorktrees.map(wt => (
 						<Text key={wt.path} color="red">
-							• {wt.branch.replace('refs/heads/', '')} ({wt.path})
+							• {wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'}{' '}
+							({wt.path})
 						</Text>
 					))}
 				</Box>
@@ -134,7 +135,9 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			{worktrees.map((worktree, index) => {
 				const isSelected = selectedIndices.has(index);
 				const isFocused = index === focusedIndex;
-				const branchName = worktree.branch.replace('refs/heads/', '');
+				const branchName = worktree.branch
+					? worktree.branch.replace('refs/heads/', '')
+					: 'detached';
 
 				return (
 					<Box key={worktree.path}>

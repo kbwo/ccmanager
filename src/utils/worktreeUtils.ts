@@ -89,7 +89,9 @@ export function prepareWorktreeItems(
 	return worktrees.map(wt => {
 		const session = sessions.find(s => s.worktreePath === wt.path);
 		const status = session ? ` [${getStatusDisplay(session.state)}]` : '';
-		const fullBranchName = wt.branch.replace('refs/heads/', '');
+		const fullBranchName = wt.branch
+			? wt.branch.replace('refs/heads/', '')
+			: 'detached';
 		const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
 		const isMain = wt.isMainWorktree ? ' (main)' : '';
 		const baseLabel = `${branchName}${isMain}${status}`;
