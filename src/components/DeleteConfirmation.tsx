@@ -18,52 +18,64 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 		'deleteBranch' | 'keepBranch' | 'confirm' | 'cancel'
 	>('deleteBranch');
 
+	// Helper functions for navigation
+	const isRadioOption = (option: typeof focusedOption) =>
+		option === 'deleteBranch' || option === 'keepBranch';
+
+	const isActionButton = (option: typeof focusedOption) =>
+		option === 'confirm' || option === 'cancel';
+
+	const handleUpArrow = () => {
+		const navigationMap = {
+			keepBranch: 'deleteBranch',
+			confirm: 'keepBranch',
+			cancel: 'keepBranch',
+		} as const;
+
+		const next = navigationMap[focusedOption as keyof typeof navigationMap];
+		if (next) setFocusedOption(next);
+	};
+
+	const handleDownArrow = () => {
+		const navigationMap = {
+			deleteBranch: 'keepBranch',
+			keepBranch: 'confirm',
+			confirm: 'cancel',
+		} as const;
+
+		const next = navigationMap[focusedOption as keyof typeof navigationMap];
+		if (next) setFocusedOption(next);
+	};
+
+	const handleHorizontalArrow = (direction: 'left' | 'right') => {
+		if (isActionButton(focusedOption)) {
+			setFocusedOption(direction === 'left' ? 'confirm' : 'cancel');
+		}
+	};
+
+	const handleSelect = () => {
+		if (isRadioOption(focusedOption)) {
+			setDeleteBranch(focusedOption === 'deleteBranch');
+		} else if (focusedOption === 'confirm') {
+			onConfirm(deleteBranch);
+		} else if (focusedOption === 'cancel') {
+			onCancel();
+		}
+	};
+
 	useInput((input, key) => {
 		if (key.upArrow) {
-			switch (focusedOption) {
-				case 'keepBranch':
-					setFocusedOption('deleteBranch');
-					break;
-				case 'confirm':
-				case 'cancel':
-					setFocusedOption('keepBranch');
-					break;
-			}
+			handleUpArrow();
 		} else if (key.downArrow) {
-			switch (focusedOption) {
-				case 'deleteBranch':
-					setFocusedOption('keepBranch');
-					break;
-				case 'keepBranch':
-					setFocusedOption('confirm');
-					break;
-				case 'confirm':
-					setFocusedOption('cancel');
-					break;
-			}
-		} else if (
-			key.leftArrow &&
-			(focusedOption === 'confirm' || focusedOption === 'cancel')
-		) {
-			setFocusedOption('confirm');
-		} else if (
-			key.rightArrow &&
-			(focusedOption === 'confirm' || focusedOption === 'cancel')
-		) {
-			setFocusedOption('cancel');
-		} else if (
-			input === ' ' &&
-			(focusedOption === 'deleteBranch' || focusedOption === 'keepBranch')
-		) {
+			handleDownArrow();
+		} else if (key.leftArrow) {
+			handleHorizontalArrow('left');
+		} else if (key.rightArrow) {
+			handleHorizontalArrow('right');
+		} else if (input === ' ' && isRadioOption(focusedOption)) {
 			setDeleteBranch(focusedOption === 'deleteBranch');
 		} else if (key.return) {
-			if (focusedOption === 'deleteBranch' || focusedOption === 'keepBranch') {
-				setDeleteBranch(focusedOption === 'deleteBranch');
-			} else if (focusedOption === 'confirm') {
-				onConfirm(deleteBranch);
-			} else if (focusedOption === 'cancel') {
-				onCancel();
-			}
+			handleSelect();
 		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
 		}
