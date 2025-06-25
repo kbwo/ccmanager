@@ -8,11 +8,16 @@ import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 
 interface NewWorktreeProps {
-	onComplete: (path: string, branch: string, baseBranch: string) => void;
+	onComplete: (
+		path: string,
+		branch: string,
+		baseBranch: string,
+		copySessionData: boolean,
+	) => void;
 	onCancel: () => void;
 }
 
-type Step = 'path' | 'branch' | 'base-branch';
+type Step = 'path' | 'branch' | 'base-branch' | 'copy-session';
 
 interface BranchItem {
 	label: string;
@@ -27,6 +32,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const [step, setStep] = useState<Step>(isAutoDirectory ? 'branch' : 'path');
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
+	const [baseBranch, setBaseBranch] = useState('');
+	const [copySessionData] = useState(worktreeConfig.copySessionData ?? true);
 
 	// Initialize worktree service and load branches (memoized to avoid re-initialization)
 	const {branches, defaultBranch} = useMemo(() => {
@@ -71,15 +78,21 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	};
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
+		setBaseBranch(item.value);
+		setStep('copy-session');
+	};
+
+	const handleCopySessionSelect = (item: {label: string; value: string}) => {
+		const shouldCopy = item.value === 'yes';
 		if (isAutoDirectory) {
 			// Generate path from branch name
 			const autoPath = generateWorktreeDirectory(
 				branch,
 				worktreeConfig.autoDirectoryPattern,
 			);
-			onComplete(autoPath, branch, item.value);
+			onComplete(autoPath, branch, baseBranch, shouldCopy);
 		} else {
-			onComplete(path, branch, item.value);
+			onComplete(path, branch, baseBranch, shouldCopy);
 		}
 	};
 
@@ -168,6 +181,28 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 						onSelect={handleBaseBranchSelect}
 						initialIndex={0}
 						limit={10}
+					/>
+				</Box>
+			)}
+
+			{step === 'copy-session' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>Copy Claude Code session data to the new worktree?</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text dimColor>
+							This will copy conversation history and context from the current
+							worktree
+						</Text>
+					</Box>
+					<SelectInput
+						items={[
+							{label: '✅ Yes, copy session data', value: 'yes'},
+							{label: '❌ No, start fresh', value: 'no'},
+						]}
+						onSelect={handleCopySessionSelect}
+						initialIndex={copySessionData ? 0 : 1}
 					/>
 				</Box>
 			)}

@@ -66,6 +66,7 @@ export interface StatusHookConfig {
 export interface WorktreeConfig {
 	autoDirectory: boolean;
 	autoDirectoryPattern?: string; // Optional pattern for directory generation
+	copySessionData?: boolean; // Whether to copy Claude session data by default
 }
 
 export interface CommandConfig {

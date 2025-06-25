@@ -1,6 +1,7 @@
 import {execSync} from 'child_process';
-import {existsSync} from 'fs';
+import {existsSync, mkdirSync, cpSync, readdirSync} from 'fs';
 import path from 'path';
+import os from 'os';
 import {Worktree} from '../types/index.js';
 
 export class WorktreeService {
@@ -190,6 +191,7 @@ export class WorktreeService {
 		worktreePath: string,
 		branch: string,
 		baseBranch: string,
+		copySessionData = false,
 	): {success: boolean; error?: string} {
 		try {
 			// Resolve the worktree path relative to the git repository root
@@ -222,6 +224,11 @@ export class WorktreeService {
 				cwd: this.gitRootPath, // Execute from git root to ensure proper resolution
 				encoding: 'utf8',
 			});
+
+			// Copy session data if requested
+			if (copySessionData) {
+				this.copyClaudeSessionData(this.rootPath, resolvedPath);
+			}
 
 			return {success: true};
 		} catch (error) {
@@ -380,5 +387,63 @@ export class WorktreeService {
 						: 'Failed to delete worktree by branch',
 			};
 		}
+	}
+
+	private copyClaudeSessionData(
+		sourceWorktreePath: string,
+		targetWorktreePath: string,
+	): void {
+		try {
+			const claudeDir = path.join(os.homedir(), '.claude');
+			if (!existsSync(claudeDir)) {
+				return;
+			}
+
+			const projectsDir = path.join(claudeDir, 'projects');
+			if (!existsSync(projectsDir)) {
+				return;
+			}
+
+			// Convert paths to Claude's naming convention
+			const sourceProjectName =
+				this.pathToClaudeProjectName(sourceWorktreePath);
+			const targetProjectName =
+				this.pathToClaudeProjectName(targetWorktreePath);
+
+			const sourceProjectDir = path.join(projectsDir, sourceProjectName);
+			const targetProjectDir = path.join(projectsDir, targetProjectName);
+
+			// Only copy if source project exists
+			if (existsSync(sourceProjectDir)) {
+				// Create target directory if it doesn't exist
+				if (!existsSync(targetProjectDir)) {
+					mkdirSync(targetProjectDir, {recursive: true});
+				}
+
+				// Copy all files from source to target
+				const files = readdirSync(sourceProjectDir);
+				for (const file of files) {
+					const sourcePath = path.join(sourceProjectDir, file);
+					const targetPath = path.join(targetProjectDir, file);
+					try {
+						cpSync(sourcePath, targetPath, {recursive: true});
+					} catch (error) {
+						// Continue copying other files if one fails
+						console.warn(`Failed to copy ${file}: ${error}`);
+					}
+				}
+			}
+		} catch (error) {
+			// Don't throw error for session data copying - it's optional
+			console.warn(`Failed to copy Claude session data: ${error}`);
+		}
+	}
+
+	private pathToClaudeProjectName(worktreePath: string): string {
+		// Convert absolute path to Claude's project naming convention
+		// Claude replaces all path separators and dots with dashes
+		const resolved = path.resolve(worktreePath);
+		// Handle both forward slashes (Linux/macOS) and backslashes (Windows)
+		return resolved.replace(/[/\\.]/g, '-');
 	}
 }
