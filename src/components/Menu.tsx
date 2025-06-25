@@ -74,8 +74,11 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 				: 'detached';
 			const isMain = wt.isMainWorktree ? ' (main)' : '';
 
+			// Only show numbers for first 10 worktrees (0-9)
+			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
+
 			return {
-				label: `${index} ❯ ${branchName}${isMain}${status}`,
+				label: `${numberPrefix}${branchName}${isMain}${status}`,
 				value: wt.path,
 				worktree: wt,
 			};
@@ -113,10 +116,10 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 	useInput((input, _key) => {
 		const keyPressed = input.toLowerCase();
 
-		// Handle number keys 0-9 for worktree selection
+		// Handle number keys 0-9 for worktree selection (first 10 only)
 		if (/^[0-9]$/.test(keyPressed)) {
 			const index = parseInt(keyPressed);
-			if (index < worktrees.length && worktrees[index]) {
+			if (index < Math.min(10, worktrees.length) && worktrees[index]) {
 				onSelectWorktree(worktrees[index]);
 			}
 			return;
@@ -243,8 +246,8 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_LABELS.IDLE}
 				</Text>
 				<Text dimColor>
-					Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select N-New
-					M-Merge D-Delete C-Config Q-Quit
+					Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first
+					10) N-New M-Merge D-Delete C-Config Q-Quit
 				</Text>
 			</Box>
 		</Box>

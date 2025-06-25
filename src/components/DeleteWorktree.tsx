@@ -22,7 +22,6 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	const [confirmMode, setConfirmMode] = useState(false);
 	const [forceDelete, setForceDelete] = useState(false);
 	const VIEWPORT_SIZE = 10; // Maximum number of items to display at once
-
 	useEffect(() => {
 		const worktreeService = new WorktreeService();
 		const allWorktrees = worktreeService.getWorktrees();
@@ -89,7 +88,6 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				}
 				return newSet;
 			});
-		}
 	});
 
 	if (worktrees.length === 0) {
