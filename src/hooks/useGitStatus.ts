@@ -25,7 +25,6 @@ export function useGitStatus(
 			try {
 				const result = await getGitStatusLimited(
 					worktree.path,
-					defaultBranch,
 					abortController.signal,
 				);
 

@@ -11,7 +11,7 @@ export interface GitStatus {
 	filesDeleted: number;
 	aheadCount: number;
 	behindCount: number;
-	parentBranch: string;
+	parentBranch: string | null;
 }
 
 export interface GitOperationResult<T> {
@@ -23,7 +23,6 @@ export interface GitOperationResult<T> {
 
 export async function getGitStatus(
 	worktreePath: string,
-	defaultBranch: string,
 	signal: AbortSignal,
 ): Promise<GitOperationResult<GitStatus>> {
 	try {
@@ -40,9 +39,7 @@ export async function getGitStatus(
 				execp('git branch --show-current', {cwd: worktreePath, signal}).catch(
 					() => EMPTY_EXEC_RESULT,
 				),
-				getWorktreeParentBranch(worktreePath, signal).then(
-					parent => parent || defaultBranch,
-				),
+				getWorktreeParentBranch(worktreePath, signal),
 			]);
 
 		// Parse file changes
@@ -65,7 +62,7 @@ export async function getGitStatus(
 		let behindCount = 0;
 
 		const currentBranch = branchResult.stdout.trim();
-		if (currentBranch && currentBranch !== parentBranch) {
+		if (currentBranch && parentBranch && currentBranch !== parentBranch) {
 			try {
 				const aheadBehindResult = await execFilePromisified(
 					'git',
@@ -162,11 +159,11 @@ export function formatGitStatus(status: GitStatus): string {
 }
 
 export function formatParentBranch(
-	parentBranch: string,
+	parentBranch: string | null,
 	currentBranch: string,
 ): string {
-	// Only show parent branch if different from current branch
-	if (parentBranch === currentBranch) {
+	// Only show parent branch if it exists and is different from current branch
+	if (!parentBranch || parentBranch === currentBranch) {
 		return '';
 	}
 

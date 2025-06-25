@@ -83,9 +83,9 @@ describe('GitService Integration Tests', {timeout: 10000}, () => {
 			const controller3 = new AbortController();
 
 			const results = await Promise.all([
-				getGitStatus(tmpDir, 'main', controller1.signal),
-				getGitStatus(tmpDir, 'main', controller2.signal),
-				getGitStatus(tmpDir, 'main', controller3.signal),
+				getGitStatus(tmpDir, controller1.signal),
+				getGitStatus(tmpDir, controller2.signal),
+				getGitStatus(tmpDir, controller3.signal),
 			]);
 
 			// All should succeed
