@@ -535,7 +535,7 @@ describe('SessionManager', () => {
 			);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
-				process.env['SHELL'] || '/bin/bash',
+				process.env['SHELL'] || 'bash',
 				[],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);

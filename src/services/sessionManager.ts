@@ -115,7 +115,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			commandConfig,
 
 			// Dual-mode properties initialization
-			bashProcess: spawn(process.env['SHELL'] || '/bin/bash', [], {
+			bashProcess: spawn(process.env['SHELL'] || 'bash', [], {
 				name: 'xterm-color',
 				cols: process.stdout.columns || 80,
 				rows: process.stdout.rows || 24,
