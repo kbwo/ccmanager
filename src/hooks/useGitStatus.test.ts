@@ -140,7 +140,6 @@ describe('useGitStatus', () => {
 		// All calls should have been made despite continuous errors
 		expect(mockGetGitStatus).toHaveBeenCalledWith(
 			'/path1',
-			'main',
 			expect.any(AbortSignal),
 		);
 	});
@@ -199,7 +198,7 @@ describe('useGitStatus', () => {
 		let activeRequests = 0;
 		const abortedSignals: AbortSignal[] = [];
 
-		mockGetGitStatus.mockImplementation(async (path, branch, signal) => {
+		mockGetGitStatus.mockImplementation(async (path, signal) => {
 			activeRequests++;
 
 			signal.addEventListener('abort', () => {
