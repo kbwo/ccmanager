@@ -1,6 +1,7 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {SessionManager} from './sessionManager.js';
 import {configurationManager} from './configurationManager.js';
+import {shortcutManager} from './shortcutManager.js';
 import {spawn, IPty} from 'node-pty';
 import {EventEmitter} from 'events';
 import {Session} from '../types/index.js';
@@ -321,6 +322,7 @@ describe('SessionManager', () => {
 	});
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	describe('createSession with presets', () => {
 		it('should use default preset when no preset ID specified', async () => {
 			// Setup mock preset
@@ -420,10 +422,75 @@ describe('SessionManager', () => {
 			await sessionManager.createSessionWithPreset('/test/worktree');
 
 			// Verify both attempts were made
+=======
+	describe('Dual Mode Bug Fixes', () => {
+		it('should handle undefined shortcut in getShortcutCode without crashing', () => {
+			// Test específico para el TypeError reportado por kbwo
+			// Previene regresión del bug: Cannot read properties of undefined (reading 'ctrl')
+			expect(() => shortcutManager.getShortcutCode(undefined as any)).not.toThrow();
+			expect(shortcutManager.getShortcutCode(undefined as any)).toBeNull();
+		});
+
+		it('should emit bashSessionData events when bash mode is active', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			
+			// Create separate mock PTYs for proper testing
+			const claudeMockPty = new MockPty();
+			const bashMockPty = new MockPty();
+			
+			vi.mocked(spawn)
+				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty);
+
+			// Create session
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.isActive = true;
+
+			// Set up event listener spy
+			const bashDataEventSpy = vi.fn();
+			sessionManager.on('bashSessionData', bashDataEventSpy);
+
+			// Simulate bash PTY sending data (trigger onData handler)
+			const bashDataHandler = bashMockPty.onData.mock.calls[0][0];
+			bashDataHandler('$ echo test\ntest\n$ ');
+
+			// Verify: bashSessionData event is emitted
+			expect(bashDataEventSpy).toHaveBeenCalledWith(session, '$ echo test\ntest\n$ ');
+		});
+	});
+
+	describe('Dual Mode Integration', () => {
+		it('should create both Claude and Bash PTYs during session creation', async () => {
+			// Setup separate mock PTYs for Claude and Bash
+			const claudeMockPty = new MockPty();
+			const bashMockPty = new MockPty();
+
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty);
+
+			// Create session
+			const session = await sessionManager.createSession('/test/worktree');
+
+			// Verify: Both PTYs are created and assigned correctly
+			expect(session.process).toBe(claudeMockPty);
+			expect(session.bashProcess).toBe(bashMockPty);
+
+			// Verify: spawn called for both Claude and Bash
+>>>>>>> a715d3d (test: add focused dual-mode integration tests)
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				1,
 				'claude',
+<<<<<<< HEAD
 				['--bad-flag'],
 				expect.any(Object),
 			);
@@ -455,6 +522,64 @@ describe('SessionManager', () => {
 				expect.any(Object),
 			);
 =======
+=======
+				expect.any(Array),
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				process.env['SHELL'] || '/bin/bash',
+				[],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Verify: Both terminals are created with allowProposedApi
+			expect(session.terminal).toBeDefined();
+			expect(session.bashTerminal).toBeDefined();
+		});
+
+		it('should route bash events correctly when in bash mode', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			
+			// Create separate mock PTYs for proper testing
+			const claudeMockPty = new MockPty();
+			const bashMockPty = new MockPty();
+			
+			vi.mocked(spawn)
+				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty);
+
+			// Create session and set bash mode
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.isActive = true;
+
+			// Set up event listener spies
+			const bashDataEventSpy = vi.fn();
+			const claudeDataEventSpy = vi.fn();
+			sessionManager.on('bashSessionData', bashDataEventSpy);
+			sessionManager.on('sessionData', claudeDataEventSpy);
+
+			// Simulate bash PTY data (should emit bashSessionData)
+			const bashDataHandler = bashMockPty.onData.mock.calls[0][0];
+			bashDataHandler('bash output');
+
+			// Simulate claude PTY data (should emit sessionData)
+			const claudeDataHandler = claudeMockPty.onData.mock.calls[0][0];
+			claudeDataHandler('claude output');
+
+			// Verify: bash data routed to bashSessionData event
+			expect(bashDataEventSpy).toHaveBeenCalledWith(session, 'bash output');
+
+			// Verify: claude data routed to sessionData event (regardless of mode)
+			expect(claudeDataEventSpy).toHaveBeenCalledWith(session, 'claude output');
+		});
+	});
+
+>>>>>>> a715d3d (test: add focused dual-mode integration tests)
 	describe('Bash Session Restoration Events', () => {
 		it('should emit bashSessionRestore event when bash session becomes active with history', async () => {
 			// Setup mock configuration
