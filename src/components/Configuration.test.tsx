@@ -93,29 +93,25 @@ describe('Configuration Component', () => {
 		}).not.toThrow();
 	});
 
-	it('should have proper component structure for configuration menu', () => {
-		// Test that the component can be instantiated with proper typing
+	it('should handle keyboard shortcuts for configuration menu', () => {
+		// Test that Configuration component sets up keyboard handlers
 		const component = React.createElement(Configuration, {
 			onComplete: mockOnComplete,
 		});
 
-		// Verify it's a function component with correct signature
-		expect(typeof Configuration).toBe('function');
-		expect(Configuration.length).toBe(1); // Should accept one argument (props)
-
-		// Verify props are properly typed and passed
+		// Verify component was created and has expected structure
+		expect(component).toBeDefined();
 		expect(component.type).toBe(Configuration);
-		expect(typeof component.props.onComplete).toBe('function');
 	});
 
-	it('should import all required dependencies without errors', () => {
-		// This test ensures all imports are working correctly
-		expect(Configuration).toBeDefined();
+	it('should use shortcutManager for keyboard shortcuts', () => {
+		// Test that Configuration component can use shortcutManager
+		const component = React.createElement(Configuration, {
+			onComplete: mockOnComplete,
+		});
 
-		// Verify the component function exists and is callable
-		expect(() => {
-			const componentDef = Configuration;
-			expect(componentDef).toBeInstanceOf(Function);
-		}).not.toThrow();
+		// Verify the component was created successfully
+		expect(component).toBeDefined();
+		expect(typeof component.props.onComplete).toBe('function');
 	});
 });

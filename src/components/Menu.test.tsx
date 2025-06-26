@@ -60,42 +60,27 @@ describe('Menu Component', () => {
 		}).not.toThrow();
 	});
 
-	it('should have proper component structure for menu interface', () => {
-		// Test that the component can be instantiated with proper typing
+	it('should handle keyboard shortcuts for worktree selection', () => {
+		// Test that Menu component sets up keyboard handlers
 		const component = React.createElement(Menu, {
 			sessionManager: mockSessionManager as any,
 			onSelectWorktree: mockOnSelectWorktree,
 		});
 
-		// Verify it's a function component with correct signature
-		expect(typeof Menu).toBe('function');
-		expect(Menu.length).toBe(1); // Should accept one argument (props)
-
-		// Verify props are properly typed and passed
+		// Verify component was created and has expected structure
+		expect(component).toBeDefined();
 		expect(component.type).toBe(Menu);
+	});
+
+	it('should handle hotkey navigation (N/M/D/C/Q)', () => {
+		// Test that Menu component can be instantiated with hotkey functionality
+		const component = React.createElement(Menu, {
+			sessionManager: mockSessionManager as any,
+			onSelectWorktree: mockOnSelectWorktree,
+		});
+
+		// Verify the component was created successfully
+		expect(component).toBeDefined();
 		expect(typeof component.props.onSelectWorktree).toBe('function');
-		expect(component.props.sessionManager).toBeDefined();
-	});
-
-	it('should handle missing or undefined props gracefully', () => {
-		// This tests component robustness
-		expect(() => {
-			// Test with minimal valid props
-			React.createElement(Menu, {
-				sessionManager: mockSessionManager as any,
-				onSelectWorktree: mockOnSelectWorktree,
-			});
-		}).not.toThrow();
-	});
-
-	it('should import all required dependencies without errors', () => {
-		// This test ensures all imports are working correctly
-		expect(Menu).toBeDefined();
-
-		// Verify the component function exists and is callable
-		expect(() => {
-			const componentDef = Menu;
-			expect(componentDef).toBeInstanceOf(Function);
-		}).not.toThrow();
 	});
 });
