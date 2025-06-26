@@ -140,12 +140,18 @@ const App: React.FC = () => {
 		path: string,
 		branch: string,
 		baseBranch: string,
+		copySessionData: boolean,
 	) => {
 		setView('creating-worktree');
 		setError(null);
 
 		// Create the worktree
-		const result = worktreeService.createWorktree(path, branch, baseBranch);
+		const result = worktreeService.createWorktree(
+			path,
+			branch,
+			baseBranch,
+			copySessionData,
+		);
 
 		if (result.success) {
 			// Success - return to menu
