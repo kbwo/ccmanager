@@ -120,20 +120,23 @@ describe('SessionManager', () => {
 				fallbackArgs: ['--resume'],
 			});
 
-			// First spawn attempt - will exit with code 1
+			// First spawn attempt (Claude) - will exit with code 1
 			const firstMockPty = new MockPty();
-			// Second spawn attempt - succeeds
+			// Second spawn attempt (Bash) - succeeds
+			const bashMockPty = new MockPty();
+			// Third spawn attempt (Claude fallback) - succeeds
 			const secondMockPty = new MockPty();
 
 			vi.mocked(spawn)
 				.mockReturnValueOnce(firstMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty)
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
 			// Create session
 			const session = await sessionManager.createSession('/test/worktree');
 
-			// Verify initial spawn
-			expect(spawn).toHaveBeenCalledTimes(1);
+			// Verify initial spawn (Claude + Bash PTYs)
+			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
 				['--invalid-flag'],
@@ -146,10 +149,10 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called
-			expect(spawn).toHaveBeenCalledTimes(2);
+			// Verify fallback spawn was called (Claude initial + Bash + Claude fallback)
+			expect(spawn).toHaveBeenCalledTimes(3);
 			expect(spawn).toHaveBeenNthCalledWith(
-				2,
+				3,
 				'claude',
 				['--resume'],
 				expect.objectContaining({cwd: '/test/worktree'}),
@@ -220,8 +223,8 @@ describe('SessionManager', () => {
 			// Wait a bit to ensure no early exit
 			await new Promise(resolve => setTimeout(resolve, 600));
 
-			// Verify only one spawn attempt
-			expect(spawn).toHaveBeenCalledTimes(1);
+			// Verify spawn attempts (Claude + Bash PTYs)
+			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
 				['--resume'],
@@ -246,8 +249,8 @@ describe('SessionManager', () => {
 
 			// Should return the same session
 			expect(session1).toBe(session2);
-			// Spawn should only be called once
-			expect(spawn).toHaveBeenCalledTimes(1);
+			// Spawn should only be called for first session (Claude + Bash PTYs)
+			expect(spawn).toHaveBeenCalledTimes(2);
 		});
 
 		it('should throw error when spawn fails with fallback args', async () => {
@@ -466,7 +469,7 @@ describe('SessionManager', () => {
 			session.bashHistory = [
 				Buffer.from('$ ls\n'),
 				Buffer.from('file1.txt file2.txt\n'),
-				Buffer.from('$ pwd\n')
+				Buffer.from('$ pwd\n'),
 			];
 
 			// Set up event listener spy
@@ -493,7 +496,7 @@ describe('SessionManager', () => {
 			session.currentMode = 'claude';
 			session.outputHistory = [
 				Buffer.from('Claude response 1\n'),
-				Buffer.from('Claude response 2\n')
+				Buffer.from('Claude response 2\n'),
 			];
 
 			// Set up event listener spy

@@ -32,11 +32,11 @@ export interface Session {
 	commandConfig?: CommandConfig; // Store command config for fallback
 
 	// Dual-mode properties
-	bashProcess?: IPty; // Bash PTY instance (created on-demand)
+	bashProcess: IPty; // Bash PTY instance (always exists)
+	bashTerminal: Terminal; // Virtual terminal for bash state detection
 	currentMode: TerminalMode; // Current active mode
 	bashHistory: Buffer[]; // Bash mode history for restoration
-	bashState: 'idle' | 'running'; // Simple state tracking for bash
-	bashWorkingDirectory?: string; // Bash PWD tracking
+	bashState: SessionState; // Bash state tracking (same as Claude)
 }
 
 export interface SessionManager {

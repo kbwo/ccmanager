@@ -115,6 +115,18 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			commandConfig,
 
 			// Dual-mode properties initialization
+			bashProcess: spawn(process.env['SHELL'] || '/bin/bash', [], {
+				name: 'xterm-color',
+				cols: process.stdout.columns || 80,
+				rows: process.stdout.rows || 24,
+				cwd: worktreePath,
+				env: process.env,
+			}),
+			bashTerminal: new Terminal({
+				cols: process.stdout.columns || 80,
+				rows: process.stdout.rows || 24,
+				allowProposedApi: true,
+			}),
 			currentMode: 'claude', // Always start in Claude mode
 			bashHistory: [],
 			bashState: 'idle',
@@ -122,6 +134,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		// Set up persistent background data handler for state detection
 		this.setupBackgroundHandler(session);
+		this.setupBashHandler(session);
 
 		this.sessions.set(worktreePath, session);
 
@@ -300,6 +313,48 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.setupExitHandler(session);
 	}
 
+	private setupBashHandler(session: Session): void {
+		// Setup bash data handler (background only - no stdout writing)
+		session.bashProcess.onData((data: string) => {
+			// Write data to bash virtual terminal for state detection
+			session.bashTerminal.write(data);
+
+			// Store in bash history as Buffer
+			const buffer = Buffer.from(data, 'utf8');
+			session.bashHistory.push(buffer);
+
+			// Apply 10MB memory limit for bash history (same as Claude)
+			const MAX_BASH_HISTORY = 10 * 1024 * 1024;
+			let totalSize = session.bashHistory.reduce(
+				(sum, buf) => sum + buf.length,
+				0,
+			);
+			while (totalSize > MAX_BASH_HISTORY && session.bashHistory.length > 0) {
+				const removed = session.bashHistory.shift();
+				if (removed) totalSize -= removed.length;
+			}
+
+			// Update bash state using terminal detection (same as Claude)
+			const oldBashState = session.bashState;
+			const newBashState = this.detectTerminalState(session.bashTerminal);
+
+			if (newBashState !== oldBashState) {
+				session.bashState = newBashState;
+			}
+
+			// Emit bash data event for active sessions
+			if (session.isActive && session.currentMode === 'bash') {
+				this.emit('bashSessionData', session, data);
+			}
+		});
+
+		// Setup bash exit handler
+		session.bashProcess.onExit(() => {
+			// Bash process exited - could restart or handle gracefully
+			console.warn(`Bash process exited for session ${session.id}`);
+		});
+	}
+
 	private cleanupSession(session: Session): void {
 		// Clear the state check interval
 		if (session.stateCheckInterval) {
@@ -324,11 +379,17 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			// If becoming active, emit a restore event with the appropriate history
 			if (active) {
 				// Restore Claude history if in Claude mode and has history
-				if (session.outputHistory.length > 0 && session.currentMode === 'claude') {
+				if (
+					session.outputHistory.length > 0 &&
+					session.currentMode === 'claude'
+				) {
 					this.emit('sessionRestore', session);
 				}
 				// Restore bash history if in bash mode and has history
-				else if (session.bashHistory.length > 0 && session.currentMode === 'bash') {
+				else if (
+					session.bashHistory.length > 0 &&
+					session.currentMode === 'bash'
+				) {
 					this.emit('bashSessionRestore', session);
 				}
 			}
@@ -348,13 +409,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				// Process might already be dead
 			}
 
-			// Clean up bash PTY if it exists
-			if (session.bashProcess) {
-				try {
-					session.bashProcess.kill();
-				} catch (_error) {
-					// Bash process might already be dead
-				}
+			// Clean up bash PTY (always exists now)
+			try {
+				session.bashProcess.kill();
+			} catch (_error) {
+				// Bash process might already be dead
 			}
 
 			// Clean up any pending timer

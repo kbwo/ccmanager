@@ -3,7 +3,6 @@ import {useStdout} from 'ink';
 import {Session as SessionType, TerminalMode} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
-import {spawn} from 'node-pty';
 
 interface SessionProps {
 	session: SessionType;
@@ -22,59 +21,15 @@ const Session: React.FC<SessionProps> = ({
 		session.currentMode,
 	);
 
-	// Create bash PTY process
-	const createBashProcess = useCallback(() => {
-		if (session.bashProcess) {
-			return session.bashProcess;
-		}
-
-		const bashPty = spawn('/bin/bash', [], {
-			name: 'xterm-color',
-			cols: process.stdout.columns || 80,
-			rows: process.stdout.rows || 24,
-			cwd: session.worktreePath,
-			env: process.env,
-		});
-
-		// Set up bash data handler for history management
-		bashPty.onData((data: string) => {
-			// Only write to stdout if we're in bash mode (check session state directly)
-			if (session.currentMode === 'bash' && !isExiting) {
-				stdout.write(data);
-			}
-
-			// Store bash history with memory management
-			const buffer = Buffer.from(data, 'utf8');
-			session.bashHistory.push(buffer);
-
-			// Apply 5MB memory limit for bash history
-			const MAX_BASH_HISTORY = 5 * 1024 * 1024;
-			let totalSize = session.bashHistory.reduce(
-				(sum, buf) => sum + buf.length,
-				0,
-			);
-			while (totalSize > MAX_BASH_HISTORY && session.bashHistory.length > 0) {
-				const removed = session.bashHistory.shift();
-				if (removed) totalSize -= removed.length;
-			}
-
-			// Update bash state (simple prompt detection)
-			session.bashState =
-				data.includes('$ ') || data.includes('# ') ? 'idle' : 'running';
-		});
-
-		session.bashProcess = bashPty;
-		return bashPty;
-	}, [session, isExiting, stdout]);
-
 	// Display mode indicator
 	const displayModeIndicator = useCallback(
 		(mode: TerminalMode) => {
 			const toggleShortcut = shortcutManager.getShortcutDisplay('toggleMode');
+			const menuShortcut = shortcutManager.getShortcutDisplay('returnToMenu');
 			const indicator =
 				mode === 'claude'
-					? `\x1b[44m Claude \x1b[0m \x1b[90m(${toggleShortcut}: Bash)\x1b[0m`
-					: `\x1b[42m Bash \x1b[0m \x1b[90m(${toggleShortcut}: Claude)\x1b[0m`;
+					? `\x1b[44m Claude \x1b[0m \x1b[90m(${toggleShortcut}: Bash | ${menuShortcut}: Menu)\x1b[0m`
+					: `\x1b[42m Bash \x1b[0m \x1b[90m(${toggleShortcut}: Claude | ${menuShortcut}: Menu)\x1b[0m`;
 
 			// Display in status line at top of terminal
 			stdout.write(`\x1b[s\x1b[1;1H${indicator}\x1b[u`);
@@ -84,46 +39,31 @@ const Session: React.FC<SessionProps> = ({
 
 	// Mode switching function
 	const toggleMode = useCallback(() => {
-		if (currentMode === 'claude') {
-			// Switching to bash mode
-			createBashProcess();
+		const newMode = currentMode === 'claude' ? 'bash' : 'claude';
 
-			// Set current mode first
-			setCurrentMode('bash');
-			session.currentMode = 'bash';
+		// Update mode state
+		setCurrentMode(newMode);
+		session.currentMode = newMode;
 
-			// Clear screen and prepare for bash
-			stdout.write('\x1B[2J\x1B[H');
+		// Clear screen for clean switch
+		stdout.write('\x1B[2J\x1B[H');
 
-			// Display mode indicator first
-			displayModeIndicator('bash');
-
-			// Bash history restoration will be triggered automatically by setSessionActive
-			// using the same robust system as Claude mode
-			sessionManager.setSessionActive(session.worktreePath, true);
+		// Show current terminal content based on mode
+		if (newMode === 'bash') {
+			// Display bash history
+			for (const buffer of session.bashHistory) {
+				stdout.write(buffer);
+			}
 		} else {
-			// Switching to claude mode
-			setCurrentMode('claude');
-			session.currentMode = 'claude';
-
-			// Clear screen for mode switch
-			stdout.write('\x1B[2J\x1B[H');
-
-			// Display mode indicator first
-			displayModeIndicator('claude');
-
-			// Claude history restoration will be triggered automatically by setSessionActive
-			// when useEffect re-runs due to mode change
-			sessionManager.setSessionActive(session.worktreePath, true);
+			// Display claude history
+			for (const buffer of session.outputHistory) {
+				stdout.write(buffer);
+			}
 		}
-	}, [
-		currentMode,
-		createBashProcess,
-		session,
-		sessionManager,
-		stdout,
-		displayModeIndicator,
-	]);
+
+		// Display mode indicator
+		displayModeIndicator(newMode);
+	}, [currentMode, session, stdout, displayModeIndicator]);
 
 	useEffect(() => {
 		if (!stdout) return;
@@ -214,8 +154,26 @@ const Session: React.FC<SessionProps> = ({
 
 		// Listen for session data events
 		const handleSessionData = (activeSession: SessionType, data: string) => {
-			// Only handle data for our session
-			if (activeSession.id === session.id && !isExiting) {
+			// Only handle data for our session and if in Claude mode
+			if (
+				activeSession.id === session.id &&
+				!isExiting &&
+				session.currentMode === 'claude'
+			) {
+				stdout.write(data);
+			}
+		};
+
+		const handleBashSessionData = (
+			activeSession: SessionType,
+			data: string,
+		) => {
+			// Only handle data for our session and if in bash mode
+			if (
+				activeSession.id === session.id &&
+				!isExiting &&
+				session.currentMode === 'bash'
+			) {
 				stdout.write(data);
 			}
 		};
@@ -228,6 +186,7 @@ const Session: React.FC<SessionProps> = ({
 		};
 
 		sessionManager.on('sessionData', handleSessionData);
+		sessionManager.on('bashSessionData', handleBashSessionData);
 		sessionManager.on('sessionExit', handleSessionExit);
 
 		// Handle terminal resize
@@ -245,13 +204,12 @@ const Session: React.FC<SessionProps> = ({
 				// Process might have exited
 			}
 
-			// Resize bash PTY if it exists
-			if (session.bashProcess) {
-				try {
-					session.bashProcess.resize(cols, rows);
-				} catch {
-					// Bash process might have exited
-				}
+			// Resize bash PTY (always exists)
+			try {
+				session.bashProcess.resize(cols, rows);
+				session.bashTerminal.resize(cols, rows);
+			} catch {
+				// Bash process might have exited
 			}
 		};
 
@@ -304,9 +262,8 @@ const Session: React.FC<SessionProps> = ({
 			if (currentMode === 'claude') {
 				session.process.write(data);
 			} else {
-				// Bash mode - create bash process if needed and write to it
-				const bashPty = createBashProcess();
-				bashPty.write(data);
+				// Bash mode - write to bash PTY
+				session.bashProcess.write(data);
 			}
 		};
 
@@ -338,6 +295,7 @@ const Session: React.FC<SessionProps> = ({
 			sessionManager.off('sessionRestore', handleSessionRestore);
 			sessionManager.off('bashSessionRestore', handleBashSessionRestore);
 			sessionManager.off('sessionData', handleSessionData);
+			sessionManager.off('bashSessionData', handleBashSessionData);
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);
 		};
@@ -347,9 +305,9 @@ const Session: React.FC<SessionProps> = ({
 		stdout,
 		onReturnToMenu,
 		isExiting,
-		createBashProcess,
 		displayModeIndicator,
 		toggleMode,
+		currentMode,
 	]);
 
 	// Return null to render nothing (PTY output goes directly to stdout)

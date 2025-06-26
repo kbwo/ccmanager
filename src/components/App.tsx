@@ -283,20 +283,12 @@ const App: React.FC = () => {
 
 	if (view === 'session' && activeSession) {
 		return (
-			<Box flexDirection="column">
-				<Session
-					key={activeSession.id}
-					session={activeSession}
-					sessionManager={sessionManager}
-					onReturnToMenu={handleReturnToMenu}
-				/>
-				<Box marginTop={1}>
-					<Text dimColor>
-						Press {shortcutManager.getShortcutDisplay('returnToMenu')} to return
-						to menu
-					</Text>
-				</Box>
-			</Box>
+			<Session
+				key={activeSession.id}
+				session={activeSession}
+				sessionManager={sessionManager}
+				onReturnToMenu={handleReturnToMenu}
+			/>
 		);
 	}
 

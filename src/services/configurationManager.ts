@@ -111,7 +111,12 @@ export class ConfigurationManager {
 	}
 
 	getShortcuts(): ShortcutConfig {
-		return this.config.shortcuts || DEFAULT_SHORTCUTS;
+		const config = this.config.shortcuts || {};
+		return {
+			returnToMenu: config.returnToMenu || DEFAULT_SHORTCUTS.returnToMenu,
+			cancel: config.cancel || DEFAULT_SHORTCUTS.cancel,
+			toggleMode: config.toggleMode || DEFAULT_SHORTCUTS.toggleMode,
+		};
 	}
 
 	setShortcuts(shortcuts: ShortcutConfig): void {
