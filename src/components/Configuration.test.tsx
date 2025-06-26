@@ -93,15 +93,4 @@ describe('Configuration Component', () => {
 		}).not.toThrow();
 	});
 
-	it('should register keyboard input handler for shortcuts', () => {
-		// Test that Configuration component sets up useInput for keyboard shortcuts
-		React.createElement(Configuration, {
-			onComplete: mockOnComplete,
-		});
-
-		// The fact that component imports and uses useInput indicates
-		// it has keyboard shortcut functionality
-		expect(Configuration).toBeDefined();
-		expect(typeof mockOnComplete).toBe('function');
-	});
 });

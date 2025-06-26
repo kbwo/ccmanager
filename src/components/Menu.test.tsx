@@ -61,16 +61,4 @@ describe('Menu Component', () => {
 		}).not.toThrow();
 	});
 
-	it('should register keyboard input handler for shortcuts', () => {
-		// Test that Menu component sets up useInput for keyboard shortcuts
-		React.createElement(Menu, {
-			sessionManager: mockSessionManager as any,
-			onSelectWorktree: mockOnSelectWorktree,
-		});
-
-		// The fact that component imports and uses useInput indicates
-		// it has keyboard shortcut functionality
-		expect(Menu).toBeDefined();
-		expect(typeof mockOnSelectWorktree).toBe('function');
-	});
 });
