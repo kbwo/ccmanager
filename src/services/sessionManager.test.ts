@@ -427,7 +427,9 @@ describe('SessionManager', () => {
 		it('should handle undefined shortcut in getShortcutCode without crashing', () => {
 			// Test específico para el TypeError reportado por kbwo
 			// Previene regresión del bug: Cannot read properties of undefined (reading 'ctrl')
-			expect(() => shortcutManager.getShortcutCode(undefined as any)).not.toThrow();
+			expect(() =>
+				shortcutManager.getShortcutCode(undefined as any),
+			).not.toThrow();
 			expect(shortcutManager.getShortcutCode(undefined as any)).toBeNull();
 		});
 
@@ -436,11 +438,11 @@ describe('SessionManager', () => {
 			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
 				command: 'claude',
 			});
-			
+
 			// Create separate mock PTYs for proper testing
 			const claudeMockPty = new MockPty();
 			const bashMockPty = new MockPty();
-			
+
 			vi.mocked(spawn)
 				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
 				.mockReturnValueOnce(bashMockPty as unknown as IPty);
@@ -455,11 +457,16 @@ describe('SessionManager', () => {
 			sessionManager.on('bashSessionData', bashDataEventSpy);
 
 			// Simulate bash PTY sending data (trigger onData handler)
-			const bashDataHandler = bashMockPty.onData.mock.calls[0][0];
-			bashDataHandler('$ echo test\ntest\n$ ');
+			const bashDataHandler = bashMockPty.onData.mock.calls[0]?.[0];
+			if (bashDataHandler) {
+				bashDataHandler('$ echo test\ntest\n$ ');
+			}
 
 			// Verify: bashSessionData event is emitted
-			expect(bashDataEventSpy).toHaveBeenCalledWith(session, '$ echo test\ntest\n$ ');
+			expect(bashDataEventSpy).toHaveBeenCalledWith(
+				session,
+				'$ echo test\ntest\n$ ',
+			);
 		});
 	});
 
@@ -543,11 +550,11 @@ describe('SessionManager', () => {
 			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
 				command: 'claude',
 			});
-			
+
 			// Create separate mock PTYs for proper testing
 			const claudeMockPty = new MockPty();
 			const bashMockPty = new MockPty();
-			
+
 			vi.mocked(spawn)
 				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
 				.mockReturnValueOnce(bashMockPty as unknown as IPty);
@@ -564,12 +571,16 @@ describe('SessionManager', () => {
 			sessionManager.on('sessionData', claudeDataEventSpy);
 
 			// Simulate bash PTY data (should emit bashSessionData)
-			const bashDataHandler = bashMockPty.onData.mock.calls[0][0];
-			bashDataHandler('bash output');
+			const bashDataHandler = bashMockPty.onData.mock.calls[0]?.[0];
+			if (bashDataHandler) {
+				bashDataHandler('bash output');
+			}
 
 			// Simulate claude PTY data (should emit sessionData)
-			const claudeDataHandler = claudeMockPty.onData.mock.calls[0][0];
-			claudeDataHandler('claude output');
+			const claudeDataHandler = claudeMockPty.onData.mock.calls[0]?.[0];
+			if (claudeDataHandler) {
+				claudeDataHandler('claude output');
+			}
 
 			// Verify: bash data routed to bashSessionData event
 			expect(bashDataEventSpy).toHaveBeenCalledWith(session, 'bash output');

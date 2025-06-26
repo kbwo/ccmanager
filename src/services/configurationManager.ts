@@ -111,7 +111,7 @@ export class ConfigurationManager {
 	}
 
 	getShortcuts(): ShortcutConfig {
-		const config = this.config.shortcuts || {};
+		const config = this.config.shortcuts || ({} as Partial<ShortcutConfig>);
 		return {
 			returnToMenu: config.returnToMenu || DEFAULT_SHORTCUTS.returnToMenu,
 			cancel: config.cancel || DEFAULT_SHORTCUTS.cancel,
