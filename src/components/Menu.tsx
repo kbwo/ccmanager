@@ -8,8 +8,13 @@ import {
 	STATUS_ICONS,
 	STATUS_LABELS,
 	MENU_ICONS,
-	getStatusDisplay,
 } from '../constants/statusIcons.js';
+import {useGitStatus} from '../hooks/useGitStatus.js';
+import {
+	prepareWorktreeItems,
+	calculateColumnPositions,
+	assembleWorktreeLabel,
+} from '../utils/worktreeUtils.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -23,7 +28,9 @@ interface MenuItem {
 }
 
 const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
-	const [worktrees, setWorktrees] = useState<Worktree[]>([]);
+	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
+	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
+	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 
@@ -31,7 +38,8 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 		// Load worktrees
 		const worktreeService = new WorktreeService();
 		const loadedWorktrees = worktreeService.getWorktrees();
-		setWorktrees(loadedWorktrees);
+		setBaseWorktrees(loadedWorktrees);
+		setDefaultBranch(worktreeService.getDefaultBranch());
 
 		// Update sessions
 		const updateSessions = () => {
@@ -60,27 +68,21 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 	}, [sessionManager]);
 
 	useEffect(() => {
-		// Build menu items
-		const menuItems: MenuItem[] = worktrees.map((wt, index) => {
-			const session = sessions.find(s => s.worktreePath === wt.path);
-			let status = '';
+		// Prepare worktree items and calculate layout
+		const items = prepareWorktreeItems(worktrees, sessions);
+		const columnPositions = calculateColumnPositions(items);
 
-			if (session) {
-				status = ` [${getStatusDisplay(session.state)}]`;
-			}
-
-			const branchName = wt.branch
-				? wt.branch.replace('refs/heads/', '')
-				: 'detached';
-			const isMain = wt.isMainWorktree ? ' (main)' : '';
+		// Build menu items with proper alignment
+		const menuItems: MenuItem[] = items.map((item, index) => {
+			const label = assembleWorktreeLabel(item, columnPositions);
 
 			// Only show numbers for first 10 worktrees (0-9)
 			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
 
 			return {
-				label: `${numberPrefix}${branchName}${isMain}${status}`,
-				value: wt.path,
-				worktree: wt,
+				label: numberPrefix + label,
+				value: item.worktree.path,
+				worktree: item.worktree,
 			};
 		});
 
@@ -110,7 +112,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			value: 'exit',
 		});
 		setItems(menuItems);
-	}, [worktrees, sessions]);
+	}, [worktrees, sessions, defaultBranch]);
 
 	// Handle hotkeys
 	useInput((input, _key) => {

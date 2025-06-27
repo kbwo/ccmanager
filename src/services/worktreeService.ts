@@ -2,6 +2,7 @@ import {execSync} from 'child_process';
 import {existsSync} from 'fs';
 import path from 'path';
 import {Worktree} from '../types/index.js';
+import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 
 export class WorktreeService {
 	private rootPath: string;
@@ -222,6 +223,16 @@ export class WorktreeService {
 				cwd: this.gitRootPath, // Execute from git root to ensure proper resolution
 				encoding: 'utf8',
 			});
+
+			// Store the parent branch in worktree config
+			try {
+				setWorktreeParentBranch(resolvedPath, baseBranch);
+			} catch (error) {
+				console.error(
+					'Warning: Failed to set parent branch in worktree config:',
+					error,
+				);
+			}
 
 			return {success: true};
 		} catch (error) {
