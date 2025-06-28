@@ -18,6 +18,11 @@ type EditField =
 	| 'fallbackArgs'
 	| 'detectionStrategy';
 
+const formatDetectionStrategy = (strategy: string | undefined): string => {
+	const value = strategy || 'claude';
+	return value === 'gemini' ? 'Gemini' : 'Claude';
+};
+
 const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	const presetsConfig = configurationManager.getCommandPresets();
 	const [presets, setPresets] = useState(presetsConfig.presets);
@@ -534,7 +539,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				value: 'fallbackArgs',
 			},
 			{
-				label: `Detection Strategy: ${preset.detectionStrategy || 'claude'}`,
+				label: `Detection Strategy: ${formatDetectionStrategy(preset.detectionStrategy)}`,
 				value: 'detectionStrategy',
 			},
 			{label: '─────────────────────────', value: 'separator1'},
@@ -591,13 +596,12 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			const isDefault = preset.id === defaultPresetId;
 			const args = preset.args?.join(' ') || '';
 			const fallback = preset.fallbackArgs?.join(' ') || '';
-			const strategy = preset.detectionStrategy || 'claude';
 			let label = preset.name;
 			if (isDefault) label += ' (default)';
 			label += `\n    Command: ${preset.command}`;
 			if (args) label += `\n    Args: ${args}`;
 			if (fallback) label += `\n    Fallback: ${fallback}`;
-			label += `\n    Detection: ${strategy}`;
+			label += `\n    Detection: ${formatDetectionStrategy(preset.detectionStrategy)}`;
 			return {
 				label,
 				value: preset.id,
