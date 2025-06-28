@@ -6,6 +6,8 @@ export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
+export type StateDetectionStrategy = 'claude' | 'gemini';
+
 export interface Worktree {
 	path: string;
 	branch?: string;
@@ -28,6 +30,7 @@ export interface Session {
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
 	isPrimaryCommand?: boolean; // Track if process was started with main command args
 	commandConfig?: CommandConfig; // Store command config for fallback
+	detectionStrategy?: StateDetectionStrategy; // State detection strategy for this session
 }
 
 export interface SessionManager {
@@ -83,6 +86,7 @@ export interface CommandPreset {
 	command: string; // The main command to execute
 	args?: string[]; // Arguments to pass to the command
 	fallbackArgs?: string[]; // Fallback arguments if main command fails
+	detectionStrategy?: StateDetectionStrategy; // State detection strategy (defaults to 'claude')
 }
 
 export interface CommandPresetsConfig {
