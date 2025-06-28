@@ -90,20 +90,20 @@ describe('ConfigureCommand - Integration Tests', () => {
 	describe('Preset Display Requirements', () => {
 		it('should format preset display correctly', () => {
 			// Test display formatting logic
-			const preset = mockPresets[0];
+			const preset = mockPresets[0]!;
 			const displayText = `${preset.name} (default)\n    Command: ${preset.command}`;
 			expect(displayText).toContain('Main (default)');
 			expect(displayText).toContain('Command: claude');
 		});
 
 		it('should handle preset with args display', () => {
-			const preset = mockPresets[1];
+			const preset = mockPresets[1]!;
 			const args = preset.args?.join(' ') || '';
 			expect(args).toBe('--resume');
 		});
 
 		it('should handle preset with fallback args display', () => {
-			const preset = mockPresets[2];
+			const preset = mockPresets[2]!;
 			const fallback = preset.fallbackArgs?.join(' ') || '';
 			expect(fallback).toBe('--no-mcp');
 		});
