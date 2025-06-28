@@ -27,6 +27,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	const [addStep, setAddStep] = useState<
 		'name' | 'command' | 'args' | 'fallbackArgs'
 	>('name');
+	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
 	const handleListNavigation = (key: Key) => {
 		const totalItems = presets.length + 2; // presets + "Add New Preset" + "Exit"
@@ -115,6 +116,13 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 
 		switch (editField) {
 			case 'name':
+				// Prevent using "Default" as a name to avoid confusion
+				if (value.trim().toLowerCase() === 'default') {
+					setErrorMessage(
+						'Cannot use "Default" as a preset name. Please choose a different name.',
+					);
+					return;
+				}
 				updatedPreset.name = value;
 				break;
 			case 'command':
@@ -140,14 +148,23 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 
 		setEditField(null);
 		setInputValue('');
+		setErrorMessage(null);
 	};
 
 	const handleAddPresetInput = (value: string) => {
 		switch (addStep) {
 			case 'name':
+				// Prevent using "Default" as a name to avoid confusion
+				if (value.trim().toLowerCase() === 'default') {
+					setErrorMessage(
+						'Cannot use "Default" as a preset name. Please choose a different name.',
+					);
+					return;
+				}
 				setNewPreset({...newPreset, name: value});
 				setAddStep('command');
 				setInputValue('');
+				setErrorMessage(null);
 				break;
 			case 'command':
 				setNewPreset({...newPreset, command: value || 'claude'});
@@ -216,12 +233,15 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			if (editField) {
 				setEditField(null);
 				setInputValue('');
+				setErrorMessage(null);
 			} else if (viewMode === 'edit') {
 				setViewMode('list');
 				setSelectedIndex(presets.findIndex(p => p.id === selectedPresetId));
+				setErrorMessage(null);
 			} else if (viewMode === 'add') {
 				setViewMode('list');
 				setSelectedIndex(presets.length);
+				setErrorMessage(null);
 			} else if (viewMode === 'delete-confirm') {
 				setViewMode('edit');
 				setSelectedIndex(5);
@@ -276,6 +296,12 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 					<Text>{titles[editField]}</Text>
 				</Box>
 
+				{errorMessage && (
+					<Box marginBottom={1}>
+						<Text color="red">{errorMessage}</Text>
+					</Box>
+				)}
+
 				<Box>
 					<TextInput
 						value={inputValue}
@@ -319,6 +345,12 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				<Box marginBottom={1}>
 					<Text>{titles[addStep]}</Text>
 				</Box>
+
+				{errorMessage && (
+					<Box marginBottom={1}>
+						<Text color="red">{errorMessage}</Text>
+					</Box>
+				)}
 
 				<Box>
 					<TextInput

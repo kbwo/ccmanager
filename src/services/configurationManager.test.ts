@@ -74,7 +74,7 @@ describe('ConfigurationManager - Command Presets', () => {
 			expect(presets.presets).toHaveLength(1);
 			expect(presets.presets[0]).toEqual({
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 			});
 			expect(presets.defaultPresetId).toBe('1');
@@ -83,7 +83,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should return configured presets', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Development', command: 'claude', args: ['--resume']},
 				],
 				defaultPresetId: '2',
@@ -111,7 +111,7 @@ describe('ConfigurationManager - Command Presets', () => {
 			expect(presets.presets).toHaveLength(1);
 			expect(presets.presets[0]).toEqual({
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 				args: ['--resume'],
 				fallbackArgs: ['--no-mcp'],
@@ -127,7 +127,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should save new presets configuration', () => {
 			const newPresets: CommandPresetsConfig = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: '2',
@@ -146,7 +146,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should return the default preset', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: '2',
@@ -166,7 +166,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should return first preset if defaultPresetId is invalid', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: 'invalid',
@@ -177,7 +177,7 @@ describe('ConfigurationManager - Command Presets', () => {
 
 			expect(defaultPreset).toEqual({
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 			});
 		});
@@ -187,7 +187,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should return preset by id', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: '1',
@@ -206,7 +206,7 @@ describe('ConfigurationManager - Command Presets', () => {
 
 		it('should return undefined for non-existent id', () => {
 			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Default', command: 'claude'}],
+				presets: [{id: '1', name: 'Main', command: 'claude'}],
 				defaultPresetId: '1',
 			};
 
@@ -220,7 +220,7 @@ describe('ConfigurationManager - Command Presets', () => {
 	describe('addPreset', () => {
 		it('should add a new preset', () => {
 			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Default', command: 'claude'}],
+				presets: [{id: '1', name: 'Main', command: 'claude'}],
 				defaultPresetId: '1',
 			};
 
@@ -241,7 +241,7 @@ describe('ConfigurationManager - Command Presets', () => {
 
 		it('should replace preset with same id', () => {
 			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Default', command: 'claude'}],
+				presets: [{id: '1', name: 'Main', command: 'claude'}],
 				defaultPresetId: '1',
 			};
 
@@ -265,7 +265,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should delete preset by id', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: '1',
@@ -281,7 +281,7 @@ describe('ConfigurationManager - Command Presets', () => {
 
 		it('should not delete the last preset', () => {
 			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Default', command: 'claude'}],
+				presets: [{id: '1', name: 'Main', command: 'claude'}],
 				defaultPresetId: '1',
 			};
 
@@ -295,7 +295,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should update defaultPresetId if default preset is deleted', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: '2',
@@ -313,7 +313,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should update default preset id', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude'},
+					{id: '1', name: 'Main', command: 'claude'},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: '1',
@@ -328,7 +328,7 @@ describe('ConfigurationManager - Command Presets', () => {
 
 		it('should not update if preset id does not exist', () => {
 			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Default', command: 'claude'}],
+				presets: [{id: '1', name: 'Main', command: 'claude'}],
 				defaultPresetId: '1',
 			};
 
@@ -344,7 +344,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should maintain getCommandConfig for backward compatibility', () => {
 			mockConfigData.commandPresets = {
 				presets: [
-					{id: '1', name: 'Default', command: 'claude', args: ['--resume']},
+					{id: '1', name: 'Main', command: 'claude', args: ['--resume']},
 					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
 				],
 				defaultPresetId: '1',
@@ -362,7 +362,7 @@ describe('ConfigurationManager - Command Presets', () => {
 
 		it('should update default preset when setCommandConfig is called', () => {
 			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Default', command: 'claude'}],
+				presets: [{id: '1', name: 'Main', command: 'claude'}],
 				defaultPresetId: '1',
 			};
 
@@ -378,7 +378,7 @@ describe('ConfigurationManager - Command Presets', () => {
 			const presets = configManager.getCommandPresets();
 			expect(presets.presets[0]).toEqual({
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 				args: ['--new-args'],
 				fallbackArgs: ['--new-fallback'],

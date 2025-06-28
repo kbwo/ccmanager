@@ -183,7 +183,7 @@ export class ConfigurationManager {
 		if (this.config.command && !this.config.commandPresets) {
 			const defaultPreset: CommandPreset = {
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: this.config.command.command,
 				args: this.config.command.args,
 				fallbackArgs: this.config.command.fallbackArgs,
@@ -203,7 +203,7 @@ export class ConfigurationManager {
 				presets: [
 					{
 						id: '1',
-						name: 'Default',
+						name: 'Main',
 						command: 'claude',
 					},
 				],

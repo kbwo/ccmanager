@@ -34,7 +34,7 @@ describe('ConfigureCommand - Preset UI', () => {
 	const mockPresets: CommandPreset[] = [
 		{
 			id: '1',
-			name: 'Default',
+			name: 'Main',
 			command: 'claude',
 		},
 		{
@@ -78,7 +78,7 @@ describe('ConfigureCommand - Preset UI', () => {
 			);
 
 			expect(lastFrame()).toContain('Command Presets');
-			expect(lastFrame()).toContain('Default');
+			expect(lastFrame()).toContain('Main');
 			expect(lastFrame()).toContain('Development');
 			expect(lastFrame()).toContain('Production');
 		});
@@ -88,7 +88,7 @@ describe('ConfigureCommand - Preset UI', () => {
 				<ConfigureCommand onComplete={mockOnComplete} />,
 			);
 
-			expect(lastFrame()).toContain('Default (default)');
+			expect(lastFrame()).toContain('Main (default)');
 		});
 
 		it('should show preset commands and args', () => {

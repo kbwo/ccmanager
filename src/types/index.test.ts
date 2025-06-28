@@ -6,12 +6,12 @@ describe('CommandPreset Types', () => {
 		it('should have required fields', () => {
 			const preset: CommandPreset = {
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 			};
 
 			expect(preset.id).toBe('1');
-			expect(preset.name).toBe('Default');
+			expect(preset.name).toBe('Main');
 			expect(preset.command).toBe('claude');
 			expect(preset.args).toBeUndefined();
 			expect(preset.fallbackArgs).toBeUndefined();
@@ -64,7 +64,7 @@ describe('CommandPreset Types', () => {
 				presets: [
 					{
 						id: '1',
-						name: 'Default',
+						name: 'Main',
 						command: 'claude',
 					},
 				],
@@ -80,7 +80,7 @@ describe('CommandPreset Types', () => {
 				presets: [
 					{
 						id: '1',
-						name: 'Default',
+						name: 'Main',
 						command: 'claude',
 					},
 					{
@@ -101,7 +101,7 @@ describe('CommandPreset Types', () => {
 			};
 
 			expect(config.presets).toHaveLength(3);
-			expect(config.presets[0]!.name).toBe('Default');
+			expect(config.presets[0]!.name).toBe('Main');
 			expect(config.presets[1]!.name).toBe('Development');
 			expect(config.presets[2]!.name).toBe('Production');
 		});
@@ -111,7 +111,7 @@ describe('CommandPreset Types', () => {
 				presets: [
 					{
 						id: '1',
-						name: 'Default',
+						name: 'Main',
 						command: 'claude',
 					},
 					{

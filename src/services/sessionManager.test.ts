@@ -322,7 +322,7 @@ describe('SessionManager', () => {
 			// Setup mock preset
 			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 				args: ['--preset-arg'],
 			});
@@ -377,7 +377,7 @@ describe('SessionManager', () => {
 			vi.mocked(configurationManager.getPresetById).mockReturnValue(undefined);
 			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 			});
 
@@ -396,7 +396,7 @@ describe('SessionManager', () => {
 			// Setup mock preset with fallback
 			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
 				id: '1',
-				name: 'Default',
+				name: 'Main',
 				command: 'claude',
 				args: ['--bad-flag'],
 				fallbackArgs: ['--good-flag'],
