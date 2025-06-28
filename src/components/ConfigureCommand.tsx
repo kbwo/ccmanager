@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput, Key} from 'ink';
 import TextInput from 'ink-text-input';
+import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {CommandPreset} from '../types/index.js';
@@ -29,36 +30,9 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	>('name');
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	const handleListNavigation = (key: Key) => {
-		const totalItems = presets.length + 2; // presets + "Add New Preset" + "Exit"
+	// Remove handleListNavigation as SelectInput handles navigation internally
 
-		if (key.upArrow) {
-			setSelectedIndex(prev => (prev > 0 ? prev - 1 : totalItems - 1));
-		} else if (key.downArrow) {
-			setSelectedIndex(prev => (prev < totalItems - 1 ? prev + 1 : 0));
-		}
-	};
-
-	const handleListSelection = () => {
-		if (selectedIndex < presets.length) {
-			// Selected a preset
-			const preset = presets[selectedIndex];
-			if (preset) {
-				setSelectedPresetId(preset.id);
-				setViewMode('edit');
-				setSelectedIndex(0);
-			}
-		} else if (selectedIndex === presets.length) {
-			// Add New Preset
-			setViewMode('add');
-			setNewPreset({});
-			setAddStep('name');
-			setInputValue('');
-		} else {
-			// Exit
-			onComplete();
-		}
-	};
+	// Remove handleListSelection as we now use handleSelectItem
 
 	const handleEditNavigation = (key: Key) => {
 		const menuItems = 7; // name, command, args, fallbackArgs, set default, delete, back
@@ -257,10 +231,8 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		}
 
 		if (viewMode === 'list') {
-			handleListNavigation(key);
-			if (key.return) {
-				handleListSelection();
-			}
+			// SelectInput handles navigation and selection
+			return;
 		} else if (viewMode === 'edit') {
 			handleEditNavigation(key);
 			if (key.return) {
@@ -500,6 +472,46 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	}
 
 	// Render preset list (default view)
+	const selectItems = [
+		...presets.map(preset => {
+			const isDefault = preset.id === defaultPresetId;
+			const args = preset.args?.join(' ') || '';
+			const fallback = preset.fallbackArgs?.join(' ') || '';
+			let label = preset.name;
+			if (isDefault) label += ' (default)';
+			label += `\n    Command: ${preset.command}`;
+			if (args) label += `\n    Args: ${args}`;
+			if (fallback) label += `\n    Fallback: ${fallback}`;
+			return {
+				label,
+				value: preset.id,
+			};
+		}),
+		{label: '➕ Add New Preset', value: 'add'},
+		{label: '❌ Exit', value: 'exit'},
+	];
+
+	const handleSelectItem = (item: {label: string; value: string}) => {
+		if (item.value === 'add') {
+			// Add New Preset
+			setViewMode('add');
+			setNewPreset({});
+			setAddStep('name');
+			setInputValue('');
+		} else if (item.value === 'exit') {
+			// Exit
+			onComplete();
+		} else {
+			// Selected a preset
+			const preset = presets.find(p => p.id === item.value);
+			if (preset) {
+				setSelectedPresetId(preset.id);
+				setViewMode('edit');
+				setSelectedIndex(0);
+			}
+		}
+	};
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
@@ -514,44 +526,11 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				</Text>
 			</Box>
 
-			<Box flexDirection="column">
-				{presets.map((preset, index) => {
-					const isSelected = selectedIndex === index;
-					const isDefault = preset.id === defaultPresetId;
-					const args = preset.args?.join(' ') || '';
-					const fallback = preset.fallbackArgs?.join(' ') || '';
-
-					return (
-						<Box key={preset.id} marginBottom={1}>
-							<Text color={isSelected ? 'cyan' : undefined}>
-								{isSelected ? '> ' : '  '}
-								{preset.name}
-								{isDefault && ' (default)'}
-								{'\n'}
-								{'    '}Command: {preset.command}
-								{args && `\n    Args: ${args}`}
-								{fallback && `\n    Fallback: ${fallback}`}
-							</Text>
-						</Box>
-					);
-				})}
-
-				<Box marginTop={1}>
-					<Text color={selectedIndex === presets.length ? 'cyan' : undefined}>
-						{selectedIndex === presets.length ? '> ' : '  '}
-						<Text bold>➕ Add New Preset</Text>
-					</Text>
-				</Box>
-
-				<Box marginTop={1}>
-					<Text
-						color={selectedIndex === presets.length + 1 ? 'cyan' : undefined}
-					>
-						{selectedIndex === presets.length + 1 ? '> ' : '  '}
-						<Text bold>❌ Exit</Text>
-					</Text>
-				</Box>
-			</Box>
+			<SelectInput
+				items={selectItems}
+				onSelect={handleSelectItem}
+				initialIndex={selectedIndex}
+			/>
 
 			<Box marginTop={1}>
 				<Text dimColor>
