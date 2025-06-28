@@ -1,18 +1,14 @@
 import React, {useState, useEffect} from 'react';
 import {useApp, Box, Text} from 'ink';
 import Menu from './Menu.js';
-import ClaudeSession from './ClaudeSession.js';
-import BashSession from './BashSession.js';
+import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
 import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
-import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {Worktree, Session as SessionType, TerminalMode} from '../types/index.js';
-import {shortcutManager} from '../services/shortcutManager.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {Worktree, Session as SessionType} from '../types/index.js';
 
 type View =
 	| 'menu'
@@ -23,27 +19,24 @@ type View =
 	| 'deleting-worktree'
 	| 'merge-worktree'
 	| 'merging-worktree'
-	| 'configuration'
-	| 'preset-selector';
+	| 'configuration';
 
 const App: React.FC = () => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>('menu');
-	const [sessionMode, setSessionMode] = useState<TerminalMode>('claude');
 	const [sessionManager] = useState(() => new SessionManager());
 	const [worktreeService] = useState(() => new WorktreeService());
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [menuKey, setMenuKey] = useState(0);
-	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
-		null,
-	);
+	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
 		const handleSessionExit = (session: SessionType) => {
+			// If the exited session is the active one, return to menu
 			setActiveSession(current => {
 				if (current && session.id === current.id) {
+					// Session that exited is the active one, trigger return to menu
 					setTimeout(() => {
 						setActiveSession(null);
 						setError(null);
@@ -62,6 +55,7 @@ const App: React.FC = () => {
 
 		sessionManager.on('sessionExit', handleSessionExit);
 
+		// Cleanup on unmount
 		return () => {
 			sessionManager.off('sessionExit', handleSessionExit);
 			sessionManager.destroy();
@@ -69,27 +63,31 @@ const App: React.FC = () => {
 	}, [sessionManager]);
 
 	const handleSelectWorktree = async (worktree: Worktree) => {
-		// Handle special menu options
+		// Check if this is the new worktree option
 		if (worktree.path === '') {
 			setView('new-worktree');
 			return;
 		}
 
+		// Check if this is the delete worktree option
 		if (worktree.path === 'DELETE_WORKTREE') {
 			setView('delete-worktree');
 			return;
 		}
 
+		// Check if this is the merge worktree option
 		if (worktree.path === 'MERGE_WORKTREE') {
 			setView('merge-worktree');
 			return;
 		}
 
+		// Check if this is the configuration option
 		if (worktree.path === 'CONFIGURATION') {
 			setView('configuration');
 			return;
 		}
 
+		// Check if this is the exit application option
 		if (worktree.path === 'EXIT_APPLICATION') {
 			sessionManager.destroy();
 			exit();
@@ -100,16 +98,8 @@ const App: React.FC = () => {
 		let session = sessionManager.getSession(worktree.path);
 
 		if (!session) {
-			// Check if we should show preset selector
-			if (configurationManager.getSelectPresetOnStart()) {
-				setSelectedWorktree(worktree);
-				setView('preset-selector');
-				return;
-			}
-
 			try {
-				// Use preset-based session creation with default preset
-				session = await sessionManager.createSessionWithPreset(worktree.path);
+				session = await sessionManager.createSession(worktree.path);
 			} catch (error) {
 				setError(`Failed to create session: ${error}`);
 				return;
@@ -117,58 +107,32 @@ const App: React.FC = () => {
 		}
 
 		setActiveSession(session);
-		setSessionMode('claude'); // Always start in Claude mode
 		setView('session');
-	};
-
-	const handlePresetSelected = async (presetId: string) => {
-		if (!selectedWorktree) return;
-
-		try {
-			const session = await sessionManager.createSessionWithPreset(
-				selectedWorktree.path,
-				presetId,
-			);
-			setActiveSession(session);
-			setSessionMode('claude');
-			setView('session');
-			setSelectedWorktree(null);
-		} catch (error) {
-			setError(`Failed to create session: ${error}`);
-			setView('menu');
-			setSelectedWorktree(null);
-		}
-	};
-
-	const handlePresetSelectorCancel = () => {
-		setSelectedWorktree(null);
-		setView('menu');
-		setMenuKey(prev => prev + 1);
-	};
-
-	const handleToggleMode = () => {
-		setSessionMode(current => current === 'claude' ? 'bash' : 'claude');
 	};
 
 	const handleReturnToMenu = () => {
 		setActiveSession(null);
 		setError(null);
 
+		// Add a small delay to ensure Session cleanup completes
 		setTimeout(() => {
 			setView('menu');
-			setMenuKey(prev => prev + 1);
+			setMenuKey(prev => prev + 1); // Force menu refresh
 
+			// Clear the screen when returning to menu
 			if (process.stdout.isTTY) {
 				process.stdout.write('\x1B[2J\x1B[H');
 			}
 
+			// Ensure stdin is in a clean state for Ink components
 			if (process.stdin.isTTY) {
+				// Flush any pending input to prevent escape sequences from leaking
 				process.stdin.read();
 				process.stdin.setRawMode(false);
 				process.stdin.resume();
 				process.stdin.setEncoding('utf8');
 			}
-		}, 50);
+		}, 50); // Small delay to ensure proper cleanup
 	};
 
 	const handleCreateWorktree = async (
@@ -179,11 +143,14 @@ const App: React.FC = () => {
 		setView('creating-worktree');
 		setError(null);
 
+		// Create the worktree
 		const result = worktreeService.createWorktree(path, branch, baseBranch);
 
 		if (result.success) {
+			// Success - return to menu
 			handleReturnToMenu();
 		} else {
+			// Show error
 			setError(result.error || 'Failed to create worktree');
 			setView('new-worktree');
 		}
@@ -193,16 +160,14 @@ const App: React.FC = () => {
 		handleReturnToMenu();
 	};
 
-	const handleDeleteWorktrees = async (
-		worktreePaths: string[],
-		deleteBranch: boolean,
-	) => {
+	const handleDeleteWorktrees = async (worktreePaths: string[]) => {
 		setView('deleting-worktree');
 		setError(null);
 
+		// Delete the worktrees
 		let hasError = false;
 		for (const path of worktreePaths) {
-			const result = worktreeService.deleteWorktree(path, {deleteBranch});
+			const result = worktreeService.deleteWorktree(path);
 			if (!result.success) {
 				hasError = true;
 				setError(result.error || 'Failed to delete worktree');
@@ -211,8 +176,10 @@ const App: React.FC = () => {
 		}
 
 		if (!hasError) {
+			// Success - return to menu
 			handleReturnToMenu();
 		} else {
+			// Show error
 			setView('delete-worktree');
 		}
 	};
@@ -230,6 +197,7 @@ const App: React.FC = () => {
 		setView('merging-worktree');
 		setError(null);
 
+		// Perform the merge
 		const mergeResult = worktreeService.mergeWorktree(
 			sourceBranch,
 			targetBranch,
@@ -237,6 +205,7 @@ const App: React.FC = () => {
 		);
 
 		if (mergeResult.success) {
+			// If user wants to delete the merged branch
 			if (deleteAfterMerge) {
 				const deleteResult =
 					worktreeService.deleteWorktreeByBranch(sourceBranch);
@@ -246,8 +215,10 @@ const App: React.FC = () => {
 					return;
 				}
 			}
+			// Success - return to menu
 			handleReturnToMenu();
 		} else {
+			// Show error
 			setError(mergeResult.error || 'Failed to merge branches');
 			setView('merge-worktree');
 		}
@@ -268,28 +239,14 @@ const App: React.FC = () => {
 	}
 
 	if (view === 'session' && activeSession) {
-		// SEPARATE COMPONENTS ARCHITECTURE: Route to Claude or Bash component
-		if (sessionMode === 'claude') {
-			return (
-				<ClaudeSession
-					key={`claude-${activeSession.id}`}
-					session={activeSession}
-					sessionManager={sessionManager}
-					onToggleMode={handleToggleMode}
-					onReturnToMenu={handleReturnToMenu}
-				/>
-			);
-		} else {
-			return (
-				<BashSession
-					key={`bash-${activeSession.id}`}
-					session={activeSession}
-					sessionManager={sessionManager}
-					onToggleMode={handleToggleMode}
-					onReturnToMenu={handleReturnToMenu}
-				/>
-			);
-		}
+		return (
+			<Session
+				key={activeSession.id}
+				session={activeSession}
+				sessionManager={sessionManager}
+				onReturnToMenu={handleReturnToMenu}
+			/>
+		);
 	}
 
 	if (view === 'new-worktree') {
@@ -366,15 +323,6 @@ const App: React.FC = () => {
 
 	if (view === 'configuration') {
 		return <Configuration onComplete={handleReturnToMenu} />;
-	}
-
-	if (view === 'preset-selector') {
-		return (
-			<PresetSelector
-				onSelect={handlePresetSelected}
-				onCancel={handlePresetSelectorCancel}
-			/>
-		);
 	}
 
 	return null;

@@ -31,8 +31,8 @@ const Session: React.FC<SessionProps> = ({
 					? `\x1b[44m Claude \x1b[0m \x1b[90m(${toggleShortcut}: Bash | ${menuShortcut}: Menu)\x1b[0m`
 					: `\x1b[42m Bash \x1b[0m \x1b[90m(${toggleShortcut}: Claude | ${menuShortcut}: Menu)\x1b[0m`;
 
-			// Display in status line at top of terminal
-			stdout.write(`\x1b[s\x1b[1;1H${indicator}\x1b[u`);
+			// Display in status line at top of terminal (FIXED: removed cursor save/restore for NBIM compatibility)
+			stdout.write(`\x1b[1;1H${indicator}\n`);
 		},
 		[stdout],
 	);
@@ -53,6 +53,13 @@ const Session: React.FC<SessionProps> = ({
 			// Display bash history
 			for (const buffer of session.bashHistory) {
 				stdout.write(buffer);
+			}
+			
+			// If bash history is empty, initialize bash with newline to get prompt
+			if (session.bashHistory.length === 0) {
+				setTimeout(() => {
+					session.bashProcess.write('\n');
+				}, 100);
 			}
 		} else {
 			// Display claude history
