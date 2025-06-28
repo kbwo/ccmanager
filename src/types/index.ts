@@ -77,9 +77,23 @@ export interface CommandConfig {
 	fallbackArgs?: string[]; // Fallback arguments if main command fails
 }
 
+export interface CommandPreset {
+	id: string; // Unique identifier for the preset
+	name: string; // User-friendly name for the preset
+	command: string; // The main command to execute
+	args?: string[]; // Arguments to pass to the command
+	fallbackArgs?: string[]; // Fallback arguments if main command fails
+}
+
+export interface CommandPresetsConfig {
+	presets: CommandPreset[]; // List of available presets
+	defaultPresetId: string; // ID of the default preset to use
+}
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
 	worktree?: WorktreeConfig;
 	command?: CommandConfig;
+	commandPresets?: CommandPresetsConfig; // New field for command presets
 }

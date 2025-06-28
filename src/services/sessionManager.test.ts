@@ -13,6 +13,8 @@ vi.mock('./configurationManager.js', () => ({
 	configurationManager: {
 		getCommandConfig: vi.fn(),
 		getStatusHooks: vi.fn(() => ({})),
+		getDefaultPreset: vi.fn(),
+		getPresetById: vi.fn(),
 	},
 }));
 
@@ -312,6 +314,142 @@ describe('SessionManager', () => {
 
 			expect(exitedSession).toBe(createdSession);
 			expect(sessionManager.getSession('/test/worktree')).toBeUndefined();
+		});
+	});
+
+	describe('createSession with presets', () => {
+		it('should use default preset when no preset ID specified', async () => {
+			// Setup mock preset
+			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Default',
+				command: 'claude',
+				args: ['--preset-arg'],
+			});
+
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session with preset
+			await sessionManager.createSessionWithPreset('/test/worktree');
+
+			// Verify spawn was called with preset config
+			expect(spawn).toHaveBeenCalledWith('claude', ['--preset-arg'], {
+				name: 'xterm-color',
+				cols: expect.any(Number),
+				rows: expect.any(Number),
+				cwd: '/test/worktree',
+				env: process.env,
+			});
+		});
+
+		it('should use specific preset when ID provided', async () => {
+			// Setup mock preset
+			vi.mocked(configurationManager.getPresetById).mockReturnValue({
+				id: '2',
+				name: 'Development',
+				command: 'claude',
+				args: ['--resume', '--dev'],
+				fallbackArgs: ['--no-mcp'],
+			});
+
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session with specific preset
+			await sessionManager.createSessionWithPreset('/test/worktree', '2');
+
+			// Verify getPresetById was called with correct ID
+			expect(configurationManager.getPresetById).toHaveBeenCalledWith('2');
+
+			// Verify spawn was called with preset config
+			expect(spawn).toHaveBeenCalledWith('claude', ['--resume', '--dev'], {
+				name: 'xterm-color',
+				cols: expect.any(Number),
+				rows: expect.any(Number),
+				cwd: '/test/worktree',
+				env: process.env,
+			});
+		});
+
+		it('should fall back to default preset if specified preset not found', async () => {
+			// Setup mocks
+			vi.mocked(configurationManager.getPresetById).mockReturnValue(undefined);
+			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Default',
+				command: 'claude',
+			});
+
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session with non-existent preset
+			await sessionManager.createSessionWithPreset('/test/worktree', 'invalid');
+
+			// Verify fallback to default preset
+			expect(configurationManager.getDefaultPreset).toHaveBeenCalled();
+			expect(spawn).toHaveBeenCalledWith('claude', [], expect.any(Object));
+		});
+
+		it('should try fallback args with preset if main command fails', async () => {
+			// Setup mock preset with fallback
+			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Default',
+				command: 'claude',
+				args: ['--bad-flag'],
+				fallbackArgs: ['--good-flag'],
+			});
+
+			// Mock spawn to fail first, succeed second
+			let callCount = 0;
+			vi.mocked(spawn).mockImplementation(() => {
+				callCount++;
+				if (callCount === 1) {
+					throw new Error('Command failed');
+				}
+				return mockPty as unknown as IPty;
+			});
+
+			// Create session
+			await sessionManager.createSessionWithPreset('/test/worktree');
+
+			// Verify both attempts were made
+			expect(spawn).toHaveBeenCalledTimes(2);
+			expect(spawn).toHaveBeenNthCalledWith(
+				1,
+				'claude',
+				['--bad-flag'],
+				expect.any(Object),
+			);
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				'claude',
+				['--good-flag'],
+				expect.any(Object),
+			);
+		});
+
+		it('should maintain backward compatibility with createSession', async () => {
+			// Setup legacy config
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+				args: ['--legacy'],
+			});
+
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session using legacy method
+			await sessionManager.createSession('/test/worktree');
+
+			// Verify legacy method still works
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--legacy'],
+				expect.any(Object),
+			);
 		});
 	});
 });

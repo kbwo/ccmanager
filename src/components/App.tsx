@@ -100,7 +100,8 @@ const App: React.FC = () => {
 
 		if (!session) {
 			try {
-				session = await sessionManager.createSession(worktree.path);
+				// Use preset-based session creation with default preset
+				session = await sessionManager.createSessionWithPreset(worktree.path);
 			} catch (error) {
 				setError(`Failed to create session: ${error}`);
 				return;
