@@ -487,8 +487,8 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				value: preset.id,
 			};
 		}),
-		{label: '➕ Add New Preset', value: 'add'},
-		{label: '❌ Exit', value: 'exit'},
+		{label: 'Add New Preset', value: 'add'},
+		{label: '← Cancel', value: 'exit'},
 	];
 
 	const handleSelectItem = (item: {label: string; value: string}) => {
