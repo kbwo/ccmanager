@@ -81,30 +81,18 @@ export class GeminiStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal): SessionState {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
-		const lines = this.getTerminalLines(terminal);
 
-		// Check for waiting prompts
-		// Check if last non-empty line is "> "
-		for (let i = lines.length - 1; i >= 0; i--) {
-			const line = lines[i]?.trim();
-			if (line === '>') {
-				return 'waiting_input';
-			}
-			if (line !== '') {
-				break;
-			}
-		}
-
-		// Check for "Enter your message" prompt
-		if (lowerContent.includes('enter your message')) {
+		// Check for waiting prompts with box character
+		if (
+			content.includes('│ Apply this change?') ||
+			content.includes('│ Allow execution?') ||
+			content.includes('│ Do you want to proceed?')
+		) {
 			return 'waiting_input';
 		}
 
 		// Check for busy state
-		if (
-			lowerContent.includes('processing...') ||
-			lowerContent.includes('generating response')
-		) {
+		if (lowerContent.includes('esc to cancel')) {
 			return 'busy';
 		}
 

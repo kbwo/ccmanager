@@ -185,12 +185,12 @@ describe('GeminiStateDetector', () => {
 	});
 
 	describe('detectState', () => {
-		it('should detect waiting_input when prompt ends with ">" ', () => {
+		it('should detect waiting_input when "Apply this change?" prompt is present', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Some output from Gemini',
-				'Ready for input',
-				'> ',
+				'│ Apply this change?',
+				'│ > ',
 			]);
 
 			// Act
@@ -200,12 +200,12 @@ describe('GeminiStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
-		it('should detect waiting_input when prompt contains "Enter your message"', () => {
+		it('should detect waiting_input when "Allow execution?" prompt is present', () => {
 			// Arrange
 			terminal = createMockTerminal([
-				'Gemini CLI v1.0',
-				'Enter your message:',
-				'',
+				'Command found: npm install',
+				'│ Allow execution?',
+				'│ > ',
 			]);
 
 			// Act
@@ -215,9 +215,27 @@ describe('GeminiStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
-		it('should detect busy when "Processing..." is present', () => {
+		it('should detect waiting_input when "Do you want to proceed?" prompt is present', () => {
 			// Arrange
-			terminal = createMockTerminal(['Processing...', 'Please wait']);
+			terminal = createMockTerminal([
+				'Changes detected',
+				'│ Do you want to proceed?',
+				'│ > ',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal);
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect busy when "esc to cancel" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Processing your request...',
+				'Press ESC to cancel',
+			]);
 
 			// Act
 			const state = detector.detectState(terminal);
@@ -226,11 +244,11 @@ describe('GeminiStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
-		it('should detect busy when "Generating response" is present', () => {
+		it('should detect busy when "ESC to cancel" is present (case insensitive)', () => {
 			// Arrange
 			terminal = createMockTerminal([
-				'Your query: How to use TypeScript',
-				'Generating response...',
+				'Running command...',
+				'Press Esc to cancel the operation',
 			]);
 
 			// Act
@@ -268,9 +286,9 @@ describe('GeminiStateDetector', () => {
 		it('should prioritize waiting_input over busy state', () => {
 			// Arrange
 			terminal = createMockTerminal([
-				'Processing...',
-				'Enter your message:',
-				'> ',
+				'Press ESC to cancel',
+				'│ Apply this change?',
+				'│ > ',
 			]);
 
 			// Act
