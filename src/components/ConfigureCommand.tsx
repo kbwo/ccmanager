@@ -492,7 +492,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		}),
 		{label: '─────────────────────────', value: 'separator1'},
 		{
-			label: `${selectPresetOnStart ? '☑' : '☐'} Select preset before session start`,
+			label: `Select preset before session start: ${selectPresetOnStart ? '✅ Enabled' : '❌ Disabled'}`,
 			value: 'toggle-select-on-start',
 		},
 		{label: '─────────────────────────', value: 'separator2'},
