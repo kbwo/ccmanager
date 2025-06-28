@@ -77,6 +77,7 @@ export class ClaudeStateDetector extends BaseStateDetector {
 	}
 }
 
+// https://github.com/google-gemini/gemini-cli/blob/main/packages/cli/src/ui/components/messages/ToolConfirmationMessage.tsx
 export class GeminiStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal): SessionState {
 		const content = this.getTerminalContent(terminal);
