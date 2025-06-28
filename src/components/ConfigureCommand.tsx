@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Box, Text, useInput, Key} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
@@ -45,51 +45,46 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 
 	// Remove handleListSelection as we now use handleSelectItem
 
-	const handleEditNavigation = (key: Key) => {
-		const menuItems = 8; // name, command, args, fallbackArgs, detectionStrategy, set default, delete, back
-
-		if (key.upArrow) {
-			setSelectedIndex(prev => (prev > 0 ? prev - 1 : menuItems - 1));
-		} else if (key.downArrow) {
-			setSelectedIndex(prev => (prev < menuItems - 1 ? prev + 1 : 0));
+	const handleEditMenuSelect = (item: {label: string; value: string}) => {
+		// Ignore separator selections
+		if (item.value.startsWith('separator')) {
+			return;
 		}
-	};
 
-	const handleEditSelection = () => {
 		const preset = presets.find(p => p.id === selectedPresetId);
 		if (!preset) return;
 
-		switch (selectedIndex) {
-			case 0: // Name
+		switch (item.value) {
+			case 'name':
 				setEditField('name');
 				setInputValue(preset.name);
 				break;
-			case 1: // Command
+			case 'command':
 				setEditField('command');
 				setInputValue(preset.command);
 				break;
-			case 2: // Args
+			case 'args':
 				setEditField('args');
 				setInputValue(preset.args?.join(' ') || '');
 				break;
-			case 3: // Fallback Args
+			case 'fallbackArgs':
 				setEditField('fallbackArgs');
 				setInputValue(preset.fallbackArgs?.join(' ') || '');
 				break;
-			case 4: // Detection Strategy
+			case 'detectionStrategy':
 				setIsSelectingStrategy(true);
 				break;
-			case 5: // Set as Default
+			case 'setDefault':
 				setDefaultPresetId(preset.id);
 				configurationManager.setDefaultPreset(preset.id);
 				break;
-			case 6: // Delete
+			case 'delete':
 				if (presets.length > 1) {
 					setViewMode('delete-confirm');
 					setSelectedIndex(0);
 				}
 				break;
-			case 7: // Back
+			case 'back':
 				setViewMode('list');
 				setSelectedIndex(presets.findIndex(p => p.id === selectedPresetId));
 				break;
@@ -286,14 +281,9 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			return;
 		}
 
-		if (viewMode === 'list') {
+		if (viewMode === 'list' || viewMode === 'edit') {
 			// SelectInput handles navigation and selection
 			return;
-		} else if (viewMode === 'edit') {
-			handleEditNavigation(key);
-			if (key.return) {
-				handleEditSelection();
-			}
 		} else if (viewMode === 'delete-confirm') {
 			if (key.upArrow || key.downArrow) {
 				setSelectedIndex(prev => (prev === 0 ? 1 : 0));
@@ -526,34 +516,48 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		const isDefault = preset.id === defaultPresetId;
 		const canDelete = presets.length > 1;
 
-		const menuItems = [
-			{label: 'Name', value: preset.name},
-			{label: 'Command', value: preset.command},
-			{label: 'Arguments', value: preset.args?.join(' ') || '(none)'},
+		const editMenuItems = [
 			{
-				label: 'Fallback Arguments',
-				value: preset.fallbackArgs?.join(' ') || '(none)',
+				label: `Name: ${preset.name}`,
+				value: 'name',
 			},
 			{
-				label: 'Detection Strategy',
-				value: preset.detectionStrategy || 'claude',
+				label: `Command: ${preset.command}`,
+				value: 'command',
 			},
 			{
-				label: isDefault ? 'Already Default' : 'Set as Default',
-				value: '',
-				isButton: true,
-				disabled: isDefault,
+				label: `Arguments: ${preset.args?.join(' ') || '(none)'}`,
+				value: 'args',
+			},
+			{
+				label: `Fallback Arguments: ${preset.fallbackArgs?.join(' ') || '(none)'}`,
+				value: 'fallbackArgs',
+			},
+			{
+				label: `Detection Strategy: ${preset.detectionStrategy || 'claude'}`,
+				value: 'detectionStrategy',
+			},
+			{label: '─────────────────────────', value: 'separator1'},
+			{
+				label: isDefault ? '⭐ Already Default' : 'Set as Default',
+				value: 'setDefault',
 			},
 			{
 				label: canDelete
 					? 'Delete Preset'
 					: 'Delete Preset (cannot delete last preset)',
-				value: '',
-				isButton: true,
-				disabled: !canDelete,
+				value: 'delete',
 			},
-			{label: 'Back to List', value: '', isButton: true, disabled: false},
+			{label: '─────────────────────────', value: 'separator2'},
+			{label: '← Back to List', value: 'back'},
 		];
+
+		// Filter out disabled items for SelectInput
+		const selectableItems = editMenuItems.filter(item => {
+			if (item.value === 'setDefault' && isDefault) return false;
+			if (item.value === 'delete' && !canDelete) return false;
+			return true;
+		});
 
 		return (
 			<Box flexDirection="column">
@@ -569,34 +573,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 					</Box>
 				)}
 
-				<Box flexDirection="column">
-					{menuItems.map((item, index) => {
-						const isSelected = selectedIndex === index;
-						const color = item.disabled
-							? 'gray'
-							: isSelected
-								? 'cyan'
-								: undefined;
-
-						return (
-							<Box key={index} marginTop={item.isButton && index > 0 ? 1 : 0}>
-								<Text color={color}>
-									{isSelected ? '> ' : '  '}
-									{item.isButton ? (
-										<Text
-											bold={isSelected && !item.disabled}
-											dimColor={item.disabled}
-										>
-											{item.label}
-										</Text>
-									) : (
-										`${item.label}: ${item.value}`
-									)}
-								</Text>
-							</Box>
-						);
-					})}
-				</Box>
+				<SelectInput items={selectableItems} onSelect={handleEditMenuSelect} />
 
 				<Box marginTop={1}>
 					<Text dimColor>
