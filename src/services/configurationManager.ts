@@ -281,6 +281,17 @@ export class ConfigurationManager {
 			this.setCommandPresets(presets);
 		}
 	}
+
+	getSelectPresetOnStart(): boolean {
+		const presets = this.getCommandPresets();
+		return presets.selectPresetOnStart ?? false;
+	}
+
+	setSelectPresetOnStart(enabled: boolean): void {
+		const presets = this.getCommandPresets();
+		presets.selectPresetOnStart = enabled;
+		this.setCommandPresets(presets);
+	}
 }
 
 export const configurationManager = new ConfigurationManager();

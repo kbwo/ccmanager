@@ -88,6 +88,7 @@ export interface CommandPreset {
 export interface CommandPresetsConfig {
 	presets: CommandPreset[]; // List of available presets
 	defaultPresetId: string; // ID of the default preset to use
+	selectPresetOnStart?: boolean; // Whether to show preset selector before starting session
 }
 
 export interface ConfigurationData {

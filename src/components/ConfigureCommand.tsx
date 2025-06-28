@@ -19,6 +19,9 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	const [defaultPresetId, setDefaultPresetId] = useState(
 		presetsConfig.defaultPresetId,
 	);
+	const [selectPresetOnStart, setSelectPresetOnStart] = useState(
+		configurationManager.getSelectPresetOnStart(),
+	);
 	const [viewMode, setViewMode] = useState<ViewMode>('list');
 	const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 	const [selectedIndex, setSelectedIndex] = useState(0);
@@ -487,6 +490,12 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				value: preset.id,
 			};
 		}),
+		{label: '─────────────────────────', value: 'separator1'},
+		{
+			label: `${selectPresetOnStart ? '☑' : '☐'} Select preset before session start`,
+			value: 'toggle-select-on-start',
+		},
+		{label: '─────────────────────────', value: 'separator2'},
 		{label: 'Add New Preset', value: 'add'},
 		{label: '← Cancel', value: 'exit'},
 	];
@@ -501,6 +510,14 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		} else if (item.value === 'exit') {
 			// Exit
 			onComplete();
+		} else if (item.value === 'toggle-select-on-start') {
+			// Toggle select preset on start
+			const newValue = !selectPresetOnStart;
+			setSelectPresetOnStart(newValue);
+			configurationManager.setSelectPresetOnStart(newValue);
+		} else if (item.value.startsWith('separator')) {
+			// Ignore separator selections
+			return;
 		} else {
 			// Selected a preset
 			const preset = presets.find(p => p.id === item.value);
