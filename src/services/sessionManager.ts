@@ -125,6 +125,91 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return session;
 	}
 
+	async createSessionWithPreset(
+		worktreePath: string,
+		presetId?: string,
+	): Promise<Session> {
+		// Check if session already exists
+		const existing = this.sessions.get(worktreePath);
+		if (existing) {
+			return existing;
+		}
+
+		const id = `session-${Date.now()}-${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
+
+		// Get preset configuration
+		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
+		if (!preset) {
+			preset = configurationManager.getDefaultPreset();
+		}
+
+		const command = preset.command;
+		const args = preset.args || [];
+		const commandConfig = {
+			command: preset.command,
+			args: preset.args,
+			fallbackArgs: preset.fallbackArgs,
+		};
+
+		// Try to spawn the process
+		let ptyProcess: IPty;
+		let isPrimaryCommand = true;
+
+		try {
+			ptyProcess = await this.spawn(command, args, worktreePath);
+		} catch (error) {
+			// If primary command fails and we have fallback args, try them
+			if (preset.fallbackArgs) {
+				try {
+					ptyProcess = await this.spawn(
+						command,
+						preset.fallbackArgs,
+						worktreePath,
+					);
+					isPrimaryCommand = false;
+				} catch (_fallbackError) {
+					// Both attempts failed, throw the original error
+					throw error;
+				}
+			} else {
+				// No fallback args, throw the error
+				throw error;
+			}
+		}
+
+		// Create virtual terminal for state detection
+		const terminal = new Terminal({
+			cols: process.stdout.columns || 80,
+			rows: process.stdout.rows || 24,
+			allowProposedApi: true,
+		});
+
+		const session: Session = {
+			id,
+			worktreePath,
+			process: ptyProcess,
+			state: 'busy', // Session starts as busy when created
+			output: [],
+			outputHistory: [],
+			lastActivity: new Date(),
+			isActive: false,
+			terminal,
+			isPrimaryCommand,
+			commandConfig,
+		};
+
+		// Set up persistent background data handler for state detection
+		this.setupBackgroundHandler(session);
+
+		this.sessions.set(worktreePath, session);
+
+		this.emit('sessionCreated', session);
+
+		return session;
+	}
+
 	private setupDataHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
