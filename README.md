@@ -1,17 +1,19 @@
-# CCManager - Claude Code Session Manager
+# CCManager - AI Code Assistant Session Manager
 
-CCManager is a TUI application for managing multiple Claude Code sessions across Git worktrees.
+CCManager is a TUI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI) across Git worktrees.
 
 https://github.com/user-attachments/assets/a6d80e73-dc06-4ef8-849d-e3857f6c7024
 
 ## Features
 
-- Run multiple Claude Code sessions in parallel across different Git worktrees
+- Run multiple AI assistant sessions in parallel across different Git worktrees
+- Support for multiple AI coding assistants (Claude Code, Gemini CLI)
 - Switch between sessions seamlessly
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
 - Configurable keyboard shortcuts
-- Command configuration with automatic fallback support
+- Command presets with automatic fallback support
+- Configurable state detection strategies for different CLI tools
 - Status change hooks for automation and notifications
 
 ## Why CCManager over Claude Squad?
@@ -107,6 +109,26 @@ Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.
   - Ctrl+C
   - Ctrl+D
   - Ctrl+[ (equivalent to Escape)
+
+## Supported AI Assistants
+
+CCManager now supports multiple AI coding assistants with tailored state detection:
+
+### Claude Code (Default)
+- Command: `claude`
+- State detection: Built-in patterns for Claude's prompts and status messages
+
+### Gemini CLI
+- Command: `gemini`
+- State detection: Custom patterns for Gemini's confirmation prompts
+- Installation: [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
+
+Each assistant has its own state detection strategy to properly track:
+- **Idle**: Ready for new input
+- **Busy**: Processing a request
+- **Waiting**: Awaiting user confirmation
+
+See [Gemini Support Documentation](docs/gemini-support.md) for detailed configuration instructions.
 
 
 ## Command Configuration

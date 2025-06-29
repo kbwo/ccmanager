@@ -104,12 +104,29 @@ npm run typecheck
 
 ### State Detection
 
-Claude Code states are detected by advanced output analysis in `promptDetector.ts`:
+Session states are detected using a strategy pattern that supports multiple CLI tools:
 
-- **Waiting for input**: Detects various prompt patterns including "Do you want" questions
-- **Busy**: Detects "ESC to interrupt" and active processing
-- **Task complete**: Identifies when Claude is ready for new input
-- **Bottom border tracking**: Handles prompt box UI elements
+#### Architecture
+- **StateDetector Interface**: Common contract for all detectors
+- **BaseStateDetector**: Shared functionality for terminal output analysis
+- **ClaudeStateDetector**: Claude Code specific patterns
+- **GeminiStateDetector**: Gemini CLI specific patterns
+
+#### Claude Code Detection
+- **Waiting for input**: `│ Do you want`, `│ Would you like`
+- **Busy**: `ESC to interrupt` (case insensitive)
+- **Idle**: Default state when no patterns match
+
+#### Gemini CLI Detection
+- **Waiting for input**: `│ Apply this change?`, `│ Allow execution?`, `│ Do you want to proceed?`
+- **Busy**: `esc to cancel` (case insensitive)
+- **Idle**: Default state when no patterns match
+
+#### Adding New CLI Support
+1. Add new strategy type to `StateDetectionStrategy` in `types/index.ts`
+2. Create detector class extending `BaseStateDetector`
+3. Add to factory in `createStateDetector`
+4. Update UI components to include new option
 
 ### Keyboard Shortcuts
 
@@ -138,6 +155,25 @@ const MyComponent: React.FC<Props> = ({prop1, prop2}) => {
 	);
 };
 ```
+
+### Command Presets
+
+```typescript
+interface CommandPreset {
+  id: string;
+  name: string;
+  command: string;
+  args?: string[];
+  fallbackArgs?: string[];
+  detectionStrategy?: StateDetectionStrategy; // 'claude' | 'gemini'
+}
+```
+
+Presets support:
+- Multiple command configurations
+- Automatic fallback on failure
+- Per-preset state detection strategy
+- Default preset selection
 
 ### Testing Sessions
 
