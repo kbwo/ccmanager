@@ -307,7 +307,8 @@ const App: React.FC = () => {
 					/>
 					<Box marginTop={1}>
 						<Text dimColor>
-							Claude: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash | {shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
+							Claude: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash
+							| {shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
 						</Text>
 					</Box>
 				</Box>
@@ -324,7 +325,8 @@ const App: React.FC = () => {
 					/>
 					<Box marginTop={1}>
 						<Text dimColor>
-							Bash: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash | {shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
+							Bash: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash |{' '}
+							{shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
 						</Text>
 					</Box>
 				</Box>
