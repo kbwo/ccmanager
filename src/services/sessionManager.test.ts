@@ -1,6 +1,7 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {SessionManager} from './sessionManager.js';
 import {configurationManager} from './configurationManager.js';
+import {shortcutManager} from './shortcutManager.js';
 import {spawn, IPty} from 'node-pty';
 import {EventEmitter} from 'events';
 import {Session} from '../types/index.js';
@@ -122,18 +123,21 @@ describe('SessionManager', () => {
 
 			// First spawn attempt - will exit with code 1
 			const firstMockPty = new MockPty();
-			// Second spawn attempt - succeeds
+			// Second spawn attempt (Bash) - succeeds
+			const bashMockPty = new MockPty();
+			// Third spawn attempt (Claude fallback) - succeeds
 			const secondMockPty = new MockPty();
 
 			vi.mocked(spawn)
 				.mockReturnValueOnce(firstMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty)
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
 			// Create session
 			const session = await sessionManager.createSession('/test/worktree');
 
 			// Verify initial spawn
-			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
 				['--invalid-flag'],
@@ -146,10 +150,10 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called
-			expect(spawn).toHaveBeenCalledTimes(2);
+			// Verify fallback spawn was called (Claude initial + Bash + Claude fallback)
+			expect(spawn).toHaveBeenCalledTimes(3);
 			expect(spawn).toHaveBeenNthCalledWith(
-				2,
+				3,
 				'claude',
 				['--resume'],
 				expect.objectContaining({cwd: '/test/worktree'}),
@@ -220,8 +224,8 @@ describe('SessionManager', () => {
 			// Wait a bit to ensure no early exit
 			await new Promise(resolve => setTimeout(resolve, 600));
 
-			// Verify only one spawn attempt
-			expect(spawn).toHaveBeenCalledTimes(1);
+			// Verify spawn attempts (Claude + Bash PTYs)
+			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
 				['--resume'],
@@ -246,8 +250,8 @@ describe('SessionManager', () => {
 
 			// Should return the same session
 			expect(session1).toBe(session2);
-			// Spawn should only be called once
-			expect(spawn).toHaveBeenCalledTimes(1);
+			// Spawn should only be called for first session (Claude + Bash PTYs)
+			expect(spawn).toHaveBeenCalledTimes(2);
 		});
 
 		it('should throw error when spawn fails with fallback args', async () => {
@@ -328,12 +332,14 @@ describe('SessionManager', () => {
 			});
 
 			// Setup spawn mock
-			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+			vi.mocked(spawn)
+				.mockReturnValueOnce(mockPty as unknown as IPty)
+				.mockReturnValueOnce(mockPty as unknown as IPty);
 
 			// Create session with preset
 			await sessionManager.createSessionWithPreset('/test/worktree');
 
-			// Verify spawn was called with preset config
+			// Verify spawn was called with preset config for Claude
 			expect(spawn).toHaveBeenCalledWith('claude', ['--preset-arg'], {
 				name: 'xterm-color',
 				cols: expect.any(Number),
@@ -341,6 +347,12 @@ describe('SessionManager', () => {
 				cwd: '/test/worktree',
 				env: process.env,
 			});
+			// Verify spawn was called for bash PTY
+			expect(spawn).toHaveBeenCalledWith(
+				process.env['SHELL'] || 'bash',
+				[],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
 		});
 
 		it('should use specific preset when ID provided', async () => {
@@ -354,7 +366,9 @@ describe('SessionManager', () => {
 			});
 
 			// Setup spawn mock
-			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+			vi.mocked(spawn)
+				.mockReturnValueOnce(mockPty as unknown as IPty)
+				.mockReturnValueOnce(mockPty as unknown as IPty);
 
 			// Create session with specific preset
 			await sessionManager.createSessionWithPreset('/test/worktree', '2');
@@ -382,7 +396,9 @@ describe('SessionManager', () => {
 			});
 
 			// Setup spawn mock
-			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+			vi.mocked(spawn)
+				.mockReturnValueOnce(mockPty as unknown as IPty)
+				.mockReturnValueOnce(mockPty as unknown as IPty);
 
 			// Create session with non-existent preset
 			await sessionManager.createSessionWithPreset('/test/worktree', 'invalid');
@@ -402,7 +418,7 @@ describe('SessionManager', () => {
 				fallbackArgs: ['--good-flag'],
 			});
 
-			// Mock spawn to fail first, succeed second
+			// Mock spawn to fail first Claude command, succeed on second, then succeed for bash
 			let callCount = 0;
 			vi.mocked(spawn).mockImplementation(() => {
 				callCount++;
@@ -415,8 +431,8 @@ describe('SessionManager', () => {
 			// Create session
 			await sessionManager.createSessionWithPreset('/test/worktree');
 
-			// Verify both attempts were made
-			expect(spawn).toHaveBeenCalledTimes(2);
+			// Verify fallback attempt was made for Claude
+			expect(spawn).toHaveBeenCalledTimes(3); // Claude (fail) + Claude (success) + Bash
 			expect(spawn).toHaveBeenNthCalledWith(
 				1,
 				'claude',
@@ -439,7 +455,9 @@ describe('SessionManager', () => {
 			});
 
 			// Setup spawn mock
-			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+			vi.mocked(spawn)
+				.mockReturnValueOnce(mockPty as unknown as IPty)
+				.mockReturnValueOnce(mockPty as unknown as IPty);
 
 			// Create session using legacy method
 			await sessionManager.createSession('/test/worktree');
@@ -450,6 +468,191 @@ describe('SessionManager', () => {
 				['--legacy'],
 				expect.any(Object),
 			);
+		});
+	});
+
+	describe('Dual Mode Bug Fixes', () => {
+		it('should handle undefined shortcut in getShortcutCode without crashing', () => {
+			// Test específico para el TypeError reportado por kbwo
+			// Previene regresión del bug: Cannot read properties of undefined (reading 'ctrl')
+			expect(() =>
+				shortcutManager.getShortcutCode(undefined as any),
+			).not.toThrow();
+			expect(shortcutManager.getShortcutCode(undefined as any)).toBeNull();
+		});
+
+		it('should emit bashSessionData events when bash mode is active', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+
+			// Create separate mock PTYs for proper testing
+			const claudeMockPty = new MockPty();
+			const bashMockPty = new MockPty();
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty);
+
+			// Create session
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.isActive = true;
+
+			// Set up event listener spy
+			const bashDataEventSpy = vi.fn();
+			sessionManager.on('bashSessionData', bashDataEventSpy);
+
+			// Simulate bash PTY sending data (trigger onData handler)
+			const bashDataHandler = bashMockPty.onData.mock.calls[0]?.[0];
+			if (bashDataHandler) {
+				bashDataHandler('$ echo test\ntest\n$ ');
+			}
+
+			// Verify: bashSessionData event is emitted
+			expect(bashDataEventSpy).toHaveBeenCalledWith(
+				session,
+				'$ echo test\ntest\n$ ',
+			);
+		});
+	});
+
+	describe('Dual Mode Integration', () => {
+		it('should create both Claude and Bash PTYs during session creation', async () => {
+			// Setup separate mock PTYs for Claude and Bash
+			const claudeMockPty = new MockPty();
+			const bashMockPty = new MockPty();
+
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty);
+
+			// Create session
+			const session = await sessionManager.createSession('/test/worktree');
+
+			// Verify: Both PTYs are created and assigned correctly
+			expect(session.process).toBe(claudeMockPty);
+			expect(session.bashProcess).toBe(bashMockPty);
+
+			// Verify: spawn called for both Claude and Bash
+			expect(spawn).toHaveBeenCalledTimes(2);
+			expect(spawn).toHaveBeenNthCalledWith(
+				1,
+				'claude',
+				expect.any(Array),
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				process.env['SHELL'] || 'bash',
+				[],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Verify: Both terminals are created with allowProposedApi
+			expect(session.terminal).toBeDefined();
+			expect(session.bashProcess).toBeDefined();
+		});
+
+		it('should route bash events correctly when in bash mode', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+
+			// Create separate mock PTYs for proper testing
+			const claudeMockPty = new MockPty();
+			const bashMockPty = new MockPty();
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(claudeMockPty as unknown as IPty)
+				.mockReturnValueOnce(bashMockPty as unknown as IPty);
+
+			// Create session and set bash mode
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.isActive = true;
+
+			// Set up event listener spies
+			const bashDataEventSpy = vi.fn();
+			const claudeDataEventSpy = vi.fn();
+			sessionManager.on('bashSessionData', bashDataEventSpy);
+			sessionManager.on('sessionData', claudeDataEventSpy);
+
+			// Simulate bash PTY data (should emit bashSessionData)
+			const bashDataHandler = bashMockPty.onData.mock.calls[0]?.[0];
+			if (bashDataHandler) {
+				bashDataHandler('bash output');
+			}
+
+			// Simulate claude PTY data (should emit sessionData)
+			const claudeDataHandler = claudeMockPty.onData.mock.calls[0]?.[0];
+			if (claudeDataHandler) {
+				claudeDataHandler('claude output');
+			}
+
+			// Verify: bash data routed to bashSessionData event
+			expect(bashDataEventSpy).toHaveBeenCalledWith(session, 'bash output');
+
+			// Verify: claude data routed to sessionData event (regardless of mode)
+			expect(claudeDataEventSpy).toHaveBeenCalledWith(session, 'claude output');
+		});
+	});
+
+	describe('Bash Session Restoration Events', () => {
+		it('should emit bashSessionRestore event when bash session becomes active with history', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session with bash history
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.bashHistory = [Buffer.from('$ echo test\ntest\n$ ')];
+
+			// Set up event listener spy
+			const bashRestoreEventSpy = vi.fn();
+			sessionManager.on('bashSessionRestore', bashRestoreEventSpy);
+
+			// Test: Activate session
+			sessionManager.setSessionActive('/test/worktree', true);
+
+			// Verify: bashSessionRestore event is emitted
+			expect(bashRestoreEventSpy).toHaveBeenCalledWith(session);
+		});
+
+		it('should not emit restore events when session has no history', async () => {
+			// Setup mock configuration
+			vi.mocked(configurationManager.getCommandConfig).mockReturnValue({
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session with empty histories
+			const session = await sessionManager.createSession('/test/worktree');
+			session.currentMode = 'bash';
+			session.bashHistory = [];
+			session.outputHistory = [];
+
+			// Set up event listener spies
+			const bashRestoreEventSpy = vi.fn();
+			const claudeRestoreEventSpy = vi.fn();
+			sessionManager.on('bashSessionRestore', bashRestoreEventSpy);
+			sessionManager.on('sessionRestore', claudeRestoreEventSpy);
+
+			// Test: Activate session with empty histories
+			sessionManager.setSessionActive('/test/worktree', true);
+
+			// Verify: No restore events are emitted
+			expect(bashRestoreEventSpy).not.toHaveBeenCalled();
+			expect(claudeRestoreEventSpy).not.toHaveBeenCalled();
 		});
 	});
 });

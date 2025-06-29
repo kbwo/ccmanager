@@ -66,6 +66,9 @@ export class ShortcutManager {
 				currentShortcuts.returnToMenu,
 			cancel:
 				this.validateShortcut(shortcuts.cancel) || currentShortcuts.cancel,
+			toggleMode:
+				this.validateShortcut(shortcuts.toggleMode) ||
+				currentShortcuts.toggleMode,
 		};
 
 		configurationManager.setShortcuts(validated);
@@ -121,6 +124,9 @@ export class ShortcutManager {
 
 	public getShortcutCode(shortcut: ShortcutKey): string | null {
 		// Convert shortcut to terminal code for raw stdin handling
+		if (!shortcut) {
+			return null; // Handle undefined/null shortcut
+		}
 		if (!shortcut.ctrl || shortcut.alt || shortcut.shift) {
 			return null; // Only support Ctrl+key for raw codes
 		}

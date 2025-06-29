@@ -51,6 +51,10 @@ const ConfigureShortcuts: React.FC<ConfigureShortcutsProps> = ({
 			value: 'returnToMenu',
 		},
 		{
+			label: `Toggle Mode: ${getShortcutDisplayFromState('toggleMode')}`,
+			value: 'toggleMode',
+		},
+		{
 			label: '---',
 			value: 'separator',
 		},

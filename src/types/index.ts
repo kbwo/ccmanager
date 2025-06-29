@@ -6,6 +6,8 @@ export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
+export type TerminalMode = 'claude' | 'bash';
+
 export interface Worktree {
 	path: string;
 	branch?: string;
@@ -28,6 +30,11 @@ export interface Session {
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
 	isPrimaryCommand?: boolean; // Track if process was started with main command args
 	commandConfig?: CommandConfig; // Store command config for fallback
+
+	// Dual-mode properties
+	bashProcess: IPty; // Bash PTY instance (always exists)
+	currentMode: TerminalMode; // Current active mode
+	bashHistory: Buffer[]; // Bash mode history for restoration
 }
 
 export interface SessionManager {
@@ -48,11 +55,13 @@ export interface ShortcutKey {
 export interface ShortcutConfig {
 	returnToMenu: ShortcutKey;
 	cancel: ShortcutKey;
+	toggleMode: ShortcutKey; // Toggle between Claude and Bash modes
 }
 
 export const DEFAULT_SHORTCUTS: ShortcutConfig = {
 	returnToMenu: {ctrl: true, key: 'e'},
 	cancel: {key: 'escape'},
+	toggleMode: {ctrl: true, key: 't'},
 };
 
 export interface StatusHook {

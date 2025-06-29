@@ -2,6 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {useApp, Box, Text} from 'ink';
 import Menu from './Menu.js';
 import Session from './Session.js';
+import BashSession from './BashSession.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
 import MergeWorktree from './MergeWorktree.js';
@@ -9,7 +10,11 @@ import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {Worktree, Session as SessionType} from '../types/index.js';
+import {
+	Worktree,
+	Session as SessionType,
+	TerminalMode,
+} from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 
@@ -28,6 +33,7 @@ type View =
 const App: React.FC = () => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>('menu');
+	const [sessionMode, setSessionMode] = useState<TerminalMode>('claude');
 	const [sessionManager] = useState(() => new SessionManager());
 	const [worktreeService] = useState(() => new WorktreeService());
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
@@ -121,7 +127,13 @@ const App: React.FC = () => {
 			}
 		}
 
+		// Clear screen before entering session
+		if (process.stdout.isTTY) {
+			process.stdout.write('\x1B[2J\x1B[H');
+		}
+
 		setActiveSession(session);
+		setSessionMode('claude'); // Always start in Claude mode
 		setView('session');
 	};
 
@@ -134,7 +146,14 @@ const App: React.FC = () => {
 				selectedWorktree.path,
 				presetId,
 			);
+
+			// Clear screen before entering session
+			if (process.stdout.isTTY) {
+				process.stdout.write('\x1B[2J\x1B[H');
+			}
+
 			setActiveSession(session);
+			setSessionMode('claude');
 			setView('session');
 			setSelectedWorktree(null);
 		} catch (error) {
@@ -148,6 +167,14 @@ const App: React.FC = () => {
 		setSelectedWorktree(null);
 		setView('menu');
 		setMenuKey(prev => prev + 1);
+	};
+
+	const handleToggleMode = () => {
+		// Clear screen before mode toggle to have a clean transition
+		if (process.stdout.isTTY) {
+			process.stdout.write('\x1B[2J\x1B[H');
+		}
+		setSessionMode(current => (current === 'claude' ? 'bash' : 'claude'));
 	};
 
 	const handleReturnToMenu = () => {
@@ -282,18 +309,35 @@ const App: React.FC = () => {
 	}
 
 	if (view === 'session' && activeSession) {
+		// SEPARATE COMPONENTS ARCHITECTURE: Route to Claude or Bash component
+		const SessionComponent = sessionMode === 'claude' ? Session : BashSession;
+		const currentModeDisplay = sessionMode === 'claude' ? 'Claude' : 'Bash';
+		const toggleModeDisplay = sessionMode === 'claude' ? 'Bash' : 'Claude';
+
 		return (
-			<Box flexDirection="column">
-				<Session
-					key={activeSession.id}
-					session={activeSession}
-					sessionManager={sessionManager}
-					onReturnToMenu={handleReturnToMenu}
-				/>
-				<Box marginTop={1}>
+			<Box flexDirection="column" height="100%">
+				<Box flexGrow={1}>
+					<SessionComponent
+						key={`${sessionMode}-${activeSession.id}`}
+						session={activeSession}
+						sessionManager={sessionManager}
+						onToggleMode={handleToggleMode}
+						onReturnToMenu={handleReturnToMenu}
+					/>
+				</Box>
+				<Box
+					borderStyle="single"
+					borderColor={sessionMode === 'claude' ? 'blue' : 'green'}
+					paddingX={1}
+				>
+					<Text color={sessionMode === 'claude' ? 'blue' : 'green'} bold>
+						{currentModeDisplay}
+					</Text>
 					<Text dimColor>
-						Press {shortcutManager.getShortcutDisplay('returnToMenu')} to return
-						to menu
+						{' '}
+						({shortcutManager.getShortcutDisplay('toggleMode')}:{' '}
+						{toggleModeDisplay} |{' '}
+						{shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
 					</Text>
 				</Box>
 			</Box>

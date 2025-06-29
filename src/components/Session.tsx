@@ -7,12 +7,14 @@ import {shortcutManager} from '../services/shortcutManager.js';
 interface SessionProps {
 	session: SessionType;
 	sessionManager: SessionManager;
+	onToggleMode: () => void;
 	onReturnToMenu: () => void;
 }
 
 const Session: React.FC<SessionProps> = ({
 	session,
 	sessionManager,
+	onToggleMode,
 	onReturnToMenu,
 }) => {
 	const {stdout} = useStdout();
@@ -21,8 +23,13 @@ const Session: React.FC<SessionProps> = ({
 	useEffect(() => {
 		if (!stdout) return;
 
-		// Clear screen when entering session
-		stdout.write('\x1B[2J\x1B[H');
+		// Only clear screen on initial load, not on mode toggles
+		if (session.outputHistory.length === 0) {
+			stdout.write('\x1B[2J\x1B[H');
+		}
+
+		// Set session to claude mode so SessionManager routes events correctly
+		session.currentMode = 'claude';
 
 		// Handle session restoration
 		const handleSessionRestore = (restoredSession: SessionType) => {
@@ -119,8 +126,19 @@ const Session: React.FC<SessionProps> = ({
 		const handleStdinData = (data: string) => {
 			if (isExiting) return;
 
+			const shortcuts = shortcutManager.getShortcuts();
+
+			// Check for toggle mode shortcut
+			const toggleModeCode = shortcutManager.getShortcutCode(
+				shortcuts.toggleMode,
+			);
+			if (toggleModeCode && data === toggleModeCode) {
+				onToggleMode();
+				return;
+			}
+
 			// Check for return to menu shortcut
-			const returnToMenuShortcut = shortcutManager.getShortcuts().returnToMenu;
+			const returnToMenuShortcut = shortcuts.returnToMenu;
 			const shortcutCode =
 				shortcutManager.getShortcutCode(returnToMenuShortcut);
 
@@ -171,7 +189,14 @@ const Session: React.FC<SessionProps> = ({
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);
 		};
-	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
+	}, [
+		session,
+		sessionManager,
+		stdout,
+		onToggleMode,
+		onReturnToMenu,
+		isExiting,
+	]);
 
 	// Return null to render nothing (PTY output goes directly to stdout)
 	return null;
