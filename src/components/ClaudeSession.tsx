@@ -75,6 +75,14 @@ const ClaudeSession: React.FC<ClaudeSessionProps> = ({
 		// Mark session as active (triggers restore event)
 		sessionManager.setSessionActive(session.worktreePath, true);
 
+		// Display mode indicator (save cursor position to avoid displacing input)
+		setTimeout(() => {
+			const toggleShortcut = shortcutManager.getShortcutDisplay('toggleMode');
+			const menuShortcut = shortcutManager.getShortcutDisplay('returnToMenu');
+			const indicator = `\x1b[44m Claude \x1b[0m \x1b[90m(${toggleShortcut}: Bash | ${menuShortcut}: Menu)\x1b[0m`;
+			stdout.write(`\x1b7\x1b[1;1H${indicator}\x1b8`);
+		}, 200);
+
 		// Resize PTY to current dimensions
 		const currentCols = process.stdout.columns || 80;
 		const currentRows = process.stdout.rows || 24;
