@@ -23,8 +23,10 @@ const BashSession: React.FC<BashSessionProps> = ({
 	useEffect(() => {
 		if (!stdout) return;
 
-		// Simple screen clear - same strategy as Menu→Claude (no ANSI cursor manipulation)
-		stdout.write('\x1B[2J\x1B[H');
+		// Only clear screen on initial load, not on mode toggles
+		if (session.bashHistory.length === 0) {
+			stdout.write('\x1B[2J\x1B[H');
+		}
 
 		// Set session to bash mode so SessionManager routes events correctly
 		session.currentMode = 'bash';

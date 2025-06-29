@@ -127,6 +127,11 @@ const App: React.FC = () => {
 			}
 		}
 
+		// Clear screen before entering session
+		if (process.stdout.isTTY) {
+			process.stdout.write('\x1B[2J\x1B[H');
+		}
+
 		setActiveSession(session);
 		setSessionMode('claude'); // Always start in Claude mode
 		setView('session');
@@ -141,6 +146,12 @@ const App: React.FC = () => {
 				selectedWorktree.path,
 				presetId,
 			);
+
+			// Clear screen before entering session
+			if (process.stdout.isTTY) {
+				process.stdout.write('\x1B[2J\x1B[H');
+			}
+
 			setActiveSession(session);
 			setSessionMode('claude');
 			setView('session');
@@ -159,6 +170,10 @@ const App: React.FC = () => {
 	};
 
 	const handleToggleMode = () => {
+		// Clear screen before mode toggle to have a clean transition
+		if (process.stdout.isTTY) {
+			process.stdout.write('\x1B[2J\x1B[H');
+		}
 		setSessionMode(current => (current === 'claude' ? 'bash' : 'claude'));
 	};
 
@@ -295,43 +310,38 @@ const App: React.FC = () => {
 
 	if (view === 'session' && activeSession) {
 		// SEPARATE COMPONENTS ARCHITECTURE: Route to Claude or Bash component
-		if (sessionMode === 'claude') {
-			return (
-				<Box flexDirection="column">
-					<Session
-						key={`claude-${activeSession.id}`}
+		const SessionComponent = sessionMode === 'claude' ? Session : BashSession;
+		const currentModeDisplay = sessionMode === 'claude' ? 'Claude' : 'Bash';
+		const toggleModeDisplay = sessionMode === 'claude' ? 'Bash' : 'Claude';
+
+		return (
+			<Box flexDirection="column" height="100%">
+				<Box flexGrow={1}>
+					<SessionComponent
+						key={`${sessionMode}-${activeSession.id}`}
 						session={activeSession}
 						sessionManager={sessionManager}
 						onToggleMode={handleToggleMode}
 						onReturnToMenu={handleReturnToMenu}
 					/>
-					<Box marginTop={1}>
-						<Text dimColor>
-							Claude: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash
-							| {shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
-						</Text>
-					</Box>
 				</Box>
-			);
-		} else {
-			return (
-				<Box flexDirection="column">
-					<BashSession
-						key={`bash-${activeSession.id}`}
-						session={activeSession}
-						sessionManager={sessionManager}
-						onToggleMode={handleToggleMode}
-						onReturnToMenu={handleReturnToMenu}
-					/>
-					<Box marginTop={1}>
-						<Text dimColor>
-							Bash: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash |{' '}
-							{shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
-						</Text>
-					</Box>
+				<Box
+					borderStyle="single"
+					borderColor={sessionMode === 'claude' ? 'blue' : 'green'}
+					paddingX={1}
+				>
+					<Text color={sessionMode === 'claude' ? 'blue' : 'green'} bold>
+						{currentModeDisplay}
+					</Text>
+					<Text dimColor>
+						{' '}
+						({shortcutManager.getShortcutDisplay('toggleMode')}:{' '}
+						{toggleModeDisplay} |{' '}
+						{shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
+					</Text>
 				</Box>
-			);
-		}
+			</Box>
+		);
 	}
 
 	if (view === 'new-worktree') {

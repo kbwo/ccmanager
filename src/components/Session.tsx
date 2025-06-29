@@ -23,8 +23,10 @@ const Session: React.FC<SessionProps> = ({
 	useEffect(() => {
 		if (!stdout) return;
 
-		// Clear screen when entering session
-		stdout.write('\x1B[2J\x1B[H');
+		// Only clear screen on initial load, not on mode toggles
+		if (session.outputHistory.length === 0) {
+			stdout.write('\x1B[2J\x1B[H');
+		}
 
 		// Set session to claude mode so SessionManager routes events correctly
 		session.currentMode = 'claude';
