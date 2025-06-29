@@ -23,7 +23,7 @@ export interface Session {
 	process: IPty;
 	state: SessionState;
 	output: string[]; // Recent output for state detection
-	outputHistory: Buffer[]; // Full output history as buffers (Claude mode)
+	outputHistory: Buffer[]; // Full output history as buffers
 	lastActivity: Date;
 	isActive: boolean;
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)

@@ -32,9 +32,7 @@ export default [
         clearInterval: true,
         setTimeout: true,
         clearTimeout: true,
-        NodeJS: true,
-        AbortController: true,
-        AbortSignal: true
+        NodeJS: true
       }
     },
     plugins: {
