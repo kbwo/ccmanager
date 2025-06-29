@@ -4,14 +4,14 @@ import {Session as SessionType} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
-interface ClaudeSessionProps {
+interface SessionProps {
 	session: SessionType;
 	sessionManager: SessionManager;
 	onToggleMode: () => void;
 	onReturnToMenu: () => void;
 }
 
-const ClaudeSession: React.FC<ClaudeSessionProps> = ({
+const Session: React.FC<SessionProps> = ({
 	session,
 	sessionManager,
 	onToggleMode,
@@ -42,9 +42,7 @@ const ClaudeSession: React.FC<ClaudeSessionProps> = ({
 
 				// Skip clear screen sequences at the beginning
 				if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
-					const cleaned = str
-						.replace(/\x1B\[2J/g, '')
-						.replace(/\x1B\[H/g, '');
+					const cleaned = str.replace(/\x1B\[2J/g, '').replace(/\x1B\[H/g, '');
 					if (cleaned.length > 0) {
 						stdout.write(Buffer.from(cleaned, 'utf8'));
 					}
@@ -129,14 +127,18 @@ const ClaudeSession: React.FC<ClaudeSessionProps> = ({
 			const shortcuts = shortcutManager.getShortcuts();
 
 			// Check for toggle mode shortcut
-			const toggleModeCode = shortcutManager.getShortcutCode(shortcuts.toggleMode);
+			const toggleModeCode = shortcutManager.getShortcutCode(
+				shortcuts.toggleMode,
+			);
 			if (toggleModeCode && data === toggleModeCode) {
 				onToggleMode();
 				return;
 			}
 
 			// Check for return to menu shortcut
-			const returnToMenuCode = shortcutManager.getShortcutCode(shortcuts.returnToMenu);
+			const returnToMenuCode = shortcutManager.getShortcutCode(
+				shortcuts.returnToMenu,
+			);
 			if (returnToMenuCode && data === returnToMenuCode) {
 				if (stdout) {
 					stdout.write('\x1b[?1004l');
@@ -181,9 +183,16 @@ const ClaudeSession: React.FC<ClaudeSessionProps> = ({
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);
 		};
-	}, [session, sessionManager, stdout, onToggleMode, onReturnToMenu, isExiting]);
+	}, [
+		session,
+		sessionManager,
+		stdout,
+		onToggleMode,
+		onReturnToMenu,
+		isExiting,
+	]);
 
 	return null;
 };
 
-export default ClaudeSession;
+export default Session;

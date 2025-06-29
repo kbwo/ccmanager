@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {useApp, Box, Text} from 'ink';
 import Menu from './Menu.js';
-import ClaudeSession from './ClaudeSession.js';
+import Session from './Session.js';
 import BashSession from './BashSession.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
@@ -10,8 +10,11 @@ import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {Worktree, Session as SessionType, TerminalMode} from '../types/index.js';
-import {shortcutManager} from '../services/shortcutManager.js';
+import {
+	Worktree,
+	Session as SessionType,
+	TerminalMode,
+} from '../types/index.js';
 import {configurationManager} from '../services/configurationManager.js';
 
 type View =
@@ -147,7 +150,7 @@ const App: React.FC = () => {
 	};
 
 	const handleToggleMode = () => {
-		setSessionMode(current => current === 'claude' ? 'bash' : 'claude');
+		setSessionMode(current => (current === 'claude' ? 'bash' : 'claude'));
 	};
 
 	const handleReturnToMenu = () => {
@@ -271,7 +274,7 @@ const App: React.FC = () => {
 		// SEPARATE COMPONENTS ARCHITECTURE: Route to Claude or Bash component
 		if (sessionMode === 'claude') {
 			return (
-				<ClaudeSession
+				<Session
 					key={`claude-${activeSession.id}`}
 					session={activeSession}
 					sessionManager={sessionManager}

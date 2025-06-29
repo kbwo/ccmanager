@@ -42,9 +42,7 @@ const BashSession: React.FC<BashSessionProps> = ({
 
 				// Skip clear screen sequences at the beginning
 				if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
-					const cleaned = str
-						.replace(/\x1B\[2J/g, '')
-						.replace(/\x1B\[H/g, '');
+					const cleaned = str.replace(/\x1B\[2J/g, '').replace(/\x1B\[H/g, '');
 					if (cleaned.length > 0) {
 						stdout.write(Buffer.from(cleaned, 'utf8'));
 					}
@@ -55,7 +53,10 @@ const BashSession: React.FC<BashSessionProps> = ({
 		};
 
 		// Handle Bash data only
-		const handleBashSessionData = (activeSession: SessionType, data: string) => {
+		const handleBashSessionData = (
+			activeSession: SessionType,
+			data: string,
+		) => {
 			if (activeSession.id === session.id && !isExiting) {
 				stdout.write(data);
 			}
@@ -136,14 +137,18 @@ const BashSession: React.FC<BashSessionProps> = ({
 			const shortcuts = shortcutManager.getShortcuts();
 
 			// Check for toggle mode shortcut
-			const toggleModeCode = shortcutManager.getShortcutCode(shortcuts.toggleMode);
+			const toggleModeCode = shortcutManager.getShortcutCode(
+				shortcuts.toggleMode,
+			);
 			if (toggleModeCode && data === toggleModeCode) {
 				onToggleMode();
 				return;
 			}
 
 			// Check for return to menu shortcut
-			const returnToMenuCode = shortcutManager.getShortcutCode(shortcuts.returnToMenu);
+			const returnToMenuCode = shortcutManager.getShortcutCode(
+				shortcuts.returnToMenu,
+			);
 			if (returnToMenuCode && data === returnToMenuCode) {
 				if (stdout) {
 					stdout.write('\x1b[?1004l');
@@ -188,7 +193,14 @@ const BashSession: React.FC<BashSessionProps> = ({
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);
 		};
-	}, [session, sessionManager, stdout, onToggleMode, onReturnToMenu, isExiting]);
+	}, [
+		session,
+		sessionManager,
+		stdout,
+		onToggleMode,
+		onReturnToMenu,
+		isExiting,
+	]);
 
 	return null;
 };

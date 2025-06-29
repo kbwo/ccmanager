@@ -33,6 +33,7 @@ describe('ConfigurationManager - Command Presets', () => {
 			shortcuts: {
 				returnToMenu: {ctrl: true, key: 'e'},
 				cancel: {key: 'escape'},
+				toggleMode: {ctrl: true, key: 't'},
 			},
 			command: {
 				command: 'claude',

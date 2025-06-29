@@ -216,10 +216,28 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			isPrimaryCommand,
 			commandConfig,
+
+			// Dual-mode properties initialization
+			bashProcess: spawn(process.env['SHELL'] || 'bash', [], {
+				name: 'xterm-color',
+				cols: process.stdout.columns || 80,
+				rows: process.stdout.rows || 24,
+				cwd: worktreePath,
+				env: process.env,
+			}),
+			bashTerminal: new Terminal({
+				cols: process.stdout.columns || 80,
+				rows: process.stdout.rows || 24,
+				allowProposedApi: true,
+			}),
+			currentMode: 'claude', // Always start in Claude mode
+			bashHistory: [],
+			bashState: 'idle',
 		};
 
 		// Set up persistent background data handler for state detection
 		this.setupBackgroundHandler(session);
+		this.setupBashHandler(session);
 
 		this.sessions.set(worktreePath, session);
 

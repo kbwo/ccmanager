@@ -29,6 +29,7 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 			shortcuts: {
 				returnToMenu: {ctrl: true, key: 'e'},
 				cancel: {key: 'escape'},
+				toggleMode: {ctrl: true, key: 't'},
 			},
 			commandPresets: {
 				presets: [
