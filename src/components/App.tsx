@@ -15,6 +15,7 @@ import {
 	Session as SessionType,
 	TerminalMode,
 } from '../types/index.js';
+import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 
 type View =
@@ -37,16 +38,18 @@ const App: React.FC = () => {
 	const [worktreeService] = useState(() => new WorktreeService());
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [menuKey, setMenuKey] = useState(0);
+	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
-	);
+	); // Store selected worktree for preset selection
 
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
 		const handleSessionExit = (session: SessionType) => {
+			// If the exited session is the active one, return to menu
 			setActiveSession(current => {
 				if (current && session.id === current.id) {
+					// Session that exited is the active one, trigger return to menu
 					setTimeout(() => {
 						setActiveSession(null);
 						setError(null);
@@ -65,6 +68,7 @@ const App: React.FC = () => {
 
 		sessionManager.on('sessionExit', handleSessionExit);
 
+		// Cleanup on unmount
 		return () => {
 			sessionManager.off('sessionExit', handleSessionExit);
 			sessionManager.destroy();
@@ -72,27 +76,31 @@ const App: React.FC = () => {
 	}, [sessionManager]);
 
 	const handleSelectWorktree = async (worktree: Worktree) => {
-		// Handle special menu options
+		// Check if this is the new worktree option
 		if (worktree.path === '') {
 			setView('new-worktree');
 			return;
 		}
 
+		// Check if this is the delete worktree option
 		if (worktree.path === 'DELETE_WORKTREE') {
 			setView('delete-worktree');
 			return;
 		}
 
+		// Check if this is the merge worktree option
 		if (worktree.path === 'MERGE_WORKTREE') {
 			setView('merge-worktree');
 			return;
 		}
 
+		// Check if this is the configuration option
 		if (worktree.path === 'CONFIGURATION') {
 			setView('configuration');
 			return;
 		}
 
+		// Check if this is the exit application option
 		if (worktree.path === 'EXIT_APPLICATION') {
 			sessionManager.destroy();
 			exit();
@@ -128,6 +136,7 @@ const App: React.FC = () => {
 		if (!selectedWorktree) return;
 
 		try {
+			// Create session with selected preset
 			const session = await sessionManager.createSessionWithPreset(
 				selectedWorktree.path,
 				presetId,
@@ -157,21 +166,25 @@ const App: React.FC = () => {
 		setActiveSession(null);
 		setError(null);
 
+		// Add a small delay to ensure Session cleanup completes
 		setTimeout(() => {
 			setView('menu');
-			setMenuKey(prev => prev + 1);
+			setMenuKey(prev => prev + 1); // Force menu refresh
 
+			// Clear the screen when returning to menu
 			if (process.stdout.isTTY) {
 				process.stdout.write('\x1B[2J\x1B[H');
 			}
 
+			// Ensure stdin is in a clean state for Ink components
 			if (process.stdin.isTTY) {
+				// Flush any pending input to prevent escape sequences from leaking
 				process.stdin.read();
 				process.stdin.setRawMode(false);
 				process.stdin.resume();
 				process.stdin.setEncoding('utf8');
 			}
-		}, 50);
+		}, 50); // Small delay to ensure proper cleanup
 	};
 
 	const handleCreateWorktree = async (
@@ -182,11 +195,14 @@ const App: React.FC = () => {
 		setView('creating-worktree');
 		setError(null);
 
+		// Create the worktree
 		const result = worktreeService.createWorktree(path, branch, baseBranch);
 
 		if (result.success) {
+			// Success - return to menu
 			handleReturnToMenu();
 		} else {
+			// Show error
 			setError(result.error || 'Failed to create worktree');
 			setView('new-worktree');
 		}
@@ -203,6 +219,7 @@ const App: React.FC = () => {
 		setView('deleting-worktree');
 		setError(null);
 
+		// Delete the worktrees
 		let hasError = false;
 		for (const path of worktreePaths) {
 			const result = worktreeService.deleteWorktree(path, {deleteBranch});
@@ -214,8 +231,10 @@ const App: React.FC = () => {
 		}
 
 		if (!hasError) {
+			// Success - return to menu
 			handleReturnToMenu();
 		} else {
+			// Show error
 			setView('delete-worktree');
 		}
 	};
@@ -233,6 +252,7 @@ const App: React.FC = () => {
 		setView('merging-worktree');
 		setError(null);
 
+		// Perform the merge
 		const mergeResult = worktreeService.mergeWorktree(
 			sourceBranch,
 			targetBranch,
@@ -240,6 +260,7 @@ const App: React.FC = () => {
 		);
 
 		if (mergeResult.success) {
+			// If user wants to delete the merged branch
 			if (deleteAfterMerge) {
 				const deleteResult =
 					worktreeService.deleteWorktreeByBranch(sourceBranch);
@@ -249,8 +270,10 @@ const App: React.FC = () => {
 					return;
 				}
 			}
+			// Success - return to menu
 			handleReturnToMenu();
 		} else {
+			// Show error
 			setError(mergeResult.error || 'Failed to merge branches');
 			setView('merge-worktree');
 		}
@@ -274,23 +297,37 @@ const App: React.FC = () => {
 		// SEPARATE COMPONENTS ARCHITECTURE: Route to Claude or Bash component
 		if (sessionMode === 'claude') {
 			return (
-				<Session
-					key={`claude-${activeSession.id}`}
-					session={activeSession}
-					sessionManager={sessionManager}
-					onToggleMode={handleToggleMode}
-					onReturnToMenu={handleReturnToMenu}
-				/>
+				<Box flexDirection="column">
+					<Session
+						key={`claude-${activeSession.id}`}
+						session={activeSession}
+						sessionManager={sessionManager}
+						onToggleMode={handleToggleMode}
+						onReturnToMenu={handleReturnToMenu}
+					/>
+					<Box marginTop={1}>
+						<Text dimColor>
+							Claude: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash | {shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
+						</Text>
+					</Box>
+				</Box>
 			);
 		} else {
 			return (
-				<BashSession
-					key={`bash-${activeSession.id}`}
-					session={activeSession}
-					sessionManager={sessionManager}
-					onToggleMode={handleToggleMode}
-					onReturnToMenu={handleReturnToMenu}
-				/>
+				<Box flexDirection="column">
+					<BashSession
+						key={`bash-${activeSession.id}`}
+						session={activeSession}
+						sessionManager={sessionManager}
+						onToggleMode={handleToggleMode}
+						onReturnToMenu={handleReturnToMenu}
+					/>
+					<Box marginTop={1}>
+						<Text dimColor>
+							Bash: ({shortcutManager.getShortcutDisplay('toggleMode')}: Bash | {shortcutManager.getShortcutDisplay('returnToMenu')}: Menu)
+						</Text>
+					</Box>
+				</Box>
 			);
 		}
 	}

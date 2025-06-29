@@ -83,14 +83,6 @@ const BashSession: React.FC<BashSessionProps> = ({
 			}, 150);
 		}
 
-		// Display mode indicator (save cursor position to avoid displacing bash input)
-		setTimeout(() => {
-			const toggleShortcut = shortcutManager.getShortcutDisplay('toggleMode');
-			const menuShortcut = shortcutManager.getShortcutDisplay('returnToMenu');
-			const indicator = `\x1b[42m Bash \x1b[0m \x1b[90m(${toggleShortcut}: Claude | ${menuShortcut}: Menu)\x1b[0m`;
-			stdout.write(`\x1b7\x1b[1;1H${indicator}\x1b8`);
-		}, 200);
-
 		// Resize PTY to current dimensions
 		const currentCols = process.stdout.columns || 80;
 		const currentRows = process.stdout.rows || 24;

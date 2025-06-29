@@ -121,7 +121,7 @@ describe('SessionManager', () => {
 				fallbackArgs: ['--resume'],
 			});
 
-			// First spawn attempt (Claude) - will exit with code 1
+			// First spawn attempt - will exit with code 1
 			const firstMockPty = new MockPty();
 			// Second spawn attempt (Bash) - succeeds
 			const bashMockPty = new MockPty();
@@ -136,7 +136,7 @@ describe('SessionManager', () => {
 			// Create session
 			const session = await sessionManager.createSession('/test/worktree');
 
-			// Verify initial spawn (Claude + Bash PTYs)
+			// Verify initial spawn
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
