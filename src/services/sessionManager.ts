@@ -122,14 +122,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				cwd: worktreePath,
 				env: process.env,
 			}),
-			bashTerminal: new Terminal({
-				cols: process.stdout.columns || 80,
-				rows: process.stdout.rows || 24,
-				allowProposedApi: true,
-			}),
 			currentMode: 'claude', // Always start in Claude mode
 			bashHistory: [],
-			bashState: 'idle',
 		};
 
 		// Set up persistent background data handler for state detection
@@ -225,14 +219,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				cwd: worktreePath,
 				env: process.env,
 			}),
-			bashTerminal: new Terminal({
-				cols: process.stdout.columns || 80,
-				rows: process.stdout.rows || 24,
-				allowProposedApi: true,
-			}),
 			currentMode: 'claude', // Always start in Claude mode
 			bashHistory: [],
-			bashState: 'idle',
 		};
 
 		// Set up persistent background data handler for state detection
@@ -334,14 +322,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private setupBashHandler(session: Session): void {
 		// Setup bash data handler (background only - no stdout writing)
 		session.bashProcess.onData((data: string) => {
-			// Write data to bash virtual terminal for state detection
-			session.bashTerminal.write(data);
-
-			// Store in bash history as Buffer
+			// Store in bash history as Buffer (no state detection)
 			const buffer = Buffer.from(data, 'utf8');
 			session.bashHistory.push(buffer);
 
-			// Apply 10MB memory limit for bash history (same as Claude)
+			// Apply 10MB memory limit for bash history
 			const MAX_BASH_HISTORY = 10 * 1024 * 1024;
 			let totalSize = session.bashHistory.reduce(
 				(sum, buf) => sum + buf.length,
@@ -350,14 +335,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			while (totalSize > MAX_BASH_HISTORY && session.bashHistory.length > 0) {
 				const removed = session.bashHistory.shift();
 				if (removed) totalSize -= removed.length;
-			}
-
-			// Update bash state using terminal detection (same as Claude)
-			const oldBashState = session.bashState;
-			const newBashState = this.detectTerminalState(session.bashTerminal);
-
-			if (newBashState !== oldBashState) {
-				session.bashState = newBashState;
 			}
 
 			// Emit bash data event for active sessions

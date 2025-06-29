@@ -156,10 +156,8 @@ describe('prepareWorktreeItems', () => {
 		terminal: {} as Session['terminal'],
 		// Dual-mode properties
 		bashProcess: {} as Session['bashProcess'],
-		bashTerminal: {} as Session['bashTerminal'],
 		currentMode: 'claude',
 		bashHistory: [],
-		bashState: 'idle',
 	};
 
 	it('should prepare basic worktree without git status', () => {

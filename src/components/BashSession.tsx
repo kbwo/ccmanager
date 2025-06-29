@@ -91,9 +91,6 @@ const BashSession: React.FC<BashSessionProps> = ({
 
 		try {
 			session.bashProcess.resize(currentCols, currentRows);
-			if (session.bashTerminal) {
-				session.bashTerminal.resize(currentCols, currentRows);
-			}
 		} catch {
 			// Bash process might have exited
 		}
@@ -103,12 +100,9 @@ const BashSession: React.FC<BashSessionProps> = ({
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
 
-			// Resize Bash PTY and virtual terminal only
+			// Resize Bash PTY only
 			try {
 				session.bashProcess.resize(cols, rows);
-				if (session.bashTerminal) {
-					session.bashTerminal.resize(cols, rows);
-				}
 			} catch {
 				// Bash process might have exited
 			}

@@ -33,10 +33,8 @@ export interface Session {
 
 	// Dual-mode properties
 	bashProcess: IPty; // Bash PTY instance (always exists)
-	bashTerminal: Terminal; // Virtual terminal for bash state detection
 	currentMode: TerminalMode; // Current active mode
 	bashHistory: Buffer[]; // Bash mode history for restoration
-	bashState: SessionState; // Bash state tracking (same as Claude)
 }
 
 export interface SessionManager {

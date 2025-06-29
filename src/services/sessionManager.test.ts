@@ -556,7 +556,7 @@ describe('SessionManager', () => {
 
 			// Verify: Both terminals are created with allowProposedApi
 			expect(session.terminal).toBeDefined();
-			expect(session.bashTerminal).toBeDefined();
+			expect(session.bashProcess).toBeDefined();
 		});
 
 		it('should route bash events correctly when in bash mode', async () => {
