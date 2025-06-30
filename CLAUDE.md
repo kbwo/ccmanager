@@ -8,13 +8,15 @@ CCManager is a TUI application for managing multiple Claude Code sessions across
 
 ```
 ccmanager/
+├── docs/                    # Documentation
 ├── src/
 │   ├── cli.tsx             # Entry point with CLI argument parsing
 │   ├── components/         # UI components
-│   ├── services/           # Business logic
-│   ├── utils/              # Utility functions
 │   ├── constants/          # Shared constants
-│   └── types/              # TypeScript definitions
+│   ├── hooks/              # React hooks
+│   ├── services/           # Business logic
+│   ├── types/              # TypeScript definitions
+│   └── utils/              # Utility functions
 ├── package.json
 ├── tsconfig.json
 ├── eslint.config.js        # Modern flat ESLint configuration
@@ -78,14 +80,6 @@ npm run typecheck
 ```
 
 ## Architecture Decisions
-
-### Why TypeScript + Ink?
-
-- **React Patterns**: Leverages familiar React concepts for UI development
-- **Type Safety**: TypeScript provides compile-time type checking
-- **Rich Ecosystem**: Access to npm packages for PTY, Git, and more
-- **Rapid Development**: Hot reloading and component reusability
-- **ES Modules**: Modern JavaScript module system for better tree-shaking
 
 ### Session Management
 
@@ -271,6 +265,7 @@ await worktreeService.mergeWorktree(worktreePath, targetBranch);
 - **Multi-Session Management**: Run Claude Code in multiple worktrees simultaneously
 - **Worktree Operations**: Create, delete, and merge worktrees from the UI
 - **Session State Tracking**: Visual indicators for session states (idle, busy, waiting)
+- **Git Status Visualization**: Real-time display of file changes and ahead/behind counts
 - **Customizable Shortcuts**: Configure keyboard shortcuts via UI or JSON file
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 
