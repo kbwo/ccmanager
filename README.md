@@ -2,7 +2,11 @@
 
 CCManager is a TUI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI) across Git worktrees.
 
-https://github.com/user-attachments/assets/a6d80e73-dc06-4ef8-849d-e3857f6c7024
+
+
+https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
+
+
 
 ## Features
 
