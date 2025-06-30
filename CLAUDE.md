@@ -8,13 +8,15 @@ CCManager is a TUI application for managing multiple Claude Code sessions across
 
 ```
 ccmanager/
+├── docs/                    # Documentation
 ├── src/
 │   ├── cli.tsx             # Entry point with CLI argument parsing
 │   ├── components/         # UI components
-│   ├── services/           # Business logic
-│   ├── utils/              # Utility functions
 │   ├── constants/          # Shared constants
-│   └── types/              # TypeScript definitions
+│   ├── hooks/              # React hooks
+│   ├── services/           # Business logic
+│   ├── types/              # TypeScript definitions
+│   └── utils/              # Utility functions
 ├── package.json
 ├── tsconfig.json
 ├── eslint.config.js        # Modern flat ESLint configuration
