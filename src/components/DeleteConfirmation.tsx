@@ -77,9 +77,9 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	};
 
 	useInput((input, key) => {
-		if (key.upArrow) {
+		if (key.upArrow || input === 'k') {
 			handleUpArrow();
-		} else if (key.downArrow) {
+		} else if (key.downArrow || input === 'j') {
 			handleDownArrow();
 		} else if (key.leftArrow) {
 			handleHorizontalArrow('left');
@@ -172,7 +172,7 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Use ↑↓ to navigate options, Space/Enter to select,{' '}
+					Use ↑↓ or j/k to navigate options, Space/Enter to select,{' '}
 					{shortcutManager.getShortcutDisplay('cancel')} to cancel
 				</Text>
 			</Box>
