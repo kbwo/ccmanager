@@ -9,6 +9,7 @@ import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {configurationManager} from './configurationManager.js';
 import {WorktreeService} from './worktreeService.js';
+import {createStateDetector} from './stateDetector.js';
 const {Terminal} = pkg;
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -32,42 +33,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return spawn(command, args, spawnOptions);
 	}
 
-	detectTerminalState(terminal: InstanceType<typeof Terminal>): SessionState {
-		// Get the last 30 lines from the terminal buffer
-		const buffer = terminal.buffer.active;
-		const lines: string[] = [];
-
-		// Start from the bottom and work our way up
-		for (let i = buffer.length - 1; i >= 0 && lines.length < 30; i--) {
-			const line = buffer.getLine(i);
-			if (line) {
-				const text = line.translateToString(true);
-				// Skip empty lines at the bottom
-				if (lines.length > 0 || text.trim() !== '') {
-					lines.unshift(text);
-				}
-			}
-		}
-
-		// Join lines and check for patterns
-		const content = lines.join('\n');
-		const lowerContent = content.toLowerCase();
-
-		// Check for waiting prompts with box character
-		if (
-			content.includes('│ Do you want') ||
-			content.includes('│ Would you like')
-		) {
-			return 'waiting_input';
-		}
-
-		// Check for busy state
-		if (lowerContent.includes('esc to interrupt')) {
-			return 'busy';
-		}
-
-		// Otherwise idle
-		return 'idle';
+	detectTerminalState(session: Session): SessionState {
+		// Create a detector based on the session's detection strategy
+		const strategy = session.detectionStrategy || 'claude';
+		const detector = createStateDetector(strategy);
+		return detector.detectState(session.terminal);
 	}
 
 	constructor() {
@@ -113,6 +83,93 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			isPrimaryCommand: true,
 			commandConfig,
+			detectionStrategy: 'claude', // Default to claude for legacy method
+		};
+
+		// Set up persistent background data handler for state detection
+		this.setupBackgroundHandler(session);
+
+		this.sessions.set(worktreePath, session);
+
+		this.emit('sessionCreated', session);
+
+		return session;
+	}
+
+	async createSessionWithPreset(
+		worktreePath: string,
+		presetId?: string,
+	): Promise<Session> {
+		// Check if session already exists
+		const existing = this.sessions.get(worktreePath);
+		if (existing) {
+			return existing;
+		}
+
+		const id = `session-${Date.now()}-${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
+
+		// Get preset configuration
+		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
+		if (!preset) {
+			preset = configurationManager.getDefaultPreset();
+		}
+
+		const command = preset.command;
+		const args = preset.args || [];
+		const commandConfig = {
+			command: preset.command,
+			args: preset.args,
+			fallbackArgs: preset.fallbackArgs,
+		};
+
+		// Try to spawn the process
+		let ptyProcess: IPty;
+		let isPrimaryCommand = true;
+
+		try {
+			ptyProcess = await this.spawn(command, args, worktreePath);
+		} catch (error) {
+			// If primary command fails and we have fallback args, try them
+			if (preset.fallbackArgs) {
+				try {
+					ptyProcess = await this.spawn(
+						command,
+						preset.fallbackArgs,
+						worktreePath,
+					);
+					isPrimaryCommand = false;
+				} catch (_fallbackError) {
+					// Both attempts failed, throw the original error
+					throw error;
+				}
+			} else {
+				// No fallback args, throw the error
+				throw error;
+			}
+		}
+
+		// Create virtual terminal for state detection
+		const terminal = new Terminal({
+			cols: process.stdout.columns || 80,
+			rows: process.stdout.rows || 24,
+			allowProposedApi: true,
+		});
+
+		const session: Session = {
+			id,
+			worktreePath,
+			process: ptyProcess,
+			state: 'busy', // Session starts as busy when created
+			output: [],
+			outputHistory: [],
+			lastActivity: new Date(),
+			isActive: false,
+			terminal,
+			isPrimaryCommand,
+			commandConfig,
+			detectionStrategy: preset.detectionStrategy || 'claude',
 		};
 
 		// Set up persistent background data handler for state detection
@@ -197,7 +254,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Set up interval-based state detection
 		session.stateCheckInterval = setInterval(() => {
 			const oldState = session.state;
-			const newState = this.detectTerminalState(session.terminal);
+			const newState = this.detectTerminalState(session);
 
 			if (newState !== oldState) {
 				session.state = newState;

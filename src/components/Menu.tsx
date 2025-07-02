@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {Box, Text} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Worktree, Session} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -8,8 +8,13 @@ import {
 	STATUS_ICONS,
 	STATUS_LABELS,
 	MENU_ICONS,
-	getStatusDisplay,
 } from '../constants/statusIcons.js';
+import {useGitStatus} from '../hooks/useGitStatus.js';
+import {
+	prepareWorktreeItems,
+	calculateColumnPositions,
+	assembleWorktreeLabel,
+} from '../utils/worktreeUtils.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -23,7 +28,9 @@ interface MenuItem {
 }
 
 const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
-	const [worktrees, setWorktrees] = useState<Worktree[]>([]);
+	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
+	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
+	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 
@@ -31,7 +38,8 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 		// Load worktrees
 		const worktreeService = new WorktreeService();
 		const loadedWorktrees = worktreeService.getWorktrees();
-		setWorktrees(loadedWorktrees);
+		setBaseWorktrees(loadedWorktrees);
+		setDefaultBranch(worktreeService.getDefaultBranch());
 
 		// Update sessions
 		const updateSessions = () => {
@@ -60,24 +68,21 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 	}, [sessionManager]);
 
 	useEffect(() => {
-		// Build menu items
-		const menuItems: MenuItem[] = worktrees.map(wt => {
-			const session = sessions.find(s => s.worktreePath === wt.path);
-			let status = '';
+		// Prepare worktree items and calculate layout
+		const items = prepareWorktreeItems(worktrees, sessions);
+		const columnPositions = calculateColumnPositions(items);
 
-			if (session) {
-				status = ` [${getStatusDisplay(session.state)}]`;
-			}
+		// Build menu items with proper alignment
+		const menuItems: MenuItem[] = items.map((item, index) => {
+			const label = assembleWorktreeLabel(item, columnPositions);
 
-			const branchName = wt.branch
-				? wt.branch.replace('refs/heads/', '')
-				: 'detached';
-			const isMain = wt.isMainWorktree ? ' (main)' : '';
+			// Only show numbers for first 10 worktrees (0-9)
+			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
 
 			return {
-				label: `${branchName}${isMain}${status}`,
-				value: wt.path,
-				worktree: wt,
+				label: numberPrefix + label,
+				value: item.worktree.path,
+				worktree: item.worktree,
 			};
 		});
 
@@ -87,27 +92,90 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 			value: 'separator',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.NEW_WORKTREE} New Worktree`,
+			label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
 			value: 'new-worktree',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
+			label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
 			value: 'merge-worktree',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
+			label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
 			value: 'delete-worktree',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
+			label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
 			value: 'configuration',
 		});
 		menuItems.push({
-			label: `${MENU_ICONS.EXIT} Exit`,
+			label: `Q ${MENU_ICONS.EXIT} Exit`,
 			value: 'exit',
 		});
 		setItems(menuItems);
-	}, [worktrees, sessions]);
+	}, [worktrees, sessions, defaultBranch]);
+
+	// Handle hotkeys
+	useInput((input, _key) => {
+		const keyPressed = input.toLowerCase();
+
+		// Handle number keys 0-9 for worktree selection (first 10 only)
+		if (/^[0-9]$/.test(keyPressed)) {
+			const index = parseInt(keyPressed);
+			if (index < Math.min(10, worktrees.length) && worktrees[index]) {
+				onSelectWorktree(worktrees[index]);
+			}
+			return;
+		}
+
+		switch (keyPressed) {
+			case 'n':
+				// Trigger new worktree action
+				onSelectWorktree({
+					path: '',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'm':
+				// Trigger merge worktree action
+				onSelectWorktree({
+					path: 'MERGE_WORKTREE',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'd':
+				// Trigger delete worktree action
+				onSelectWorktree({
+					path: 'DELETE_WORKTREE',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'c':
+				// Trigger configuration action
+				onSelectWorktree({
+					path: 'CONFIGURATION',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+			case 'q':
+			case 'x':
+				// Trigger exit action
+				onSelectWorktree({
+					path: 'EXIT_APPLICATION',
+					branch: '',
+					isMainWorktree: false,
+					hasSession: false,
+				});
+				break;
+		}
+	});
 
 	const handleSelect = (item: MenuItem) => {
 		if (item.value === 'separator') {
@@ -179,7 +247,10 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_ICONS.WAITING} {STATUS_LABELS.WAITING} {STATUS_ICONS.IDLE}{' '}
 					{STATUS_LABELS.IDLE}
 				</Text>
-				<Text dimColor>Controls: ↑↓ Navigate Enter Select</Text>
+				<Text dimColor>
+					Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first
+					10) N-New M-Merge D-Delete C-Config Q-Quit
+				</Text>
 			</Box>
 		</Box>
 	);

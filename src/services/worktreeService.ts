@@ -3,6 +3,7 @@ import {existsSync, mkdirSync, cpSync, readdirSync} from 'fs';
 import path from 'path';
 import os from 'os';
 import {Worktree} from '../types/index.js';
+import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 
 export class WorktreeService {
 	private rootPath: string;
@@ -228,6 +229,16 @@ export class WorktreeService {
 			// Copy session data if requested
 			if (copySessionData) {
 				this.copyClaudeSessionData(this.rootPath, resolvedPath);
+      }
+
+			// Store the parent branch in worktree config
+			try {
+				setWorktreeParentBranch(resolvedPath, baseBranch);
+			} catch (error) {
+				console.error(
+					'Warning: Failed to set parent branch in worktree config:',
+					error,
+				);
 			}
 
 			return {success: true};

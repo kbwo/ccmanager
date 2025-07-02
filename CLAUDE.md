@@ -8,13 +8,15 @@ CCManager is a TUI application for managing multiple Claude Code sessions across
 
 ```
 ccmanager/
+├── docs/                    # Documentation
 ├── src/
 │   ├── cli.tsx             # Entry point with CLI argument parsing
 │   ├── components/         # UI components
-│   ├── services/           # Business logic
-│   ├── utils/              # Utility functions
 │   ├── constants/          # Shared constants
-│   └── types/              # TypeScript definitions
+│   ├── hooks/              # React hooks
+│   ├── services/           # Business logic
+│   ├── types/              # TypeScript definitions
+│   └── utils/              # Utility functions
 ├── package.json
 ├── tsconfig.json
 ├── eslint.config.js        # Modern flat ESLint configuration
@@ -79,14 +81,6 @@ npm run typecheck
 
 ## Architecture Decisions
 
-### Why TypeScript + Ink?
-
-- **React Patterns**: Leverages familiar React concepts for UI development
-- **Type Safety**: TypeScript provides compile-time type checking
-- **Rich Ecosystem**: Access to npm packages for PTY, Git, and more
-- **Rapid Development**: Hot reloading and component reusability
-- **ES Modules**: Modern JavaScript module system for better tree-shaking
-
 ### Session Management
 
 - Each worktree maintains its own Claude Code process
@@ -104,12 +98,29 @@ npm run typecheck
 
 ### State Detection
 
-Claude Code states are detected by advanced output analysis in `promptDetector.ts`:
+Session states are detected using a strategy pattern that supports multiple CLI tools:
 
-- **Waiting for input**: Detects various prompt patterns including "Do you want" questions
-- **Busy**: Detects "ESC to interrupt" and active processing
-- **Task complete**: Identifies when Claude is ready for new input
-- **Bottom border tracking**: Handles prompt box UI elements
+#### Architecture
+- **StateDetector Interface**: Common contract for all detectors
+- **BaseStateDetector**: Shared functionality for terminal output analysis
+- **ClaudeStateDetector**: Claude Code specific patterns
+- **GeminiStateDetector**: Gemini CLI specific patterns
+
+#### Claude Code Detection
+- **Waiting for input**: `│ Do you want`, `│ Would you like`
+- **Busy**: `ESC to interrupt` (case insensitive)
+- **Idle**: Default state when no patterns match
+
+#### Gemini CLI Detection
+- **Waiting for input**: `│ Apply this change?`, `│ Allow execution?`, `│ Do you want to proceed?`
+- **Busy**: `esc to cancel` (case insensitive)
+- **Idle**: Default state when no patterns match
+
+#### Adding New CLI Support
+1. Add new strategy type to `StateDetectionStrategy` in `types/index.ts`
+2. Create detector class extending `BaseStateDetector`
+3. Add to factory in `createStateDetector`
+4. Update UI components to include new option
 
 ### Keyboard Shortcuts
 
@@ -138,6 +149,25 @@ const MyComponent: React.FC<Props> = ({prop1, prop2}) => {
 	);
 };
 ```
+
+### Command Presets
+
+```typescript
+interface CommandPreset {
+  id: string;
+  name: string;
+  command: string;
+  args?: string[];
+  fallbackArgs?: string[];
+  detectionStrategy?: StateDetectionStrategy; // 'claude' | 'gemini'
+}
+```
+
+Presets support:
+- Multiple command configurations
+- Automatic fallback on failure
+- Per-preset state detection strategy
+- Default preset selection
 
 ### Testing Sessions
 
@@ -235,6 +265,7 @@ await worktreeService.mergeWorktree(worktreePath, targetBranch);
 - **Multi-Session Management**: Run Claude Code in multiple worktrees simultaneously
 - **Worktree Operations**: Create, delete, and merge worktrees from the UI
 - **Session State Tracking**: Visual indicators for session states (idle, busy, waiting)
+- **Git Status Visualization**: Real-time display of file changes and ahead/behind counts
 - **Customizable Shortcuts**: Configure keyboard shortcuts via UI or JSON file
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 

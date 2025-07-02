@@ -7,6 +7,8 @@ import {
 	ShortcutConfig,
 	WorktreeConfig,
 	CommandConfig,
+	CommandPreset,
+	CommandPresetsConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
 
@@ -83,6 +85,9 @@ export class ConfigurationManager {
 				command: 'claude',
 			};
 		}
+
+		// Migrate legacy command config to presets if needed
+		this.migrateLegacyCommandToPresets();
 	}
 
 	private migrateLegacyShortcuts(): void {
@@ -155,16 +160,146 @@ export class ConfigurationManager {
 	}
 
 	getCommandConfig(): CommandConfig {
-		return (
-			this.config.command || {
-				command: 'claude',
-			}
-		);
+		// For backward compatibility, return the default preset as CommandConfig
+		const defaultPreset = this.getDefaultPreset();
+		return {
+			command: defaultPreset.command,
+			args: defaultPreset.args,
+			fallbackArgs: defaultPreset.fallbackArgs,
+		};
 	}
 
 	setCommandConfig(commandConfig: CommandConfig): void {
 		this.config.command = commandConfig;
+
+		// Also update the default preset for backward compatibility
+		if (this.config.commandPresets) {
+			const defaultPreset = this.config.commandPresets.presets.find(
+				p => p.id === this.config.commandPresets!.defaultPresetId,
+			);
+			if (defaultPreset) {
+				defaultPreset.command = commandConfig.command;
+				defaultPreset.args = commandConfig.args;
+				defaultPreset.fallbackArgs = commandConfig.fallbackArgs;
+			}
+		}
+
 		this.saveConfig();
+	}
+
+	private migrateLegacyCommandToPresets(): void {
+		// Only migrate if we have legacy command config but no presets
+		if (this.config.command && !this.config.commandPresets) {
+			const defaultPreset: CommandPreset = {
+				id: '1',
+				name: 'Main',
+				command: this.config.command.command,
+				args: this.config.command.args,
+				fallbackArgs: this.config.command.fallbackArgs,
+			};
+
+			this.config.commandPresets = {
+				presets: [defaultPreset],
+				defaultPresetId: '1',
+			};
+
+			this.saveConfig();
+		}
+
+		// Ensure default presets if none exist
+		if (!this.config.commandPresets) {
+			this.config.commandPresets = {
+				presets: [
+					{
+						id: '1',
+						name: 'Main',
+						command: 'claude',
+					},
+				],
+				defaultPresetId: '1',
+			};
+		}
+	}
+
+	getCommandPresets(): CommandPresetsConfig {
+		if (!this.config.commandPresets) {
+			this.migrateLegacyCommandToPresets();
+		}
+		return this.config.commandPresets!;
+	}
+
+	setCommandPresets(presets: CommandPresetsConfig): void {
+		this.config.commandPresets = presets;
+		this.saveConfig();
+	}
+
+	getDefaultPreset(): CommandPreset {
+		const presets = this.getCommandPresets();
+		const defaultPreset = presets.presets.find(
+			p => p.id === presets.defaultPresetId,
+		);
+
+		// If default preset not found, return the first one
+		return defaultPreset || presets.presets[0]!;
+	}
+
+	getPresetById(id: string): CommandPreset | undefined {
+		const presets = this.getCommandPresets();
+		return presets.presets.find(p => p.id === id);
+	}
+
+	addPreset(preset: CommandPreset): void {
+		const presets = this.getCommandPresets();
+
+		// Replace if exists, otherwise add
+		const existingIndex = presets.presets.findIndex(p => p.id === preset.id);
+		if (existingIndex >= 0) {
+			presets.presets[existingIndex] = preset;
+		} else {
+			presets.presets.push(preset);
+		}
+
+		this.setCommandPresets(presets);
+	}
+
+	deletePreset(id: string): void {
+		const presets = this.getCommandPresets();
+
+		// Don't delete if it's the last preset
+		if (presets.presets.length <= 1) {
+			return;
+		}
+
+		// Remove the preset
+		presets.presets = presets.presets.filter(p => p.id !== id);
+
+		// Update default if needed
+		if (presets.defaultPresetId === id && presets.presets.length > 0) {
+			presets.defaultPresetId = presets.presets[0]!.id;
+		}
+
+		this.setCommandPresets(presets);
+	}
+
+	setDefaultPreset(id: string): void {
+		const presets = this.getCommandPresets();
+
+		// Only update if preset exists
+		if (presets.presets.some(p => p.id === id)) {
+			presets.defaultPresetId = id;
+			this.setCommandPresets(presets);
+		}
+	}
+
+	getSelectPresetOnStart(): boolean {
+		const presets = this.getCommandPresets();
+		return presets.selectPresetOnStart ?? false;
+	}
+
+	setSelectPresetOnStart(enabled: boolean): void {
+		const presets = this.getCommandPresets();
+		presets.selectPresetOnStart = enabled;
+		this.setCommandPresets(presets);
 	}
 }
 

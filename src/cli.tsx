@@ -3,6 +3,7 @@ import React from 'react';
 import {render} from 'ink';
 import meow from 'meow';
 import App from './components/App.js';
+import {worktreeConfigManager} from './services/worktreeConfigManager.js';
 
 meow(
 	`
@@ -28,5 +29,8 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
 	);
 	process.exit(1);
 }
+
+// Initialize worktree config manager
+worktreeConfigManager.initialize();
 
 render(<App />);

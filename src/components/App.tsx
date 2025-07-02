@@ -6,10 +6,12 @@ import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
 import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
+import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {Worktree, Session as SessionType} from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {configurationManager} from '../services/configurationManager.js';
 
 type View =
 	| 'menu'
@@ -20,7 +22,8 @@ type View =
 	| 'deleting-worktree'
 	| 'merge-worktree'
 	| 'merging-worktree'
-	| 'configuration';
+	| 'configuration'
+	| 'preset-selector';
 
 const App: React.FC = () => {
 	const {exit} = useApp();
@@ -30,6 +33,9 @@ const App: React.FC = () => {
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
+	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
+		null,
+	); // Store selected worktree for preset selection
 
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
@@ -99,8 +105,16 @@ const App: React.FC = () => {
 		let session = sessionManager.getSession(worktree.path);
 
 		if (!session) {
+			// Check if we should show preset selector
+			if (configurationManager.getSelectPresetOnStart()) {
+				setSelectedWorktree(worktree);
+				setView('preset-selector');
+				return;
+			}
+
 			try {
-				session = await sessionManager.createSession(worktree.path);
+				// Use preset-based session creation with default preset
+				session = await sessionManager.createSessionWithPreset(worktree.path);
 			} catch (error) {
 				setError(`Failed to create session: ${error}`);
 				return;
@@ -109,6 +123,31 @@ const App: React.FC = () => {
 
 		setActiveSession(session);
 		setView('session');
+	};
+
+	const handlePresetSelected = async (presetId: string) => {
+		if (!selectedWorktree) return;
+
+		try {
+			// Create session with selected preset
+			const session = await sessionManager.createSessionWithPreset(
+				selectedWorktree.path,
+				presetId,
+			);
+			setActiveSession(session);
+			setView('session');
+			setSelectedWorktree(null);
+		} catch (error) {
+			setError(`Failed to create session: ${error}`);
+			setView('menu');
+			setSelectedWorktree(null);
+		}
+	};
+
+	const handlePresetSelectorCancel = () => {
+		setSelectedWorktree(null);
+		setView('menu');
+		setMenuKey(prev => prev + 1);
 	};
 
 	const handleReturnToMenu = () => {
@@ -341,6 +380,15 @@ const App: React.FC = () => {
 
 	if (view === 'configuration') {
 		return <Configuration onComplete={handleReturnToMenu} />;
+	}
+
+	if (view === 'preset-selector') {
+		return (
+			<PresetSelector
+				onSelect={handlePresetSelected}
+				onCancel={handlePresetSelectorCancel}
+			/>
+		);
 	}
 
 	return null;
