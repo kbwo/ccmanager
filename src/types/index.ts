@@ -30,6 +30,8 @@ export interface Session {
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
 	isPrimaryCommand?: boolean; // Track if process was started with main command args
 	commandConfig?: CommandConfig; // Store command config for fallback
+	presetId?: string; // Store preset ID for display purposes
+	presetName?: string; // Store preset name for display purposes
 	detectionStrategy?: StateDetectionStrategy; // State detection strategy for this session
 }
 

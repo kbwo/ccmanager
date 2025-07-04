@@ -24,7 +24,7 @@ interface WorktreeItem {
 	fileChanges: string;
 	aheadBehind: string;
 	parentBranch: string;
-	commandName: string;
+	presetName: string;
 	error?: string;
 	// Visible lengths (without ANSI codes) for alignment calculation
 	lengths: {
@@ -32,7 +32,7 @@ interface WorktreeItem {
 		fileChanges: number;
 		aheadBehind: number;
 		parentBranch: number;
-		commandName: number;
+		presetName: number;
 	};
 }
 
@@ -101,13 +101,15 @@ export function prepareWorktreeItems(
 		let fileChanges = '';
 		let aheadBehind = '';
 		let parentBranch = '';
-		let commandName = '';
+		let presetName = '';
 		let error = '';
 
-		// Get command name from session
-		if (session && session.commandConfig) {
-			const command = session.commandConfig.command;
-			commandName = `\x1b[36m[${command}]\x1b[0m`; // Cyan color for command info
+		// Get preset name from session (fallback to command if no preset name)
+		if (session) {
+			const displayName = session.presetName || session.commandConfig?.command || '';
+			if (displayName) {
+				presetName = `\x1b[36m[${displayName}]\x1b[0m`; // Cyan color for preset info
+			}
 		}
 
 		if (wt.gitStatus) {
@@ -132,14 +134,14 @@ export function prepareWorktreeItems(
 			fileChanges,
 			aheadBehind,
 			parentBranch,
-			commandName,
+			presetName,
 			error,
 			lengths: {
 				base: stripAnsi(baseLabel).length,
 				fileChanges: stripAnsi(fileChanges).length,
 				aheadBehind: stripAnsi(aheadBehind).length,
 				parentBranch: stripAnsi(parentBranch).length,
-				commandName: stripAnsi(commandName).length,
+				presetName: stripAnsi(presetName).length,
 			},
 		};
 	});
@@ -153,7 +155,7 @@ export function calculateColumnPositions(items: WorktreeItem[]) {
 	let maxBranchLength = 0;
 	let maxFileChangesLength = 0;
 	let maxAheadBehindLength = 0;
-	let maxCommandNameLength = 0;
+	let maxPresetNameLength = 0;
 
 	items.forEach(item => {
 		// Skip items with errors for alignment calculation
@@ -168,22 +170,22 @@ export function calculateColumnPositions(items: WorktreeItem[]) {
 			maxAheadBehindLength,
 			item.lengths.aheadBehind,
 		);
-		maxCommandNameLength = Math.max(
-			maxCommandNameLength,
-			item.lengths.commandName,
+		maxPresetNameLength = Math.max(
+			maxPresetNameLength,
+			item.lengths.presetName,
 		);
 	});
 
 	// Simple column positioning
-	const commandNameColumn = maxBranchLength + MIN_COLUMN_PADDING;
-	const fileChangesColumn = commandNameColumn + maxCommandNameLength + MIN_COLUMN_PADDING;
+	const presetNameColumn = maxBranchLength + MIN_COLUMN_PADDING;
+	const fileChangesColumn = presetNameColumn + maxPresetNameLength + MIN_COLUMN_PADDING;
 	const aheadBehindColumn =
 		fileChangesColumn + maxFileChangesLength + MIN_COLUMN_PADDING + 2;
 	const parentBranchColumn =
 		aheadBehindColumn + maxAheadBehindLength + MIN_COLUMN_PADDING + 2;
 
 	return {
-		commandName: commandNameColumn,
+		presetName: presetNameColumn,
 		fileChanges: fileChangesColumn,
 		aheadBehind: aheadBehindColumn,
 		parentBranch: parentBranchColumn,
@@ -210,9 +212,9 @@ export function assembleWorktreeLabel(
 	let label = item.baseLabel;
 	let currentLength = item.lengths.base;
 
-	if (item.commandName) {
-		label = padTo(label, currentLength, columns.commandName) + item.commandName;
-		currentLength = columns.commandName + item.lengths.commandName;
+	if (item.presetName) {
+		label = padTo(label, currentLength, columns.presetName) + item.presetName;
+		currentLength = columns.presetName + item.lengths.presetName;
 	}
 	if (item.fileChanges) {
 		label = padTo(label, currentLength, columns.fileChanges) + item.fileChanges;

@@ -54,6 +54,14 @@ describe('SessionManager', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		
+		// Setup default preset mock
+		vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			id: 'default',
+			name: 'Default',
+			command: 'claude',
+		});
+		
 		sessionManager = new SessionManager();
 		mockPty = new MockPty();
 	});
