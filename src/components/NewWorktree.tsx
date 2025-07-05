@@ -78,7 +78,23 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
 		setBaseBranch(item.value);
-		setStep('copy-settings');
+
+		// Check if settings file exists in the base branch
+		const service = new WorktreeService();
+		if (service.hasSettingsFileInBranch(item.value)) {
+			setStep('copy-settings');
+		} else {
+			// Skip copy-settings step and complete with copySettings = false
+			if (isAutoDirectory) {
+				const autoPath = generateWorktreeDirectory(
+					branch,
+					worktreeConfig.autoDirectoryPattern,
+				);
+				onComplete(autoPath, branch, item.value, false);
+			} else {
+				onComplete(path, branch, item.value, false);
+			}
+		}
 	};
 
 	const handleCopySettingsSelect = (item: {label: string; value: boolean}) => {

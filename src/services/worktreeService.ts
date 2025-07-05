@@ -403,6 +403,46 @@ export class WorktreeService {
 		}
 	}
 
+	hasSettingsFileInBranch(branchName: string): boolean {
+		const settingsFileName = 'settings.local.json';
+		const claudeDir = '.claude';
+
+		// Find the worktree directory for the branch
+		const worktrees = this.getWorktrees();
+		let targetWorktree = worktrees.find(
+			wt => wt.branch && wt.branch.replace('refs/heads/', '') === branchName,
+		);
+
+		// If branch worktree not found, try the default branch
+		if (!targetWorktree) {
+			const defaultBranch = this.getDefaultBranch();
+			if (branchName === defaultBranch) {
+				targetWorktree = worktrees.find(
+					wt =>
+						wt.branch && wt.branch.replace('refs/heads/', '') === defaultBranch,
+				);
+			}
+		}
+
+		// If still not found and it's the default branch, try the main worktree
+		if (!targetWorktree && branchName === this.getDefaultBranch()) {
+			targetWorktree = worktrees.find(wt => wt.isMainWorktree);
+		}
+
+		if (!targetWorktree) {
+			return false;
+		}
+
+		// Check if settings file exists in the worktree
+		const settingsPath = path.join(
+			targetWorktree.path,
+			claudeDir,
+			settingsFileName,
+		);
+
+		return existsSync(settingsPath);
+	}
+
 	private copySettingsFromBaseBranch(
 		worktreePath: string,
 		baseBranch: string,
