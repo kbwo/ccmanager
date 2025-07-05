@@ -1,5 +1,5 @@
 import {execSync} from 'child_process';
-import {existsSync} from 'fs';
+import {existsSync, mkdirSync, copyFileSync} from 'fs';
 import path from 'path';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
@@ -191,6 +191,7 @@ export class WorktreeService {
 		worktreePath: string,
 		branch: string,
 		baseBranch: string,
+		copySettings: boolean = false,
 	): {success: boolean; error?: string} {
 		try {
 			// Resolve the worktree path relative to the git repository root
@@ -232,6 +233,15 @@ export class WorktreeService {
 					'Warning: Failed to set parent branch in worktree config:',
 					error,
 				);
+			}
+
+			// Copy settings.local.json if requested
+			if (copySettings) {
+				try {
+					this.copySettingsFromBaseBranch(resolvedPath, baseBranch);
+				} catch (error) {
+					console.error('Warning: Failed to copy settings.local.json:', error);
+				}
 			}
 
 			return {success: true};
@@ -391,5 +401,58 @@ export class WorktreeService {
 						: 'Failed to delete worktree by branch',
 			};
 		}
+	}
+
+	private copySettingsFromBaseBranch(
+		worktreePath: string,
+		baseBranch: string,
+	): void {
+		const settingsFileName = 'settings.local.json';
+		const claudeDir = '.claude';
+		// Find the worktree directory for the base branch
+		const worktrees = this.getWorktrees();
+		let baseWorktree = worktrees.find(
+			wt => wt.branch && wt.branch.replace('refs/heads/', '') === baseBranch,
+		);
+
+		// If base branch worktree not found, try the default branch
+		if (!baseWorktree) {
+			const defaultBranch = this.getDefaultBranch();
+			baseWorktree = worktrees.find(
+				wt =>
+					wt.branch && wt.branch.replace('refs/heads/', '') === defaultBranch,
+			);
+		}
+
+		// If still not found, try the main worktree
+		if (!baseWorktree) {
+			baseWorktree = worktrees.find(wt => wt.isMainWorktree);
+		}
+
+		if (!baseWorktree) {
+			throw new Error('Could not find base worktree to copy settings from');
+		}
+
+		// Check if settings file exists in base worktree
+		const sourceSettingsPath = path.join(
+			baseWorktree.path,
+			claudeDir,
+			settingsFileName,
+		);
+
+		if (!existsSync(sourceSettingsPath)) {
+			// No settings file to copy, this is fine
+			return;
+		}
+
+		// Create .claude directory in new worktree if it doesn't exist
+		const targetClaudeDir = path.join(worktreePath, claudeDir);
+		if (!existsSync(targetClaudeDir)) {
+			mkdirSync(targetClaudeDir, {recursive: true});
+		}
+
+		// Copy the settings file
+		const targetSettingsPath = path.join(targetClaudeDir, settingsFileName);
+		copyFileSync(sourceSettingsPath, targetSettingsPath);
 	}
 }
