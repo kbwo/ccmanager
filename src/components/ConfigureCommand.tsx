@@ -20,7 +20,14 @@ type EditField =
 
 const formatDetectionStrategy = (strategy: string | undefined): string => {
 	const value = strategy || 'claude';
-	return value === 'gemini' ? 'Gemini' : 'Claude';
+	switch (value) {
+		case 'gemini':
+			return 'Gemini';
+		case 'codex':
+			return 'Codex';
+		default:
+			return 'Claude';
+	}
 };
 
 const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
@@ -306,6 +313,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		const strategyItems = [
 			{label: 'Claude', value: 'claude'},
 			{label: 'Gemini', value: 'gemini'},
+			{label: 'Codex', value: 'codex'},
 		];
 
 		const currentStrategy = preset.detectionStrategy || 'claude';
@@ -397,6 +405,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			const strategyItems = [
 				{label: 'Claude', value: 'claude'},
 				{label: 'Gemini', value: 'gemini'},
+				{label: 'Codex', value: 'codex'},
 			];
 
 			return (
