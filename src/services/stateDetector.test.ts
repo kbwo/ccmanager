@@ -1,5 +1,9 @@
 import {describe, it, expect, beforeEach} from 'vitest';
-import {ClaudeStateDetector, GeminiStateDetector, CodexStateDetector} from './stateDetector.js';
+import {
+	ClaudeStateDetector,
+	GeminiStateDetector,
+	CodexStateDetector,
+} from './stateDetector.js';
 import type {Terminal} from '../types/index.js';
 
 describe('ClaudeStateDetector', () => {
@@ -329,11 +333,7 @@ describe('CodexStateDetector', () => {
 
 	it('should detect waiting_input state for │Allow pattern', () => {
 		// Arrange
-		terminal = createMockTerminal([
-			'Some output',
-			'│Allow execution?',
-			'│ > ',
-		]);
+		terminal = createMockTerminal(['Some output', '│Allow execution?', '│ > ']);
 
 		// Act
 		const state = detector.detectState(terminal);
@@ -344,11 +344,7 @@ describe('CodexStateDetector', () => {
 
 	it('should detect waiting_input state for [y/N] pattern', () => {
 		// Arrange
-		terminal = createMockTerminal([
-			'Some output',
-			'Continue? [y/N]',
-			'> ',
-		]);
+		terminal = createMockTerminal(['Some output', 'Continue? [y/N]', '> ']);
 
 		// Act
 		const state = detector.detectState(terminal);
@@ -403,11 +399,7 @@ describe('CodexStateDetector', () => {
 
 	it('should detect idle state when no patterns match', () => {
 		// Arrange
-		terminal = createMockTerminal([
-			'Normal output',
-			'Some message',
-			'Ready',
-		]);
+		terminal = createMockTerminal(['Normal output', 'Some message', 'Ready']);
 
 		// Act
 		const state = detector.detectState(terminal);
@@ -418,10 +410,7 @@ describe('CodexStateDetector', () => {
 
 	it('should prioritize waiting_input over busy', () => {
 		// Arrange
-		terminal = createMockTerminal([
-			'press esc to cancel',
-			'[y/N]',
-		]);
+		terminal = createMockTerminal(['press esc to cancel', '[y/N]']);
 
 		// Act
 		const state = detector.detectState(terminal);
