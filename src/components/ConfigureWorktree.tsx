@@ -24,6 +24,9 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	const [pattern, setPattern] = useState(
 		worktreeConfig.autoDirectoryPattern || '../{branch}',
 	);
+	const [copySessionData, setCopySessionData] = useState(
+		worktreeConfig.copySessionData ?? true,
+	);
 	const [editMode, setEditMode] = useState<EditMode>('menu');
 	const [tempPattern, setTempPattern] = useState(pattern);
 
@@ -46,6 +49,10 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			value: 'pattern',
 		},
 		{
+			label: `Copy Session Data: ${copySessionData ? '✅ Enabled' : '❌ Disabled'}`,
+			value: 'toggleCopy',
+		},
+		{
 			label: '💾 Save Changes',
 			value: 'save',
 		},
@@ -64,11 +71,15 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 				setTempPattern(pattern);
 				setEditMode('pattern');
 				break;
+			case 'toggleCopy':
+				setCopySessionData(!copySessionData);
+				break;
 			case 'save':
 				// Save the configuration
 				configurationManager.setWorktreeConfig({
 					autoDirectory,
 					autoDirectoryPattern: pattern,
+					copySessionData,
 				});
 				onComplete();
 				break;
@@ -130,7 +141,7 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			</Box>
 
 			<Box marginBottom={1}>
-				<Text dimColor>Configure automatic worktree directory generation</Text>
+				<Text dimColor>Configure worktree creation settings</Text>
 			</Box>
 
 			{autoDirectory && (
