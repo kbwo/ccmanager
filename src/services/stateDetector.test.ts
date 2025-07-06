@@ -1,5 +1,9 @@
 import {describe, it, expect, beforeEach} from 'vitest';
-import {ClaudeStateDetector, GeminiStateDetector} from './stateDetector.js';
+import {
+	ClaudeStateDetector,
+	GeminiStateDetector,
+	CodexStateDetector,
+} from './stateDetector.js';
 import type {Terminal} from '../types/index.js';
 
 describe('ClaudeStateDetector', () => {
@@ -297,5 +301,121 @@ describe('GeminiStateDetector', () => {
 			// Assert
 			expect(state).toBe('waiting_input'); // waiting_input should take precedence
 		});
+	});
+});
+
+describe('CodexStateDetector', () => {
+	let detector: CodexStateDetector;
+	let terminal: Terminal;
+
+	const createMockTerminal = (lines: string[]): Terminal => {
+		const buffer = {
+			length: lines.length,
+			active: {
+				length: lines.length,
+				getLine: (index: number) => {
+					if (index >= 0 && index < lines.length) {
+						return {
+							translateToString: () => lines[index],
+						};
+					}
+					return null;
+				},
+			},
+		};
+
+		return {buffer} as unknown as Terminal;
+	};
+
+	beforeEach(() => {
+		detector = new CodexStateDetector();
+	});
+
+	it('should detect waiting_input state for │Allow pattern', () => {
+		// Arrange
+		terminal = createMockTerminal(['Some output', '│Allow execution?', '│ > ']);
+
+		// Act
+		const state = detector.detectState(terminal);
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input state for [y/N] pattern', () => {
+		// Arrange
+		terminal = createMockTerminal(['Some output', 'Continue? [y/N]', '> ']);
+
+		// Act
+		const state = detector.detectState(terminal);
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input state for Press any key pattern', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Some output',
+			'Press any key to continue...',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal);
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect busy state for press esc pattern', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Processing...',
+			'press esc to cancel',
+			'Working...',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal);
+
+		// Assert
+		expect(state).toBe('busy');
+	});
+
+	it('should detect busy state for PRESS ESC (uppercase)', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Processing...',
+			'PRESS ESC to stop',
+			'Working...',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal);
+
+		// Assert
+		expect(state).toBe('busy');
+	});
+
+	it('should detect idle state when no patterns match', () => {
+		// Arrange
+		terminal = createMockTerminal(['Normal output', 'Some message', 'Ready']);
+
+		// Act
+		const state = detector.detectState(terminal);
+
+		// Assert
+		expect(state).toBe('idle');
+	});
+
+	it('should prioritize waiting_input over busy', () => {
+		// Arrange
+		terminal = createMockTerminal(['press esc to cancel', '[y/N]']);
+
+		// Act
+		const state = detector.detectState(terminal);
+
+		// Assert
+		expect(state).toBe('waiting_input');
 	});
 });

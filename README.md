@@ -2,7 +2,11 @@
 
 CCManager is a TUI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI) across Git worktrees.
 
-https://github.com/user-attachments/assets/a6d80e73-dc06-4ef8-849d-e3857f6c7024
+
+
+https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
+
+
 
 ## Features
 
@@ -52,13 +56,6 @@ $ npm start
 $ npx ccmanager
 ```
 
-## Environment Variables
-
-### CCMANAGER_CLAUDE_ARGS
-
-⚠️ **Deprecated in v0.1.9**: `CCMANAGER_CLAUDE_ARGS` is no longer supported. Please use the [Command Configuration](#command-configuration) feature instead.
-
-
 ## Keyboard Shortcuts
 
 ### Default Shortcuts
@@ -71,7 +68,7 @@ $ npx ccmanager
 You can customize keyboard shortcuts in two ways:
 
 1. **Through the UI**: Select "Configuration" → "Configure Shortcuts" from the main menu
-2. **Configuration file**: Edit `~/.config/ccmanager/config.json` (or legacy `~/.config/ccmanager/shortcuts.json`)
+2. **Configuration file**: Edit `~/.config/ccmanager/config.json`
 
 Example configuration:
 ```json
@@ -85,17 +82,6 @@ Example configuration:
     "cancel": {
       "key": "escape"
     }
-  }
-}
-
-// shortcuts.json (legacy format, still supported)
-{
-  "returnToMenu": {
-    "ctrl": true,
-    "key": "r"
-  },
-  "cancel": {
-    "key": "escape"
   }
 }
 ```
@@ -167,7 +153,33 @@ Status hooks allow you to:
 - Trigger automations based on session activity
 - Integrate with notification systems like [noti](https://github.com/variadico/noti)
 
-For detailed setup instructions, see [docs/state-hooks.md](docs/state-hooks.md).
+For detailed setup instructions, see [docs/state-hooks.md](docs/status-hooks.md).
+
+## Automatic Worktree Directory Generation
+
+CCManager can automatically generate worktree directory paths based on branch names, streamlining the worktree creation process.
+
+- **Auto-generate paths**: No need to manually specify directories
+- **Customizable patterns**: Use placeholders like `{branch}` in your pattern
+- **Smart sanitization**: Branch names are automatically made filesystem-safe
+
+For detailed configuration and examples, see [docs/worktree-auto-directory.md](docs/worktree-auto-directory.md).
+
+## Git Worktree Configuration
+
+CCManager can display enhanced git status information for each worktree when Git's worktree configuration extension is enabled.
+
+```bash
+# Enable enhanced status tracking
+git config extensions.worktreeConfig true
+```
+
+With this enabled, you'll see:
+- **File changes**: `+10 -5` (additions/deletions)
+- **Commit tracking**: `↑3 ↓1` (ahead/behind parent branch)
+- **Parent branch context**: Shows which branch the worktree was created from
+
+For complete setup instructions and troubleshooting, see [docs/git-worktree-config.md](docs/git-worktree-config.md).
 
 ## Development
 
