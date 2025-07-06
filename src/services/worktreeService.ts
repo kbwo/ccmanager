@@ -1,5 +1,5 @@
 import {execSync} from 'child_process';
-import {existsSync, mkdirSync, copyFileSync} from 'fs';
+import {existsSync, mkdirSync, readdirSync, statSync, copyFileSync} from 'fs';
 import path from 'path';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
@@ -191,7 +191,7 @@ export class WorktreeService {
 		worktreePath: string,
 		branch: string,
 		baseBranch: string,
-		copySettings: boolean = false,
+		copyClaudeDirectory: boolean = false,
 	): {success: boolean; error?: string} {
 		try {
 			// Resolve the worktree path relative to the git repository root
@@ -235,12 +235,12 @@ export class WorktreeService {
 				);
 			}
 
-			// Copy settings.local.json if requested
-			if (copySettings) {
+			// Copy .claude directory if requested
+			if (copyClaudeDirectory) {
 				try {
-					this.copySettingsFromBaseBranch(resolvedPath, baseBranch);
+					this.copyClaudeDirectoryFromBaseBranch(resolvedPath, baseBranch);
 				} catch (error) {
-					console.error('Warning: Failed to copy settings.local.json:', error);
+					console.error('Warning: Failed to copy .claude directory:', error);
 				}
 			}
 
@@ -403,8 +403,7 @@ export class WorktreeService {
 		}
 	}
 
-	hasSettingsFileInBranch(branchName: string): boolean {
-		const settingsFileName = 'settings.local.json';
+	hasClaudeDirectoryInBranch(branchName: string): boolean {
 		const claudeDir = '.claude';
 
 		// Find the worktree directory for the branch
@@ -433,21 +432,15 @@ export class WorktreeService {
 			return false;
 		}
 
-		// Check if settings file exists in the worktree
-		const settingsPath = path.join(
-			targetWorktree.path,
-			claudeDir,
-			settingsFileName,
-		);
-
-		return existsSync(settingsPath);
+		// Check if .claude directory exists in the worktree
+		const claudePath = path.join(targetWorktree.path, claudeDir);
+		return existsSync(claudePath) && statSync(claudePath).isDirectory();
 	}
 
-	private copySettingsFromBaseBranch(
+	private copyClaudeDirectoryFromBaseBranch(
 		worktreePath: string,
 		baseBranch: string,
 	): void {
-		const settingsFileName = 'settings.local.json';
 		const claudeDir = '.claude';
 		// Find the worktree directory for the base branch
 		const worktrees = this.getWorktrees();
@@ -473,26 +466,44 @@ export class WorktreeService {
 			throw new Error('Could not find base worktree to copy settings from');
 		}
 
-		// Check if settings file exists in base worktree
-		const sourceSettingsPath = path.join(
-			baseWorktree.path,
-			claudeDir,
-			settingsFileName,
-		);
+		// Check if .claude directory exists in base worktree
+		const sourceClaudeDir = path.join(baseWorktree.path, claudeDir);
 
-		if (!existsSync(sourceSettingsPath)) {
-			// No settings file to copy, this is fine
+		if (
+			!existsSync(sourceClaudeDir) ||
+			!statSync(sourceClaudeDir).isDirectory()
+		) {
+			// No .claude directory to copy, this is fine
 			return;
 		}
 
-		// Create .claude directory in new worktree if it doesn't exist
+		// Create .claude directory in new worktree
 		const targetClaudeDir = path.join(worktreePath, claudeDir);
-		if (!existsSync(targetClaudeDir)) {
-			mkdirSync(targetClaudeDir, {recursive: true});
+		this.copyDirectoryRecursive(sourceClaudeDir, targetClaudeDir);
+	}
+
+	private copyDirectoryRecursive(source: string, target: string): void {
+		// Create target directory if it doesn't exist
+		if (!existsSync(target)) {
+			mkdirSync(target, {recursive: true});
 		}
 
-		// Copy the settings file
-		const targetSettingsPath = path.join(targetClaudeDir, settingsFileName);
-		copyFileSync(sourceSettingsPath, targetSettingsPath);
+		// Read directory contents
+		const files = readdirSync(source);
+
+		// Copy each file/directory
+		for (const file of files) {
+			const sourcePath = path.join(source, file);
+			const targetPath = path.join(target, file);
+			const stat = statSync(sourcePath);
+
+			if (stat.isDirectory()) {
+				// Recursively copy subdirectories
+				this.copyDirectoryRecursive(sourcePath, targetPath);
+			} else {
+				// Copy file
+				copyFileSync(sourcePath, targetPath);
+			}
+		}
 	}
 }

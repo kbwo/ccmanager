@@ -12,7 +12,7 @@ interface NewWorktreeProps {
 		path: string,
 		branch: string,
 		baseBranch: string,
-		copySettings: boolean,
+		copyClaudeDirectory: boolean,
 	) => void;
 	onCancel: () => void;
 }
@@ -79,9 +79,9 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
 		setBaseBranch(item.value);
 
-		// Check if settings file exists in the base branch
+		// Check if .claude directory exists in the base branch
 		const service = new WorktreeService();
-		if (service.hasSettingsFileInBranch(item.value)) {
+		if (service.hasClaudeDirectoryInBranch(item.value)) {
 			setStep('copy-settings');
 		} else {
 			// Skip copy-settings step and complete with copySettings = false
@@ -203,14 +203,17 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
 						<Text>
-							Copy .claude/settings.local.json from base branch (
+							Copy .claude directory from base branch (
 							<Text color="cyan">{baseBranch}</Text>)?
 						</Text>
 					</Box>
 					<SelectInput
 						items={[
-							{label: 'Yes - Copy settings from base branch', value: true},
-							{label: 'No - Start with fresh settings', value: false},
+							{
+								label: 'Yes - Copy .claude directory from base branch',
+								value: true,
+							},
+							{label: 'No - Start without .claude directory', value: false},
 						]}
 						onSelect={handleCopySettingsSelect}
 						initialIndex={0}
