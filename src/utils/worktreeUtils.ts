@@ -106,7 +106,8 @@ export function prepareWorktreeItems(
 
 		// Get preset name from session (fallback to command if no preset name)
 		if (session) {
-			const displayName = session.presetName || session.commandConfig?.command || '';
+			const displayName =
+				session.presetName || session.commandConfig?.command || '';
 			if (displayName) {
 				presetName = `\x1b[36m[${displayName}]\x1b[0m`; // Cyan color for preset info
 			}
@@ -178,7 +179,8 @@ export function calculateColumnPositions(items: WorktreeItem[]) {
 
 	// Simple column positioning
 	const presetNameColumn = maxBranchLength + MIN_COLUMN_PADDING;
-	const fileChangesColumn = presetNameColumn + maxPresetNameLength + MIN_COLUMN_PADDING;
+	const fileChangesColumn =
+		presetNameColumn + maxPresetNameLength + MIN_COLUMN_PADDING;
 	const aheadBehindColumn =
 		fileChangesColumn + maxFileChangesLength + MIN_COLUMN_PADDING + 2;
 	const parentBranchColumn =
