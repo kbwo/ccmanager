@@ -4,6 +4,8 @@ import path from 'path';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 
+const CLAUDE_DIR = '.claude';
+
 export class WorktreeService {
 	private rootPath: string;
 	private gitRootPath: string;
@@ -404,8 +406,6 @@ export class WorktreeService {
 	}
 
 	hasClaudeDirectoryInBranch(branchName: string): boolean {
-		const claudeDir = '.claude';
-
 		// Find the worktree directory for the branch
 		const worktrees = this.getWorktrees();
 		let targetWorktree = worktrees.find(
@@ -433,7 +433,7 @@ export class WorktreeService {
 		}
 
 		// Check if .claude directory exists in the worktree
-		const claudePath = path.join(targetWorktree.path, claudeDir);
+		const claudePath = path.join(targetWorktree.path, CLAUDE_DIR);
 		return existsSync(claudePath) && statSync(claudePath).isDirectory();
 	}
 
@@ -441,7 +441,6 @@ export class WorktreeService {
 		worktreePath: string,
 		baseBranch: string,
 	): void {
-		const claudeDir = '.claude';
 		// Find the worktree directory for the base branch
 		const worktrees = this.getWorktrees();
 		let baseWorktree = worktrees.find(
@@ -467,7 +466,7 @@ export class WorktreeService {
 		}
 
 		// Check if .claude directory exists in base worktree
-		const sourceClaudeDir = path.join(baseWorktree.path, claudeDir);
+		const sourceClaudeDir = path.join(baseWorktree.path, CLAUDE_DIR);
 
 		if (
 			!existsSync(sourceClaudeDir) ||
@@ -478,7 +477,7 @@ export class WorktreeService {
 		}
 
 		// Copy .claude directory to new worktree
-		const targetClaudeDir = path.join(worktreePath, claudeDir);
+		const targetClaudeDir = path.join(worktreePath, CLAUDE_DIR);
 		cpSync(sourceClaudeDir, targetClaudeDir, {recursive: true});
 	}
 }
