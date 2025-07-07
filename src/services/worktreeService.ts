@@ -1,5 +1,5 @@
 import {execSync} from 'child_process';
-import {existsSync, mkdirSync, readdirSync, statSync, copyFileSync} from 'fs';
+import {existsSync, statSync, cpSync} from 'fs';
 import path from 'path';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
@@ -477,33 +477,8 @@ export class WorktreeService {
 			return;
 		}
 
-		// Create .claude directory in new worktree
+		// Copy .claude directory to new worktree
 		const targetClaudeDir = path.join(worktreePath, claudeDir);
-		this.copyDirectoryRecursive(sourceClaudeDir, targetClaudeDir);
-	}
-
-	private copyDirectoryRecursive(source: string, target: string): void {
-		// Create target directory if it doesn't exist
-		if (!existsSync(target)) {
-			mkdirSync(target, {recursive: true});
-		}
-
-		// Read directory contents
-		const files = readdirSync(source);
-
-		// Copy each file/directory
-		for (const file of files) {
-			const sourcePath = path.join(source, file);
-			const targetPath = path.join(target, file);
-			const stat = statSync(sourcePath);
-
-			if (stat.isDirectory()) {
-				// Recursively copy subdirectories
-				this.copyDirectoryRecursive(sourcePath, targetPath);
-			} else {
-				// Copy file
-				copyFileSync(sourcePath, targetPath);
-			}
-		}
+		cpSync(sourceClaudeDir, targetClaudeDir, {recursive: true});
 	}
 }
