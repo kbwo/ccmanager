@@ -45,15 +45,27 @@ Following Claude Code's philosophy, CCManager keeps things minimal and intuitive
 ## Install
 
 ```bash
-$ npm install
-$ npm run build
-$ npm start
+npm install -g ccmanager
+```
+
+Or for local development:
+
+```bash
+npm install
+npm run build
+npm start
 ```
 
 ## Usage
 
 ```bash
-$ npx ccmanager
+ccmanager
+```
+
+Or run without installing:
+
+```bash
+npx ccmanager
 ```
 
 ## Keyboard Shortcuts
