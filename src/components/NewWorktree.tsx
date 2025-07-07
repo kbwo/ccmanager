@@ -8,11 +8,16 @@ import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 
 interface NewWorktreeProps {
-	onComplete: (path: string, branch: string, baseBranch: string) => void;
+	onComplete: (
+		path: string,
+		branch: string,
+		baseBranch: string,
+		copyClaudeDirectory: boolean,
+	) => void;
 	onCancel: () => void;
 }
 
-type Step = 'path' | 'branch' | 'base-branch';
+type Step = 'path' | 'branch' | 'base-branch' | 'copy-settings';
 
 interface BranchItem {
 	label: string;
@@ -27,6 +32,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const [step, setStep] = useState<Step>(isAutoDirectory ? 'branch' : 'path');
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
+	const [baseBranch, setBaseBranch] = useState('');
 
 	// Initialize worktree service and load branches (memoized to avoid re-initialization)
 	const {branches, defaultBranch} = useMemo(() => {
@@ -71,15 +77,36 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	};
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
+		setBaseBranch(item.value);
+
+		// Check if .claude directory exists in the base branch
+		const service = new WorktreeService();
+		if (service.hasClaudeDirectoryInBranch(item.value)) {
+			setStep('copy-settings');
+		} else {
+			// Skip copy-settings step and complete with copySettings = false
+			if (isAutoDirectory) {
+				const autoPath = generateWorktreeDirectory(
+					branch,
+					worktreeConfig.autoDirectoryPattern,
+				);
+				onComplete(autoPath, branch, item.value, false);
+			} else {
+				onComplete(path, branch, item.value, false);
+			}
+		}
+	};
+
+	const handleCopySettingsSelect = (item: {label: string; value: boolean}) => {
 		if (isAutoDirectory) {
 			// Generate path from branch name
 			const autoPath = generateWorktreeDirectory(
 				branch,
 				worktreeConfig.autoDirectoryPattern,
 			);
-			onComplete(autoPath, branch, item.value);
+			onComplete(autoPath, branch, baseBranch, item.value);
 		} else {
-			onComplete(path, branch, item.value);
+			onComplete(path, branch, baseBranch, item.value);
 		}
 	};
 
@@ -168,6 +195,28 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 						onSelect={handleBaseBranchSelect}
 						initialIndex={0}
 						limit={10}
+					/>
+				</Box>
+			)}
+
+			{step === 'copy-settings' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>
+							Copy .claude directory from base branch (
+							<Text color="cyan">{baseBranch}</Text>)?
+						</Text>
+					</Box>
+					<SelectInput
+						items={[
+							{
+								label: 'Yes - Copy .claude directory from base branch',
+								value: true,
+							},
+							{label: 'No - Start without .claude directory', value: false},
+						]}
+						onSelect={handleCopySettingsSelect}
+						initialIndex={0}
 					/>
 				</Box>
 			)}

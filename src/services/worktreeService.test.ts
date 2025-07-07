@@ -1,9 +1,13 @@
 import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
+import {existsSync, statSync, Stats} from 'fs';
 
 // Mock child_process module
 vi.mock('child_process');
+
+// Mock fs module
+vi.mock('fs');
 
 // Mock worktreeConfigManager
 vi.mock('./worktreeConfigManager.js', () => ({
@@ -16,6 +20,8 @@ vi.mock('./worktreeConfigManager.js', () => ({
 
 // Get the mocked function with proper typing
 const mockedExecSync = vi.mocked(execSync);
+const mockedExistsSync = vi.mocked(existsSync);
+const mockedStatSync = vi.mocked(statSync);
 
 describe('WorktreeService', () => {
 	let service: WorktreeService;
@@ -202,6 +208,208 @@ origin/feature/test
 				'git worktree add -b "new-feature" "/path/to/worktree" "main"',
 				expect.any(Object),
 			);
+		});
+	});
+
+	describe('hasClaudeDirectoryInBranch', () => {
+		it('should return true when .claude directory exists in branch worktree', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature-branch
+HEAD efgh5678
+branch refs/heads/feature-branch
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockImplementation(path => {
+				return path === '/fake/path/feature-branch/.claude';
+			});
+
+			mockedStatSync.mockImplementation(
+				() =>
+					({
+						isDirectory: () => true,
+					}) as Stats,
+			);
+
+			const result = service.hasClaudeDirectoryInBranch('feature-branch');
+
+			expect(result).toBe(true);
+			expect(existsSync).toHaveBeenCalledWith(
+				'/fake/path/feature-branch/.claude',
+			);
+			expect(statSync).toHaveBeenCalledWith(
+				'/fake/path/feature-branch/.claude',
+			);
+		});
+
+		it('should return false when .claude directory does not exist', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature-branch
+HEAD efgh5678
+branch refs/heads/feature-branch
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockReturnValue(false);
+
+			const result = service.hasClaudeDirectoryInBranch('feature-branch');
+
+			expect(result).toBe(false);
+			expect(existsSync).toHaveBeenCalledWith(
+				'/fake/path/feature-branch/.claude',
+			);
+		});
+
+		it('should return false when .claude exists but is not a directory', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature-branch
+HEAD efgh5678
+branch refs/heads/feature-branch
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockReturnValue(true);
+			mockedStatSync.mockImplementation(
+				() =>
+					({
+						isDirectory: () => false,
+					}) as Stats,
+			);
+
+			const result = service.hasClaudeDirectoryInBranch('feature-branch');
+
+			expect(result).toBe(false);
+		});
+
+		it('should fallback to default branch when branch worktree not found', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+`;
+					}
+					if (cmd.includes('symbolic-ref')) {
+						return 'main\n';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockReturnValue(true);
+			mockedStatSync.mockImplementation(
+				() =>
+					({
+						isDirectory: () => true,
+					}) as Stats,
+			);
+
+			// When asking for main branch that doesn't have a separate worktree
+			const result = service.hasClaudeDirectoryInBranch('main');
+
+			expect(result).toBe(true);
+			expect(existsSync).toHaveBeenCalledWith('/fake/path/.claude');
+		});
+
+		it('should return false when branch not found in any worktree', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+`;
+					}
+					if (cmd.includes('symbolic-ref')) {
+						return 'main\n';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const result = service.hasClaudeDirectoryInBranch('non-existent-branch');
+
+			expect(result).toBe(false);
+		});
+
+		it('should check main worktree when branch is default branch', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/other-branch
+HEAD efgh5678
+branch refs/heads/other-branch
+`;
+					}
+					if (cmd.includes('symbolic-ref')) {
+						return 'main\n';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockReturnValue(true);
+			mockedStatSync.mockImplementation(
+				() =>
+					({
+						isDirectory: () => true,
+					}) as Stats,
+			);
+
+			const result = service.hasClaudeDirectoryInBranch('main');
+
+			expect(result).toBe(true);
+			expect(existsSync).toHaveBeenCalledWith('/fake/path/.claude');
 		});
 	});
 });
