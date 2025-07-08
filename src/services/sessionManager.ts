@@ -61,6 +61,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		const command = commandConfig.command || 'claude';
 		const args = commandConfig.args || [];
 
+		// Get default preset for display purposes
+		const defaultPreset = configurationManager.getDefaultPreset();
+
 		// Spawn the process with fallback support
 		const ptyProcess = await this.spawn(command, args, worktreePath);
 
@@ -83,6 +86,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			isPrimaryCommand: true,
 			commandConfig,
+			presetId: defaultPreset.id,
+			presetName: defaultPreset.name,
 			detectionStrategy: 'claude', // Default to claude for legacy method
 		};
 
@@ -169,6 +174,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			isPrimaryCommand,
 			commandConfig,
+			presetId: preset.id,
+			presetName: preset.name,
 			detectionStrategy: preset.detectionStrategy || 'claude',
 		};
 
