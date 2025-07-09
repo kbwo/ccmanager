@@ -69,7 +69,16 @@ export class ConfigurationManager {
 		if (!this.config.worktree) {
 			this.config.worktree = {
 				autoDirectory: false,
+				copySessionData: true,
 			};
+		}
+		if (
+			!Object.prototype.hasOwnProperty.call(
+				this.config.worktree,
+				'copySessionData',
+			)
+		) {
+			this.config.worktree.copySessionData = true;
 		}
 		if (!this.config.command) {
 			this.config.command = {
