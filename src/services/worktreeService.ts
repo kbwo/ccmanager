@@ -232,7 +232,7 @@ export class WorktreeService {
 			// Copy session data if requested
 			if (copySessionData) {
 				this.copyClaudeSessionData(this.rootPath, resolvedPath);
-      }
+			}
 
 			// Store the parent branch in worktree config
 			try {
@@ -412,7 +412,6 @@ export class WorktreeService {
 		}
 	}
 
-
 	private copyClaudeSessionData(
 		sourceWorktreePath: string,
 		targetWorktreePath: string,
@@ -469,7 +468,7 @@ export class WorktreeService {
 		const resolved = path.resolve(worktreePath);
 		// Handle both forward slashes (Linux/macOS) and backslashes (Windows)
 		return resolved.replace(/[/\\.]/g, '-');
-  }
+	}
 
 	hasClaudeDirectoryInBranch(branchName: string): boolean {
 		// Find the worktree directory for the branch
