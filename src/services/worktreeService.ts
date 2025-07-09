@@ -1,9 +1,11 @@
 import {execSync} from 'child_process';
-import {existsSync, mkdirSync, cpSync, readdirSync} from 'fs';
+import {existsSync, mkdirSync, statSync, cpSync, readdirSync} from 'fs';
 import path from 'path';
 import os from 'os';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
+
+const CLAUDE_DIR = '.claude';
 
 export class WorktreeService {
 	private rootPath: string;
@@ -193,6 +195,7 @@ export class WorktreeService {
 		branch: string,
 		baseBranch: string,
 		copySessionData = false,
+		copyClaudeDirectory: boolean = false,
 	): {success: boolean; error?: string} {
 		try {
 			// Resolve the worktree path relative to the git repository root
@@ -239,6 +242,15 @@ export class WorktreeService {
 					'Warning: Failed to set parent branch in worktree config:',
 					error,
 				);
+			}
+
+			// Copy .claude directory if requested
+			if (copyClaudeDirectory) {
+				try {
+					this.copyClaudeDirectoryFromBaseBranch(resolvedPath, baseBranch);
+				} catch (error) {
+					console.error('Warning: Failed to copy .claude directory:', error);
+				}
 			}
 
 			return {success: true};
@@ -400,6 +412,7 @@ export class WorktreeService {
 		}
 	}
 
+
 	private copyClaudeSessionData(
 		sourceWorktreePath: string,
 		targetWorktreePath: string,
@@ -456,5 +469,81 @@ export class WorktreeService {
 		const resolved = path.resolve(worktreePath);
 		// Handle both forward slashes (Linux/macOS) and backslashes (Windows)
 		return resolved.replace(/[/\\.]/g, '-');
+  }
+
+	hasClaudeDirectoryInBranch(branchName: string): boolean {
+		// Find the worktree directory for the branch
+		const worktrees = this.getWorktrees();
+		let targetWorktree = worktrees.find(
+			wt => wt.branch && wt.branch.replace('refs/heads/', '') === branchName,
+		);
+
+		// If branch worktree not found, try the default branch
+		if (!targetWorktree) {
+			const defaultBranch = this.getDefaultBranch();
+			if (branchName === defaultBranch) {
+				targetWorktree = worktrees.find(
+					wt =>
+						wt.branch && wt.branch.replace('refs/heads/', '') === defaultBranch,
+				);
+			}
+		}
+
+		// If still not found and it's the default branch, try the main worktree
+		if (!targetWorktree && branchName === this.getDefaultBranch()) {
+			targetWorktree = worktrees.find(wt => wt.isMainWorktree);
+		}
+
+		if (!targetWorktree) {
+			return false;
+		}
+
+		// Check if .claude directory exists in the worktree
+		const claudePath = path.join(targetWorktree.path, CLAUDE_DIR);
+		return existsSync(claudePath) && statSync(claudePath).isDirectory();
+	}
+
+	private copyClaudeDirectoryFromBaseBranch(
+		worktreePath: string,
+		baseBranch: string,
+	): void {
+		// Find the worktree directory for the base branch
+		const worktrees = this.getWorktrees();
+		let baseWorktree = worktrees.find(
+			wt => wt.branch && wt.branch.replace('refs/heads/', '') === baseBranch,
+		);
+
+		// If base branch worktree not found, try the default branch
+		if (!baseWorktree) {
+			const defaultBranch = this.getDefaultBranch();
+			baseWorktree = worktrees.find(
+				wt =>
+					wt.branch && wt.branch.replace('refs/heads/', '') === defaultBranch,
+			);
+		}
+
+		// If still not found, try the main worktree
+		if (!baseWorktree) {
+			baseWorktree = worktrees.find(wt => wt.isMainWorktree);
+		}
+
+		if (!baseWorktree) {
+			throw new Error('Could not find base worktree to copy settings from');
+		}
+
+		// Check if .claude directory exists in base worktree
+		const sourceClaudeDir = path.join(baseWorktree.path, CLAUDE_DIR);
+
+		if (
+			!existsSync(sourceClaudeDir) ||
+			!statSync(sourceClaudeDir).isDirectory()
+		) {
+			// No .claude directory to copy, this is fine
+			return;
+		}
+
+		// Copy .claude directory to new worktree
+		const targetClaudeDir = path.join(worktreePath, CLAUDE_DIR);
+		cpSync(sourceClaudeDir, targetClaudeDir, {recursive: true});
 	}
 }

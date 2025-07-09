@@ -12,12 +12,13 @@ interface NewWorktreeProps {
 		path: string,
 		branch: string,
 		baseBranch: string,
-		copySessionData: boolean,
+		copyClaudeDirectory: boolean,
+ 		copySessionData: boolean,
 	) => void;
 	onCancel: () => void;
 }
 
-type Step = 'path' | 'branch' | 'base-branch' | 'copy-session';
+type Step = 'path' | 'branch' | 'base-branch' | 'copy-settings' | 'copy-session';
 
 interface BranchItem {
 	label: string;
@@ -82,20 +83,33 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 		setStep('copy-session');
 	};
 
-	const handleCopySessionSelect = (item: {label: string; value: string}) => {
-		const shouldCopy = item.value === 'yes';
+	const handleCopySettingsSelect = (item: {label: string; value: boolean}) => {
 		if (isAutoDirectory) {
 			// Generate path from branch name
 			const autoPath = generateWorktreeDirectory(
 				branch,
 				worktreeConfig.autoDirectoryPattern,
 			);
-			onComplete(autoPath, branch, baseBranch, shouldCopy);
+			onComplete(autoPath, branch, baseBranch, item.value, copySessionData);
 		} else {
-			onComplete(path, branch, baseBranch, shouldCopy);
+			onComplete(path, branch, baseBranch, item.value, copySessionData);
 		}
 	};
 
+  const handleCopySessionSelect = (item: {label: string; value: boolean}) => {
+    const shouldCopy = item.value === 'yes';
+		if (isAutoDirectory) {
+			// Generate path from branch name
+			const autoPath = generateWorktreeDirectory(
+				branch,
+				worktreeConfig.autoDirectoryPattern,
+			);
+			onComplete(autoPath, branch, baseBranch, item.value, shouldCopy);
+		} else {
+			onComplete(path, branch, baseBranch, item.value, shouldCopy);
+		}
+	};
+  
 	// Calculate generated path for preview (memoized to avoid expensive recalculations)
 	const generatedPath = useMemo(() => {
 		return isAutoDirectory && branch
@@ -184,8 +198,30 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					/>
 				</Box>
 			)}
+      
+			{step === 'copy-settings' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>
+							Copy .claude directory from base branch (
+							<Text color="cyan">{baseBranch}</Text>)?
+						</Text>
+					</Box>
+					<SelectInput
+						items={[
+							{
+								label: 'Yes - Copy .claude directory from base branch',
+								value: true,
+							},
+							{label: 'No - Start without .claude directory', value: false},
+						]}
+						onSelect={handleCopySettingsSelect}
+						initialIndex={0}
+					/>
+				</Box>
+			)}
 
-			{step === 'copy-session' && (
+		  {step === 'copy-session' && (
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
 						<Text>Copy Claude Code session data to the new worktree?</Text>
@@ -206,7 +242,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					/>
 				</Box>
 			)}
-
+  
 			<Box marginTop={1}>
 				<Text dimColor>
 					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel

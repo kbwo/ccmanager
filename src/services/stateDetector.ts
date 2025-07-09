@@ -16,6 +16,8 @@ export function createStateDetector(
 			return new ClaudeStateDetector();
 		case 'gemini':
 			return new GeminiStateDetector();
+		case 'codex':
+			return new CodexStateDetector();
 		default:
 			return new ClaudeStateDetector();
 	}
@@ -94,6 +96,30 @@ export class GeminiStateDetector extends BaseStateDetector {
 
 		// Check for busy state
 		if (lowerContent.includes('esc to cancel')) {
+			return 'busy';
+		}
+
+		// Otherwise idle
+		return 'idle';
+	}
+}
+
+export class CodexStateDetector extends BaseStateDetector {
+	detectState(terminal: Terminal): SessionState {
+		const content = this.getTerminalContent(terminal);
+		const lowerContent = content.toLowerCase();
+
+		// Check for waiting prompts
+		if (
+			content.includes('│Allow') ||
+			content.includes('[y/N]') ||
+			content.includes('Press any key')
+		) {
+			return 'waiting_input';
+		}
+
+		// Check for busy state
+		if (lowerContent.includes('press esc')) {
 			return 'busy';
 		}
 

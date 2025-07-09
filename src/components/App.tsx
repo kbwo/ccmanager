@@ -180,6 +180,7 @@ const App: React.FC = () => {
 		branch: string,
 		baseBranch: string,
 		copySessionData: boolean,
+		copyClaudeDirectory: boolean,
 	) => {
 		setView('creating-worktree');
 		setError(null);
@@ -190,6 +191,7 @@ const App: React.FC = () => {
 			branch,
 			baseBranch,
 			copySessionData,
+			copyClaudeDirectory,
 		);
 
 		if (result.success) {
