@@ -173,7 +173,7 @@ CCManager supports running AI assistant sessions inside devcontainers while keep
 
 - **Host-based management**: CCManager runs on your host machine, managing sessions inside containers
 - **Seamless integration**: All existing features (presets, status hooks, etc.) work with devcontainers
-- **Security-focused**: Devcontainer configuration includes network restrictions for safe AI usage
+- **Security-focused**: Compatible with Anthropic's recommended devcontainer configurations
 - **Persistent state**: Configuration and history persist across container recreations
 
 ### Usage
@@ -192,7 +192,7 @@ The devcontainer integration requires both commands:
 
 - **Isolated environments**: Each project can have its own dependencies and tools
 - **Host notifications**: Status hooks run on the host, enabling desktop notifications
-- **Network security**: Built-in firewall configuration restricts network access
+- **Network security**: Works with network-restricted containers per Anthropic's guidelines
 - **Consistent setup**: Share devcontainer configurations across teams
 - **Safe experimentation**: Run commands like `claude --dangerously-skip-permissions` without risk
 

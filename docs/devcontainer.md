@@ -48,34 +48,16 @@ Both arguments accept any valid devcontainer commands with any options or argume
 - **Flexibility**: Mix and match different tool versions per project
 - **Risk-free Operations**: Safely run commands like `claude --dangerously-skip-permissions` within isolated container environments
 
-## Example Devcontainer Configuration
+## Devcontainer Configuration
 
-CCManager includes a sample devcontainer configuration optimized for AI assistant usage:
+For optimal devcontainer setup with Claude Code, refer to Anthropic's official documentation:
+[Development containers - Anthropic](https://docs.anthropic.com/en/docs/claude-code/devcontainer)
 
-```json
-{
-  "name": "Claude Code Sandbox",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
-  "runArgs": [
-    "--cap-add=NET_ADMIN",
-    "--cap-add=NET_RAW"
-  ],
-  "remoteUser": "node",
-  "postCreateCommand": "sudo /usr/local/bin/init-firewall.sh"
-}
-```
-
-### Key Features
-
-1. **Pre-installed Tools**: Node.js, git, Claude Code, and development utilities
-2. **Network Restrictions**: Firewall rules limiting access to:
-   - GitHub APIs
-   - npm registry
-   - Anthropic API endpoints
-   - Local host network
-3. **Persistent Storage**: Configuration and history preserved across container recreations
+This guide provides:
+- Recommended container configurations
+- Security best practices
+- Network restriction guidelines
+- Persistent storage setup
 
 ## Preset Support
 
@@ -83,9 +65,9 @@ All CCManager preset features work seamlessly with devcontainers:
 
 ```bash
 # The preset command and args are automatically passed to the container
-# If you have a preset "claude-opus" with args ["-m", "claude-3-opus"]
+# If you have a preset "claude-opus" with args ["--dangerously-skip-permissions", "-m", "claude-3-opus"]
 # CCManager will execute:
-# devcontainer exec --workspace-folder . -- claude -m claude-3-opus
+# devcontainer exec --workspace-folder . -- claude --dangerously-skip-permissions -m claude-3-opus
 ```
 
 ## Troubleshooting
@@ -100,10 +82,7 @@ Verify your devcontainer exec command works by testing it manually with a simple
 
 ### Network Issues in Container
 
-The included devcontainer configuration restricts network access. To modify allowed domains:
-1. Edit `.devcontainer/init-firewall.sh`
-2. Add domains to the allowed list
-3. Rebuild the container
+If using network restrictions based on Anthropic's devcontainer guide, you may need to modify allowed domains for your specific use case.
 
 ## Best Practices
 
