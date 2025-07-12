@@ -226,6 +226,54 @@ await worktreeService.deleteWorktree(worktreePath, { force: true });
 await worktreeService.mergeWorktree(worktreePath, targetBranch);
 ```
 
+### Devcontainer Integration
+
+CCManager supports running sessions inside devcontainers while maintaining host-level management:
+
+#### CLI Arguments
+```bash
+npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." \
+              --devc-exec-command "devcontainer exec --workspace-folder ."
+```
+
+Both arguments must be provided together:
+- `--devc-up-command`: Command to start the devcontainer
+- `--devc-exec-command`: Command to execute inside the container
+
+#### Implementation
+```typescript
+// Create session with devcontainer support
+await sessionManager.createSessionWithDevcontainer(
+  worktreePath,
+  {
+    upCommand: 'devcontainer up --workspace-folder .',
+    execCommand: 'devcontainer exec --workspace-folder .'
+  },
+  presetId // optional
+);
+```
+
+The implementation:
+1. Executes the up command to start the container
+2. Parses the exec command to extract arguments
+3. Appends preset command with `--` separator
+4. Spawns PTY process inside the container
+
+#### Testing Devcontainer Features
+```typescript
+// Mock devcontainer commands
+const devcontainerConfig: DevcontainerConfig = {
+  upCommand: 'devcontainer up --workspace-folder .',
+  execCommand: 'devcontainer exec --workspace-folder .'
+};
+
+// Test session creation
+await sessionManager.createSessionWithDevcontainer(
+  '/test/worktree',
+  devcontainerConfig
+);
+```
+
 ## Common Issues
 
 ### PTY Compatibility
@@ -268,6 +316,7 @@ await worktreeService.mergeWorktree(worktreePath, targetBranch);
 - **Git Status Visualization**: Real-time display of file changes and ahead/behind counts
 - **Customizable Shortcuts**: Configure keyboard shortcuts via UI or JSON file
 - **Cross-Platform**: Works on Windows, macOS, and Linux
+- **Devcontainer Integration**: Run sessions inside containers while managing from host
 
 ### User Interface
 

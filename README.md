@@ -165,6 +165,38 @@ CCManager can automatically generate worktree directory paths based on branch na
 
 For detailed configuration and examples, see [docs/worktree-auto-directory.md](docs/worktree-auto-directory.md).
 
+## Devcontainer Integration
+
+CCManager supports running AI assistant sessions inside devcontainers while keeping the manager itself on the host machine. This enables sandboxed development environments with restricted network access while maintaining host-level notifications and automation.
+
+### Features
+
+- **Host-based management**: CCManager runs on your host machine, managing sessions inside containers
+- **Seamless integration**: All existing features (presets, status hooks, etc.) work with devcontainers
+- **Security-focused**: Devcontainer configuration includes network restrictions for safe AI usage
+- **Persistent state**: Configuration and history persist across container recreations
+
+### Usage
+
+```bash
+# Start CCManager with devcontainer support
+npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." \
+              --devc-exec-command "devcontainer exec --workspace-folder ."
+```
+
+The devcontainer integration requires both commands:
+- `--devc-up-command`: Command to start the devcontainer
+- `--devc-exec-command`: Command to execute commands inside the container
+
+### Benefits
+
+- **Isolated environments**: Each project can have its own dependencies and tools
+- **Host notifications**: Status hooks run on the host, enabling desktop notifications
+- **Network security**: Built-in firewall configuration restricts network access
+- **Consistent setup**: Share devcontainer configurations across teams
+
+For detailed setup and configuration, see [docs/devcontainer.md](docs/devcontainer.md).
+
 ## Git Worktree Configuration
 
 CCManager can display enhanced git status information for each worktree when Git's worktree configuration extension is enabled.
