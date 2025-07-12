@@ -3,14 +3,17 @@ import {
 	Session,
 	SessionManager as ISessionManager,
 	SessionState,
+	DevcontainerConfig,
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
 import {exec} from 'child_process';
+import {promisify} from 'util';
 import {configurationManager} from './configurationManager.js';
 import {WorktreeService} from './worktreeService.js';
 import {createStateDetector} from './stateDetector.js';
 const {Terminal} = pkg;
+const execAsync = promisify(exec);
 
 export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
@@ -364,6 +367,93 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				},
 			);
 		}
+	}
+
+	async createSessionWithDevcontainer(
+		worktreePath: string,
+		devcontainerConfig: DevcontainerConfig,
+		presetId?: string,
+	): Promise<Session> {
+		// Check if session already exists
+		const existing = this.sessions.get(worktreePath);
+		if (existing) {
+			return existing;
+		}
+
+		// Execute devcontainer up command first
+		try {
+			await execAsync(devcontainerConfig.upCommand, {cwd: worktreePath});
+		} catch (error) {
+			throw new Error(
+				`Failed to start devcontainer: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+
+		const id = `session-${Date.now()}-${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
+
+		// Get preset configuration
+		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
+		if (!preset) {
+			preset = configurationManager.getDefaultPreset();
+		}
+
+		// Parse the exec command to extract arguments
+		const execParts = devcontainerConfig.execCommand.split(/\s+/);
+		const devcontainerCmd = execParts[0] || 'devcontainer'; // Should be 'devcontainer'
+		const execArgs = execParts.slice(1); // Rest of the exec command args
+
+		// Build the full command: devcontainer exec [args] -- [preset command] [preset args]
+		const fullArgs = [
+			...execArgs,
+			'--',
+			preset.command,
+			...(preset.args || []),
+		];
+
+		// Spawn the process within devcontainer
+		const ptyProcess = await this.spawn(
+			devcontainerCmd,
+			fullArgs,
+			worktreePath,
+		);
+
+		// Create virtual terminal for state detection
+		const terminal = new Terminal({
+			cols: process.stdout.columns || 80,
+			rows: process.stdout.rows || 24,
+			allowProposedApi: true,
+		});
+
+		const session: Session = {
+			id,
+			worktreePath,
+			process: ptyProcess,
+			state: 'busy', // Session starts as busy when created
+			output: [],
+			outputHistory: [],
+			lastActivity: new Date(),
+			isActive: false,
+			terminal,
+			isPrimaryCommand: true,
+			commandConfig: {
+				command: preset.command,
+				args: preset.args,
+				fallbackArgs: preset.fallbackArgs,
+			},
+			detectionStrategy: preset.detectionStrategy || 'claude',
+			devcontainerConfig,
+		};
+
+		// Set up persistent background data handler for state detection
+		this.setupBackgroundHandler(session);
+
+		this.sessions.set(worktreePath, session);
+
+		this.emit('sessionCreated', session);
+
+		return session;
 	}
 
 	destroy(): void {
