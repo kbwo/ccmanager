@@ -240,6 +240,26 @@ Both arguments must be provided together and accept any valid commands/options:
 - `--devc-up-command`: Any command to start the devcontainer
 - `--devc-exec-command`: Any command to execute inside the container
 
+#### Design Rationale: Why Full Command Flexibility?
+
+The decision to accept complete commands rather than just arguments was deliberate:
+
+1. **Tool Agnostic**: Not everyone uses the `devcontainer` CLI directly. Some may use:
+   - `mise exec devcontainer up` for version management
+   - Custom wrapper scripts
+   - Alternative container management tools
+
+2. **Command Variations**: Different workflows require different commands:
+   - `devcontainer up` vs `devcontainer set-up` for different initialization strategies
+   - Custom scripts that handle pre/post container setup
+
+3. **User Control**: While the full command can be lengthy, users can:
+   - Create shell aliases for frequently used commands
+   - Use shell scripts to wrap complex command sequences
+   - Maintain their existing workflow without CCManager dictating the approach
+
+This design ensures CCManager remains a flexible tool that adapts to users' existing workflows rather than forcing a specific approach.
+
 #### Implementation
 ```typescript
 // Create session with devcontainer support

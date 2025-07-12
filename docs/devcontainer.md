@@ -25,6 +25,19 @@ npx ccmanager --devc-up-command "<your devcontainer up command>" \
 
 Both arguments accept any valid devcontainer commands with any options or arguments you need. The commands are executed as-is, giving you full flexibility to customize based on your project's requirements.
 
+### Why Full Commands Instead of Just Arguments?
+
+CCManager accepts complete commands (not just arguments) for maximum flexibility:
+
+- **Alternative tools**: Use `mise exec devcontainer up` or other wrapper tools
+- **Command variations**: Choose between `devcontainer up` or `devcontainer set-up` based on your needs  
+- **Custom workflows**: Integrate with your existing scripts and aliases
+
+If the command length bothers you, simply create a shell alias:
+```bash
+alias ccm-dev='npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." --devc-exec-command "devcontainer exec --workspace-folder ."'
+```
+
 ## How It Works
 
 1. **Container Startup**: When you select a worktree, CCManager executes the `--devc-up-command` to ensure the container is running
@@ -79,18 +92,3 @@ Test your devcontainer up command manually to ensure it works correctly.
 ### Session Creation Fails
 
 Verify your devcontainer exec command works by testing it manually with a simple command.
-
-### Network Issues in Container
-
-If using network restrictions based on Anthropic's devcontainer guide, you may need to modify allowed domains for your specific use case.
-
-## Best Practices
-
-1. **Consistent Commands**: Use the same devcontainer commands across your team
-2. **Version Control**: Include `.devcontainer` configuration in your repository
-3. **Resource Limits**: Set appropriate CPU/memory limits in devcontainer.json
-4. **Security**: Review and customize network restrictions for your needs
-
-## Integration with CI/CD
-
-The devcontainer integration can be used in CI/CD pipelines by providing appropriate devcontainer commands for your CI environment. This enables automated AI-assisted tasks in controlled container environments.
