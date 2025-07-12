@@ -232,13 +232,13 @@ CCManager supports running sessions inside devcontainers while maintaining host-
 
 #### CLI Arguments
 ```bash
-npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." \
-              --devc-exec-command "devcontainer exec --workspace-folder ."
+npx ccmanager --devc-up-command "<your devcontainer up command>" \
+              --devc-exec-command "<your devcontainer exec command>"
 ```
 
-Both arguments must be provided together:
-- `--devc-up-command`: Command to start the devcontainer
-- `--devc-exec-command`: Command to execute inside the container
+Both arguments must be provided together and accept any valid commands/options:
+- `--devc-up-command`: Any command to start the devcontainer
+- `--devc-exec-command`: Any command to execute inside the container
 
 #### Implementation
 ```typescript

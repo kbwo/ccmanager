@@ -18,26 +18,12 @@ The devcontainer integration allows you to:
 
 ## Usage
 
-### Basic Command
-
 ```bash
-npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." \
-              --devc-exec-command "devcontainer exec --workspace-folder ."
+npx ccmanager --devc-up-command "<your devcontainer up command>" \
+              --devc-exec-command "<your devcontainer exec command>"
 ```
 
-### Custom Workspace Paths
-
-```bash
-npx ccmanager --devc-up-command "devcontainer up --workspace-folder /path/to/project" \
-              --devc-exec-command "devcontainer exec --workspace-folder /path/to/project"
-```
-
-### With Additional Options
-
-```bash
-npx ccmanager --devc-up-command "devcontainer up --workspace-folder . --config .devcontainer/alternate.json" \
-              --devc-exec-command "devcontainer exec --workspace-folder . --user vscode"
-```
+Both arguments accept any valid devcontainer commands with any options or arguments you need. The commands are executed as-is, giving you full flexibility to customize based on your project's requirements.
 
 ## How It Works
 
@@ -60,6 +46,7 @@ npx ccmanager --devc-up-command "devcontainer up --workspace-folder . --config .
 - **Host Notifications**: Status hooks run on host, enabling desktop notifications
 - **Performance**: No need to install CCManager in every container
 - **Flexibility**: Mix and match different tool versions per project
+- **Risk-free Operations**: Safely run commands like `claude --dangerously-skip-permissions` within isolated container environments
 
 ## Example Devcontainer Configuration
 
@@ -105,19 +92,11 @@ All CCManager preset features work seamlessly with devcontainers:
 
 ### Container Fails to Start
 
-Check the devcontainer up command output:
-```bash
-# Test manually
-devcontainer up --workspace-folder .
-```
+Test your devcontainer up command manually to ensure it works correctly.
 
 ### Session Creation Fails
 
-Verify the exec command works:
-```bash
-# Test manually
-devcontainer exec --workspace-folder . -- claude --version
-```
+Verify your devcontainer exec command works by testing it manually with a simple command.
 
 ### Network Issues in Container
 
@@ -135,16 +114,4 @@ The included devcontainer configuration restricts network access. To modify allo
 
 ## Integration with CI/CD
 
-The devcontainer integration can be used in CI/CD pipelines:
-
-```yaml
-# Example GitHub Actions workflow
-- name: Start devcontainer
-  run: devcontainer up --workspace-folder .
-
-- name: Run CCManager session
-  run: |
-    npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." \
-                  --devc-exec-command "devcontainer exec --workspace-folder ." \
-                  --auto-approve # hypothetical flag for CI
-```
+The devcontainer integration can be used in CI/CD pipelines by providing appropriate devcontainer commands for your CI environment. This enables automated AI-assisted tasks in controlled container environments.

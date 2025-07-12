@@ -180,13 +180,13 @@ CCManager supports running AI assistant sessions inside devcontainers while keep
 
 ```bash
 # Start CCManager with devcontainer support
-npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." \
-              --devc-exec-command "devcontainer exec --workspace-folder ."
+npx ccmanager --devc-up-command "<your devcontainer up command>" \
+              --devc-exec-command "<your devcontainer exec command>"
 ```
 
 The devcontainer integration requires both commands:
-- `--devc-up-command`: Command to start the devcontainer
-- `--devc-exec-command`: Command to execute commands inside the container
+- `--devc-up-command`: Any command to start the devcontainer
+- `--devc-exec-command`: Any command to execute inside the container
 
 ### Benefits
 
@@ -194,6 +194,7 @@ The devcontainer integration requires both commands:
 - **Host notifications**: Status hooks run on the host, enabling desktop notifications
 - **Network security**: Built-in firewall configuration restricts network access
 - **Consistent setup**: Share devcontainer configurations across teams
+- **Safe experimentation**: Run commands like `claude --dangerously-skip-permissions` without risk
 
 For detailed setup and configuration, see [docs/devcontainer.md](docs/devcontainer.md).
 
