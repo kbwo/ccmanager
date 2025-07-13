@@ -36,7 +36,6 @@ export interface Session {
 
 export interface SessionManager {
 	sessions: Map<string, Session>;
-	createSession(worktreePath: string): Promise<Session>;
 	getSession(worktreePath: string): Session | undefined;
 	destroySession(worktreePath: string): void;
 	getAllSessions(): Session[];

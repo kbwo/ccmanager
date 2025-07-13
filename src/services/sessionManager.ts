@@ -4,6 +4,7 @@ import {
 	SessionManager as ISessionManager,
 	SessionState,
 	DevcontainerConfig,
+	StateDetectionStrategy,
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
@@ -48,31 +49,34 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions = new Map();
 	}
 
-	async createSession(worktreePath: string): Promise<Session> {
-		// Check if session already exists
-		const existing = this.sessions.get(worktreePath);
-		if (existing) {
-			return existing;
-		}
+	private createSessionId(): string {
+		return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+	}
 
-		const id = `session-${Date.now()}-${Math.random()
-			.toString(36)
-			.substr(2, 9)}`;
-
-		// Get command configuration
-		const commandConfig = configurationManager.getCommandConfig();
-		const command = commandConfig.command || 'claude';
-		const args = commandConfig.args || [];
-
-		// Spawn the process with fallback support
-		const ptyProcess = await this.spawn(command, args, worktreePath);
-
-		// Create virtual terminal for state detection
-		const terminal = new Terminal({
+	private createTerminal(): pkg.Terminal {
+		return new Terminal({
 			cols: process.stdout.columns || 80,
 			rows: process.stdout.rows || 24,
 			allowProposedApi: true,
 		});
+	}
+
+	private async createSessionInternal(
+		worktreePath: string,
+		ptyProcess: IPty,
+		commandConfig: {
+			command: string;
+			args?: string[];
+			fallbackArgs?: string[];
+		},
+		options: {
+			isPrimaryCommand?: boolean;
+			detectionStrategy?: StateDetectionStrategy;
+			devcontainerConfig?: DevcontainerConfig;
+		} = {},
+	): Promise<Session> {
+		const id = this.createSessionId();
+		const terminal = this.createTerminal();
 
 		const session: Session = {
 			id,
@@ -84,9 +88,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
-			isPrimaryCommand: true,
+			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			commandConfig,
-			detectionStrategy: 'claude', // Default to claude for legacy method
+			detectionStrategy: options.detectionStrategy ?? 'claude',
+			devcontainerConfig: options.devcontainerConfig,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -108,10 +113,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (existing) {
 			return existing;
 		}
-
-		const id = `session-${Date.now()}-${Math.random()
-			.toString(36)
-			.substr(2, 9)}`;
 
 		// Get preset configuration
 		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
@@ -153,36 +154,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 		}
 
-		// Create virtual terminal for state detection
-		const terminal = new Terminal({
-			cols: process.stdout.columns || 80,
-			rows: process.stdout.rows || 24,
-			allowProposedApi: true,
-		});
-
-		const session: Session = {
-			id,
-			worktreePath,
-			process: ptyProcess,
-			state: 'busy', // Session starts as busy when created
-			output: [],
-			outputHistory: [],
-			lastActivity: new Date(),
-			isActive: false,
-			terminal,
+		return this.createSessionInternal(worktreePath, ptyProcess, commandConfig, {
 			isPrimaryCommand,
-			commandConfig,
-			detectionStrategy: preset.detectionStrategy || 'claude',
-		};
-
-		// Set up persistent background data handler for state detection
-		this.setupBackgroundHandler(session);
-
-		this.sessions.set(worktreePath, session);
-
-		this.emit('sessionCreated', session);
-
-		return session;
+			detectionStrategy: preset.detectionStrategy,
+		});
 	}
 
 	private setupDataHandler(session: Session): void {
@@ -389,10 +364,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			);
 		}
 
-		const id = `session-${Date.now()}-${Math.random()
-			.toString(36)
-			.substr(2, 9)}`;
-
 		// Get preset configuration
 		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
 		if (!preset) {
@@ -419,41 +390,17 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			worktreePath,
 		);
 
-		// Create virtual terminal for state detection
-		const terminal = new Terminal({
-			cols: process.stdout.columns || 80,
-			rows: process.stdout.rows || 24,
-			allowProposedApi: true,
-		});
-
-		const session: Session = {
-			id,
-			worktreePath,
-			process: ptyProcess,
-			state: 'busy', // Session starts as busy when created
-			output: [],
-			outputHistory: [],
-			lastActivity: new Date(),
-			isActive: false,
-			terminal,
-			isPrimaryCommand: true,
-			commandConfig: {
-				command: preset.command,
-				args: preset.args,
-				fallbackArgs: preset.fallbackArgs,
-			},
-			detectionStrategy: preset.detectionStrategy || 'claude',
-			devcontainerConfig,
+		const commandConfig = {
+			command: preset.command,
+			args: preset.args,
+			fallbackArgs: preset.fallbackArgs,
 		};
 
-		// Set up persistent background data handler for state detection
-		this.setupBackgroundHandler(session);
-
-		this.sessions.set(worktreePath, session);
-
-		this.emit('sessionCreated', session);
-
-		return session;
+		return this.createSessionInternal(worktreePath, ptyProcess, commandConfig, {
+			isPrimaryCommand: true,
+			detectionStrategy: preset.detectionStrategy,
+			devcontainerConfig,
+		});
 	}
 
 	destroy(): void {
