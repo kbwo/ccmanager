@@ -66,12 +66,6 @@ alias ccm-dev='npx ccmanager --devc-up-command "devcontainer up --workspace-fold
 For optimal devcontainer setup with Claude Code, refer to Anthropic's official documentation:
 [Development containers - Anthropic](https://docs.anthropic.com/en/docs/claude-code/devcontainer)
 
-This guide provides:
-- Recommended container configurations
-- Security best practices
-- Network restriction guidelines
-- Persistent storage setup
-
 ## Preset Support
 
 All CCManager preset features work seamlessly with devcontainers:
@@ -80,7 +74,7 @@ All CCManager preset features work seamlessly with devcontainers:
 # The preset command and args are automatically passed to the container
 # If you have a preset "claude-opus" with args ["--dangerously-skip-permissions", "-m", "claude-3-opus"]
 # CCManager will execute:
-# devcontainer exec --workspace-folder . -- claude --dangerously-skip-permissions -m claude-3-opus
+devcontainer exec --workspace-folder . -- claude --dangerously-skip-permissions -m claude-3-opus
 ```
 
 ## Troubleshooting

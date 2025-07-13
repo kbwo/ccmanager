@@ -190,10 +190,6 @@ The devcontainer integration requires both commands:
 
 ### Benefits
 
-- **Isolated environments**: Each project can have its own dependencies and tools
-- **Host notifications**: Status hooks run on the host, enabling desktop notifications
-- **Network security**: Works with network-restricted containers per Anthropic's guidelines
-- **Consistent setup**: Share devcontainer configurations across teams
 - **Safe experimentation**: Run commands like `claude --dangerously-skip-permissions` without risk
 
 For detailed setup and configuration, see [docs/devcontainer.md](docs/devcontainer.md).
