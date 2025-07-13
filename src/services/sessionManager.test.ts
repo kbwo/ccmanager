@@ -1,7 +1,7 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {spawn, IPty} from 'node-pty';
 import {EventEmitter} from 'events';
-import {Session} from '../types/index.js';
+import {Session, DevcontainerConfig} from '../types/index.js';
 import {exec} from 'child_process';
 
 // Mock node-pty
@@ -35,6 +35,11 @@ vi.mock('@xterm/headless', () => ({
 			write: vi.fn(),
 		})),
 	},
+}));
+
+// Mock worktreeService
+vi.mock('./worktreeService.js', () => ({
+	WorktreeService: vi.fn(),
 }));
 
 // Create a mock IPty class
@@ -593,6 +598,190 @@ describe('SessionManager', () => {
 					'claude',
 					'--model',
 					'opus',
+				],
+				expect.any(Object),
+			);
+		});
+
+		it('should spawn process with devcontainer exec command', async () => {
+			// Create a new session manager and reset mocks
+			vi.clearAllMocks();
+			sessionManager = new SessionManager();
+
+			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+				args: [],
+			});
+
+			// Setup spawn mock
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			type MockExecParams = Parameters<typeof exec>;
+			const mockExec = vi.mocked(exec);
+			mockExec.mockImplementation(
+				(
+					cmd: MockExecParams[0],
+					options: MockExecParams[1],
+					callback?: MockExecParams[2],
+				) => {
+					if (typeof options === 'function') {
+						callback = options as MockExecParams[2];
+						options = undefined;
+					}
+					if (callback && typeof callback === 'function') {
+						callback(null, 'Container started', '');
+					}
+					return {} as ReturnType<typeof exec>;
+				},
+			);
+
+			await sessionManager.createSessionWithDevcontainer('/test/worktree2', {
+				upCommand: 'devcontainer up --workspace-folder .',
+				execCommand: 'devcontainer exec --workspace-folder .',
+			});
+
+			// Should spawn with devcontainer exec command
+			expect(spawn).toHaveBeenCalledWith(
+				'devcontainer',
+				['exec', '--workspace-folder', '.', '--', 'claude'],
+				expect.objectContaining({
+					cwd: '/test/worktree2',
+				}),
+			);
+		});
+
+		it('should use preset with devcontainer', async () => {
+			type MockExecParams = Parameters<typeof exec>;
+			const mockExec = vi.mocked(exec);
+			mockExec.mockImplementation(
+				(
+					cmd: MockExecParams[0],
+					options: MockExecParams[1],
+					callback?: MockExecParams[2],
+				) => {
+					if (typeof options === 'function') {
+						callback = options as MockExecParams[2];
+						options = undefined;
+					}
+					if (callback && typeof callback === 'function') {
+						callback(null, 'Container started', '');
+					}
+					return {} as ReturnType<typeof exec>;
+				},
+			);
+
+			await sessionManager.createSessionWithDevcontainer(
+				'/test/worktree',
+				{
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				},
+				'custom-preset',
+			);
+
+			// Should call createSessionWithPreset internally
+			const session = sessionManager.getSession('/test/worktree');
+			expect(session).toBeDefined();
+			expect(session?.devcontainerConfig).toEqual({
+				upCommand: 'devcontainer up --workspace-folder .',
+				execCommand: 'devcontainer exec --workspace-folder .',
+			});
+		});
+
+		it('should parse exec command and append preset command', async () => {
+			type MockExecParams = Parameters<typeof exec>;
+			const mockExec = vi.mocked(exec);
+			mockExec.mockImplementation(
+				(
+					cmd: MockExecParams[0],
+					options: MockExecParams[1],
+					callback?: MockExecParams[2],
+				) => {
+					if (typeof options === 'function') {
+						callback = options as MockExecParams[2];
+						options = undefined;
+					}
+					if (callback && typeof callback === 'function') {
+						callback(null, 'Container started', '');
+					}
+					return {} as ReturnType<typeof exec>;
+				},
+			);
+
+			const config: DevcontainerConfig = {
+				upCommand: 'devcontainer up --workspace-folder /path/to/project',
+				execCommand:
+					'devcontainer exec --workspace-folder /path/to/project --user vscode',
+			};
+
+			await sessionManager.createSessionWithDevcontainer(
+				'/test/worktree',
+				config,
+			);
+
+			expect(spawn).toHaveBeenCalledWith(
+				'devcontainer',
+				[
+					'exec',
+					'--workspace-folder',
+					'/path/to/project',
+					'--user',
+					'vscode',
+					'--',
+					'claude',
+				],
+				expect.any(Object),
+			);
+		});
+
+		it('should handle preset with args in devcontainer', async () => {
+			type MockExecParams = Parameters<typeof exec>;
+			const mockExec = vi.mocked(exec);
+			mockExec.mockImplementation(
+				(
+					cmd: MockExecParams[0],
+					options: MockExecParams[1],
+					callback?: MockExecParams[2],
+				) => {
+					if (typeof options === 'function') {
+						callback = options as MockExecParams[2];
+						options = undefined;
+					}
+					if (callback && typeof callback === 'function') {
+						callback(null, 'Container started', '');
+					}
+					return {} as ReturnType<typeof exec>;
+				},
+			);
+
+			vi.mocked(configurationManager.getPresetById).mockReturnValue({
+				id: 'claude-with-args',
+				name: 'Claude with Args',
+				command: 'claude',
+				args: ['-m', 'claude-3-opus'],
+			});
+
+			await sessionManager.createSessionWithDevcontainer(
+				'/test/worktree',
+				{
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				},
+				'claude-with-args',
+			);
+
+			expect(spawn).toHaveBeenCalledWith(
+				'devcontainer',
+				[
+					'exec',
+					'--workspace-folder',
+					'.',
+					'--',
+					'claude',
+					'-m',
+					'claude-3-opus',
 				],
 				expect.any(Object),
 			);
