@@ -32,7 +32,6 @@ const App: React.FC = () => {
 	const [worktreeService] = useState(() => new WorktreeService());
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
@@ -48,7 +47,6 @@ const App: React.FC = () => {
 						setActiveSession(null);
 						setError(null);
 						setView('menu');
-						setMenuKey(prev => prev + 1);
 						if (process.stdout.isTTY) {
 							process.stdout.write('\x1B[2J\x1B[H');
 						}
@@ -147,7 +145,6 @@ const App: React.FC = () => {
 	const handlePresetSelectorCancel = () => {
 		setSelectedWorktree(null);
 		setView('menu');
-		setMenuKey(prev => prev + 1);
 	};
 
 	const handleReturnToMenu = () => {
@@ -157,7 +154,6 @@ const App: React.FC = () => {
 		// Add a small delay to ensure Session cleanup completes
 		setTimeout(() => {
 			setView('menu');
-			setMenuKey(prev => prev + 1); // Force menu refresh
 
 			// Clear the screen when returning to menu
 			if (process.stdout.isTTY) {
@@ -280,7 +276,6 @@ const App: React.FC = () => {
 	if (view === 'menu') {
 		return (
 			<Menu
-				key={menuKey}
 				sessionManager={sessionManager}
 				onSelectWorktree={handleSelectWorktree}
 			/>
