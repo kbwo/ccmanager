@@ -19,7 +19,7 @@ The devcontainer integration allows you to:
 ## Usage
 
 ```bash
-npx ccmanager --devc-up-command "<your devcontainer up command>" \
+ccmanager --devc-up-command "<your devcontainer up command>" \
               --devc-exec-command "<your devcontainer exec command>"
 ```
 
@@ -29,14 +29,11 @@ Both arguments accept any valid devcontainer commands with any options or argume
 
 CCManager accepts complete commands (not just arguments) for maximum flexibility:
 
-- **Alternative tools**: Use `mise exec devcontainer up` or other wrapper tools
+- **Alternative tools**: Use `mise exec` or other wrapper tools
 - **Command variations**: Choose between `devcontainer up` or `devcontainer set-up` based on your needs  
 - **Custom workflows**: Integrate with your existing scripts and aliases
 
 If the command length bothers you, simply create a shell alias:
-```bash
-alias ccm-dev='npx ccmanager --devc-up-command "devcontainer up --workspace-folder ." --devc-exec-command "devcontainer exec --workspace-folder ."'
-```
 
 ## How It Works
 

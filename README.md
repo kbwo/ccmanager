@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Command presets with automatic fallback support
 - Configurable state detection strategies for different CLI tools
 - Status change hooks for automation and notifications
+- Devcontainer integration
 
 ## Why CCManager over Claude Squad?
 
