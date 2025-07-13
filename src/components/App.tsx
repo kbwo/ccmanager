@@ -176,7 +176,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 
 	const handleReturnToMenu = () => {
 		setActiveSession(null);
-		setError(null);
+		// Don't clear error here - let user dismiss it manually
 
 		// Add a small delay to ensure Session cleanup completes
 		setTimeout(() => {
@@ -301,6 +301,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 				key={menuKey}
 				sessionManager={sessionManager}
 				onSelectWorktree={handleSelectWorktree}
+				error={error}
+				onDismissError={() => setError(null)}
 			/>
 		);
 	}
