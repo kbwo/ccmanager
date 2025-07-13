@@ -9,7 +9,11 @@ import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {Worktree, Session as SessionType} from '../types/index.js';
+import {
+	Worktree,
+	Session as SessionType,
+	DevcontainerConfig,
+} from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 
@@ -25,7 +29,11 @@ type View =
 	| 'configuration'
 	| 'preset-selector';
 
-const App: React.FC = () => {
+interface AppProps {
+	devcontainerConfig?: DevcontainerConfig;
+}
+
+const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>('menu');
 	const [sessionManager] = useState(() => new SessionManager());
@@ -114,7 +122,14 @@ const App: React.FC = () => {
 
 			try {
 				// Use preset-based session creation with default preset
-				session = await sessionManager.createSessionWithPreset(worktree.path);
+				if (devcontainerConfig) {
+					session = await sessionManager.createSessionWithDevcontainer(
+						worktree.path,
+						devcontainerConfig,
+					);
+				} else {
+					session = await sessionManager.createSessionWithPreset(worktree.path);
+				}
 			} catch (error) {
 				setError(`Failed to create session: ${error}`);
 				return;
@@ -130,10 +145,19 @@ const App: React.FC = () => {
 
 		try {
 			// Create session with selected preset
-			const session = await sessionManager.createSessionWithPreset(
-				selectedWorktree.path,
-				presetId,
-			);
+			let session: SessionType;
+			if (devcontainerConfig) {
+				session = await sessionManager.createSessionWithDevcontainer(
+					selectedWorktree.path,
+					devcontainerConfig,
+					presetId,
+				);
+			} else {
+				session = await sessionManager.createSessionWithPreset(
+					selectedWorktree.path,
+					presetId,
+				);
+			}
 			setActiveSession(session);
 			setView('session');
 			setSelectedWorktree(null);
@@ -152,7 +176,7 @@ const App: React.FC = () => {
 
 	const handleReturnToMenu = () => {
 		setActiveSession(null);
-		setError(null);
+		// Don't clear error here - let user dismiss it manually
 
 		// Add a small delay to ensure Session cleanup completes
 		setTimeout(() => {
@@ -283,6 +307,8 @@ const App: React.FC = () => {
 				key={menuKey}
 				sessionManager={sessionManager}
 				onSelectWorktree={handleSelectWorktree}
+				error={error}
+				onDismissError={() => setError(null)}
 			/>
 		);
 	}

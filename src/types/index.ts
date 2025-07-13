@@ -31,11 +31,11 @@ export interface Session {
 	isPrimaryCommand?: boolean; // Track if process was started with main command args
 	commandConfig?: CommandConfig; // Store command config for fallback
 	detectionStrategy?: StateDetectionStrategy; // State detection strategy for this session
+	devcontainerConfig?: DevcontainerConfig; // Devcontainer configuration if session runs in container
 }
 
 export interface SessionManager {
 	sessions: Map<string, Session>;
-	createSession(worktreePath: string): Promise<Session>;
 	getSession(worktreePath: string): Session | undefined;
 	destroySession(worktreePath: string): void;
 	getAllSessions(): Session[];
@@ -93,6 +93,11 @@ export interface CommandPresetsConfig {
 	presets: CommandPreset[]; // List of available presets
 	defaultPresetId: string; // ID of the default preset to use
 	selectPresetOnStart?: boolean; // Whether to show preset selector before starting session
+}
+
+export interface DevcontainerConfig {
+	upCommand: string; // Command to start devcontainer
+	execCommand: string; // Command to execute in devcontainer
 }
 
 export interface ConfigurationData {

@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Command presets with automatic fallback support
 - Configurable state detection strategies for different CLI tools
 - Status change hooks for automation and notifications
+- Devcontainer integration
 
 ## Why CCManager over Claude Squad?
 
@@ -176,6 +177,35 @@ CCManager can automatically generate worktree directory paths based on branch na
 - **Smart sanitization**: Branch names are automatically made filesystem-safe
 
 For detailed configuration and examples, see [docs/worktree-auto-directory.md](docs/worktree-auto-directory.md).
+
+## Devcontainer Integration
+
+CCManager supports running AI assistant sessions inside devcontainers while keeping the manager itself on the host machine. This enables sandboxed development environments with restricted network access while maintaining host-level notifications and automation.
+
+### Features
+
+- **Host-based management**: CCManager runs on your host machine, managing sessions inside containers
+- **Seamless integration**: All existing features (presets, status hooks, etc.) work with devcontainers
+- **Security-focused**: Compatible with Anthropic's recommended devcontainer configurations
+- **Persistent state**: Configuration and history persist across container recreations
+
+### Usage
+
+```bash
+# Start CCManager with devcontainer support
+npx ccmanager --devc-up-command "<your devcontainer up command>" \
+              --devc-exec-command "<your devcontainer exec command>"
+```
+
+The devcontainer integration requires both commands:
+- `--devc-up-command`: Any command to start the devcontainer
+- `--devc-exec-command`: Any command to execute inside the container
+
+### Benefits
+
+- **Safe experimentation**: Run commands like `claude --dangerously-skip-permissions` without risk
+
+For detailed setup and configuration, see [docs/devcontainer.md](docs/devcontainer.md).
 
 ## Git Worktree Configuration
 

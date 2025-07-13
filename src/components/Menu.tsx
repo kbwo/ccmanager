@@ -19,6 +19,8 @@ import {
 interface MenuProps {
 	sessionManager: SessionManager;
 	onSelectWorktree: (worktree: Worktree) => void;
+	error?: string | null;
+	onDismissError?: () => void;
 }
 
 interface MenuItem {
@@ -27,7 +29,12 @@ interface MenuItem {
 	worktree?: Worktree;
 }
 
-const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
+const Menu: React.FC<MenuProps> = ({
+	sessionManager,
+	onSelectWorktree,
+	error,
+	onDismissError,
+}) => {
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
 	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
@@ -116,6 +123,12 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 
 	// Handle hotkeys
 	useInput((input, _key) => {
+		// Dismiss error on any key press when error is shown
+		if (error && onDismissError) {
+			onDismissError();
+			return;
+		}
+
 		const keyPressed = input.toLowerCase();
 
 		// Handle number keys 0-9 for worktree selection (first 10 only)
@@ -239,7 +252,20 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 				</Text>
 			</Box>
 
-			<SelectInput items={items} onSelect={handleSelect} isFocused={true} />
+			<SelectInput items={items} onSelect={handleSelect} isFocused={!error} />
+
+			{error && (
+				<Box marginTop={1} paddingX={1} borderStyle="round" borderColor="red">
+					<Box flexDirection="column">
+						<Text color="red" bold>
+							Error: {error}
+						</Text>
+						<Text color="gray" dimColor>
+							Press any key to dismiss
+						</Text>
+					</Box>
+				</Box>
+			)}
 
 			<Box marginTop={1} flexDirection="column">
 				<Text dimColor>

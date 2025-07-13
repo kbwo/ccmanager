@@ -226,6 +226,74 @@ await worktreeService.deleteWorktree(worktreePath, { force: true });
 await worktreeService.mergeWorktree(worktreePath, targetBranch);
 ```
 
+### Devcontainer Integration
+
+CCManager supports running sessions inside devcontainers while maintaining host-level management:
+
+#### CLI Arguments
+```bash
+npx ccmanager --devc-up-command "<your devcontainer up command>" \
+              --devc-exec-command "<your devcontainer exec command>"
+```
+
+Both arguments must be provided together and accept any valid commands/options:
+- `--devc-up-command`: Any command to start the devcontainer
+- `--devc-exec-command`: Any command to execute inside the container
+
+#### Design Rationale: Why Full Command Flexibility?
+
+The decision to accept complete commands rather than just arguments was deliberate:
+
+1. **Tool Agnostic**: Not everyone uses the `devcontainer` CLI directly. Some may use:
+   - `mise exec devcontainer up` for version management
+   - Custom wrapper scripts
+   - Alternative container management tools
+
+2. **Command Variations**: Different workflows require different commands:
+   - `devcontainer up` vs `devcontainer set-up` for different initialization strategies
+   - Custom scripts that handle pre/post container setup
+
+3. **User Control**: While the full command can be lengthy, users can:
+   - Create shell aliases for frequently used commands
+   - Use shell scripts to wrap complex command sequences
+   - Maintain their existing workflow without CCManager dictating the approach
+
+This design ensures CCManager remains a flexible tool that adapts to users' existing workflows rather than forcing a specific approach.
+
+#### Implementation
+```typescript
+// Create session with devcontainer support
+await sessionManager.createSessionWithDevcontainer(
+  worktreePath,
+  {
+    upCommand: 'devcontainer up --workspace-folder .',
+    execCommand: 'devcontainer exec --workspace-folder .'
+  },
+  presetId // optional
+);
+```
+
+The implementation:
+1. Executes the up command to start the container
+2. Parses the exec command to extract arguments
+3. Appends preset command with `--` separator
+4. Spawns PTY process inside the container
+
+#### Testing Devcontainer Features
+```typescript
+// Mock devcontainer commands
+const devcontainerConfig: DevcontainerConfig = {
+  upCommand: 'devcontainer up --workspace-folder .',
+  execCommand: 'devcontainer exec --workspace-folder .'
+};
+
+// Test session creation
+await sessionManager.createSessionWithDevcontainer(
+  '/test/worktree',
+  devcontainerConfig
+);
+```
+
 ## Common Issues
 
 ### PTY Compatibility
@@ -268,6 +336,7 @@ await worktreeService.mergeWorktree(worktreePath, targetBranch);
 - **Git Status Visualization**: Real-time display of file changes and ahead/behind counts
 - **Customizable Shortcuts**: Configure keyboard shortcuts via UI or JSON file
 - **Cross-Platform**: Works on Windows, macOS, and Linux
+- **Devcontainer Integration**: Run sessions inside containers while managing from host
 
 ### User Interface
 
