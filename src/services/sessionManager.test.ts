@@ -153,7 +153,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledWith('claude', [], expect.any(Object));
 		});
 
-		it('should try fallback args with preset if main command fails', async () => {
+		it('should throw error when spawn fails with preset', async () => {
 			// Setup mock preset with fallback
 			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
 				id: '1',
@@ -163,31 +163,21 @@ describe('SessionManager', () => {
 				fallbackArgs: ['--good-flag'],
 			});
 
-			// Mock spawn to fail first, succeed second
-			let callCount = 0;
+			// Mock spawn to fail
 			vi.mocked(spawn).mockImplementation(() => {
-				callCount++;
-				if (callCount === 1) {
-					throw new Error('Command failed');
-				}
-				return mockPty as unknown as IPty;
+				throw new Error('Command failed');
 			});
 
-			// Create session
-			await sessionManager.createSessionWithPreset('/test/worktree');
+			// Expect createSessionWithPreset to throw
+			await expect(
+				sessionManager.createSessionWithPreset('/test/worktree'),
+			).rejects.toThrow('Command failed');
 
-			// Verify both attempts were made
-			expect(spawn).toHaveBeenCalledTimes(2);
-			expect(spawn).toHaveBeenNthCalledWith(
-				1,
+			// Verify only one spawn attempt was made
+			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledWith(
 				'claude',
 				['--bad-flag'],
-				expect.any(Object),
-			);
-			expect(spawn).toHaveBeenNthCalledWith(
-				2,
-				'claude',
-				['--good-flag'],
 				expect.any(Object),
 			);
 		});
@@ -313,6 +303,57 @@ describe('SessionManager', () => {
 				['--resume'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
+		});
+
+		it('should use empty args as fallback when no fallback args specified', async () => {
+			// Setup mock preset without fallback args
+			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+				args: ['--invalid-flag'],
+				// No fallbackArgs
+			});
+
+			// First spawn attempt - will exit with code 1
+			const firstMockPty = new MockPty();
+			// Second spawn attempt - succeeds
+			const secondMockPty = new MockPty();
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(firstMockPty as unknown as IPty)
+				.mockReturnValueOnce(secondMockPty as unknown as IPty);
+
+			// Create session
+			const session =
+				await sessionManager.createSessionWithPreset('/test/worktree');
+
+			// Verify initial spawn
+			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--invalid-flag'],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Simulate exit with code 1 on first attempt
+			firstMockPty.emit('exit', {exitCode: 1});
+
+			// Wait for fallback to occur
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Verify fallback spawn was called with empty args
+			expect(spawn).toHaveBeenCalledTimes(2);
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				'claude',
+				[], // Empty args
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Verify session process was replaced
+			expect(session.process).toBe(secondMockPty);
+			expect(session.isPrimaryCommand).toBe(false);
 		});
 
 		it('should handle custom command configuration', async () => {
@@ -785,6 +826,156 @@ describe('SessionManager', () => {
 				],
 				expect.any(Object),
 			);
+		});
+
+		it('should use empty args as fallback in devcontainer when no fallback args specified', async () => {
+			// Setup exec mock for devcontainer up
+			type MockExecParams = Parameters<typeof exec>;
+			const mockExec = vi.mocked(exec);
+			mockExec.mockImplementation(
+				(
+					cmd: MockExecParams[0],
+					options: MockExecParams[1],
+					callback?: MockExecParams[2],
+				) => {
+					if (typeof options === 'function') {
+						callback = options as MockExecParams[2];
+						options = undefined;
+					}
+					if (callback && typeof callback === 'function') {
+						callback(null, 'Container started', '');
+					}
+					return {} as ReturnType<typeof exec>;
+				},
+			);
+
+			// Setup preset without fallback args
+			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+				args: ['--invalid-flag'],
+				// No fallbackArgs
+			});
+
+			// First spawn attempt - will exit with code 1
+			const firstMockPty = new MockPty();
+			// Second spawn attempt - succeeds
+			const secondMockPty = new MockPty();
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(firstMockPty as unknown as IPty)
+				.mockReturnValueOnce(secondMockPty as unknown as IPty);
+
+			const session = await sessionManager.createSessionWithDevcontainer(
+				'/test/worktree',
+				{
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				},
+			);
+
+			// Verify initial spawn
+			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledWith(
+				'devcontainer',
+				['exec', '--workspace-folder', '.', '--', 'claude', '--invalid-flag'],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Simulate exit with code 1 on first attempt
+			firstMockPty.emit('exit', {exitCode: 1});
+
+			// Wait for fallback to occur
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Verify fallback spawn was called with empty args
+			expect(spawn).toHaveBeenCalledTimes(2);
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				'devcontainer',
+				['exec', '--workspace-folder', '.', '--', 'claude'], // No args after claude
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Verify session process was replaced
+			expect(session.process).toBe(secondMockPty);
+			expect(session.isPrimaryCommand).toBe(false);
+		});
+
+		it('should use fallback args in devcontainer when primary command exits with code 1', async () => {
+			// Setup exec mock for devcontainer up
+			type MockExecParams = Parameters<typeof exec>;
+			const mockExec = vi.mocked(exec);
+			mockExec.mockImplementation(
+				(
+					cmd: MockExecParams[0],
+					options: MockExecParams[1],
+					callback?: MockExecParams[2],
+				) => {
+					if (typeof options === 'function') {
+						callback = options as MockExecParams[2];
+						options = undefined;
+					}
+					if (callback && typeof callback === 'function') {
+						callback(null, 'Container started', '');
+					}
+					return {} as ReturnType<typeof exec>;
+				},
+			);
+
+			// Setup preset with fallback
+			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+				args: ['--bad-flag'],
+				fallbackArgs: ['--good-flag'],
+			});
+
+			// First spawn attempt - will exit with code 1
+			const firstMockPty = new MockPty();
+			// Second spawn attempt - succeeds
+			const secondMockPty = new MockPty();
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(firstMockPty as unknown as IPty)
+				.mockReturnValueOnce(secondMockPty as unknown as IPty);
+
+			const session = await sessionManager.createSessionWithDevcontainer(
+				'/test/worktree',
+				{
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				},
+			);
+
+			// Verify initial spawn
+			expect(spawn).toHaveBeenCalledTimes(1);
+			expect(spawn).toHaveBeenCalledWith(
+				'devcontainer',
+				['exec', '--workspace-folder', '.', '--', 'claude', '--bad-flag'],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Simulate exit with code 1 on first attempt
+			firstMockPty.emit('exit', {exitCode: 1});
+
+			// Wait for fallback to occur
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Verify fallback spawn was called
+			expect(spawn).toHaveBeenCalledTimes(2);
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				'devcontainer',
+				['exec', '--workspace-folder', '.', '--', 'claude', '--good-flag'],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+
+			// Verify session process was replaced
+			expect(session.process).toBe(secondMockPty);
+			expect(session.isPrimaryCommand).toBe(false);
 		});
 	});
 });

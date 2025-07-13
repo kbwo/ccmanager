@@ -128,34 +128,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			fallbackArgs: preset.fallbackArgs,
 		};
 
-		// Try to spawn the process
-		let ptyProcess: IPty;
-		let isPrimaryCommand = true;
-
-		try {
-			ptyProcess = await this.spawn(command, args, worktreePath);
-		} catch (error) {
-			// If primary command fails and we have fallback args, try them
-			if (preset.fallbackArgs) {
-				try {
-					ptyProcess = await this.spawn(
-						command,
-						preset.fallbackArgs,
-						worktreePath,
-					);
-					isPrimaryCommand = false;
-				} catch (_fallbackError) {
-					// Both attempts failed, throw the original error
-					throw error;
-				}
-			} else {
-				// No fallback args, throw the error
-				throw error;
-			}
-		}
+		// Spawn the process - fallback will be handled by setupExitHandler
+		const ptyProcess = await this.spawn(command, args, worktreePath);
 
 		return this.createSessionInternal(worktreePath, ptyProcess, commandConfig, {
-			isPrimaryCommand,
+			isPrimaryCommand: true,
 			detectionStrategy: preset.detectionStrategy,
 		});
 	}
@@ -192,17 +169,51 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		});
 	}
 
+	/**
+	 * Sets up exit handler for the session process.
+	 * When the process exits with code 1 and it's the primary command,
+	 * it will attempt to spawn a fallback process.
+	 * If fallbackArgs are configured, they will be used.
+	 * If no fallbackArgs are configured, the command will be retried with no arguments.
+	 */
 	private setupExitHandler(session: Session): void {
 		session.process.onExit(async (e: {exitCode: number; signal?: number}) => {
 			// Check if we should attempt fallback
 			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
 				try {
-					// Spawn fallback process
-					const fallbackProcess = await this.spawn(
-						session.commandConfig?.command || 'claude',
-						session.commandConfig?.fallbackArgs || [],
-						session.worktreePath,
-					);
+					let fallbackProcess: IPty;
+					// Use fallback args if available, otherwise use empty args
+					const fallbackArgs = session.commandConfig?.fallbackArgs || [];
+
+					// Check if we're in a devcontainer session
+					if (session.devcontainerConfig) {
+						// Parse the exec command to extract arguments
+						const execParts =
+							session.devcontainerConfig.execCommand.split(/\s+/);
+						const devcontainerCmd = execParts[0] || 'devcontainer';
+						const execArgs = execParts.slice(1);
+
+						// Build fallback command for devcontainer
+						const fallbackFullArgs = [
+							...execArgs,
+							'--',
+							session.commandConfig?.command || 'claude',
+							...fallbackArgs,
+						];
+
+						fallbackProcess = await this.spawn(
+							devcontainerCmd,
+							fallbackFullArgs,
+							session.worktreePath,
+						);
+					} else {
+						// Regular fallback without devcontainer
+						fallbackProcess = await this.spawn(
+							session.commandConfig?.command || 'claude',
+							fallbackArgs,
+							session.worktreePath,
+						);
+					}
 
 					// Replace the process
 					session.process = fallbackProcess;
@@ -383,7 +394,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			...(preset.args || []),
 		];
 
-		// Spawn the process within devcontainer
+		// Spawn the process within devcontainer - fallback will be handled by setupExitHandler
 		const ptyProcess = await this.spawn(
 			devcontainerCmd,
 			fullArgs,
