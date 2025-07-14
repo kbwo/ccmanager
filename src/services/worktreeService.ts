@@ -4,6 +4,8 @@ import path from 'path';
 import os from 'os';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
+import {getClaudeDir, getClaudeProjectsDir, pathToClaudeProjectName} from '../utils/claudeDir.js';
+import {logger} from '../utils/logger.js';
 
 const CLAUDE_DIR = '.claude';
 
@@ -417,21 +419,16 @@ export class WorktreeService {
 		targetWorktreePath: string,
 	): void {
 		try {
-			const claudeDir = path.join(os.homedir(), '.claude');
-			if (!existsSync(claudeDir)) {
-				return;
-			}
-
-			const projectsDir = path.join(claudeDir, 'projects');
+			const projectsDir = getClaudeProjectsDir();
 			if (!existsSync(projectsDir)) {
-				return;
+				throw new Error(`Claude projects directory does not exist: ${projectsDir}`);
 			}
 
 			// Convert paths to Claude's naming convention
 			const sourceProjectName =
-				this.pathToClaudeProjectName(sourceWorktreePath);
+				pathToClaudeProjectName(sourceWorktreePath);
 			const targetProjectName =
-				this.pathToClaudeProjectName(targetWorktreePath);
+				pathToClaudeProjectName(targetWorktreePath);
 
 			const sourceProjectDir = path.join(projectsDir, sourceProjectName);
 			const targetProjectDir = path.join(projectsDir, targetProjectName);
@@ -452,23 +449,16 @@ export class WorktreeService {
 						cpSync(sourcePath, targetPath, {recursive: true});
 					} catch (error) {
 						// Continue copying other files if one fails
-						console.warn(`Failed to copy ${file}: ${error}`);
+						logger.warn(`Failed to copy ${file}: ${error}`);
 					}
 				}
 			}
 		} catch (error) {
-			// Don't throw error for session data copying - it's optional
-			console.warn(`Failed to copy Claude session data: ${error}`);
+			logger.error(`Failed to copy Claude session data: ${error}`);
+			throw new Error(`Failed to copy Claude session data: ${error}`);
 		}
 	}
 
-	private pathToClaudeProjectName(worktreePath: string): string {
-		// Convert absolute path to Claude's project naming convention
-		// Claude replaces all path separators and dots with dashes
-		const resolved = path.resolve(worktreePath);
-		// Handle both forward slashes (Linux/macOS) and backslashes (Windows)
-		return resolved.replace(/[/\\.]/g, '-');
-	}
 
 	hasClaudeDirectoryInBranch(branchName: string): boolean {
 		// Find the worktree directory for the branch
