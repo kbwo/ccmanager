@@ -15,12 +15,10 @@ import {logger} from './logger.js';
  */
 export function getClaudeDir(): string {
 	const envConfigDir = process.env['CLAUDE_CONFIG_DIR'];
-	
 	if (envConfigDir) {
 		logger.info('Using CLAUDE_CONFIG_DIR:', envConfigDir);
 		return envConfigDir.trim();
 	}
-	
 	// Default to ~/.claude for backward compatibility and when not set
 	logger.info('CLAUDE_CONFIG_DIR not set, using default: ~/.claude');
 	return path.join(os.homedir(), '.claude');

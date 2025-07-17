@@ -1,10 +1,12 @@
 import {execSync} from 'child_process';
 import {existsSync, mkdirSync, statSync, cpSync, readdirSync} from 'fs';
 import path from 'path';
-import os from 'os';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
-import {getClaudeDir, getClaudeProjectsDir, pathToClaudeProjectName} from '../utils/claudeDir.js';
+import {
+	getClaudeProjectsDir,
+	pathToClaudeProjectName,
+} from '../utils/claudeDir.js';
 import {logger} from '../utils/logger.js';
 
 const CLAUDE_DIR = '.claude';
@@ -421,14 +423,14 @@ export class WorktreeService {
 		try {
 			const projectsDir = getClaudeProjectsDir();
 			if (!existsSync(projectsDir)) {
-				throw new Error(`Claude projects directory does not exist: ${projectsDir}`);
+				throw new Error(
+					`Claude projects directory does not exist: ${projectsDir}`,
+				);
 			}
 
 			// Convert paths to Claude's naming convention
-			const sourceProjectName =
-				pathToClaudeProjectName(sourceWorktreePath);
-			const targetProjectName =
-				pathToClaudeProjectName(targetWorktreePath);
+			const sourceProjectName = pathToClaudeProjectName(sourceWorktreePath);
+			const targetProjectName = pathToClaudeProjectName(targetWorktreePath);
 
 			const sourceProjectDir = path.join(projectsDir, sourceProjectName);
 			const targetProjectDir = path.join(projectsDir, targetProjectName);
@@ -458,7 +460,6 @@ export class WorktreeService {
 			throw new Error(`Failed to copy Claude session data: ${error}`);
 		}
 	}
-
 
 	hasClaudeDirectoryInBranch(branchName: string): boolean {
 		// Find the worktree directory for the branch
