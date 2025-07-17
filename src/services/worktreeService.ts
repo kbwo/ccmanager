@@ -1,5 +1,5 @@
 import {execSync} from 'child_process';
-import {existsSync, mkdirSync, statSync, cpSync, readdirSync} from 'fs';
+import {existsSync, statSync, cpSync} from 'fs';
 import path from 'path';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
@@ -437,22 +437,15 @@ export class WorktreeService {
 
 			// Only copy if source project exists
 			if (existsSync(sourceProjectDir)) {
-				// Create target directory if it doesn't exist
-				if (!existsSync(targetProjectDir)) {
-					mkdirSync(targetProjectDir, {recursive: true});
-				}
-
-				// Copy all files from source to target
-				const files = readdirSync(sourceProjectDir);
-				for (const file of files) {
-					const sourcePath = path.join(sourceProjectDir, file);
-					const targetPath = path.join(targetProjectDir, file);
-					try {
-						cpSync(sourcePath, targetPath, {recursive: true});
-					} catch (error) {
-						// Continue copying other files if one fails
-						logger.warn(`Failed to copy ${file}: ${error}`);
-					}
+				try {
+					cpSync(sourceProjectDir, targetProjectDir, {
+						recursive: true,
+						force: true,
+						errorOnExist: false,
+						preserveTimestamps: true,
+					});
+				} catch (error) {
+					logger.warn(`Failed to copy some files: ${error}`);
 				}
 			}
 		} catch (error) {
