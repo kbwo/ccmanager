@@ -297,7 +297,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			// SelectInput handles navigation and selection
 			return;
 		} else if (viewMode === 'delete-confirm') {
-			if (key.upArrow || key.downArrow) {
+			if (key.upArrow || input === 'k' || key.downArrow || input === 'j') {
 				setSelectedIndex(prev => (prev === 0 ? 1 : 0));
 			} else if (key.return) {
 				handleDeleteConfirm();
@@ -516,7 +516,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				</Box>
 
 				<Box marginTop={1}>
-					<Text dimColor>Press ↑↓ to navigate, Enter to confirm</Text>
+					<Text dimColor>Press ↑↓ or j/k to navigate, Enter to confirm</Text>
 				</Box>
 			</Box>
 		);

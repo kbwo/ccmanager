@@ -41,9 +41,9 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			return;
 		}
 
-		if (key.upArrow) {
+		if (key.upArrow || input === 'k') {
 			setFocusedIndex(prev => Math.max(0, prev - 1));
-		} else if (key.downArrow) {
+		} else if (key.downArrow || input === 'j') {
 			setFocusedIndex(prev => Math.min(worktrees.length - 1, prev + 1));
 		} else if (input === ' ') {
 			// Toggle selection
@@ -164,7 +164,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 
 			<Box marginTop={1} flexDirection="column">
 				<Text dimColor>
-					Controls: ↑↓ Navigate, Space Select, Enter Confirm,{' '}
+					Controls: ↑↓ or j/k Navigate, Space Select, Enter Confirm,{' '}
 					{shortcutManager.getShortcutDisplay('cancel')} Cancel
 				</Text>
 				{selectedIndices.size > 0 && (
