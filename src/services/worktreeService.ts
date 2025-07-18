@@ -3,6 +3,10 @@ import {existsSync, statSync, cpSync} from 'fs';
 import path from 'path';
 import {Worktree} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
+import {
+	getClaudeProjectsDir,
+	pathToClaudeProjectName,
+} from '../utils/claudeDir.js';
 
 const CLAUDE_DIR = '.claude';
 
@@ -193,6 +197,7 @@ export class WorktreeService {
 		worktreePath: string,
 		branch: string,
 		baseBranch: string,
+		copySessionData = false,
 		copyClaudeDirectory: boolean = false,
 	): {success: boolean; error?: string} {
 		try {
@@ -226,6 +231,11 @@ export class WorktreeService {
 				cwd: this.gitRootPath, // Execute from git root to ensure proper resolution
 				encoding: 'utf8',
 			});
+
+			// Copy session data if requested
+			if (copySessionData) {
+				this.copyClaudeSessionData(this.rootPath, resolvedPath);
+			}
 
 			// Store the parent branch in worktree config
 			try {
@@ -402,6 +412,40 @@ export class WorktreeService {
 						? error.message
 						: 'Failed to delete worktree by branch',
 			};
+		}
+	}
+
+	private copyClaudeSessionData(
+		sourceWorktreePath: string,
+		targetWorktreePath: string,
+	): void {
+		try {
+			const projectsDir = getClaudeProjectsDir();
+			if (!existsSync(projectsDir)) {
+				throw new Error(
+					`Claude projects directory does not exist: ${projectsDir}`,
+				);
+			}
+
+			// Convert paths to Claude's naming convention
+			const sourceProjectName = pathToClaudeProjectName(sourceWorktreePath);
+			const targetProjectName = pathToClaudeProjectName(targetWorktreePath);
+
+			const sourceProjectDir = path.join(projectsDir, sourceProjectName);
+			const targetProjectDir = path.join(projectsDir, targetProjectName);
+
+			// Only copy if source project exists
+			if (existsSync(sourceProjectDir)) {
+				cpSync(sourceProjectDir, targetProjectDir, {
+					recursive: true,
+					force: true,
+					errorOnExist: false,
+					preserveTimestamps: true,
+				});
+			}
+		} catch (error) {
+			console.error(`Failed to copy Claude session data: ${error}`);
+			throw new Error(`Failed to copy Claude session data: ${error}`);
 		}
 	}
 

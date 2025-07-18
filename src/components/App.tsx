@@ -203,6 +203,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 		path: string,
 		branch: string,
 		baseBranch: string,
+		copySessionData: boolean,
 		copyClaudeDirectory: boolean,
 	) => {
 		setView('creating-worktree');
@@ -213,6 +214,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 			path,
 			branch,
 			baseBranch,
+			copySessionData,
 			copyClaudeDirectory,
 		);
 

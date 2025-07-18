@@ -15,6 +15,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Switch between sessions seamlessly
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
+- **Copy Claude Code session data** between worktrees to maintain conversation context
 - Configurable keyboard shortcuts
 - Command presets with automatic fallback support
 - Configurable state detection strategies for different CLI tools
@@ -152,6 +153,41 @@ CCManager supports configuring the command and arguments used to run Claude Code
 4. Save changes
 
 For detailed configuration options and examples, see [docs/command-config.md](docs/command-config.md).
+
+
+## Session Data Copying
+
+CCManager can copy Claude Code session data (conversation history, context, and project state) when creating new worktrees, allowing you to maintain context across different branches.
+
+### Features
+
+- **Seamless Context Transfer**: Continue conversations in new worktrees without losing context
+- **Configurable Default**: Set whether to copy session data by default
+- **Per-Creation Choice**: Decide on each worktree creation whether to copy data
+- **Safe Operation**: Copying is non-fatal - worktree creation succeeds even if copying fails
+
+### How It Works
+
+When creating a new worktree, CCManager:
+1. Asks whether to copy session data from the current worktree
+2. Copies all session files from `~/.claude/projects/[source-path]` to `~/.claude/projects/[target-path]`
+3. Preserves conversation history, project context, and Claude Code state
+4. Allows immediate continuation of conversations in the new worktree
+
+### Configuration
+
+1. Navigate to **Configuration** → **Configure Worktree**
+2. Toggle **Copy Session Data** to set the default behavior
+3. Save changes
+
+The default choice (copy or start fresh) will be pre-selected when creating new worktrees.
+
+### Use Cases
+
+- **Feature Development**: Copy session data when creating feature branches to maintain project context
+- **Experimentation**: Start fresh when testing unrelated changes
+- **Collaboration**: Share session state across team worktrees
+- **Context Preservation**: Maintain long conversations across multiple development branches
 
 
 ## Status Change Hooks
