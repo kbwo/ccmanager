@@ -7,7 +7,6 @@ import {
 	getClaudeProjectsDir,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
-import {logger} from '../utils/logger.js';
 
 const CLAUDE_DIR = '.claude';
 
@@ -437,19 +436,15 @@ export class WorktreeService {
 
 			// Only copy if source project exists
 			if (existsSync(sourceProjectDir)) {
-				try {
-					cpSync(sourceProjectDir, targetProjectDir, {
-						recursive: true,
-						force: true,
-						errorOnExist: false,
-						preserveTimestamps: true,
-					});
-				} catch (error) {
-					logger.warn(`Failed to copy some files: ${error}`);
-				}
+				cpSync(sourceProjectDir, targetProjectDir, {
+					recursive: true,
+					force: true,
+					errorOnExist: false,
+					preserveTimestamps: true,
+				});
 			}
 		} catch (error) {
-			logger.error(`Failed to copy Claude session data: ${error}`);
+			console.error(`Failed to copy Claude session data: ${error}`);
 			throw new Error(`Failed to copy Claude session data: ${error}`);
 		}
 	}
