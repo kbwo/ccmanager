@@ -1,6 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
-import TextInput from 'ink-text-input';
+import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {StatusHookConfig, SessionState} from '../types/index.js';
@@ -137,7 +137,7 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 				</Box>
 
 				<Box marginBottom={1}>
-					<TextInput
+					<TextInputWrapper
 						value={currentCommand}
 						onChange={setCurrentCommand}
 						onSubmit={handleCommandSubmit}

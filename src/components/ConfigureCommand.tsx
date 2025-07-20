@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
-import TextInput from 'ink-text-input';
+import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
@@ -375,7 +375,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				)}
 
 				<Box>
-					<TextInput
+					<TextInputWrapper
 						value={inputValue}
 						onChange={setInputValue}
 						onSubmit={handleFieldUpdate}
@@ -460,7 +460,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				)}
 
 				<Box>
-					<TextInput
+					<TextInputWrapper
 						value={inputValue}
 						onChange={setInputValue}
 						onSubmit={handleAddPresetInput}
