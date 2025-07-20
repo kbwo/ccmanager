@@ -293,15 +293,13 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			return;
 		}
 
-		if (viewMode === 'list' || viewMode === 'edit') {
+		if (
+			viewMode === 'list' ||
+			viewMode === 'edit' ||
+			viewMode === 'delete-confirm'
+		) {
 			// SelectInput handles navigation and selection
 			return;
-		} else if (viewMode === 'delete-confirm') {
-			if (key.upArrow || key.downArrow) {
-				setSelectedIndex(prev => (prev === 0 ? 1 : 0));
-			} else if (key.return) {
-				handleDeleteConfirm();
-			}
 		}
 	});
 
@@ -490,6 +488,20 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	if (viewMode === 'delete-confirm') {
 		const preset = presets.find(p => p.id === selectedPresetId);
 
+		const confirmItems = [
+			{label: 'Yes, delete', value: 'yes'},
+			{label: 'Cancel', value: 'cancel'},
+		];
+
+		const handleConfirmSelect = (item: {value: string}) => {
+			if (item.value === 'yes') {
+				handleDeleteConfirm();
+			} else {
+				setViewMode('edit');
+				setSelectedIndex(6); // Return to delete option in edit menu
+			}
+		};
+
 		return (
 			<Box flexDirection="column">
 				<Box marginBottom={1}>
@@ -502,21 +514,35 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 					<Text>Delete preset &quot;{preset?.name}&quot;?</Text>
 				</Box>
 
-				<Box flexDirection="column">
-					<Box>
-						<Text color={selectedIndex === 0 ? 'red' : undefined}>
-							{selectedIndex === 0 ? '> ' : '  '}Yes, delete
+				<SelectInput
+					items={confirmItems}
+					onSelect={handleConfirmSelect}
+					initialIndex={1} // Default to Cancel
+					indicatorComponent={({isSelected}) => (
+						<Text color={isSelected ? 'red' : undefined}>
+							{isSelected ? '>' : ' '}
 						</Text>
-					</Box>
-					<Box>
-						<Text color={selectedIndex === 1 ? 'cyan' : undefined}>
-							{selectedIndex === 1 ? '> ' : '  '}Cancel
+					)}
+					itemComponent={({isSelected, label}) => (
+						<Text
+							color={
+								label === 'Yes, delete'
+									? isSelected
+										? 'red'
+										: undefined
+									: isSelected
+										? 'cyan'
+										: undefined
+							}
+							inverse={isSelected}
+						>
+							{label}
 						</Text>
-					</Box>
-				</Box>
+					)}
+				/>
 
 				<Box marginTop={1}>
-					<Text dimColor>Press ↑↓ to navigate, Enter to confirm</Text>
+					<Text dimColor>Press ↑↓/j/k to navigate, Enter to confirm</Text>
 				</Box>
 			</Box>
 		);

@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
+import SelectInput from 'ink-select-input';
 import {Worktree} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import DeleteConfirmation from './DeleteConfirmation.js';
@@ -18,9 +19,8 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
 		new Set(),
 	);
-	const [focusedIndex, setFocusedIndex] = useState(0);
 	const [confirmMode, setConfirmMode] = useState(false);
-	const VIEWPORT_SIZE = 10; // Maximum number of items to display at once
+	const [focusedIndex, setFocusedIndex] = useState(0);
 
 	useEffect(() => {
 		const worktreeService = new WorktreeService();
@@ -30,23 +30,33 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		setWorktrees(deletableWorktrees);
 	}, []);
 
-	useInput((input, key) => {
-		if (key.ctrl && input === 'c') {
-			onCancel();
-			return;
-		}
+	// Create menu items from worktrees
+	const menuItems = worktrees.map((worktree, index) => {
+		const branchName = worktree.branch
+			? worktree.branch.replace('refs/heads/', '')
+			: 'detached';
+		const isSelected = selectedIndices.has(index);
+		return {
+			label: `${isSelected ? '[✓]' : '[ ]'} ${branchName} (${worktree.path})`,
+			value: index.toString(),
+		};
+	});
 
+	const handleSelect = (item: {value: string}) => {
+		// Don't toggle on Enter - this will be used to confirm
+		// We'll handle Space key separately for toggling
+		const index = parseInt(item.value, 10);
+		setFocusedIndex(index);
+	};
+
+	useInput((input, key) => {
 		if (confirmMode) {
 			// Confirmation component handles input
 			return;
 		}
 
-		if (key.upArrow) {
-			setFocusedIndex(prev => Math.max(0, prev - 1));
-		} else if (key.downArrow) {
-			setFocusedIndex(prev => Math.min(worktrees.length - 1, prev + 1));
-		} else if (input === ' ') {
-			// Toggle selection
+		if (input === ' ') {
+			// Toggle selection on space
 			setSelectedIndices(prev => {
 				const newSet = new Set(prev);
 				if (newSet.has(focusedIndex)) {
@@ -56,10 +66,8 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				}
 				return newSet;
 			});
-		} else if (key.return) {
-			if (selectedIndices.size > 0) {
-				setConfirmMode(true);
-			}
+		} else if (key.return && selectedIndices.size > 0) {
+			setConfirmMode(true);
 		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
 		}
@@ -115,56 +123,37 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				</Text>
 			</Box>
 
-			{(() => {
-				// Calculate viewport window
-				const viewportStart = Math.max(
-					0,
-					Math.min(
-						focusedIndex - Math.floor(VIEWPORT_SIZE / 2),
-						worktrees.length - VIEWPORT_SIZE,
-					),
-				);
-				const viewportEnd = Math.min(
-					viewportStart + VIEWPORT_SIZE,
-					worktrees.length,
-				);
-				const visibleWorktrees = worktrees.slice(viewportStart, viewportEnd);
-
-				return (
-					<>
-						{viewportStart > 0 && (
-							<Text dimColor>↑ {viewportStart} more...</Text>
-						)}
-						{visibleWorktrees.map((worktree, relativeIndex) => {
-							const actualIndex = viewportStart + relativeIndex;
-							const isSelected = selectedIndices.has(actualIndex);
-							const isFocused = actualIndex === focusedIndex;
-							const branchName = worktree.branch
-								? worktree.branch.replace('refs/heads/', '')
-								: 'detached';
-
-							return (
-								<Box key={worktree.path}>
-									<Text
-										color={isFocused ? 'green' : undefined}
-										inverse={isFocused}
-										dimColor={!isFocused && !isSelected}
-									>
-										{isSelected ? '[✓]' : '[ ]'} {branchName} ({worktree.path})
-									</Text>
-								</Box>
-							);
-						})}
-						{viewportEnd < worktrees.length && (
-							<Text dimColor>↓ {worktrees.length - viewportEnd} more...</Text>
-						)}
-					</>
-				);
-			})()}
+			<SelectInput
+				items={menuItems}
+				onSelect={handleSelect}
+				onHighlight={(item: {value: string}) => {
+					const index = parseInt(item.value, 10);
+					setFocusedIndex(index);
+				}}
+				limit={10}
+				indicatorComponent={({isSelected}) => (
+					<Text color={isSelected ? 'green' : undefined}>
+						{isSelected ? '>' : ' '}
+					</Text>
+				)}
+				itemComponent={({isSelected, label}) => {
+					// Check if this item is actually selected (checkbox checked)
+					const hasCheckmark = label.includes('[✓]');
+					return (
+						<Text
+							color={isSelected ? 'green' : undefined}
+							inverse={isSelected}
+							dimColor={!isSelected && !hasCheckmark}
+						>
+							{label}
+						</Text>
+					);
+				}}
+			/>
 
 			<Box marginTop={1} flexDirection="column">
 				<Text dimColor>
-					Controls: ↑↓ Navigate, Space Select, Enter Confirm,{' '}
+					Controls: ↑↓/j/k Navigate, Space Select, Enter Confirm,{' '}
 					{shortcutManager.getShortcutDisplay('cancel')} Cancel
 				</Text>
 				{selectedIndices.size > 0 && (

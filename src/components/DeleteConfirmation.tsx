@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
+import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface DeleteConfirmationProps {
@@ -17,80 +18,53 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	const hasAnyBranches = worktrees.some(wt => wt.branch);
 
 	const [deleteBranch, setDeleteBranch] = useState(true);
-	const [focusedOption, setFocusedOption] = useState<
-		'deleteBranch' | 'keepBranch' | 'confirm' | 'cancel'
-	>(hasAnyBranches ? 'deleteBranch' : 'confirm');
+	const [view, setView] = useState<'options' | 'actions'>(
+		hasAnyBranches ? 'options' : 'actions',
+	);
 
-	// Helper functions for navigation
-	const isRadioOption = (option: typeof focusedOption) =>
-		option === 'deleteBranch' || option === 'keepBranch';
+	// Menu items for branch options
+	const branchOptions = [
+		{
+			label: `${deleteBranch ? '(•)' : '( )'} Delete the branches too`,
+			value: 'deleteBranch',
+		},
+		{
+			label: `${!deleteBranch ? '(•)' : '( )'} Keep the branches`,
+			value: 'keepBranch',
+		},
+	];
 
-	const isActionButton = (option: typeof focusedOption) =>
-		option === 'confirm' || option === 'cancel';
+	// Menu items for actions
+	const actionOptions = [
+		{label: 'Confirm', value: 'confirm'},
+		{label: 'Cancel', value: 'cancel'},
+	];
 
-	const handleUpArrow = () => {
-		if (!hasAnyBranches) {
-			if (focusedOption === 'cancel') setFocusedOption('confirm');
-			return;
-		}
-
-		const navigationMap = {
-			keepBranch: 'deleteBranch',
-			confirm: 'keepBranch',
-			cancel: 'keepBranch',
-		} as const;
-
-		const next = navigationMap[focusedOption as keyof typeof navigationMap];
-		if (next) setFocusedOption(next);
-	};
-
-	const handleDownArrow = () => {
-		if (!hasAnyBranches) {
-			if (focusedOption === 'confirm') setFocusedOption('cancel');
-			return;
-		}
-
-		const navigationMap = {
-			deleteBranch: 'keepBranch',
-			keepBranch: 'confirm',
-			confirm: 'cancel',
-		} as const;
-
-		const next = navigationMap[focusedOption as keyof typeof navigationMap];
-		if (next) setFocusedOption(next);
-	};
-
-	const handleHorizontalArrow = (direction: 'left' | 'right') => {
-		if (isActionButton(focusedOption)) {
-			setFocusedOption(direction === 'left' ? 'confirm' : 'cancel');
+	const handleBranchSelect = (item: {value: string}) => {
+		if (item.value === 'deleteBranch') {
+			setDeleteBranch(true);
+		} else {
+			setDeleteBranch(false);
 		}
 	};
 
-	const handleSelect = () => {
-		if (isRadioOption(focusedOption)) {
-			setDeleteBranch(focusedOption === 'deleteBranch');
-		} else if (focusedOption === 'confirm') {
+	const handleActionSelect = (item: {value: string}) => {
+		if (item.value === 'confirm') {
 			onConfirm(deleteBranch);
-		} else if (focusedOption === 'cancel') {
+		} else {
 			onCancel();
 		}
 	};
 
 	useInput((input, key) => {
-		if (key.upArrow) {
-			handleUpArrow();
-		} else if (key.downArrow) {
-			handleDownArrow();
-		} else if (key.leftArrow) {
-			handleHorizontalArrow('left');
-		} else if (key.rightArrow) {
-			handleHorizontalArrow('right');
-		} else if (input === ' ' && isRadioOption(focusedOption)) {
-			setDeleteBranch(focusedOption === 'deleteBranch');
-		} else if (key.return) {
-			handleSelect();
-		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
+		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
+		} else if (hasAnyBranches && view === 'options' && key.tab) {
+			// Switch from options to actions
+			setView('actions');
+		} else if (hasAnyBranches && view === 'actions' && key.shift && key.tab) {
+			// Switch from actions back to options
+			setView('options');
 		}
 	});
 
@@ -128,51 +102,74 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 			{hasAnyBranches && (
 				<Box marginBottom={1} flexDirection="column">
 					<Text bold>What do you want to do with the associated branches?</Text>
-					<Box marginTop={1} flexDirection="column">
-						<Box>
-							<Text
-								color={focusedOption === 'deleteBranch' ? 'red' : undefined}
-								inverse={focusedOption === 'deleteBranch'}
-							>
-								{deleteBranch ? '(•)' : '( )'} Delete the branches too
-							</Text>
-						</Box>
-						<Box>
-							<Text
-								color={focusedOption === 'keepBranch' ? 'green' : undefined}
-								inverse={focusedOption === 'keepBranch'}
-							>
-								{!deleteBranch ? '(•)' : '( )'} Keep the branches
-							</Text>
-						</Box>
+					<Box marginTop={1}>
+						{view === 'options' ? (
+							<SelectInput
+								items={branchOptions}
+								onSelect={handleBranchSelect}
+								initialIndex={deleteBranch ? 0 : 1}
+								indicatorComponent={({isSelected}) => (
+									<Text color={isSelected ? 'red' : undefined}>
+										{isSelected ? '>' : ' '}
+									</Text>
+								)}
+								itemComponent={({isSelected, label}) => (
+									<Text
+										color={isSelected ? 'red' : undefined}
+										inverse={isSelected}
+									>
+										{label}
+									</Text>
+								)}
+							/>
+						) : (
+							<Box flexDirection="column">
+								{branchOptions.map(option => (
+									<Text key={option.value} dimColor>
+										{option.label}
+									</Text>
+								))}
+							</Box>
+						)}
 					</Box>
 				</Box>
 			)}
 
 			<Box marginTop={1}>
-				<Box marginRight={2}>
-					<Text
-						color={focusedOption === 'confirm' ? 'green' : 'white'}
-						inverse={focusedOption === 'confirm'}
-					>
-						{' '}
-						Confirm{' '}
-					</Text>
-				</Box>
-				<Box>
-					<Text
-						color={focusedOption === 'cancel' ? 'red' : 'white'}
-						inverse={focusedOption === 'cancel'}
-					>
-						{' '}
-						Cancel{' '}
-					</Text>
-				</Box>
+				{view === 'actions' || !hasAnyBranches ? (
+					<SelectInput
+						items={actionOptions}
+						onSelect={handleActionSelect}
+						initialIndex={0}
+						indicatorComponent={({isSelected}) => (
+							<Text>{isSelected ? '>' : ' '}</Text>
+						)}
+						itemComponent={({isSelected, label}) => {
+							const color = label === 'Confirm' ? 'green' : 'red';
+							return (
+								<Text color={isSelected ? color : 'white'} inverse={isSelected}>
+									{' '}
+									{label}{' '}
+								</Text>
+							);
+						}}
+					/>
+				) : (
+					<Box>
+						<Box marginRight={2}>
+							<Text dimColor> Confirm </Text>
+						</Box>
+						<Box>
+							<Text dimColor> Cancel </Text>
+						</Box>
+					</Box>
+				)}
 			</Box>
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Use ↑↓ to navigate options, Space/Enter to select,{' '}
+					Use ↑↓/j/k to navigate, Space/Enter to select
+					{hasAnyBranches ? ', Tab to switch sections' : ''},{' '}
 					{shortcutManager.getShortcutDisplay('cancel')} to cancel
 				</Text>
 			</Box>
