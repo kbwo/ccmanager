@@ -1,6 +1,6 @@
 import React, {useState, useMemo} from 'react';
 import {Box, Text, useInput} from 'ink';
-import TextInput from 'ink-text-input';
+import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
@@ -134,7 +134,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					</Box>
 					<Box>
 						<Text color="cyan">{'> '}</Text>
-						<TextInput
+						<TextInputWrapper
 							value={path}
 							onChange={setPath}
 							onSubmit={handlePathSubmit}
@@ -152,7 +152,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					</Box>
 					<Box>
 						<Text color="cyan">{'> '}</Text>
-						<TextInput
+						<TextInputWrapper
 							value={branch}
 							onChange={setBranch}
 							onSubmit={handleBranchSubmit}
@@ -167,7 +167,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					</Box>
 					<Box>
 						<Text color="cyan">{'> '}</Text>
-						<TextInput
+						<TextInputWrapper
 							value={branch}
 							onChange={setBranch}
 							onSubmit={handleBranchSubmit}

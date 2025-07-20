@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import TextInput from 'ink-text-input';
+import TextInputWrapper from './TextInputWrapper.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
@@ -117,7 +117,7 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 
 				<Box>
 					<Text color="cyan">{'> '}</Text>
-					<TextInput
+					<TextInputWrapper
 						value={tempPattern}
 						onChange={setTempPattern}
 						onSubmit={handlePatternSubmit}

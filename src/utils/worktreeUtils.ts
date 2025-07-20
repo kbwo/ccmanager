@@ -1,4 +1,5 @@
 import path from 'path';
+import stripAnsi from 'strip-ansi';
 import {Worktree, Session} from '../types/index.js';
 import {getStatusDisplay} from '../constants/statusIcons.js';
 import {
@@ -10,9 +11,6 @@ import {
 // Constants
 const MAX_BRANCH_NAME_LENGTH = 40; // Maximum characters for branch name display
 const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
-
-// Strip ANSI escape codes for length calculation
-const stripAnsi = (str: string): string => str.replace(/\x1b\[[0-9;]*m/g, '');
 
 /**
  * Worktree item with formatted content for display.
