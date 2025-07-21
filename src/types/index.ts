@@ -108,3 +108,48 @@ export interface ConfigurationData {
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
 }
+
+// Multi-project support interfaces
+export interface GitProject {
+	name: string; // Project name (directory name)
+	path: string; // Full path to the git repository
+	relativePath: string; // Relative path from CCMANAGER_PROJECTS_DIR
+	worktrees: Worktree[]; // List of worktrees for this project
+	isValid: boolean; // Whether the project is a valid git repository
+	error?: string; // Error message if project is invalid
+}
+
+export interface MultiProjectConfig {
+	enabled: boolean; // Whether multi-project mode is enabled
+	projectsDir: string; // Path to directory containing git projects (from CCMANAGER_PROJECTS_DIR)
+	rootMarker?: string; // Optional marker from CCMANAGER_MULTI_PROJECT_ROOT
+}
+
+export type MenuMode = 'normal' | 'multi-project';
+
+export interface IMultiProjectService {
+	discoverProjects(projectsDir: string): Promise<GitProject[]>;
+	validateGitRepository(path: string): Promise<boolean>;
+	getProjectWorktrees(projectPath: string): Promise<Worktree[]>;
+}
+
+export interface IProjectManager {
+	currentMode: MenuMode;
+	currentProject?: GitProject;
+	projects: GitProject[];
+
+	setMode(mode: MenuMode): void;
+	selectProject(project: GitProject): void;
+	getWorktreeService(projectPath?: string): IWorktreeService;
+	refreshProjects(): Promise<void>;
+}
+
+export interface IWorktreeService {
+	listWorktrees(): Promise<Worktree[]>;
+	createWorktree(branchName: string, path?: string): Promise<void>;
+	deleteWorktree(
+		worktreePath: string,
+		options?: {force?: boolean},
+	): Promise<void>;
+	mergeWorktree(worktreePath: string, targetBranch?: string): Promise<void>;
+}
