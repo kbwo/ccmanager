@@ -31,9 +31,13 @@ type View =
 
 interface AppProps {
 	devcontainerConfig?: DevcontainerConfig;
+	multiProject?: boolean;
 }
 
-const App: React.FC<AppProps> = ({devcontainerConfig}) => {
+const App: React.FC<AppProps> = ({
+	devcontainerConfig,
+	multiProject: _multiProject,
+}) => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>('menu');
 	const [sessionManager] = useState(() => new SessionManager());
