@@ -113,7 +113,7 @@ export interface ConfigurationData {
 export interface GitProject {
 	name: string; // Project name (directory name)
 	path: string; // Full path to the git repository
-	relativePath: string; // Relative path from CCMANAGER_PROJECTS_DIR
+	relativePath: string; // Relative path from CCMANAGER_MULTI_PROJECT_ROOT
 	worktrees: Worktree[]; // List of worktrees for this project
 	isValid: boolean; // Whether the project is a valid git repository
 	error?: string; // Error message if project is invalid
@@ -121,7 +121,7 @@ export interface GitProject {
 
 export interface MultiProjectConfig {
 	enabled: boolean; // Whether multi-project mode is enabled
-	projectsDir: string; // Path to directory containing git projects (from CCMANAGER_PROJECTS_DIR)
+	projectsDir: string; // Path to directory containing git projects (from CCMANAGER_MULTI_PROJECT_ROOT)
 	rootMarker?: string; // Optional marker from CCMANAGER_MULTI_PROJECT_ROOT
 }
 
