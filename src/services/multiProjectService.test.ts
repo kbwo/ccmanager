@@ -231,6 +231,64 @@ describe('MultiProjectService', () => {
 			expect(projects[0]?.relativePath).toMatch(/org\d\/repo\d/);
 			expect(projects[1]?.relativePath).toMatch(/org\d\/repo\d/);
 		});
+
+		it('should skip projects that have worktrees', async () => {
+			const mockProjectsDir = '/home/user/projects';
+
+			vi.mocked(fs.access).mockImplementation(async path => {
+				if (
+					path === mockProjectsDir ||
+					path === `${mockProjectsDir}/project-with-worktrees/.git` ||
+					path === `${mockProjectsDir}/project-without-worktrees/.git`
+				) {
+					return undefined;
+				}
+				throw new Error('Not found');
+			});
+
+			vi.mocked(fs.readdir).mockImplementation(async dir => {
+				if (dir === mockProjectsDir) {
+					return [
+						{name: 'project-with-worktrees', isDirectory: () => true},
+						{name: 'project-without-worktrees', isDirectory: () => true},
+					] as any;
+				}
+				return [];
+			});
+
+			vi.mocked(execSync).mockImplementation((cmd, options) => {
+				const cwd = (options as any).cwd;
+
+				// git rev-parse --git-dir
+				if (cmd.includes('--git-dir')) {
+					if (
+						cwd.includes('project-with-worktrees') ||
+						cwd.includes('project-without-worktrees')
+					) {
+						return '.git';
+					}
+					throw new Error('Not a git repo');
+				}
+
+				// git worktree list --porcelain
+				if (cmd.includes('worktree list')) {
+					if (cwd.includes('project-with-worktrees')) {
+						// Multiple worktrees
+						return 'worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main\n\nworktree /path/to/feature\nHEAD def456\nbranch refs/heads/feature';
+					} else if (cwd.includes('project-without-worktrees')) {
+						// Only main worktree
+						return 'worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main';
+					}
+				}
+
+				throw new Error('Unknown command');
+			});
+
+			const projects = await service.discoverProjects(mockProjectsDir);
+
+			expect(projects).toHaveLength(1);
+			expect(projects[0]?.name).toBe('project-without-worktrees');
+		});
 	});
 
 	describe('validateGitRepository', () => {

@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {useApp, Box, Text} from 'ink';
 import Menu from './Menu.js';
+import ProjectList from './ProjectList.js';
 import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
@@ -13,12 +14,15 @@ import {
 	Worktree,
 	Session as SessionType,
 	DevcontainerConfig,
+	GitProject,
 } from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
+import {MULTI_PROJECT_ENV_VARS} from '../constants/multiProject.js';
 
 type View =
 	| 'menu'
+	| 'project-list'
 	| 'session'
 	| 'new-worktree'
 	| 'creating-worktree'
@@ -34,20 +38,24 @@ interface AppProps {
 	multiProject?: boolean;
 }
 
-const App: React.FC<AppProps> = ({
-	devcontainerConfig,
-	multiProject: _multiProject,
-}) => {
+const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const {exit} = useApp();
-	const [view, setView] = useState<View>('menu');
+	const [view, setView] = useState<View>(
+		multiProject ? 'project-list' : 'menu',
+	);
 	const [sessionManager] = useState(() => new SessionManager());
-	const [worktreeService] = useState(() => new WorktreeService());
+	const [worktreeService, setWorktreeService] = useState(
+		() => new WorktreeService(),
+	);
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
+	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
+		null,
+	); // Store selected project in multi-project mode
 
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
@@ -59,7 +67,11 @@ const App: React.FC<AppProps> = ({
 					setTimeout(() => {
 						setActiveSession(null);
 						setError(null);
-						setView('menu');
+						if (multiProject && selectedProject) {
+							setView('menu');
+						} else {
+							setView(multiProject ? 'project-list' : 'menu');
+						}
 						setMenuKey(prev => prev + 1);
 						if (process.stdout.isTTY) {
 							process.stdout.write('\x1B[2J\x1B[H');
@@ -79,7 +91,7 @@ const App: React.FC<AppProps> = ({
 			sessionManager.off('sessionExit', handleSessionExit);
 			sessionManager.destroy();
 		};
-	}, [sessionManager]);
+	}, [sessionManager, multiProject, selectedProject]);
 
 	const handleSelectWorktree = async (worktree: Worktree) => {
 		// Check if this is the new worktree option
@@ -108,8 +120,13 @@ const App: React.FC<AppProps> = ({
 
 		// Check if this is the exit application option
 		if (worktree.path === 'EXIT_APPLICATION') {
-			sessionManager.destroy();
-			exit();
+			// In multi-project mode with a selected project, go back to project list
+			if (multiProject && selectedProject) {
+				handleBackToProjectList();
+			} else {
+				sessionManager.destroy();
+				exit();
+			}
 			return;
 		}
 
@@ -184,7 +201,13 @@ const App: React.FC<AppProps> = ({
 
 		// Add a small delay to ensure Session cleanup completes
 		setTimeout(() => {
-			setView('menu');
+			if (multiProject && selectedProject) {
+				// In multi-project mode with a selected project, go back to worktree menu
+				setView('menu');
+			} else {
+				// Otherwise go to the appropriate initial view
+				setView(multiProject ? 'project-list' : 'menu');
+			}
 			setMenuKey(prev => prev + 1); // Force menu refresh
 
 			// Clear the screen when returning to menu
@@ -306,6 +329,50 @@ const App: React.FC<AppProps> = ({
 	const handleCancelMergeWorktree = () => {
 		handleReturnToMenu();
 	};
+
+	const handleSelectProject = (project: GitProject) => {
+		// Handle special exit case
+		if (project.path === 'EXIT_APPLICATION') {
+			sessionManager.destroy();
+			exit();
+			return;
+		}
+
+		// Set the selected project and update worktree service
+		setSelectedProject(project);
+		setWorktreeService(new WorktreeService(project.path));
+		setView('menu');
+	};
+
+	const handleBackToProjectList = () => {
+		setSelectedProject(null);
+		setWorktreeService(new WorktreeService()); // Reset to default
+		setView('project-list');
+		setMenuKey(prev => prev + 1);
+	};
+
+	if (view === 'project-list' && multiProject) {
+		const projectsDir = process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR];
+		if (!projectsDir) {
+			return (
+				<Box>
+					<Text color="red">
+						Error: {MULTI_PROJECT_ENV_VARS.PROJECTS_DIR} environment variable
+						not set
+					</Text>
+				</Box>
+			);
+		}
+
+		return (
+			<ProjectList
+				projectsDir={projectsDir}
+				onSelectProject={handleSelectProject}
+				error={error}
+				onDismissError={() => setError(null)}
+			/>
+		);
+	}
 
 	if (view === 'menu') {
 		return (

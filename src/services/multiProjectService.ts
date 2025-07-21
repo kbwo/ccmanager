@@ -57,6 +57,11 @@ export class MultiProjectService implements IMultiProjectService {
 
 				// Check if this directory is a git repository
 				if (await this.validateGitRepository(fullPath)) {
+					// Skip projects that have worktrees
+					if (await this.hasWorktrees(fullPath)) {
+						continue;
+					}
+
 					const relativePath = path.relative(rootDir, fullPath);
 					const name = path.basename(fullPath);
 
@@ -123,6 +128,27 @@ export class MultiProjectService implements IMultiProjectService {
 			} catch {
 				return false;
 			}
+		}
+	}
+
+	/**
+	 * Check if a git repository has any worktrees (besides the main one)
+	 */
+	private async hasWorktrees(projectPath: string): Promise<boolean> {
+		try {
+			const output = execSync('git worktree list --porcelain', {
+				cwd: projectPath,
+				encoding: 'utf8',
+				stdio: 'pipe',
+			});
+
+			// Parse the worktree list output
+			const worktrees = output.trim().split('\n\n').filter(Boolean);
+
+			// If there's more than one worktree (the main one), then it has additional worktrees
+			return worktrees.length > 1;
+		} catch {
+			return false;
 		}
 	}
 
