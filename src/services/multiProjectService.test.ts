@@ -78,10 +78,10 @@ describe('MultiProjectService', () => {
 			const projects = await service.discoverProjects(mockProjectsDir);
 
 			expect(projects).toHaveLength(2);
-			expect(projects[0].name).toBe('project1');
-			expect(projects[1].name).toBe('project2');
-			expect(projects[0].isValid).toBe(true);
-			expect(projects[1].isValid).toBe(true);
+			expect(projects[0]?.name).toBe('project1');
+			expect(projects[1]?.name).toBe('project2');
+			expect(projects[0]?.isValid).toBe(true);
+			expect(projects[1]?.isValid).toBe(true);
 		});
 
 		it('should handle name conflicts by using relative paths', async () => {
@@ -228,8 +228,8 @@ describe('MultiProjectService', () => {
 
 			expect(projects).toHaveLength(2);
 			expect(projects.map(p => p.name).sort()).toEqual(['repo1', 'repo2']);
-			expect(projects[0].relativePath).toMatch(/org\d\/repo\d/);
-			expect(projects[1].relativePath).toMatch(/org\d\/repo\d/);
+			expect(projects[0]?.relativePath).toMatch(/org\d\/repo\d/);
+			expect(projects[1]?.relativePath).toMatch(/org\d\/repo\d/);
 		});
 	});
 

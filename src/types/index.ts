@@ -145,11 +145,25 @@ export interface IProjectManager {
 }
 
 export interface IWorktreeService {
-	listWorktrees(): Promise<Worktree[]>;
-	createWorktree(branchName: string, path?: string): Promise<void>;
+	getWorktrees(): Worktree[];
+	createWorktree(
+		worktreePath: string,
+		branch: string,
+		baseBranch: string,
+		copySessionData?: boolean,
+		copyClaudeDirectory?: boolean,
+	): {success: boolean; error?: string};
 	deleteWorktree(
 		worktreePath: string,
-		options?: {force?: boolean},
-	): Promise<void>;
-	mergeWorktree(worktreePath: string, targetBranch?: string): Promise<void>;
+		options?: {deleteBranch?: boolean},
+	): {success: boolean; error?: string};
+	mergeWorktree(
+		worktreePath: string,
+		targetBranch?: string,
+	): {
+		success: boolean;
+		mergedBranch?: string;
+		error?: string;
+		deletedWorktree?: boolean;
+	};
 }
