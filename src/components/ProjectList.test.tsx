@@ -95,6 +95,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -110,6 +112,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -121,6 +125,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -132,6 +138,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -169,6 +177,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -180,6 +190,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -203,6 +215,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -214,6 +228,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -235,6 +251,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -246,6 +264,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -266,6 +286,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -287,6 +309,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -296,6 +320,8 @@ describe('ProjectList', () => {
 				<ProjectList
 					projectsDir="/projects"
 					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
 				/>,
 			);
 			return lastFrame()?.includes('No git repositories found') ?? false;
@@ -316,49 +342,6 @@ describe('ProjectList', () => {
 
 		expect(lastFrame()).toContain('Error: Test error');
 		expect(lastFrame()).toContain('Press any key to dismiss');
-	});
-
-	it('should respect limit prop for SelectInput', async () => {
-		const manyProjects = Array.from({length: 20}, (_, i) => ({
-			name: `project${i}`,
-			path: `/projects/project${i}`,
-			relativePath: `project${i}`,
-			worktrees: [],
-			isValid: true,
-		}));
-
-		mockDiscoverProjects.mockResolvedValue(manyProjects);
-
-		const {lastFrame, rerender} = render(
-			<ProjectList
-				projectsDir="/projects"
-				onSelectProject={mockOnSelectProject}
-				limit={10}
-			/>,
-		);
-
-		// Wait a bit for async operations
-		await new Promise(resolve => setTimeout(resolve, 100));
-
-		// Force rerender
-		rerender(
-			<ProjectList
-				projectsDir="/projects"
-				onSelectProject={mockOnSelectProject}
-				limit={10}
-			/>,
-		);
-
-		// Wait for projects to load
-		await vi.waitFor(() => {
-			const frame = lastFrame();
-			return frame && !frame.includes('Loading projects...');
-		});
-
-		// Should show only first 10 numbered items (0-9)
-		expect(lastFrame()).toContain('0 ❯');
-		expect(lastFrame()).toContain('9 ❯');
-		expect(lastFrame()).not.toContain('10 ❯');
 	});
 
 	it('should show worktree count when loaded', async () => {
@@ -400,6 +383,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 
@@ -411,6 +396,8 @@ describe('ProjectList', () => {
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
 			/>,
 		);
 

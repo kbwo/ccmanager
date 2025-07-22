@@ -8,9 +8,8 @@ import {MENU_ICONS} from '../constants/statusIcons.js';
 interface ProjectListProps {
 	projectsDir: string;
 	onSelectProject: (project: GitProject) => void;
-	error?: string | null;
-	onDismissError?: () => void;
-	limit?: number;
+	error: string | null;
+	onDismissError: () => void;
 }
 
 interface MenuItem {
@@ -24,13 +23,13 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	onSelectProject,
 	error,
 	onDismissError,
-	limit,
 }) => {
 	const [projects, setProjects] = useState<GitProject[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [worktreesLoaded, setWorktreesLoaded] = useState(false);
+	const limit = 10;
 
 	const loadProjects = async () => {
 		setLoading(true);
@@ -44,7 +43,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 
 			// Load worktrees for the first few visible projects
 			if (discoveredProjects.length > 0) {
-				const visibleProjects = discoveredProjects.slice(0, limit || 10);
+				const visibleProjects = discoveredProjects.slice(0, 10);
 				await service.loadProjectWorktrees(visibleProjects);
 				setWorktreesLoaded(true);
 			}
