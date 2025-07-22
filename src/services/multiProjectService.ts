@@ -4,8 +4,23 @@ import {GitProject, IMultiProjectService, Worktree} from '../types/index.js';
 import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 
+interface DiscoveryTask {
+	path: string;
+	relativePath: string;
+}
+
+interface DiscoveryResult {
+	path: string;
+	relativePath: string;
+	name: string;
+	isGitRepo: boolean;
+	hasMultipleWorktrees: boolean;
+	error?: string;
+}
+
 export class MultiProjectService implements IMultiProjectService {
 	private projectCache: Map<string, GitProject> = new Map();
+	private discoveryWorkers = 4; // Number of concurrent workers
 
 	async discoverProjects(projectsDir: string): Promise<GitProject[]> {
 		const projects: GitProject[] = [];
@@ -15,20 +30,47 @@ export class MultiProjectService implements IMultiProjectService {
 			// Verify the directory exists
 			await fs.access(projectsDir);
 
-			// Recursively scan for git repositories
-			await this.scanDirectory(projectsDir, projectsDir, projectMap);
+			// Step 1: Fast concurrent directory discovery
+			const directories = await this.discoverDirectories(projectsDir);
 
-			// Convert map to array and handle name conflicts
-			for (const project of projectMap.values()) {
-				projects.push(project);
+			// Step 2: Process directories in parallel to check if they're git repos
+			const results = await this.processDirectoriesInParallel(
+				directories,
+				projectsDir,
+			);
+
+			// Step 3: Filter and create project objects
+			for (const result of results) {
+				if (result.isGitRepo && !result.hasMultipleWorktrees) {
+					// Handle name conflicts
+					let displayName = result.name;
+					if (projectMap.has(result.name)) {
+						displayName = result.relativePath.replace(/[/\\]/g, '/');
+					}
+
+					const project: GitProject = {
+						name: displayName,
+						path: result.path,
+						relativePath: result.relativePath,
+						worktrees: [], // Lazy load worktrees later
+						isValid: true,
+						error: result.error,
+					};
+
+					projectMap.set(displayName, project);
+				}
 			}
 
-			// Sort projects by name for consistent display
+			// Convert to array and sort
+			projects.push(...projectMap.values());
 			projects.sort((a, b) => a.name.localeCompare(b.name));
 
-			// Cache the results
+			// Cache results
 			this.projectCache.clear();
 			projects.forEach(p => this.projectCache.set(p.path, p));
+
+			// Step 4: Lazy load worktrees for visible projects only
+			// This will be done on-demand when projects are displayed
 
 			return projects;
 		} catch (error) {
@@ -39,66 +81,186 @@ export class MultiProjectService implements IMultiProjectService {
 		}
 	}
 
-	private async scanDirectory(
-		dir: string,
+	/**
+	 * Fast directory discovery - similar to ghq's approach
+	 */
+	private async discoverDirectories(
 		rootDir: string,
-		projectMap: Map<string, GitProject>,
-	): Promise<void> {
-		try {
-			const entries = await fs.readdir(dir, {withFileTypes: true});
+		maxDepth: number = 3,
+	): Promise<DiscoveryTask[]> {
+		const tasks: DiscoveryTask[] = [];
+		const seen = new Set<string>();
 
-			for (const entry of entries) {
-				if (!entry.isDirectory()) continue;
+		const walk = async (dir: string, depth: number): Promise<void> => {
+			if (depth > maxDepth) return;
 
-				// Skip hidden directories except .git
-				if (entry.name.startsWith('.') && entry.name !== '.git') continue;
+			try {
+				const entries = await fs.readdir(dir, {withFileTypes: true});
 
-				const fullPath = path.join(dir, entry.name);
+				// Process entries in parallel
+				await Promise.all(
+					entries.map(async entry => {
+						if (!entry.isDirectory()) return;
+						if (entry.name.startsWith('.') && entry.name !== '.git') return;
 
-				// Check if this directory is a git repository
-				if (await this.validateGitRepository(fullPath)) {
-					// Skip projects that have worktrees
-					if (await this.hasWorktrees(fullPath)) {
-						continue;
-					}
+						const fullPath = path.join(dir, entry.name);
+						const relativePath = path.relative(rootDir, fullPath);
 
-					const relativePath = path.relative(rootDir, fullPath);
-					const name = path.basename(fullPath);
+						// Quick check if this is a git repository
+						const hasGitDir = await this.hasGitDirectory(fullPath);
+						if (hasGitDir) {
+							// Found a git repository - add to tasks and skip subdirectories
+							if (!seen.has(fullPath)) {
+								seen.add(fullPath);
+								tasks.push({path: fullPath, relativePath});
+							}
+							return; // Early termination - don't walk subdirectories
+						}
 
-					// Handle name conflicts by including parent directory
-					let displayName = name;
-					if (projectMap.has(name)) {
-						// Use relative path for conflicts
-						displayName = relativePath.replace(/[/\\]/g, '/');
-					}
-
-					const project: GitProject = {
-						name: displayName,
-						path: fullPath,
-						relativePath,
-						worktrees: [],
-						isValid: true,
-					};
-
-					// Get worktrees for this project
-					try {
-						project.worktrees = await this.getProjectWorktrees(fullPath);
-					} catch (error) {
-						project.isValid = false;
-						project.error = `Failed to get worktrees: ${(error as Error).message}`;
-					}
-
-					projectMap.set(displayName, project);
-				} else {
-					// Continue scanning subdirectories even if current is not a git repo
-					await this.scanDirectory(fullPath, rootDir, projectMap);
+						// Not a git repo, continue walking subdirectories
+						await walk(fullPath, depth + 1);
+					}),
+				);
+			} catch (error) {
+				// Silently skip directories we can't read
+				if ((error as NodeJS.ErrnoException).code !== 'EACCES') {
+					console.error(`Error scanning directory ${dir}:`, error);
 				}
 			}
-		} catch (error) {
-			// Silently skip directories we can't read
-			if ((error as NodeJS.ErrnoException).code !== 'EACCES') {
-				console.error(`Error scanning directory ${dir}:`, error);
+		};
+
+		await walk(rootDir, 0);
+		return tasks;
+	}
+
+	/**
+	 * Quick check for .git directory without running git commands
+	 */
+	private async hasGitDirectory(dirPath: string): Promise<boolean> {
+		try {
+			const gitPath = path.join(dirPath, '.git');
+			const stats = await fs.stat(gitPath);
+			return stats.isDirectory() || stats.isFile(); // File for worktrees
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * Process directories in parallel using worker pool pattern
+	 */
+	private async processDirectoriesInParallel(
+		tasks: DiscoveryTask[],
+		rootDir: string,
+	): Promise<DiscoveryResult[]> {
+		const results: DiscoveryResult[] = [];
+		const queue = [...tasks];
+		const workers: Promise<void>[] = [];
+
+		// Create worker function
+		const worker = async (): Promise<void> => {
+			while (queue.length > 0) {
+				const task = queue.shift();
+				if (!task) break;
+
+				const result = await this.processDirectory(task, rootDir);
+				results.push(result);
 			}
+		};
+
+		// Start workers
+		for (let i = 0; i < this.discoveryWorkers; i++) {
+			workers.push(worker());
+		}
+
+		// Wait for all workers to complete
+		await Promise.all(workers);
+
+		return results;
+	}
+
+	/**
+	 * Process a single directory to check if it's a valid git repo
+	 */
+	private async processDirectory(
+		task: DiscoveryTask,
+		_rootDir: string,
+	): Promise<DiscoveryResult> {
+		const result: DiscoveryResult = {
+			path: task.path,
+			relativePath: task.relativePath,
+			name: path.basename(task.path),
+			isGitRepo: false,
+			hasMultipleWorktrees: false,
+		};
+
+		try {
+			// Quick validation - already checked for .git existence
+			const isValid = await this.quickValidateGitRepository(task.path);
+			if (!isValid) {
+				return result;
+			}
+
+			result.isGitRepo = true;
+
+			// Check for worktrees only if it's a valid repo
+			result.hasMultipleWorktrees = await this.quickHasWorktrees(task.path);
+		} catch (error) {
+			result.error = `Failed to process: ${(error as Error).message}`;
+		}
+
+		return result;
+	}
+
+	/**
+	 * Quick git repository validation with minimal overhead
+	 */
+	private async quickValidateGitRepository(
+		projectPath: string,
+	): Promise<boolean> {
+		try {
+			// Just check if we can get git directory - faster than full validation
+			execSync('git rev-parse --git-dir', {
+				cwd: projectPath,
+				encoding: 'utf8',
+				stdio: 'pipe',
+				timeout: 1000, // 1 second timeout for faster failures
+			});
+			return true;
+		} catch {
+			// Also check for bare repositories
+			try {
+				const result = execSync('git rev-parse --is-bare-repository', {
+					cwd: projectPath,
+					encoding: 'utf8',
+					stdio: 'pipe',
+					timeout: 1000,
+				}).trim();
+				return result === 'true';
+			} catch {
+				return false;
+			}
+		}
+	}
+
+	/**
+	 * Quick check if repository has multiple worktrees
+	 */
+	private async quickHasWorktrees(projectPath: string): Promise<boolean> {
+		try {
+			// Use git worktree list with minimal output
+			const output = execSync('git worktree list --porcelain', {
+				cwd: projectPath,
+				encoding: 'utf8',
+				stdio: 'pipe',
+				timeout: 1000, // 1 second timeout
+			});
+
+			// Count worktrees by counting "worktree" lines
+			const worktreeCount = (output.match(/^worktree /gm) || []).length;
+			return worktreeCount > 1;
+		} catch {
+			return false;
 		}
 	}
 
@@ -128,27 +290,6 @@ export class MultiProjectService implements IMultiProjectService {
 			} catch {
 				return false;
 			}
-		}
-	}
-
-	/**
-	 * Check if a git repository has any worktrees (besides the main one)
-	 */
-	private async hasWorktrees(projectPath: string): Promise<boolean> {
-		try {
-			const output = execSync('git worktree list --porcelain', {
-				cwd: projectPath,
-				encoding: 'utf8',
-				stdio: 'pipe',
-			});
-
-			// Parse the worktree list output
-			const worktrees = output.trim().split('\n\n').filter(Boolean);
-
-			// If there's more than one worktree (the main one), then it has additional worktrees
-			return worktrees.length > 1;
-		} catch {
-			return false;
 		}
 	}
 
@@ -187,5 +328,23 @@ export class MultiProjectService implements IMultiProjectService {
 
 		this.projectCache.set(projectPath, project);
 		return project;
+	}
+
+	/**
+	 * Load worktrees for specific projects on demand
+	 */
+	async loadProjectWorktrees(projects: GitProject[]): Promise<void> {
+		// Load worktrees in parallel for visible projects
+		await Promise.all(
+			projects.map(async project => {
+				if (project.worktrees.length === 0 && project.isValid) {
+					try {
+						project.worktrees = await this.getProjectWorktrees(project.path);
+					} catch (error) {
+						project.error = `Failed to load worktrees: ${(error as Error).message}`;
+					}
+				}
+			}),
+		);
 	}
 }

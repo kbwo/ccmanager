@@ -1,9 +1,40 @@
 import React from 'react';
 import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
-import ProjectList from './ProjectList.js';
 import {GitProject} from '../types/index.js';
-import {MultiProjectService} from '../services/multiProjectService.js';
+
+// Import the actual component code but skip the useInput hook
+vi.mock('ink', async () => {
+	const actual = await vi.importActual<typeof import('ink')>('ink');
+	return {
+		...actual,
+		useInput: vi.fn(),
+	};
+});
+
+// Mock SelectInput to render items as simple text
+vi.mock('ink-select-input', async () => {
+	const React = await vi.importActual<typeof import('react')>('react');
+	const {Text, Box} = await vi.importActual<typeof import('ink')>('ink');
+
+	return {
+		default: ({items}: any) => {
+			return React.createElement(
+				Box,
+				{flexDirection: 'column'},
+				items.map((item: any, index: number) =>
+					React.createElement(Text, {key: index}, item.label),
+				),
+			);
+		},
+	};
+});
+
+// Now import after mocking
+const {default: ProjectList} = await import('./ProjectList.js');
+const {MultiProjectService} = await import(
+	'../services/multiProjectService.js'
+);
 
 // Mock the MultiProjectService
 vi.mock('../services/multiProjectService.js', () => {
@@ -11,6 +42,7 @@ vi.mock('../services/multiProjectService.js', () => {
 		MultiProjectService: vi.fn().mockImplementation(() => {
 			return {
 				discoverProjects: vi.fn(),
+				loadProjectWorktrees: vi.fn().mockResolvedValue(undefined),
 			};
 		}),
 	};
@@ -48,10 +80,12 @@ describe('ProjectList', () => {
 		vi.clearAllMocks();
 		mockDiscoverProjects.mockClear();
 		mockDiscoverProjects.mockResolvedValue(mockProjects);
+		const mockLoadProjectWorktrees = vi.fn().mockResolvedValue(undefined);
 		vi.mocked(MultiProjectService).mockImplementation(
 			() =>
 				({
 					discoverProjects: mockDiscoverProjects,
+					loadProjectWorktrees: mockLoadProjectWorktrees,
 				}) as any,
 		);
 	});
@@ -90,16 +124,25 @@ describe('ProjectList', () => {
 			/>,
 		);
 
-		// Wait for component to update after async loading
-		await vi.waitFor(() => {
-			rerender(
-				<ProjectList
-					projectsDir="/projects"
-					onSelectProject={mockOnSelectProject}
-				/>,
-			);
-			return lastFrame()?.includes('project1') ?? false;
-		});
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+			/>,
+		);
+
+		// Wait for SelectInput to render with our mock
+		await vi.waitFor(
+			() => {
+				const frame = lastFrame();
+				return frame && !frame.includes('Loading projects...');
+			},
+			{timeout: 2000},
+		);
 
 		const frame = lastFrame();
 		expect(frame).toContain('0 ❯ project1');
@@ -129,15 +172,21 @@ describe('ProjectList', () => {
 			/>,
 		);
 
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+			/>,
+		);
+
 		// Wait for component to update after async loading
 		await vi.waitFor(() => {
-			rerender(
-				<ProjectList
-					projectsDir="/projects"
-					onSelectProject={mockOnSelectProject}
-				/>,
-			);
-			return lastFrame()?.includes('project1') ?? false;
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
 		});
 
 		// Verify menu structure
@@ -150,7 +199,18 @@ describe('ProjectList', () => {
 	});
 
 	it('should display number shortcuts for first 10 projects', async () => {
-		const {lastFrame} = render(
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+			/>,
+		);
+
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
@@ -159,7 +219,8 @@ describe('ProjectList', () => {
 
 		// Wait for projects to load
 		await vi.waitFor(() => {
-			return lastFrame()?.includes('project1') ?? false;
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
 		});
 
 		// Verify number prefixes are shown
@@ -170,7 +231,18 @@ describe('ProjectList', () => {
 	});
 
 	it('should display exit option in menu', async () => {
-		const {lastFrame} = render(
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+			/>,
+		);
+
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
 			<ProjectList
 				projectsDir="/projects"
 				onSelectProject={mockOnSelectProject}
@@ -179,7 +251,8 @@ describe('ProjectList', () => {
 
 		// Wait for projects to load
 		await vi.waitFor(() => {
-			return lastFrame()?.includes('project1') ?? false;
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
 		});
 
 		// Verify exit option is shown
@@ -264,21 +337,91 @@ describe('ProjectList', () => {
 			/>,
 		);
 
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				limit={10}
+			/>,
+		);
+
 		// Wait for projects to load
 		await vi.waitFor(() => {
-			rerender(
-				<ProjectList
-					projectsDir="/projects"
-					onSelectProject={mockOnSelectProject}
-					limit={10}
-				/>,
-			);
-			return lastFrame()?.includes('project0') ?? false;
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
 		});
 
 		// Should show only first 10 numbered items (0-9)
 		expect(lastFrame()).toContain('0 ❯');
 		expect(lastFrame()).toContain('9 ❯');
 		expect(lastFrame()).not.toContain('10 ❯');
+	});
+
+	it('should show worktree count when loaded', async () => {
+		const projectsWithWorktrees: GitProject[] = [
+			{
+				name: 'project1',
+				path: '/projects/project1',
+				relativePath: 'project1',
+				worktrees: [{path: '/path1', isMainWorktree: true, hasSession: false}],
+				isValid: true,
+			},
+			{
+				name: 'project2',
+				path: '/projects/project2',
+				relativePath: 'project2',
+				worktrees: [
+					{path: '/path2', isMainWorktree: true, hasSession: false},
+					{path: '/path3', isMainWorktree: false, hasSession: false},
+				],
+				isValid: true,
+			},
+		];
+
+		mockDiscoverProjects.mockResolvedValue(projectsWithWorktrees);
+
+		// Mock loadProjectWorktrees to set worktrees
+		vi.mocked(MultiProjectService).mockImplementation(
+			() =>
+				({
+					discoverProjects: mockDiscoverProjects,
+					loadProjectWorktrees: vi.fn().mockImplementation(() => {
+						// Simulate that worktrees are already loaded in the projects
+						return Promise.resolve();
+					}),
+				}) as any,
+		);
+
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+			/>,
+		);
+
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+			/>,
+		);
+
+		// Wait for projects to load and worktrees to be loaded
+		await vi.waitFor(() => {
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
+		});
+
+		const frame = lastFrame();
+		expect(frame).toContain('project1 (1 worktree)');
+		expect(frame).toContain('project2 (2 worktrees)');
 	});
 });

@@ -30,15 +30,24 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
+	const [worktreesLoaded, setWorktreesLoaded] = useState(false);
 
 	const loadProjects = async () => {
 		setLoading(true);
 		setLoadError(null);
+		setWorktreesLoaded(false);
 
 		try {
 			const service = new MultiProjectService();
 			const discoveredProjects = await service.discoverProjects(projectsDir);
 			setProjects(discoveredProjects);
+
+			// Load worktrees for the first few visible projects
+			if (discoveredProjects.length > 0) {
+				const visibleProjects = discoveredProjects.slice(0, limit || 10);
+				await service.loadProjectWorktrees(visibleProjects);
+				setWorktreesLoaded(true);
+			}
 		} catch (err) {
 			setLoadError((err as Error).message);
 		} finally {
@@ -57,8 +66,14 @@ const ProjectList: React.FC<ProjectListProps> = ({
 			// Only show numbers for first 10 projects (0-9)
 			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
 
+			// Show worktree count if loaded
+			const worktreeInfo =
+				worktreesLoaded && project.worktrees.length > 0
+					? ` (${project.worktrees.length} worktree${project.worktrees.length > 1 ? 's' : ''})`
+					: '';
+
 			return {
-				label: numberPrefix + project.name,
+				label: numberPrefix + project.name + worktreeInfo,
 				value: project.path,
 				project,
 			};
@@ -82,12 +97,12 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		});
 
 		setItems(menuItems);
-	}, [projects]);
+	}, [projects, worktreesLoaded]);
 
 	// Handle hotkeys
 	useInput((input, _key) => {
 		// Skip in test environment to avoid stdin.ref error
-		if (typeof process !== 'undefined' && process.env['NODE_ENV'] === 'test') {
+		if (!process.stdin.setRawMode) {
 			return;
 		}
 

@@ -131,6 +131,7 @@ export interface IMultiProjectService {
 	discoverProjects(projectsDir: string): Promise<GitProject[]>;
 	validateGitRepository(path: string): Promise<boolean>;
 	getProjectWorktrees(projectPath: string): Promise<Worktree[]>;
+	loadProjectWorktrees(projects: GitProject[]): Promise<void>;
 }
 
 export interface IProjectManager {
