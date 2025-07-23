@@ -28,25 +28,16 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
-	const [worktreesLoaded, setWorktreesLoaded] = useState(false);
 	const limit = 10;
 
 	const loadProjects = async () => {
 		setLoading(true);
 		setLoadError(null);
-		setWorktreesLoaded(false);
 
 		try {
 			const service = new MultiProjectService();
 			const discoveredProjects = await service.discoverProjects(projectsDir);
 			setProjects(discoveredProjects);
-
-			// Load worktrees for the first few visible projects
-			if (discoveredProjects.length > 0) {
-				const visibleProjects = discoveredProjects.slice(0, 10);
-				await service.loadProjectWorktrees(visibleProjects);
-				setWorktreesLoaded(true);
-			}
 		} catch (err) {
 			setLoadError((err as Error).message);
 		} finally {
@@ -65,14 +56,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
 			// Only show numbers for first 10 projects (0-9)
 			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
 
-			// Show worktree count if loaded
-			const worktreeInfo =
-				worktreesLoaded && project.worktrees.length > 0
-					? ` (${project.worktrees.length} worktree${project.worktrees.length > 1 ? 's' : ''})`
-					: '';
-
 			return {
-				label: numberPrefix + project.name + worktreeInfo,
+				label: numberPrefix + project.name,
 				value: project.path,
 				project,
 			};
@@ -96,7 +81,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		});
 
 		setItems(menuItems);
-	}, [projects, worktreesLoaded]);
+	}, [projects]);
 
 	// Handle hotkeys
 	useInput((input, _key) => {
@@ -134,7 +119,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
 					path: 'EXIT_APPLICATION',
 					name: '',
 					relativePath: '',
-					worktrees: [],
 					isValid: false,
 				});
 				break;
@@ -152,7 +136,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
 				path: 'EXIT_APPLICATION',
 				name: '',
 				relativePath: '',
-				worktrees: [],
 				isValid: false,
 			});
 		} else if (item.project) {

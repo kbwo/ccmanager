@@ -1,9 +1,7 @@
 import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
 import {MultiProjectService} from './multiProjectService.js';
-import {GitProject} from '../types/index.js';
 import {promises as fs} from 'fs';
 import {execSync} from 'child_process';
-import {WorktreeService} from './worktreeService.js';
 
 vi.mock('fs', () => ({
 	promises: {
@@ -17,25 +15,12 @@ vi.mock('child_process', () => ({
 	execSync: vi.fn(),
 }));
 
-vi.mock('./worktreeService.js', () => ({
-	WorktreeService: vi.fn().mockImplementation(() => ({
-		getWorktrees: vi.fn().mockReturnValue([]),
-	})),
-}));
-
 describe('MultiProjectService', () => {
 	let service: MultiProjectService;
 
 	beforeEach(() => {
 		service = new MultiProjectService();
 		vi.clearAllMocks();
-		// Reset WorktreeService mock to default behavior
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getWorktrees: vi.fn().mockReturnValue([]),
-				}) as any,
-		);
 	});
 
 	afterEach(() => {
@@ -96,9 +81,6 @@ describe('MultiProjectService', () => {
 			expect(projects[1]?.name).toBe('project2');
 			expect(projects[0]?.isValid).toBe(true);
 			expect(projects[1]?.isValid).toBe(true);
-			// Worktrees should be empty (lazy loaded)
-			expect(projects[0]?.worktrees).toEqual([]);
-			expect(projects[1]?.worktrees).toEqual([]);
 		});
 
 		it('should handle name conflicts by using relative paths', async () => {
@@ -210,10 +192,9 @@ describe('MultiProjectService', () => {
 
 			const projects = await service.discoverProjects(mockProjectsDir);
 
-			// Valid repo should be included with empty worktrees
+			// Valid repo should be included
 			const validProject = projects.find(p => p.name === 'valid-repo');
 			expect(validProject?.isValid).toBe(true);
-			expect(validProject?.worktrees).toEqual([]);
 		});
 
 		it('should recursively scan subdirectories', async () => {
@@ -339,40 +320,6 @@ describe('MultiProjectService', () => {
 		});
 	});
 
-	describe('loadProjectWorktrees', () => {
-		it('should load worktrees for projects on demand', async () => {
-			const mockProjects: GitProject[] = [
-				{
-					name: 'project1',
-					path: '/projects/project1',
-					relativePath: 'project1',
-					worktrees: [],
-					isValid: true,
-				},
-			];
-
-			const mockWorktrees = [
-				{
-					path: '/projects/project1',
-					branch: 'main',
-					isMainWorktree: true,
-					hasSession: false,
-				},
-			];
-
-			vi.mocked(WorktreeService).mockImplementation(
-				() =>
-					({
-						getWorktrees: vi.fn().mockReturnValue(mockWorktrees),
-					}) as any,
-			);
-
-			await service.loadProjectWorktrees(mockProjects);
-
-			expect(mockProjects[0]?.worktrees).toEqual(mockWorktrees);
-		});
-	});
-
 	describe('validateGitRepository', () => {
 		beforeEach(() => {
 			vi.clearAllMocks();
@@ -411,46 +358,6 @@ describe('MultiProjectService', () => {
 
 			const result = await service.validateGitRepository('/path/to/normal-dir');
 			expect(result).toBe(false);
-		});
-	});
-
-	describe('getProjectWorktrees', () => {
-		it('should return worktrees from WorktreeService', async () => {
-			const mockWorktrees = [
-				{
-					path: '/path/to/repo',
-					branch: 'main',
-					isMainWorktree: true,
-					hasSession: false,
-				},
-			];
-
-			const mockGetWorktrees = vi.fn().mockReturnValue(mockWorktrees);
-			vi.mocked(WorktreeService).mockImplementation(
-				() =>
-					({
-						getWorktrees: mockGetWorktrees,
-					}) as any,
-			);
-
-			const worktrees = await service.getProjectWorktrees('/path/to/repo');
-			expect(worktrees).toEqual(mockWorktrees);
-		});
-
-		it('should throw error when WorktreeService fails', async () => {
-			const mockGetWorktrees = vi.fn().mockImplementation(() => {
-				throw new Error('Failed to get worktrees');
-			});
-			vi.mocked(WorktreeService).mockImplementation(
-				() =>
-					({
-						getWorktrees: mockGetWorktrees,
-					}) as any,
-			);
-
-			await expect(
-				service.getProjectWorktrees('/path/to/repo'),
-			).rejects.toThrow('Failed to get worktrees');
 		});
 	});
 

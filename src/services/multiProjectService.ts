@@ -1,7 +1,6 @@
 import {promises as fs} from 'fs';
 import path from 'path';
-import {GitProject, IMultiProjectService, Worktree} from '../types/index.js';
-import {WorktreeService} from './worktreeService.js';
+import {GitProject, IMultiProjectService} from '../types/index.js';
 import {execSync} from 'child_process';
 
 interface DiscoveryTask {
@@ -52,7 +51,6 @@ export class MultiProjectService implements IMultiProjectService {
 						name: displayName,
 						path: result.path,
 						relativePath: result.relativePath,
-						worktrees: [], // Lazy load worktrees later
 						isValid: true,
 						error: result.error,
 					};
@@ -68,9 +66,6 @@ export class MultiProjectService implements IMultiProjectService {
 			// Cache results
 			this.projectCache.clear();
 			projects.forEach(p => this.projectCache.set(p.path, p));
-
-			// Step 4: Lazy load worktrees for visible projects only
-			// This will be done on-demand when projects are displayed
 
 			return projects;
 		} catch (error) {
@@ -293,11 +288,6 @@ export class MultiProjectService implements IMultiProjectService {
 		}
 	}
 
-	async getProjectWorktrees(projectPath: string): Promise<Worktree[]> {
-		const worktreeService = new WorktreeService(projectPath);
-		return worktreeService.getWorktrees();
-	}
-
 	// Helper method to get a cached project
 	getCachedProject(projectPath: string): GitProject | undefined {
 		return this.projectCache.get(projectPath);
@@ -315,36 +305,10 @@ export class MultiProjectService implements IMultiProjectService {
 			name,
 			path: projectPath,
 			relativePath: name,
-			worktrees: [],
 			isValid: true,
 		};
 
-		try {
-			project.worktrees = await this.getProjectWorktrees(projectPath);
-		} catch (error) {
-			project.isValid = false;
-			project.error = `Failed to get worktrees: ${(error as Error).message}`;
-		}
-
 		this.projectCache.set(projectPath, project);
 		return project;
-	}
-
-	/**
-	 * Load worktrees for specific projects on demand
-	 */
-	async loadProjectWorktrees(projects: GitProject[]): Promise<void> {
-		// Load worktrees in parallel for visible projects
-		await Promise.all(
-			projects.map(async project => {
-				if (project.worktrees.length === 0 && project.isValid) {
-					try {
-						project.worktrees = await this.getProjectWorktrees(project.path);
-					} catch (error) {
-						project.error = `Failed to load worktrees: ${(error as Error).message}`;
-					}
-				}
-			}),
-		);
 	}
 }

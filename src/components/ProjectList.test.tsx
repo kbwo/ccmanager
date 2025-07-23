@@ -42,7 +42,6 @@ vi.mock('../services/multiProjectService.js', () => {
 		MultiProjectService: vi.fn().mockImplementation(() => {
 			return {
 				discoverProjects: vi.fn(),
-				loadProjectWorktrees: vi.fn().mockResolvedValue(undefined),
 			};
 		}),
 	};
@@ -57,21 +56,18 @@ describe('ProjectList', () => {
 			name: 'project1',
 			path: '/projects/project1',
 			relativePath: 'project1',
-			worktrees: [],
 			isValid: true,
 		},
 		{
 			name: 'project2',
 			path: '/projects/project2',
 			relativePath: 'project2',
-			worktrees: [],
 			isValid: true,
 		},
 		{
 			name: 'project3',
 			path: '/projects/project3',
 			relativePath: 'project3',
-			worktrees: [],
 			isValid: true,
 		},
 	];
@@ -80,12 +76,10 @@ describe('ProjectList', () => {
 		vi.clearAllMocks();
 		mockDiscoverProjects.mockClear();
 		mockDiscoverProjects.mockResolvedValue(mockProjects);
-		const mockLoadProjectWorktrees = vi.fn().mockResolvedValue(undefined);
 		vi.mocked(MultiProjectService).mockImplementation(
 			() =>
 				({
 					discoverProjects: mockDiscoverProjects,
-					loadProjectWorktrees: mockLoadProjectWorktrees,
 				}) as any,
 		);
 	});
@@ -342,73 +336,5 @@ describe('ProjectList', () => {
 
 		expect(lastFrame()).toContain('Error: Test error');
 		expect(lastFrame()).toContain('Press any key to dismiss');
-	});
-
-	it('should show worktree count when loaded', async () => {
-		const projectsWithWorktrees: GitProject[] = [
-			{
-				name: 'project1',
-				path: '/projects/project1',
-				relativePath: 'project1',
-				worktrees: [{path: '/path1', isMainWorktree: true, hasSession: false}],
-				isValid: true,
-			},
-			{
-				name: 'project2',
-				path: '/projects/project2',
-				relativePath: 'project2',
-				worktrees: [
-					{path: '/path2', isMainWorktree: true, hasSession: false},
-					{path: '/path3', isMainWorktree: false, hasSession: false},
-				],
-				isValid: true,
-			},
-		];
-
-		mockDiscoverProjects.mockResolvedValue(projectsWithWorktrees);
-
-		// Mock loadProjectWorktrees to set worktrees
-		vi.mocked(MultiProjectService).mockImplementation(
-			() =>
-				({
-					discoverProjects: mockDiscoverProjects,
-					loadProjectWorktrees: vi.fn().mockImplementation(() => {
-						// Simulate that worktrees are already loaded in the projects
-						return Promise.resolve();
-					}),
-				}) as any,
-		);
-
-		const {lastFrame, rerender} = render(
-			<ProjectList
-				projectsDir="/projects"
-				onSelectProject={mockOnSelectProject}
-				error={null}
-				onDismissError={mockOnDismissError}
-			/>,
-		);
-
-		// Wait a bit for async operations
-		await new Promise(resolve => setTimeout(resolve, 100));
-
-		// Force rerender
-		rerender(
-			<ProjectList
-				projectsDir="/projects"
-				onSelectProject={mockOnSelectProject}
-				error={null}
-				onDismissError={mockOnDismissError}
-			/>,
-		);
-
-		// Wait for projects to load and worktrees to be loaded
-		await vi.waitFor(() => {
-			const frame = lastFrame();
-			return frame && !frame.includes('Loading projects...');
-		});
-
-		const frame = lastFrame();
-		expect(frame).toContain('project1 (1 worktree)');
-		expect(frame).toContain('project2 (2 worktrees)');
 	});
 });

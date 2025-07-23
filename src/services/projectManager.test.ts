@@ -74,7 +74,6 @@ describe('ProjectManager', () => {
 				name: 'test-project',
 				path: '/test/path',
 				relativePath: 'test-project',
-				worktrees: [],
 				isValid: true,
 			};
 
@@ -96,7 +95,6 @@ describe('ProjectManager', () => {
 				name: 'test-project',
 				path: '/test/path',
 				relativePath: 'test-project',
-				worktrees: [],
 				isValid: true,
 			};
 
@@ -124,7 +122,6 @@ describe('ProjectManager', () => {
 				name: 'test-project',
 				path: '/test/project',
 				relativePath: 'test-project',
-				worktrees: [],
 				isValid: true,
 			};
 
@@ -165,14 +162,12 @@ describe('ProjectManager', () => {
 					name: 'project1',
 					path: '/home/user/projects/project1',
 					relativePath: 'project1',
-					worktrees: [],
 					isValid: true,
 				},
 				{
 					name: 'project2',
 					path: '/home/user/projects/project2',
 					relativePath: 'project2',
-					worktrees: [],
 					isValid: true,
 				},
 			];
@@ -194,20 +189,11 @@ describe('ProjectManager', () => {
 				name: 'project1',
 				path: '/home/user/projects/project1',
 				relativePath: 'project1',
-				worktrees: [],
 				isValid: true,
 			};
 
 			const updatedProject: GitProject = {
 				...oldProject,
-				worktrees: [
-					{
-						path: '/home/user/projects/project1',
-						branch: 'main',
-						isMainWorktree: true,
-						hasSession: false,
-					},
-				],
 			};
 
 			projectManager.selectProject(oldProject);
@@ -226,7 +212,6 @@ describe('ProjectManager', () => {
 				name: 'project1',
 				path: '/home/user/projects/project1',
 				relativePath: 'project1',
-				worktrees: [],
 				isValid: true,
 			};
 
@@ -284,7 +269,6 @@ describe('ProjectManager', () => {
 				name: 'test',
 				path: '/test/path',
 				relativePath: 'test',
-				worktrees: [],
 				isValid: true,
 			};
 			projectManager.selectProject(project);
