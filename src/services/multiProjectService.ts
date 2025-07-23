@@ -40,7 +40,7 @@ export class MultiProjectService implements IMultiProjectService {
 
 			// Step 3: Filter and create project objects
 			for (const result of results) {
-				if (result.isGitRepo && !result.hasMultipleWorktrees) {
+				if (result.isGitRepo) {
 					// Handle name conflicts
 					let displayName = result.name;
 					if (projectMap.has(result.name)) {

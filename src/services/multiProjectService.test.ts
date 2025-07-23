@@ -255,7 +255,7 @@ describe('MultiProjectService', () => {
 			expect(projects[1]?.relativePath).toMatch(/org\d\/repo\d/);
 		});
 
-		it('should skip projects that have worktrees', async () => {
+		it('should include projects that have worktrees', async () => {
 			const mockProjectsDir = '/home/user/projects';
 
 			vi.mocked(fs.access).mockImplementation(async path => {
@@ -315,8 +315,11 @@ describe('MultiProjectService', () => {
 
 			const projects = await service.discoverProjects(mockProjectsDir);
 
-			expect(projects).toHaveLength(1);
-			expect(projects[0]?.name).toBe('project-without-worktrees');
+			expect(projects).toHaveLength(2);
+			expect(projects.map(p => p.name).sort()).toEqual([
+				'project-with-worktrees',
+				'project-without-worktrees',
+			]);
 		});
 	});
 
