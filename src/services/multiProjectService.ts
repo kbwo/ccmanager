@@ -13,7 +13,6 @@ interface DiscoveryResult {
 	relativePath: string;
 	name: string;
 	isGitRepo: boolean;
-	hasMultipleWorktrees: boolean;
 	error?: string;
 }
 
@@ -186,7 +185,6 @@ export class MultiProjectService implements IMultiProjectService {
 			relativePath: task.relativePath,
 			name: path.basename(task.path),
 			isGitRepo: false,
-			hasMultipleWorktrees: false,
 		};
 
 		try {
@@ -197,9 +195,6 @@ export class MultiProjectService implements IMultiProjectService {
 			}
 
 			result.isGitRepo = true;
-
-			// Check for worktrees only if it's a valid repo
-			result.hasMultipleWorktrees = await this.quickHasWorktrees(task.path);
 		} catch (error) {
 			result.error = `Failed to process: ${(error as Error).message}`;
 		}
@@ -235,27 +230,6 @@ export class MultiProjectService implements IMultiProjectService {
 			} catch {
 				return false;
 			}
-		}
-	}
-
-	/**
-	 * Quick check if repository has multiple worktrees
-	 */
-	private async quickHasWorktrees(projectPath: string): Promise<boolean> {
-		try {
-			// Use git worktree list with minimal output
-			const output = execSync('git worktree list --porcelain', {
-				cwd: projectPath,
-				encoding: 'utf8',
-				stdio: 'pipe',
-				timeout: 1000, // 1 second timeout
-			});
-
-			// Count worktrees by counting "worktree" lines
-			const worktreeCount = (output.match(/^worktree /gm) || []).length;
-			return worktreeCount > 1;
-		} catch {
-			return false;
 		}
 	}
 
