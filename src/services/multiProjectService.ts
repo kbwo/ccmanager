@@ -1,7 +1,6 @@
 import {promises as fs} from 'fs';
 import path from 'path';
 import {GitProject, IMultiProjectService} from '../types/index.js';
-import {execSync} from 'child_process';
 
 interface DiscoveryTask {
 	path: string;
@@ -12,7 +11,6 @@ interface DiscoveryResult {
 	path: string;
 	relativePath: string;
 	name: string;
-	isGitRepo: boolean;
 	error?: string;
 }
 
@@ -37,25 +35,23 @@ export class MultiProjectService implements IMultiProjectService {
 				projectsDir,
 			);
 
-			// Step 3: Filter and create project objects
+			// Step 3: Create project objects (all results are valid git repos)
 			for (const result of results) {
-				if (result.isGitRepo) {
-					// Handle name conflicts
-					let displayName = result.name;
-					if (projectMap.has(result.name)) {
-						displayName = result.relativePath.replace(/[/\\]/g, '/');
-					}
-
-					const project: GitProject = {
-						name: displayName,
-						path: result.path,
-						relativePath: result.relativePath,
-						isValid: true,
-						error: result.error,
-					};
-
-					projectMap.set(displayName, project);
+				// Handle name conflicts
+				let displayName = result.name;
+				if (projectMap.has(result.name)) {
+					displayName = result.relativePath.replace(/[/\\]/g, '/');
 				}
+
+				const project: GitProject = {
+					name: displayName,
+					path: result.path,
+					relativePath: result.relativePath,
+					isValid: true,
+					error: result.error,
+				};
+
+				projectMap.set(displayName, project);
 			}
 
 			// Convert to array and sort
@@ -158,7 +154,9 @@ export class MultiProjectService implements IMultiProjectService {
 				if (!task) break;
 
 				const result = await this.processDirectory(task, rootDir);
-				results.push(result);
+				if (result) {
+					results.push(result);
+				}
 			}
 		};
 
@@ -175,26 +173,29 @@ export class MultiProjectService implements IMultiProjectService {
 
 	/**
 	 * Process a single directory to check if it's a valid git repo
+	 * @param task - The discovery task containing path information
+	 * @param _rootDir - The root directory (unused)
+	 * @returns A DiscoveryResult object if the directory is a valid git repository,
+	 *          or null if it's not a valid git repository (will be filtered out)
 	 */
 	private async processDirectory(
 		task: DiscoveryTask,
 		_rootDir: string,
-	): Promise<DiscoveryResult> {
+	): Promise<DiscoveryResult | null> {
 		const result: DiscoveryResult = {
 			path: task.path,
 			relativePath: task.relativePath,
 			name: path.basename(task.path),
-			isGitRepo: false,
 		};
 
 		try {
-			// Quick validation - already checked for .git existence
-			const isValid = await this.quickValidateGitRepository(task.path);
-			if (!isValid) {
-				return result;
+			// Check if directory has .git (already validated in discoverDirectories)
+			// Double-check here to ensure it's still valid
+			const hasGit = await this.hasGitDirectory(task.path);
+			if (!hasGit) {
+				// Not a git repo, return null to filter it out
+				return null;
 			}
-
-			result.isGitRepo = true;
 		} catch (error) {
 			result.error = `Failed to process: ${(error as Error).message}`;
 		}
@@ -202,64 +203,9 @@ export class MultiProjectService implements IMultiProjectService {
 		return result;
 	}
 
-	/**
-	 * Quick git repository validation with minimal overhead
-	 */
-	private async quickValidateGitRepository(
-		projectPath: string,
-	): Promise<boolean> {
-		try {
-			// Just check if we can get git directory - faster than full validation
-			execSync('git rev-parse --git-dir', {
-				cwd: projectPath,
-				encoding: 'utf8',
-				stdio: 'pipe',
-				timeout: 1000, // 1 second timeout for faster failures
-			});
-			return true;
-		} catch {
-			// Also check for bare repositories
-			try {
-				const result = execSync('git rev-parse --is-bare-repository', {
-					cwd: projectPath,
-					encoding: 'utf8',
-					stdio: 'pipe',
-					timeout: 1000,
-				}).trim();
-				return result === 'true';
-			} catch {
-				return false;
-			}
-		}
-	}
-
 	async validateGitRepository(projectPath: string): Promise<boolean> {
-		try {
-			// Check for .git directory or file (for worktrees)
-			const gitPath = path.join(projectPath, '.git');
-			await fs.access(gitPath);
-
-			// Verify it's a valid git repository by running a git command
-			execSync('git rev-parse --git-dir', {
-				cwd: projectPath,
-				encoding: 'utf8',
-				stdio: 'pipe',
-			});
-
-			return true;
-		} catch {
-			// Also check if it's a bare repository
-			try {
-				execSync('git rev-parse --is-bare-repository', {
-					cwd: projectPath,
-					encoding: 'utf8',
-					stdio: 'pipe',
-				});
-				return true;
-			} catch {
-				return false;
-			}
-		}
+		// Simply check for .git directory existence
+		return this.hasGitDirectory(projectPath);
 	}
 
 	// Helper method to get a cached project

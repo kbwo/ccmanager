@@ -329,35 +329,24 @@ describe('MultiProjectService', () => {
 		});
 
 		it('should return true for valid git repository', async () => {
-			vi.mocked(fs.access).mockResolvedValue(undefined);
-			vi.mocked(execSync).mockReturnValue('.git');
+			vi.mocked(fs.stat).mockResolvedValue({
+				isDirectory: () => true,
+				isFile: () => false,
+			} as any);
 
 			const result = await service.validateGitRepository('/path/to/repo');
 			expect(result).toBe(true);
 		});
 
-		it('should return true for bare repository', async () => {
-			vi.mocked(fs.access).mockRejectedValue(new Error('No .git'));
-
-			vi.mocked(execSync).mockImplementation(cmd => {
-				// Check which git command is being called
-				if (cmd.includes('--git-dir')) {
-					throw new Error('Not regular repo');
-				} else if (cmd.includes('--is-bare-repository')) {
-					return 'true';
-				}
-				throw new Error('Unknown command');
-			});
+		it('should return false for bare repository (no .git directory)', async () => {
+			vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
 			const result = await service.validateGitRepository('/path/to/bare-repo');
-			expect(result).toBe(true);
+			expect(result).toBe(false);
 		});
 
 		it('should return false for non-git directory', async () => {
-			vi.mocked(fs.access).mockRejectedValue(new Error('No .git'));
-			vi.mocked(execSync).mockImplementation(() => {
-				throw new Error('Not a git repo');
-			});
+			vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
 			const result = await service.validateGitRepository('/path/to/normal-dir');
 			expect(result).toBe(false);
@@ -400,8 +389,10 @@ describe('MultiProjectService', () => {
 		it('should refresh single project', async () => {
 			const projectPath = '/home/user/projects/myproject';
 
-			vi.mocked(fs.access).mockResolvedValue(undefined);
-			vi.mocked(execSync).mockReturnValue('.git');
+			vi.mocked(fs.stat).mockResolvedValue({
+				isDirectory: () => true,
+				isFile: () => false,
+			} as any);
 
 			const refreshedProject = await service.refreshProject(projectPath);
 
@@ -418,15 +409,14 @@ describe('MultiProjectService', () => {
 			const projectPath = '/home/user/projects/myproject';
 
 			// First, add to cache - setup valid project
-			vi.mocked(fs.access).mockResolvedValue(undefined);
-			vi.mocked(execSync).mockReturnValue('.git');
+			vi.mocked(fs.stat).mockResolvedValue({
+				isDirectory: () => true,
+				isFile: () => false,
+			} as any);
 			await service.refreshProject(projectPath);
 
 			// Now make it invalid
-			vi.mocked(fs.access).mockRejectedValue(new Error('No .git'));
-			vi.mocked(execSync).mockImplementation(() => {
-				throw new Error('Not a git repo');
-			});
+			vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
 			const refreshedProject = await service.refreshProject(projectPath);
 
