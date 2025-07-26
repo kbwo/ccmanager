@@ -379,9 +379,11 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 			<Menu
 				key={menuKey}
 				sessionManager={sessionManager}
+				worktreeService={worktreeService}
 				onSelectWorktree={handleSelectWorktree}
 				error={error}
 				onDismissError={() => setError(null)}
+				projectName={selectedProject?.name}
 			/>
 		);
 	}

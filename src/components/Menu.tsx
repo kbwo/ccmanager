@@ -18,9 +18,11 @@ import {
 
 interface MenuProps {
 	sessionManager: SessionManager;
+	worktreeService: WorktreeService;
 	onSelectWorktree: (worktree: Worktree) => void;
 	error?: string | null;
 	onDismissError?: () => void;
+	projectName?: string;
 }
 
 interface MenuItem {
@@ -31,9 +33,11 @@ interface MenuItem {
 
 const Menu: React.FC<MenuProps> = ({
 	sessionManager,
+	worktreeService,
 	onSelectWorktree,
 	error,
 	onDismissError,
+	projectName,
 }) => {
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
@@ -43,7 +47,6 @@ const Menu: React.FC<MenuProps> = ({
 
 	useEffect(() => {
 		// Load worktrees
-		const worktreeService = new WorktreeService();
 		const loadedWorktrees = worktreeService.getWorktrees();
 		setBaseWorktrees(loadedWorktrees);
 		setDefaultBranch(worktreeService.getDefaultBranch());
@@ -72,7 +75,7 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager]);
+	}, [sessionManager, worktreeService]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
@@ -114,12 +117,21 @@ const Menu: React.FC<MenuProps> = ({
 			label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
 			value: 'configuration',
 		});
-		menuItems.push({
-			label: `Q ${MENU_ICONS.EXIT} Exit`,
-			value: 'exit',
-		});
+		if (projectName) {
+			// In multi-project mode, show 'Back to project list'
+			menuItems.push({
+				label: `B 🔙 Back to project list`,
+				value: 'back-to-projects',
+			});
+		} else {
+			// In single-project mode, show 'Exit'
+			menuItems.push({
+				label: `Q ${MENU_ICONS.EXIT} Exit`,
+				value: 'exit',
+			});
+		}
 		setItems(menuItems);
-	}, [worktrees, sessions, defaultBranch]);
+	}, [worktrees, sessions, defaultBranch, projectName]);
 
 	// Handle hotkeys
 	useInput((input, _key) => {
@@ -177,15 +189,28 @@ const Menu: React.FC<MenuProps> = ({
 					hasSession: false,
 				});
 				break;
+			case 'b':
+				// In multi-project mode, go back to project list
+				if (projectName) {
+					onSelectWorktree({
+						path: 'EXIT_APPLICATION',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				}
+				break;
 			case 'q':
 			case 'x':
-				// Trigger exit action
-				onSelectWorktree({
-					path: 'EXIT_APPLICATION',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				// Trigger exit action (only in single-project mode)
+				if (!projectName) {
+					onSelectWorktree({
+						path: 'EXIT_APPLICATION',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				}
 				break;
 		}
 	});
@@ -233,6 +258,14 @@ const Menu: React.FC<MenuProps> = ({
 				isMainWorktree: false,
 				hasSession: false,
 			});
+		} else if (item.value === 'back-to-projects') {
+			// Handle in parent component - use special marker
+			onSelectWorktree({
+				path: 'EXIT_APPLICATION',
+				branch: '',
+				isMainWorktree: false,
+				hasSession: false,
+			});
 		} else if (item.worktree) {
 			onSelectWorktree(item.worktree);
 		}
@@ -243,6 +276,7 @@ const Menu: React.FC<MenuProps> = ({
 			<Box marginBottom={1}>
 				<Text bold color="green">
 					CCManager - Claude Code Worktree Manager
+					{projectName ? ` - ${projectName}` : ''}
 				</Text>
 			</Box>
 
@@ -275,7 +309,8 @@ const Menu: React.FC<MenuProps> = ({
 				</Text>
 				<Text dimColor>
 					Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first
-					10) N-New M-Merge D-Delete C-Config Q-Quit
+					10) N-New M-Merge D-Delete C-Config{' '}
+					{projectName ? 'B-Back' : 'Q-Quit'}
 				</Text>
 			</Box>
 		</Box>
