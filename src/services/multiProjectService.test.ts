@@ -2,6 +2,12 @@ import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
 import {MultiProjectService} from './multiProjectService.js';
 import {promises as fs} from 'fs';
 import {execSync} from 'child_process';
+import type {Stats, Dirent, PathLike} from 'fs';
+import type {ExecSyncOptions} from 'child_process';
+
+// Type assertion helper to avoid ESLint no-explicit-any errors
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFunction = (...args: any[]) => any;
 
 vi.mock('fs', () => ({
 	promises: {
@@ -43,27 +49,27 @@ describe('MultiProjectService', () => {
 					path === `${mockProjectsDir}/project1/.git` ||
 					path === `${mockProjectsDir}/project2/.git`
 				) {
-					return {isDirectory: () => true, isFile: () => false} as any;
+					return {isDirectory: () => true, isFile: () => false} as Stats;
 				}
 				throw new Error('Not found');
 			});
 
-			vi.mocked(fs.readdir).mockImplementation(async dir => {
+			vi.mocked(fs.readdir).mockImplementation((async (dir: PathLike) => {
 				if (dir === mockProjectsDir) {
 					return [
 						{name: 'project1', isDirectory: () => true},
 						{name: 'project2', isDirectory: () => true},
 						{name: 'not-a-repo', isDirectory: () => true},
 						{name: 'file.txt', isDirectory: () => false},
-					] as any;
+					] as unknown as Dirent[];
 				}
 				return [];
-			});
+			}) as AnyFunction);
 
 			vi.mocked(execSync).mockImplementation((cmd, _options) => {
-				const cwd = (_options as any).cwd;
+				const cwd = (_options as ExecSyncOptions)?.cwd?.toString();
 				if (cmd.includes('rev-parse --git-dir')) {
-					if (cwd.includes('project1') || cwd.includes('project2')) {
+					if (cwd?.includes('project1') || cwd?.includes('project2')) {
 						return '.git';
 					}
 					throw new Error('Not a git repo');
@@ -98,31 +104,35 @@ describe('MultiProjectService', () => {
 					path === `${mockProjectsDir}/frontend/app/.git` ||
 					path === `${mockProjectsDir}/backend/app/.git`
 				) {
-					return {isDirectory: () => true, isFile: () => false} as any;
+					return {isDirectory: () => true, isFile: () => false} as Stats;
 				}
 				throw new Error('Not found');
 			});
 
-			vi.mocked(fs.readdir).mockImplementation(async dir => {
+			vi.mocked(fs.readdir).mockImplementation((async (dir: PathLike) => {
 				if (dir === mockProjectsDir) {
 					return [
 						{name: 'frontend', isDirectory: () => true},
 						{name: 'backend', isDirectory: () => true},
-					] as any;
+					] as unknown as Dirent[];
 				}
 				if (dir === `${mockProjectsDir}/frontend`) {
-					return [{name: 'app', isDirectory: () => true}] as any;
+					return [
+						{name: 'app', isDirectory: () => true},
+					] as unknown as Dirent[];
 				}
 				if (dir === `${mockProjectsDir}/backend`) {
-					return [{name: 'app', isDirectory: () => true}] as any;
+					return [
+						{name: 'app', isDirectory: () => true},
+					] as unknown as Dirent[];
 				}
 				return [];
-			});
+			}) as AnyFunction);
 
 			vi.mocked(execSync).mockImplementation((cmd, _options) => {
-				const cwd = (_options as any).cwd;
+				const cwd = (_options as ExecSyncOptions)?.cwd?.toString();
 				if (cmd.includes('rev-parse --git-dir')) {
-					if (cwd.includes('/app')) {
+					if (cwd?.includes('/app')) {
 						return '.git';
 					}
 					throw new Error('Not a git repo');
@@ -161,25 +171,25 @@ describe('MultiProjectService', () => {
 
 			vi.mocked(fs.stat).mockImplementation(async path => {
 				if (path === `${mockProjectsDir}/valid-repo/.git`) {
-					return {isDirectory: () => true, isFile: () => false} as any;
+					return {isDirectory: () => true, isFile: () => false} as Stats;
 				}
 				throw new Error('Not found');
 			});
 
-			vi.mocked(fs.readdir).mockImplementation(async dir => {
+			vi.mocked(fs.readdir).mockImplementation((async (dir: PathLike) => {
 				if (dir === mockProjectsDir) {
 					return [
 						{name: 'valid-repo', isDirectory: () => true},
 						{name: 'corrupted-repo', isDirectory: () => true},
-					] as any;
+					] as unknown as Dirent[];
 				}
 				return [];
-			});
+			}) as AnyFunction);
 
 			vi.mocked(execSync).mockImplementation((cmd, _options) => {
-				const cwd = (_options as any).cwd;
+				const cwd = (_options as ExecSyncOptions)?.cwd?.toString();
 				if (cmd.includes('rev-parse --git-dir')) {
-					if (cwd.includes('valid-repo')) {
+					if (cwd?.includes('valid-repo')) {
 						return '.git';
 					}
 					throw new Error('Not a git repo');
@@ -212,31 +222,35 @@ describe('MultiProjectService', () => {
 					path === `${mockProjectsDir}/org1/repo1/.git` ||
 					path === `${mockProjectsDir}/org2/repo2/.git`
 				) {
-					return {isDirectory: () => true, isFile: () => false} as any;
+					return {isDirectory: () => true, isFile: () => false} as Stats;
 				}
 				throw new Error('Not found');
 			});
 
-			vi.mocked(fs.readdir).mockImplementation(async dir => {
+			vi.mocked(fs.readdir).mockImplementation((async (dir: PathLike) => {
 				if (dir === mockProjectsDir) {
 					return [
 						{name: 'org1', isDirectory: () => true},
 						{name: 'org2', isDirectory: () => true},
-					] as any;
+					] as unknown as Dirent[];
 				}
 				if (dir === `${mockProjectsDir}/org1`) {
-					return [{name: 'repo1', isDirectory: () => true}] as any;
+					return [
+						{name: 'repo1', isDirectory: () => true},
+					] as unknown as Dirent[];
 				}
 				if (dir === `${mockProjectsDir}/org2`) {
-					return [{name: 'repo2', isDirectory: () => true}] as any;
+					return [
+						{name: 'repo2', isDirectory: () => true},
+					] as unknown as Dirent[];
 				}
 				return [];
-			});
+			}) as AnyFunction);
 
 			vi.mocked(execSync).mockImplementation((cmd, _options) => {
-				const cwd = (_options as any).cwd;
+				const cwd = (_options as ExecSyncOptions)?.cwd?.toString();
 				if (cmd.includes('rev-parse --git-dir')) {
-					if (cwd.includes('repo1') || cwd.includes('repo2')) {
+					if (cwd?.includes('repo1') || cwd?.includes('repo2')) {
 						return '.git';
 					}
 					throw new Error('Not a git repo');
@@ -270,29 +284,29 @@ describe('MultiProjectService', () => {
 					path === `${mockProjectsDir}/project-with-worktrees/.git` ||
 					path === `${mockProjectsDir}/project-without-worktrees/.git`
 				) {
-					return {isDirectory: () => true, isFile: () => false} as any;
+					return {isDirectory: () => true, isFile: () => false} as Stats;
 				}
 				throw new Error('Not found');
 			});
 
-			vi.mocked(fs.readdir).mockImplementation(async dir => {
+			vi.mocked(fs.readdir).mockImplementation((async (dir: PathLike) => {
 				if (dir === mockProjectsDir) {
 					return [
 						{name: 'project-with-worktrees', isDirectory: () => true},
 						{name: 'project-without-worktrees', isDirectory: () => true},
-					] as any;
+					] as unknown as Dirent[];
 				}
 				return [];
-			});
+			}) as AnyFunction);
 
 			vi.mocked(execSync).mockImplementation((cmd, _options) => {
-				const cwd = (_options as any).cwd;
+				const cwd = (_options as ExecSyncOptions)?.cwd?.toString();
 
 				// git rev-parse --git-dir
 				if (cmd.includes('--git-dir')) {
 					if (
-						cwd.includes('project-with-worktrees') ||
-						cwd.includes('project-without-worktrees')
+						cwd?.includes('project-with-worktrees') ||
+						cwd?.includes('project-without-worktrees')
 					) {
 						return '.git';
 					}
@@ -301,10 +315,10 @@ describe('MultiProjectService', () => {
 
 				// git worktree list --porcelain
 				if (cmd.includes('worktree list')) {
-					if (cwd.includes('project-with-worktrees')) {
+					if (cwd?.includes('project-with-worktrees')) {
 						// Multiple worktrees
 						return 'worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main\n\nworktree /path/to/feature\nHEAD def456\nbranch refs/heads/feature';
-					} else if (cwd.includes('project-without-worktrees')) {
+					} else if (cwd?.includes('project-without-worktrees')) {
 						// Only main worktree
 						return 'worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main';
 					}
@@ -332,7 +346,7 @@ describe('MultiProjectService', () => {
 			vi.mocked(fs.stat).mockResolvedValue({
 				isDirectory: () => true,
 				isFile: () => false,
-			} as any);
+			} as Stats);
 
 			const result = await service.validateGitRepository('/path/to/repo');
 			expect(result).toBe(true);
@@ -358,12 +372,13 @@ describe('MultiProjectService', () => {
 			const mockProjectsDir = '/home/user/projects';
 
 			vi.mocked(fs.access).mockResolvedValue(undefined);
-			vi.mocked(fs.readdir).mockResolvedValue([
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(vi.mocked(fs.readdir) as any).mockResolvedValue([
 				{name: 'project1', isDirectory: () => true},
-			] as any);
+			] as unknown as Dirent[]);
 			vi.mocked(fs.stat).mockImplementation(async path => {
 				if (path === `${mockProjectsDir}/project1/.git`) {
-					return {isDirectory: () => true, isFile: () => false} as any;
+					return {isDirectory: () => true, isFile: () => false} as Stats;
 				}
 				throw new Error('Not found');
 			});
@@ -392,7 +407,7 @@ describe('MultiProjectService', () => {
 			vi.mocked(fs.stat).mockResolvedValue({
 				isDirectory: () => true,
 				isFile: () => false,
-			} as any);
+			} as Stats);
 
 			const refreshedProject = await service.refreshProject(projectPath);
 
@@ -412,7 +427,7 @@ describe('MultiProjectService', () => {
 			vi.mocked(fs.stat).mockResolvedValue({
 				isDirectory: () => true,
 				isFile: () => false,
-			} as any);
+			} as Stats);
 			await service.refreshProject(projectPath);
 
 			// Now make it invalid
