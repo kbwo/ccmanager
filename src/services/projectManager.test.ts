@@ -3,7 +3,7 @@ import {ProjectManager} from './projectManager.js';
 import {WorktreeService} from './worktreeService.js';
 import {MultiProjectService} from './multiProjectService.js';
 import {GitProject} from '../types/index.js';
-import {MULTI_PROJECT_ENV_VARS} from '../constants/multiProject.js';
+import {ENV_VARS} from '../constants/env.js';
 
 vi.mock('./worktreeService.js');
 vi.mock('./multiProjectService.js');
@@ -25,8 +25,8 @@ describe('ProjectManager', () => {
 
 	describe('initialization', () => {
 		it('should initialize in normal mode when no env vars are set', () => {
-			delete process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT];
-			delete process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR];
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 
 			projectManager = new ProjectManager();
 
@@ -36,8 +36,8 @@ describe('ProjectManager', () => {
 		});
 
 		it('should initialize in multi-project mode when env vars are set', () => {
-			process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
-			process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR] = '/home/user/projects';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/home/user/projects';
 
 			projectManager = new ProjectManager();
 
@@ -45,8 +45,8 @@ describe('ProjectManager', () => {
 		});
 
 		it('should fall back to normal mode if PROJECTS_DIR is not set', () => {
-			process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
-			delete process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR];
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 
 			projectManager = new ProjectManager();
 
@@ -56,8 +56,8 @@ describe('ProjectManager', () => {
 
 	describe('mode switching', () => {
 		beforeEach(() => {
-			process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
-			process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR] = '/home/user/projects';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/home/user/projects';
 			projectManager = new ProjectManager();
 		});
 
@@ -151,8 +151,8 @@ describe('ProjectManager', () => {
 
 	describe('refreshProjects', () => {
 		beforeEach(() => {
-			process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
-			process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR] = '/home/user/projects';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/home/user/projects';
 			projectManager = new ProjectManager();
 		});
 
@@ -227,7 +227,7 @@ describe('ProjectManager', () => {
 		});
 
 		it('should throw error if projects directory not configured', async () => {
-			delete process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR];
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 			projectManager = new ProjectManager();
 
 			await expect(projectManager.refreshProjects()).rejects.toThrow(
@@ -238,21 +238,21 @@ describe('ProjectManager', () => {
 
 	describe('helper methods', () => {
 		it('should check if multi-project is enabled', () => {
-			delete process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT];
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 			projectManager = new ProjectManager();
 			expect(projectManager.isMultiProjectEnabled()).toBe(false);
 
-			process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = 'true';
 			projectManager = new ProjectManager();
 			expect(projectManager.isMultiProjectEnabled()).toBe(true);
 		});
 
 		it('should get projects directory', () => {
-			process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR] = '/test/dir';
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/test/dir';
 			projectManager = new ProjectManager();
 			expect(projectManager.getProjectsDir()).toBe('/test/dir');
 
-			delete process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR];
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 			projectManager = new ProjectManager();
 			expect(projectManager.getProjectsDir()).toBeUndefined();
 		});

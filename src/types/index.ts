@@ -144,6 +144,7 @@ export interface IProjectManager {
 
 export interface IWorktreeService {
 	getWorktrees(): Worktree[];
+	getGitRootPath(): string;
 	createWorktree(
 		worktreePath: string,
 		branch: string,

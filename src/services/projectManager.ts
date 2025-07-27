@@ -6,7 +6,7 @@ import {
 } from '../types/index.js';
 import {WorktreeService} from './worktreeService.js';
 import {MultiProjectService} from './multiProjectService.js';
-import {MULTI_PROJECT_ENV_VARS} from '../constants/multiProject.js';
+import {ENV_VARS} from '../constants/env.js';
 
 export class ProjectManager implements IProjectManager {
 	currentMode: MenuMode;
@@ -19,9 +19,8 @@ export class ProjectManager implements IProjectManager {
 
 	constructor() {
 		// Initialize mode based on environment variables
-		const multiProjectRoot =
-			process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT];
-		this.projectsDir = process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR];
+		const multiProjectRoot = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		this.projectsDir = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 
 		// Set initial mode
 		this.currentMode = multiProjectRoot ? 'multi-project' : 'normal';
@@ -88,7 +87,7 @@ export class ProjectManager implements IProjectManager {
 	// Helper methods
 
 	isMultiProjectEnabled(): boolean {
-		return !!process.env[MULTI_PROJECT_ENV_VARS.MULTI_PROJECT_ROOT];
+		return !!process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 	}
 
 	getProjectsDir(): string | undefined {

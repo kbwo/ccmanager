@@ -15,12 +15,13 @@ import {
 export class ConfigurationManager {
 	private configPath: string;
 	private legacyShortcutsPath: string;
+	private configDir: string;
 	private config: ConfigurationData = {};
 
 	constructor() {
 		// Determine config directory based on platform
 		const homeDir = homedir();
-		const configDir =
+		this.configDir =
 			process.platform === 'win32'
 				? join(
 						process.env['APPDATA'] || join(homeDir, 'AppData', 'Roaming'),
@@ -29,12 +30,12 @@ export class ConfigurationManager {
 				: join(homeDir, '.config', 'ccmanager');
 
 		// Ensure config directory exists
-		if (!existsSync(configDir)) {
-			mkdirSync(configDir, {recursive: true});
+		if (!existsSync(this.configDir)) {
+			mkdirSync(this.configDir, {recursive: true});
 		}
 
-		this.configPath = join(configDir, 'config.json');
-		this.legacyShortcutsPath = join(configDir, 'shortcuts.json');
+		this.configPath = join(this.configDir, 'config.json');
+		this.legacyShortcutsPath = join(this.configDir, 'shortcuts.json');
 		this.loadConfig();
 	}
 

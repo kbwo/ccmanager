@@ -18,7 +18,9 @@ import {
 } from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
-import {MULTI_PROJECT_ENV_VARS} from '../constants/multiProject.js';
+import {ENV_VARS} from '../constants/env.js';
+import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
+import {recentProjectsService} from '../services/recentProjectsService.js';
 
 type View =
 	| 'menu'
@@ -341,6 +343,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		// Set the selected project and update worktree service
 		setSelectedProject(project);
 		setWorktreeService(new WorktreeService(project.path));
+		// Add to recent projects
+		recentProjectsService.addRecentProject(project);
 		setView('menu');
 	};
 
@@ -352,14 +356,11 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	};
 
 	if (view === 'project-list' && multiProject) {
-		const projectsDir = process.env[MULTI_PROJECT_ENV_VARS.PROJECTS_DIR];
+		const projectsDir = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 		if (!projectsDir) {
 			return (
 				<Box>
-					<Text color="red">
-						Error: {MULTI_PROJECT_ENV_VARS.PROJECTS_DIR} environment variable
-						not set
-					</Text>
+					<Text color="red">Error: {MULTI_PROJECT_ERRORS.NO_PROJECTS_DIR}</Text>
 				</Box>
 			);
 		}
@@ -381,9 +382,11 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
 				onSelectWorktree={handleSelectWorktree}
+				onSelectRecentProject={handleSelectProject}
 				error={error}
 				onDismissError={() => setError(null)}
 				projectName={selectedProject?.name}
+				multiProject={multiProject}
 			/>
 		);
 	}

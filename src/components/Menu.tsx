@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import {Worktree, Session} from '../types/index.js';
+import {Worktree, Session, GitProject} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {
@@ -15,41 +15,90 @@ import {
 	calculateColumnPositions,
 	assembleWorktreeLabel,
 } from '../utils/worktreeUtils.js';
+import {
+	recentProjectsService,
+	RecentProject,
+} from '../services/recentProjectsService.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
 	worktreeService: WorktreeService;
 	onSelectWorktree: (worktree: Worktree) => void;
+	onSelectRecentProject?: (project: GitProject) => void;
 	error?: string | null;
 	onDismissError?: () => void;
 	projectName?: string;
+	multiProject?: boolean;
 }
 
-interface MenuItem {
+interface CommonItem {
+	type: 'common';
 	label: string;
 	value: string;
-	worktree?: Worktree;
 }
+
+interface WorktreeItem {
+	type: 'worktree';
+	label: string;
+	value: string;
+	worktree: Worktree;
+}
+
+interface ProjectItem {
+	type: 'project';
+	label: string;
+	value: string;
+	recentProject: RecentProject;
+}
+
+type MenuItem = CommonItem | WorktreeItem | ProjectItem;
+
+const createSeparatorWithText = (
+	text: string,
+	totalWidth: number = 35,
+): string => {
+	const textWithSpaces = ` ${text} `;
+	const textLength = textWithSpaces.length;
+	const remainingWidth = totalWidth - textLength;
+	const leftDashes = Math.floor(remainingWidth / 2);
+	const rightDashes = Math.ceil(remainingWidth / 2);
+
+	return '─'.repeat(leftDashes) + textWithSpaces + '─'.repeat(rightDashes);
+};
 
 const Menu: React.FC<MenuProps> = ({
 	sessionManager,
 	worktreeService,
 	onSelectWorktree,
+	onSelectRecentProject,
 	error,
 	onDismissError,
 	projectName,
+	multiProject = false,
 }) => {
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
 	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
+	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 
 	useEffect(() => {
 		// Load worktrees
 		const loadedWorktrees = worktreeService.getWorktrees();
 		setBaseWorktrees(loadedWorktrees);
 		setDefaultBranch(worktreeService.getDefaultBranch());
+
+		// Load recent projects if in multi-project mode
+		if (multiProject) {
+			// Filter out the current project from recent projects
+			const allRecentProjects = recentProjectsService.getRecentProjects();
+			const currentProjectPath = worktreeService.getGitRootPath();
+			const filteredProjects = allRecentProjects.filter(
+				project => project.path !== currentProjectPath,
+			);
+			setRecentProjects(filteredProjects);
+		}
 
 		// Update sessions
 		const updateSessions = () => {
@@ -75,7 +124,7 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager, worktreeService]);
+	}, [sessionManager, worktreeService, multiProject]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
@@ -83,55 +132,92 @@ const Menu: React.FC<MenuProps> = ({
 		const columnPositions = calculateColumnPositions(items);
 
 		// Build menu items with proper alignment
-		const menuItems: MenuItem[] = items.map((item, index) => {
+		const menuItems: MenuItem[] = items.map((item, index): WorktreeItem => {
 			const label = assembleWorktreeLabel(item, columnPositions);
 
 			// Only show numbers for first 10 worktrees (0-9)
 			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
 
 			return {
+				type: 'worktree',
 				label: numberPrefix + label,
 				value: item.worktree.path,
 				worktree: item.worktree,
 			};
 		});
 
+		// Add recent projects section if enabled and has recent projects
+		if (multiProject && recentProjects.length > 0) {
+			menuItems.push({
+				type: 'common',
+				label: createSeparatorWithText('Recent'),
+				value: 'recent-separator',
+			});
+
+			// Add recent projects
+			recentProjects.forEach((project, index) => {
+				menuItems.push({
+					type: 'project',
+					label: `${project.name}`,
+					value: `recent-project-${index}`,
+					recentProject: project,
+				});
+			});
+		}
+
 		// Add menu options
-		menuItems.push({
-			label: '─────────────',
-			value: 'separator',
-		});
-		menuItems.push({
-			label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
-			value: 'new-worktree',
-		});
-		menuItems.push({
-			label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
-			value: 'merge-worktree',
-		});
-		menuItems.push({
-			label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
-			value: 'delete-worktree',
-		});
-		menuItems.push({
-			label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
-			value: 'configuration',
-		});
+		const otherMenuItems: MenuItem[] = [
+			{
+				type: 'common',
+				label: createSeparatorWithText('Other'),
+				value: 'other-separator',
+			},
+			{
+				type: 'common',
+				label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
+				value: 'new-worktree',
+			},
+			{
+				type: 'common',
+				label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
+				value: 'merge-worktree',
+			},
+			{
+				type: 'common',
+				label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
+				value: 'delete-worktree',
+			},
+			{
+				type: 'common',
+				label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
+				value: 'configuration',
+			},
+		];
+		menuItems.push(...otherMenuItems);
 		if (projectName) {
 			// In multi-project mode, show 'Back to project list'
 			menuItems.push({
+				type: 'common',
 				label: `B 🔙 Back to project list`,
 				value: 'back-to-projects',
 			});
 		} else {
 			// In single-project mode, show 'Exit'
 			menuItems.push({
+				type: 'common',
 				label: `Q ${MENU_ICONS.EXIT} Exit`,
 				value: 'exit',
 			});
 		}
 		setItems(menuItems);
-	}, [worktrees, sessions, defaultBranch, projectName]);
+	}, [
+		worktrees,
+		sessions,
+		defaultBranch,
+		projectName,
+		multiProject,
+		recentProjects,
+	]);
 
 	// Handle hotkeys
 	useInput((input, _key) => {
@@ -216,8 +302,19 @@ const Menu: React.FC<MenuProps> = ({
 	});
 
 	const handleSelect = (item: MenuItem) => {
-		if (item.value === 'separator') {
-			// Do nothing for separator
+		if (item.value.endsWith('-separator') || item.value === 'recent-header') {
+			// Do nothing for separators and headers
+		} else if (item.type === 'project') {
+			// Handle recent project selection
+			if (onSelectRecentProject) {
+				const project: GitProject = {
+					path: item.recentProject.path,
+					name: item.recentProject.name,
+					relativePath: item.recentProject.path,
+					isValid: true,
+				};
+				onSelectRecentProject(project);
+			}
 		} else if (item.value === 'new-worktree') {
 			// Handle in parent component
 			onSelectWorktree({
@@ -266,7 +363,7 @@ const Menu: React.FC<MenuProps> = ({
 				isMainWorktree: false,
 				hasSession: false,
 			});
-		} else if (item.worktree) {
+		} else if (item.type === 'worktree') {
 			onSelectWorktree(item.worktree);
 		}
 	};
@@ -286,7 +383,11 @@ const Menu: React.FC<MenuProps> = ({
 				</Text>
 			</Box>
 
-			<SelectInput items={items} onSelect={handleSelect} isFocused={!error} />
+			<SelectInput
+				items={items}
+				onSelect={item => handleSelect(item as MenuItem)}
+				isFocused={!error}
+			/>
 
 			{error && (
 				<Box marginTop={1} paddingX={1} borderStyle="round" borderColor="red">

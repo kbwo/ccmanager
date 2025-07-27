@@ -38,6 +38,103 @@ describe('WorktreeService', () => {
 		service = new WorktreeService('/fake/path');
 	});
 
+	describe('getGitRootPath', () => {
+		it('should always return an absolute path when git command returns absolute path', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --git-common-dir'
+				) {
+					return '/absolute/repo/.git\n';
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const service = new WorktreeService('/some/path');
+			const result = service.getGitRootPath();
+
+			expect(result).toBe('/absolute/repo');
+			expect(result.startsWith('/')).toBe(true);
+		});
+
+		it('should convert relative path to absolute path', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --git-common-dir'
+				) {
+					return '.git\n';
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const service = new WorktreeService('/work/project');
+			const result = service.getGitRootPath();
+
+			// Should resolve relative .git to absolute path
+			expect(result).toBe('/work/project');
+			expect(result.startsWith('/')).toBe(true);
+		});
+
+		it('should handle relative paths with subdirectories', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --git-common-dir'
+				) {
+					return '../.git\n';
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const service = new WorktreeService('/work/project/subdir');
+			const result = service.getGitRootPath();
+
+			// Should resolve relative ../.git to absolute path
+			expect(result).toBe('/work/project');
+			expect(result.startsWith('/')).toBe(true);
+		});
+
+		it('should return absolute path on git command failure', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --git-common-dir'
+				) {
+					throw new Error('Not a git repository');
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const service = new WorktreeService('relative/path');
+			const result = service.getGitRootPath();
+
+			// Should convert relative path to absolute path
+			expect(result.startsWith('/')).toBe(true);
+			expect(result.endsWith('relative/path')).toBe(true);
+		});
+
+		it('should handle worktree paths correctly', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --git-common-dir'
+				) {
+					// Worktrees often return paths like: /path/to/main/.git/worktrees/feature
+					return '/main/repo/.git/worktrees/feature\n';
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const service = new WorktreeService('/main/repo/feature-worktree');
+			const result = service.getGitRootPath();
+
+			// Should get the parent of .git directory
+			expect(result).toBe('/main/repo');
+			expect(result.startsWith('/')).toBe(true);
+		});
+	});
+
 	describe('getDefaultBranch', () => {
 		it('should return default branch from origin', () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
