@@ -20,6 +20,7 @@ import {
 	RecentProject,
 } from '../services/recentProjectsService.js';
 import TextInputWrapper from './TextInputWrapper.js';
+import {useSearchMode} from '../hooks/useSearchMode.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -83,9 +84,12 @@ const Menu: React.FC<MenuProps> = ({
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
-	const [isSearchMode, setIsSearchMode] = useState(false);
-	const [searchQuery, setSearchQuery] = useState('');
-	const [selectedIndex, setSelectedIndex] = useState(0);
+
+	// Use the search mode hook
+	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
+		useSearchMode(items.length, {
+			isDisabled: !!error,
+		});
 
 	useEffect(() => {
 		// Load worktrees
@@ -249,15 +253,8 @@ const Menu: React.FC<MenuProps> = ({
 		isSearchMode,
 	]);
 
-	// Reset selected index when items change in search mode
-	useEffect(() => {
-		if (isSearchMode && selectedIndex >= items.length) {
-			setSelectedIndex(Math.max(0, items.length - 1));
-		}
-	}, [items, isSearchMode, selectedIndex]);
-
 	// Handle hotkeys
-	useInput((input, key) => {
+	useInput((input, _key) => {
 		// Skip in test environment to avoid stdin.ref error
 		if (!process.stdin.setRawMode) {
 			return;
@@ -269,43 +266,12 @@ const Menu: React.FC<MenuProps> = ({
 			return;
 		}
 
-		// Handle ESC key
-		if (key.escape) {
-			if (isSearchMode) {
-				// Exit search mode but keep filter
-				setIsSearchMode(false);
-			} else {
-				// Clear filter when not in search mode
-				setSearchQuery('');
-			}
-			return;
-		}
-
-		// Handle Enter key in search mode to exit search mode but keep filter
-		if (key.return && isSearchMode) {
-			setIsSearchMode(false);
-			return;
-		}
-
-		// Handle arrow keys in search mode for navigation
+		// Don't process other keys if in search mode (handled by useSearchMode)
 		if (isSearchMode) {
-			if (key.upArrow && selectedIndex > 0) {
-				setSelectedIndex(selectedIndex - 1);
-			} else if (key.downArrow && selectedIndex < items.length - 1) {
-				setSelectedIndex(selectedIndex + 1);
-			}
 			return;
 		}
 
 		const keyPressed = input.toLowerCase();
-
-		// Handle "/" key to enter search mode
-		if (input === '/') {
-			setIsSearchMode(true);
-			// Don't clear search query - preserve current filter
-			setSelectedIndex(0);
-			return;
-		}
 
 		// Handle number keys 0-9 for worktree selection (first 10 only)
 		if (/^[0-9]$/.test(keyPressed)) {

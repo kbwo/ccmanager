@@ -5,6 +5,7 @@ import {GitProject} from '../types/index.js';
 import {MultiProjectService} from '../services/multiProjectService.js';
 import {MENU_ICONS} from '../constants/statusIcons.js';
 import TextInputWrapper from './TextInputWrapper.js';
+import {useSearchMode} from '../hooks/useSearchMode.js';
 
 interface ProjectListProps {
 	projectsDir: string;
@@ -29,10 +30,14 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
-	const [isSearchMode, setIsSearchMode] = useState(false);
-	const [searchQuery, setSearchQuery] = useState('');
-	const [selectedIndex, setSelectedIndex] = useState(0);
 	const limit = 10;
+
+	// Use the search mode hook
+	const displayError = error || loadError;
+	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
+		useSearchMode(items.length, {
+			isDisabled: !!displayError,
+		});
 
 	const loadProjects = async () => {
 		setLoading(true);
@@ -94,62 +99,27 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		}
 
 		setItems(menuItems);
-		// Reset selected index if it's out of bounds
-		if (selectedIndex >= menuItems.length) {
-			setSelectedIndex(0);
-		}
-	}, [projects, searchQuery, isSearchMode, selectedIndex]);
+	}, [projects, searchQuery, isSearchMode]);
 
 	// Handle hotkeys
-	useInput((input, key) => {
+	useInput((input, _key) => {
 		// Skip in test environment to avoid stdin.ref error
 		if (!process.stdin.setRawMode) {
 			return;
 		}
 
 		// Dismiss error on any key press when error is shown
-		if ((error || loadError) && onDismissError) {
+		if (displayError && onDismissError) {
 			onDismissError();
 			return;
 		}
 
-		// Handle ESC key
-		if (key.escape) {
-			if (isSearchMode) {
-				// Exit search mode but keep filter
-				setIsSearchMode(false);
-			} else {
-				// Clear filter when not in search mode
-				setSearchQuery('');
-			}
-			return;
-		}
-
-		// Handle Enter key in search mode to exit search mode but keep filter
-		if (key.return && isSearchMode) {
-			setIsSearchMode(false);
-			return;
-		}
-
-		// Handle arrow keys in search mode for navigation
+		// Don't process other keys if in search mode (handled by useSearchMode)
 		if (isSearchMode) {
-			if (key.upArrow && selectedIndex > 0) {
-				setSelectedIndex(selectedIndex - 1);
-			} else if (key.downArrow && selectedIndex < items.length - 1) {
-				setSelectedIndex(selectedIndex + 1);
-			}
 			return;
 		}
 
 		const keyPressed = input.toLowerCase();
-
-		// Handle "/" key to enter search mode
-		if (input === '/') {
-			setIsSearchMode(true);
-			// Don't clear search query - preserve current filter
-			setSelectedIndex(0);
-			return;
-		}
 
 		// Handle number keys 0-9 for project selection (first 10 only)
 		if (/^[0-9]$/.test(keyPressed)) {
@@ -204,8 +174,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
 			onSelectProject(item.project);
 		}
 	};
-
-	const displayError = error || loadError;
 
 	return (
 		<Box flexDirection="column">
