@@ -19,6 +19,7 @@ import {
 	recentProjectsService,
 	RecentProject,
 } from '../services/recentProjectsService.js';
+import TextInputWrapper from './TextInputWrapper.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -82,6 +83,9 @@ const Menu: React.FC<MenuProps> = ({
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+	const [isSearchMode, setIsSearchMode] = useState(false);
+	const [searchQuery, setSearchQuery] = useState('');
+	const [selectedIndex, setSelectedIndex] = useState(0);
 
 	useEffect(() => {
 		// Load worktrees
@@ -131,83 +135,107 @@ const Menu: React.FC<MenuProps> = ({
 		const items = prepareWorktreeItems(worktrees, sessions);
 		const columnPositions = calculateColumnPositions(items);
 
+		// Filter worktrees based on search query
+		const filteredItems = searchQuery
+			? items.filter(item => {
+					const branchName = item.worktree.branch || '';
+					const searchLower = searchQuery.toLowerCase();
+					return (
+						branchName.toLowerCase().includes(searchLower) ||
+						item.worktree.path.toLowerCase().includes(searchLower)
+					);
+				})
+			: items;
+
 		// Build menu items with proper alignment
-		const menuItems: MenuItem[] = items.map((item, index): WorktreeItem => {
-			const label = assembleWorktreeLabel(item, columnPositions);
+		const menuItems: MenuItem[] = filteredItems.map(
+			(item, index): WorktreeItem => {
+				const label = assembleWorktreeLabel(item, columnPositions);
 
-			// Only show numbers for first 10 worktrees (0-9)
-			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
+				// Only show numbers for first 10 worktrees (0-9) when not in search mode
+				const numberPrefix = !isSearchMode && index < 10 ? `${index} ❯ ` : '❯ ';
 
-			return {
-				type: 'worktree',
-				label: numberPrefix + label,
-				value: item.worktree.path,
-				worktree: item.worktree,
-			};
-		});
+				return {
+					type: 'worktree',
+					label: numberPrefix + label,
+					value: item.worktree.path,
+					worktree: item.worktree,
+				};
+			},
+		);
 
-		// Add recent projects section if enabled and has recent projects
-		if (multiProject && recentProjects.length > 0) {
-			menuItems.push({
-				type: 'common',
-				label: createSeparatorWithText('Recent'),
-				value: 'recent-separator',
-			});
+		// Filter recent projects based on search query
+		const filteredRecentProjects = searchQuery
+			? recentProjects.filter(project =>
+					project.name.toLowerCase().includes(searchQuery.toLowerCase()),
+				)
+			: recentProjects;
 
-			// Add recent projects
-			recentProjects.forEach((project, index) => {
+		// Add menu options only when not in search mode
+		if (!isSearchMode) {
+			// Add recent projects section if enabled and has recent projects
+			if (multiProject && filteredRecentProjects.length > 0) {
 				menuItems.push({
-					type: 'project',
-					label: `${project.name}`,
-					value: `recent-project-${index}`,
-					recentProject: project,
+					type: 'common',
+					label: createSeparatorWithText('Recent'),
+					value: 'recent-separator',
 				});
-			});
-		}
 
-		// Add menu options
-		const otherMenuItems: MenuItem[] = [
-			{
-				type: 'common',
-				label: createSeparatorWithText('Other'),
-				value: 'other-separator',
-			},
-			{
-				type: 'common',
-				label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
-				value: 'new-worktree',
-			},
-			{
-				type: 'common',
-				label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
-				value: 'merge-worktree',
-			},
-			{
-				type: 'common',
-				label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
-				value: 'delete-worktree',
-			},
-			{
-				type: 'common',
-				label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
-				value: 'configuration',
-			},
-		];
-		menuItems.push(...otherMenuItems);
-		if (projectName) {
-			// In multi-project mode, show 'Back to project list'
-			menuItems.push({
-				type: 'common',
-				label: `B 🔙 Back to project list`,
-				value: 'back-to-projects',
-			});
-		} else {
-			// In single-project mode, show 'Exit'
-			menuItems.push({
-				type: 'common',
-				label: `Q ${MENU_ICONS.EXIT} Exit`,
-				value: 'exit',
-			});
+				// Add recent projects
+				filteredRecentProjects.forEach((project, index) => {
+					menuItems.push({
+						type: 'project',
+						label: `${project.name}`,
+						value: `recent-project-${index}`,
+						recentProject: project,
+					});
+				});
+			}
+
+			// Add menu options
+			const otherMenuItems: MenuItem[] = [
+				{
+					type: 'common',
+					label: createSeparatorWithText('Other'),
+					value: 'other-separator',
+				},
+				{
+					type: 'common',
+					label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
+					value: 'new-worktree',
+				},
+				{
+					type: 'common',
+					label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
+					value: 'merge-worktree',
+				},
+				{
+					type: 'common',
+					label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
+					value: 'delete-worktree',
+				},
+				{
+					type: 'common',
+					label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
+					value: 'configuration',
+				},
+			];
+			menuItems.push(...otherMenuItems);
+			if (projectName) {
+				// In multi-project mode, show 'Back to project list'
+				menuItems.push({
+					type: 'common',
+					label: `B 🔙 Back to project list`,
+					value: 'back-to-projects',
+				});
+			} else {
+				// In single-project mode, show 'Exit'
+				menuItems.push({
+					type: 'common',
+					label: `Q ${MENU_ICONS.EXIT} Exit`,
+					value: 'exit',
+				});
+			}
 		}
 		setItems(menuItems);
 	}, [
@@ -217,23 +245,75 @@ const Menu: React.FC<MenuProps> = ({
 		projectName,
 		multiProject,
 		recentProjects,
+		searchQuery,
+		isSearchMode,
 	]);
 
+	// Reset selected index when items change in search mode
+	useEffect(() => {
+		if (isSearchMode && selectedIndex >= items.length) {
+			setSelectedIndex(Math.max(0, items.length - 1));
+		}
+	}, [items, isSearchMode, selectedIndex]);
+
 	// Handle hotkeys
-	useInput((input, _key) => {
+	useInput((input, key) => {
+		// Skip in test environment to avoid stdin.ref error
+		if (!process.stdin.setRawMode) {
+			return;
+		}
+
 		// Dismiss error on any key press when error is shown
 		if (error && onDismissError) {
 			onDismissError();
 			return;
 		}
 
+		// Handle ESC key
+		if (key.escape) {
+			if (isSearchMode) {
+				// Exit search mode but keep filter
+				setIsSearchMode(false);
+			} else {
+				// Clear filter when not in search mode
+				setSearchQuery('');
+			}
+			return;
+		}
+
+		// Handle Enter key in search mode to exit search mode but keep filter
+		if (key.return && isSearchMode) {
+			setIsSearchMode(false);
+			return;
+		}
+
+		// Handle arrow keys in search mode for navigation
+		if (isSearchMode) {
+			if (key.upArrow && selectedIndex > 0) {
+				setSelectedIndex(selectedIndex - 1);
+			} else if (key.downArrow && selectedIndex < items.length - 1) {
+				setSelectedIndex(selectedIndex + 1);
+			}
+			return;
+		}
+
 		const keyPressed = input.toLowerCase();
+
+		// Handle "/" key to enter search mode
+		if (input === '/') {
+			setIsSearchMode(true);
+			// Don't clear search query - preserve current filter
+			setSelectedIndex(0);
+			return;
+		}
 
 		// Handle number keys 0-9 for worktree selection (first 10 only)
 		if (/^[0-9]$/.test(keyPressed)) {
 			const index = parseInt(keyPressed);
-			if (index < Math.min(10, worktrees.length) && worktrees[index]) {
-				onSelectWorktree(worktrees[index]);
+			// Get filtered worktree items
+			const worktreeItems = items.filter(item => item.type === 'worktree');
+			if (index < Math.min(10, worktreeItems.length) && worktreeItems[index]) {
+				onSelectWorktree(worktreeItems[index].worktree);
 			}
 			return;
 		}
@@ -383,11 +463,43 @@ const Menu: React.FC<MenuProps> = ({
 				</Text>
 			</Box>
 
-			<SelectInput
-				items={items}
-				onSelect={item => handleSelect(item as MenuItem)}
-				isFocused={!error}
-			/>
+			{isSearchMode && (
+				<Box marginBottom={1}>
+					<Text>Search: </Text>
+					<TextInputWrapper
+						value={searchQuery}
+						onChange={setSearchQuery}
+						focus={true}
+						placeholder="Type to filter worktrees..."
+					/>
+				</Box>
+			)}
+
+			{isSearchMode && items.length === 0 ? (
+				<Box>
+					<Text color="yellow">No worktrees match your search</Text>
+				</Box>
+			) : isSearchMode ? (
+				// In search mode, show the items as a list without SelectInput
+				<Box flexDirection="column">
+					{items.map((item, index) => (
+						<Text
+							key={item.value}
+							color={index === selectedIndex ? 'green' : undefined}
+						>
+							{index === selectedIndex ? '❯ ' : '  '}
+							{item.label}
+						</Text>
+					))}
+				</Box>
+			) : (
+				<SelectInput
+					items={items}
+					onSelect={item => handleSelect(item as MenuItem)}
+					isFocused={!error}
+					initialIndex={selectedIndex}
+				/>
+			)}
 
 			{error && (
 				<Box marginTop={1} paddingX={1} borderStyle="round" borderColor="red">
@@ -409,9 +521,15 @@ const Menu: React.FC<MenuProps> = ({
 					{STATUS_LABELS.IDLE}
 				</Text>
 				<Text dimColor>
-					Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first
-					10) N-New M-Merge D-Delete C-Config{' '}
-					{projectName ? 'B-Back' : 'Q-Quit'}
+					{isSearchMode
+						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
+						: searchQuery
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete C-Config ${
+									projectName ? 'B-Back' : 'Q-Quit'
+								}`
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first 10) /-Search N-New M-Merge D-Delete C-Config ${
+									projectName ? 'B-Back' : 'Q-Quit'
+								}`}
 				</Text>
 			</Box>
 		</Box>
