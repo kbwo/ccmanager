@@ -95,10 +95,18 @@ const Session: React.FC<SessionProps> = ({
 		const handleResize = () => {
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
-			session.process.resize(cols, rows);
-			// Also resize the virtual terminal
-			if (session.terminal) {
-				session.terminal.resize(cols, rows);
+			try {
+				session.process.resize(cols, rows);
+				// Also resize the virtual terminal
+				if (session.terminal) {
+					try {
+						session.terminal.resize(cols, rows);
+					} catch {
+						// Suppress xterm.js parsing errors
+					}
+				}
+			} catch {
+				// Suppress PTY resize errors
 			}
 		};
 
