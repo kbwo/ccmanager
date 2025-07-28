@@ -38,15 +38,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	detectTerminalState(session: Session): SessionState {
-		try {
-			// Create a detector based on the session's detection strategy
-			const strategy = session.detectionStrategy || 'claude';
-			const detector = createStateDetector(strategy);
-			return detector.detectState(session.terminal);
-		} catch {
-			// Return idle state if detection fails
-			return 'idle';
-		}
+		// Create a detector based on the session's detection strategy
+		const strategy = session.detectionStrategy || 'claude';
+		const detector = createStateDetector(strategy);
+		return detector.detectState(session.terminal);
 	}
 
 	constructor() {
