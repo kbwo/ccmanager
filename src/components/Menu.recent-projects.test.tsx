@@ -131,8 +131,8 @@ describe('Menu - Recent Projects', () => {
 
 		const output = lastFrame();
 		expect(output).toContain('─ Recent ─');
-		expect(output).toContain('📁 Project 1');
-		expect(output).toContain('📁 Project 2');
+		expect(output).toContain('Project 1');
+		expect(output).toContain('Project 2');
 	});
 
 	it('should not show recent projects section when no recent projects', () => {
@@ -226,8 +226,8 @@ describe('Menu - Recent Projects', () => {
 		const output = lastFrame();
 		expect(output).toContain('─ Recent ─');
 		expect(output).not.toContain('Current Project');
-		expect(output).toContain('📁 Project 1');
-		expect(output).toContain('📁 Project 2');
+		expect(output).toContain('Project 1');
+		expect(output).toContain('Project 2');
 	});
 
 	it('should hide recent projects section when all projects are filtered out', () => {

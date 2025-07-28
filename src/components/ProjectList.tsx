@@ -6,6 +6,10 @@ import {MultiProjectService} from '../services/multiProjectService.js';
 import {MENU_ICONS} from '../constants/statusIcons.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import {
+	recentProjectsService,
+	RecentProject,
+} from '../services/recentProjectsService.js';
 
 interface ProjectListProps {
 	projectsDir: string;
@@ -27,6 +31,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	onDismissError,
 }) => {
 	const [projects, setProjects] = useState<GitProject[]>([]);
+	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
@@ -37,6 +42,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
 		useSearchMode(items.length, {
 			isDisabled: !!displayError,
+			skipInTest: false,
 		});
 
 	const loadProjects = async () => {
@@ -47,6 +53,10 @@ const ProjectList: React.FC<ProjectListProps> = ({
 			const service = new MultiProjectService();
 			const discoveredProjects = await service.discoverProjects(projectsDir);
 			setProjects(discoveredProjects);
+
+			// Load recent projects with no limit (pass 0)
+			const allRecentProjects = recentProjectsService.getRecentProjects(0);
+			setRecentProjects(allRecentProjects);
 		} catch (err) {
 			setLoadError((err as Error).message);
 		} finally {
@@ -60,6 +70,43 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	}, [projectsDir]);
 
 	useEffect(() => {
+		const menuItems: MenuItem[] = [];
+		let currentIndex = 0;
+
+		// Filter recent projects based on search query
+		const filteredRecentProjects = searchQuery
+			? recentProjects.filter(project =>
+					project.name.toLowerCase().includes(searchQuery.toLowerCase()),
+				)
+			: recentProjects;
+
+		// Add recent projects section if available and not in search mode
+		if (filteredRecentProjects.length > 0) {
+			// Add "Recent" separator only when not in search mode
+			if (!isSearchMode) {
+				menuItems.push({
+					label: '── Recent ──',
+					value: 'separator-recent',
+				});
+			}
+
+			// Add recent projects
+			filteredRecentProjects.forEach(recentProject => {
+				// Find the full project data
+				const fullProject = projects.find(p => p.path === recentProject.path);
+				if (fullProject) {
+					const numberPrefix =
+						!isSearchMode && currentIndex < 10 ? `${currentIndex} ❯ ` : '❯ ';
+					menuItems.push({
+						label: numberPrefix + recentProject.name,
+						value: recentProject.path,
+						project: fullProject,
+					});
+					currentIndex++;
+				}
+			});
+		}
+
 		// Filter projects based on search query
 		const filteredProjects = searchQuery
 			? projects.filter(project =>
@@ -67,16 +114,36 @@ const ProjectList: React.FC<ProjectListProps> = ({
 				)
 			: projects;
 
-		// Build menu items from filtered projects
-		const menuItems: MenuItem[] = filteredProjects.map((project, index) => {
-			// Only show numbers for first 10 projects (0-9) when not in search mode
-			const numberPrefix = !isSearchMode && index < 10 ? `${index} ❯ ` : '❯ ';
+		// Filter out recent projects from all projects to avoid duplicates
+		const recentPaths = new Set(filteredRecentProjects.map(rp => rp.path));
+		const nonRecentProjects = filteredProjects.filter(
+			project => !recentPaths.has(project.path),
+		);
 
-			return {
+		// Add "All Projects" separator if we have both recent and other projects
+		if (
+			filteredRecentProjects.length > 0 &&
+			nonRecentProjects.length > 0 &&
+			!isSearchMode
+		) {
+			menuItems.push({
+				label: '── All Projects ──',
+				value: 'separator-all',
+			});
+		}
+
+		// Build menu items from filtered non-recent projects
+		nonRecentProjects.forEach(project => {
+			// Only show numbers for first 10 total items (0-9) when not in search mode
+			const numberPrefix =
+				!isSearchMode && currentIndex < 10 ? `${currentIndex} ❯ ` : '❯ ';
+
+			menuItems.push({
 				label: numberPrefix + project.name,
 				value: project.path,
 				project,
-			};
+			});
+			currentIndex++;
 		});
 
 		// Add menu options only when not in search mode
@@ -99,7 +166,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		}
 
 		setItems(menuItems);
-	}, [projects, searchQuery, isSearchMode]);
+	}, [projects, recentProjects, searchQuery, isSearchMode]);
 
 	// Handle hotkeys
 	useInput((input, _key) => {
@@ -124,17 +191,13 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		// Handle number keys 0-9 for project selection (first 10 only)
 		if (/^[0-9]$/.test(keyPressed)) {
 			const index = parseInt(keyPressed);
-			// Get filtered projects based on search query
-			const filteredProjects = searchQuery
-				? projects.filter(project =>
-						project.name.toLowerCase().includes(searchQuery.toLowerCase()),
-					)
-				: projects;
+			// Get all selectable items (recent + non-recent projects)
+			const selectableItems = items.filter(item => item.project);
 			if (
-				index < Math.min(10, filteredProjects.length) &&
-				filteredProjects[index]
+				index < Math.min(10, selectableItems.length) &&
+				selectableItems[index]?.project
 			) {
-				onSelectProject(filteredProjects[index]);
+				onSelectProject(selectableItems[index].project!);
 			}
 			return;
 		}
@@ -158,8 +221,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	});
 
 	const handleSelect = (item: MenuItem) => {
-		if (item.value === 'separator') {
-			// Do nothing for separator
+		if (item.value.startsWith('separator')) {
+			// Do nothing for separators
 		} else if (item.value === 'refresh') {
 			loadProjects();
 		} else if (item.value === 'exit') {

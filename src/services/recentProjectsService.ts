@@ -10,11 +10,16 @@ export class RecentProjectsService {
 	private static readonly MAX_RECENT_PROJECTS = 5;
 	private recentProjects: RecentProject[] = [];
 
-	public getRecentProjects(): RecentProject[] {
+	public getRecentProjects(limit?: number): RecentProject[] {
 		// Return recent projects sorted by last accessed
-		return this.recentProjects
-			.sort((a, b) => b.lastAccessed - a.lastAccessed)
-			.slice(0, RecentProjectsService.MAX_RECENT_PROJECTS);
+		const sorted = this.recentProjects.sort(
+			(a, b) => b.lastAccessed - a.lastAccessed,
+		);
+
+		// Apply limit if specified, otherwise use default MAX_RECENT_PROJECTS
+		const maxItems =
+			limit !== undefined ? limit : RecentProjectsService.MAX_RECENT_PROJECTS;
+		return maxItems > 0 ? sorted.slice(0, maxItems) : sorted;
 	}
 
 	public addRecentProject(project: GitProject): void {
@@ -40,10 +45,10 @@ export class RecentProjectsService {
 			this.recentProjects.unshift(recentProject);
 		}
 
-		// Keep only the max number of projects
-		this.recentProjects = this.recentProjects
-			.sort((a, b) => b.lastAccessed - a.lastAccessed)
-			.slice(0, RecentProjectsService.MAX_RECENT_PROJECTS);
+		// Sort by last accessed (newest first)
+		this.recentProjects = this.recentProjects.sort(
+			(a, b) => b.lastAccessed - a.lastAccessed,
+		);
 	}
 
 	public clearRecentProjects(): void {

@@ -45,7 +45,7 @@ describe('RecentProjectsService', () => {
 			expect(result[2]?.path).toBe('/project1');
 		});
 
-		it('should limit to max recent projects', () => {
+		it('should limit to max recent projects by default', () => {
 			// Add 10 projects
 			for (let i = 0; i < 10; i++) {
 				service.addRecentProject({
@@ -56,9 +56,17 @@ describe('RecentProjectsService', () => {
 				});
 			}
 
+			// Default behavior should limit to 5
 			const result = service.getRecentProjects();
-
 			expect(result).toHaveLength(5);
+
+			// With limit 0, should return all projects
+			const allResult = service.getRecentProjects(0);
+			expect(allResult).toHaveLength(10);
+
+			// With custom limit, should respect it
+			const customResult = service.getRecentProjects(3);
+			expect(customResult).toHaveLength(3);
 		});
 	});
 
