@@ -1,0 +1,212 @@
+import {describe, it, expect, beforeEach, vi} from 'vitest';
+import {globalSessionManager} from './globalSessionManager.js';
+
+interface MockSession {
+	id: string;
+	worktreePath?: string;
+}
+
+interface MockSessionManager {
+	sessions: Map<string, MockSession>;
+	getAllSessions(): MockSession[];
+	destroy(): void;
+}
+
+// Mock SessionManager
+vi.mock('./sessionManager.js', () => {
+	class MockSessionManager {
+		sessions = new Map<string, MockSession>();
+
+		getAllSessions() {
+			return Array.from(this.sessions.values());
+		}
+
+		destroy() {
+			this.sessions.clear();
+		}
+
+		getSession(worktreePath: string) {
+			return this.sessions.get(worktreePath);
+		}
+
+		setSessionActive(_worktreePath: string, _active: boolean) {
+			// Mock implementation
+		}
+
+		destroySession(worktreePath: string) {
+			this.sessions.delete(worktreePath);
+		}
+
+		on() {
+			// Mock implementation
+		}
+
+		off() {
+			// Mock implementation
+		}
+
+		emit() {
+			// Mock implementation
+		}
+
+		async createSessionWithPreset(_worktreePath: string, _presetId?: string) {
+			// Mock implementation
+			return {} as never;
+		}
+
+		async createSessionWithDevcontainer(
+			_worktreePath: string,
+			_config: unknown,
+			_presetId?: string,
+		) {
+			// Mock implementation
+			return {} as never;
+		}
+	}
+
+	return {SessionManager: MockSessionManager};
+});
+
+describe('GlobalSessionManager', () => {
+	beforeEach(() => {
+		// Clear any existing sessions
+		globalSessionManager.destroyAllSessions();
+	});
+
+	it('should return the same manager instance for the same project', () => {
+		const manager1 = globalSessionManager.getManagerForProject('/project1');
+		const manager2 = globalSessionManager.getManagerForProject('/project1');
+
+		expect(manager1).toBe(manager2);
+	});
+
+	it('should return different managers for different projects', () => {
+		const manager1 = globalSessionManager.getManagerForProject('/project1');
+		const manager2 = globalSessionManager.getManagerForProject('/project2');
+
+		expect(manager1).not.toBe(manager2);
+	});
+
+	it('should return global manager when no project path is provided', () => {
+		const manager1 = globalSessionManager.getManagerForProject();
+		const manager2 = globalSessionManager.getManagerForProject();
+
+		expect(manager1).toBe(manager2);
+	});
+
+	it('should get all active sessions from all managers', () => {
+		const globalManager =
+			globalSessionManager.getManagerForProject() as unknown as MockSessionManager;
+		const project1Manager = globalSessionManager.getManagerForProject(
+			'/project1',
+		) as unknown as MockSessionManager;
+		const project2Manager = globalSessionManager.getManagerForProject(
+			'/project2',
+		) as unknown as MockSessionManager;
+
+		// Add mock sessions
+		globalManager.sessions.set('global-session', {
+			id: 'global-session',
+		});
+		project1Manager.sessions.set('project1-session', {
+			id: 'project1-session',
+		});
+		project2Manager.sessions.set('project2-session', {
+			id: 'project2-session',
+		});
+
+		const allSessions = globalSessionManager.getAllActiveSessions();
+
+		expect(allSessions).toHaveLength(3);
+		const sessionIds = allSessions.map(s => (s as MockSession).id);
+		expect(sessionIds).toContain('global-session');
+		expect(sessionIds).toContain('project1-session');
+		expect(sessionIds).toContain('project2-session');
+	});
+
+	it('should destroy all sessions when destroyAllSessions is called', () => {
+		const globalManager =
+			globalSessionManager.getManagerForProject() as unknown as MockSessionManager;
+		const project1Manager = globalSessionManager.getManagerForProject(
+			'/project1',
+		) as unknown as MockSessionManager;
+
+		// Add mock sessions
+		globalManager.sessions.set('global-session', {
+			id: 'global-session',
+		});
+		project1Manager.sessions.set('project1-session', {
+			id: 'project1-session',
+		});
+
+		globalSessionManager.destroyAllSessions();
+
+		expect(globalManager.sessions.size).toBe(0);
+		expect(project1Manager.sessions.size).toBe(0);
+	});
+
+	it('should destroy only project sessions when destroyProjectSessions is called', () => {
+		const globalManager =
+			globalSessionManager.getManagerForProject() as unknown as MockSessionManager;
+		const project1Manager = globalSessionManager.getManagerForProject(
+			'/project1',
+		) as unknown as MockSessionManager;
+		const project2Manager = globalSessionManager.getManagerForProject(
+			'/project2',
+		) as unknown as MockSessionManager;
+
+		// Add mock sessions
+		globalManager.sessions.set('global-session', {
+			id: 'global-session',
+		});
+		project1Manager.sessions.set('project1-session', {
+			id: 'project1-session',
+		});
+		project2Manager.sessions.set('project2-session', {
+			id: 'project2-session',
+		});
+
+		globalSessionManager.destroyProjectSessions('/project1');
+
+		// Global and project2 sessions should remain
+		expect(globalManager.sessions.size).toBe(1);
+		expect(project2Manager.sessions.size).toBe(1);
+		// project1 sessions should be cleared
+		const newProject1Manager = globalSessionManager.getManagerForProject(
+			'/project1',
+		) as unknown as MockSessionManager;
+		expect(newProject1Manager).not.toBe(project1Manager); // Should be a new instance
+		expect(newProject1Manager.sessions.size).toBe(0);
+	});
+
+	it('should persist sessions when switching between projects', () => {
+		const project1Manager = globalSessionManager.getManagerForProject(
+			'/project1',
+		) as unknown as MockSessionManager;
+		project1Manager.sessions.set('session1', {
+			id: 'session1',
+			worktreePath: '/project1/main',
+		});
+
+		// Switch to project2
+		const project2Manager = globalSessionManager.getManagerForProject(
+			'/project2',
+		) as unknown as MockSessionManager;
+		project2Manager.sessions.set('session2', {
+			id: 'session2',
+			worktreePath: '/project2/main',
+		});
+
+		// Switch back to project1
+		const project1ManagerAgain = globalSessionManager.getManagerForProject(
+			'/project1',
+		) as unknown as MockSessionManager;
+
+		// Session should still exist
+		expect(project1ManagerAgain).toBe(project1Manager);
+		expect(project1ManagerAgain.sessions.get('session1')).toEqual({
+			id: 'session1',
+			worktreePath: '/project1/main',
+		});
+	});
+});

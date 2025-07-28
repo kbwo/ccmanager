@@ -4,6 +4,7 @@ import {render} from 'ink';
 import meow from 'meow';
 import App from './components/App.js';
 import {worktreeConfigManager} from './services/worktreeConfigManager.js';
+import {globalSessionManager} from './services/globalSessionManager.js';
 
 const cli = meow(
 	`
@@ -85,7 +86,20 @@ const appProps = {
 	multiProject: cli.flags.multiProject,
 };
 
-render(<App {...appProps} />);
+const app = render(<App {...appProps} />);
+
+// Clean up sessions on exit
+process.on('SIGINT', () => {
+	globalSessionManager.destroyAllSessions();
+	app.unmount();
+	process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+	globalSessionManager.destroyAllSessions();
+	app.unmount();
+	process.exit(0);
+});
 
 // Export for testing
 export const parsedArgs = cli;

@@ -9,6 +9,7 @@ import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
+import {globalSessionManager} from '../services/globalSessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {
 	Worktree,
@@ -45,7 +46,9 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const [view, setView] = useState<View>(
 		multiProject ? 'project-list' : 'menu',
 	);
-	const [sessionManager] = useState(() => new SessionManager());
+	const [sessionManager, setSessionManager] = useState<SessionManager>(() =>
+		globalSessionManager.getManagerForProject(),
+	);
 	const [worktreeService, setWorktreeService] = useState(
 		() => new WorktreeService(),
 	);
@@ -88,10 +91,10 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 		sessionManager.on('sessionExit', handleSessionExit);
 
-		// Cleanup on unmount
+		// Re-attach listener when session manager changes
 		return () => {
 			sessionManager.off('sessionExit', handleSessionExit);
-			sessionManager.destroy();
+			// Don't destroy sessions on unmount - they persist in memory
 		};
 	}, [sessionManager, multiProject, selectedProject]);
 
@@ -126,7 +129,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 			if (multiProject && selectedProject) {
 				handleBackToProjectList();
 			} else {
-				sessionManager.destroy();
+				// Only destroy all sessions when actually exiting the app
+				globalSessionManager.destroyAllSessions();
 				exit();
 			}
 			return;
@@ -335,22 +339,30 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const handleSelectProject = (project: GitProject) => {
 		// Handle special exit case
 		if (project.path === 'EXIT_APPLICATION') {
-			sessionManager.destroy();
+			globalSessionManager.destroyAllSessions();
 			exit();
 			return;
 		}
 
-		// Set the selected project and update worktree service
+		// Set the selected project and update services
 		setSelectedProject(project);
 		setWorktreeService(new WorktreeService(project.path));
+		// Get or create session manager for this project
+		const projectSessionManager = globalSessionManager.getManagerForProject(
+			project.path,
+		);
+		setSessionManager(projectSessionManager);
 		// Add to recent projects
 		recentProjectsService.addRecentProject(project);
 		setView('menu');
 	};
 
 	const handleBackToProjectList = () => {
+		// Sessions persist in their project-specific managers
 		setSelectedProject(null);
 		setWorktreeService(new WorktreeService()); // Reset to default
+		// Reset to global session manager for project list view
+		setSessionManager(globalSessionManager.getManagerForProject());
 		setView('project-list');
 		setMenuKey(prev => prev + 1);
 	};
