@@ -58,6 +58,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			cols: process.stdout.columns || 80,
 			rows: process.stdout.rows || 24,
 			allowProposedApi: true,
+			logLevel: 'off',
 		});
 	}
 
