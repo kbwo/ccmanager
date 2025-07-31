@@ -10,6 +10,8 @@ import {
 	recentProjectsService,
 	RecentProject,
 } from '../services/recentProjectsService.js';
+import {globalSessionManager} from '../services/globalSessionManager.js';
+import {SessionManager} from '../services/sessionManager.js';
 
 interface ProjectListProps {
 	projectsDir: string;
@@ -95,10 +97,17 @@ const ProjectList: React.FC<ProjectListProps> = ({
 				// Find the full project data
 				const fullProject = projects.find(p => p.path === recentProject.path);
 				if (fullProject) {
+					// Get session counts for this project
+					const projectSessions = globalSessionManager.getProjectSessions(
+						recentProject.path,
+					);
+					const counts = SessionManager.getSessionCounts(projectSessions);
+					const countsFormatted = SessionManager.formatSessionCounts(counts);
+
 					const numberPrefix =
 						!isSearchMode && currentIndex < 10 ? `${currentIndex} ❯ ` : '❯ ';
 					menuItems.push({
-						label: numberPrefix + recentProject.name,
+						label: numberPrefix + recentProject.name + countsFormatted,
 						value: recentProject.path,
 						project: fullProject,
 					});
@@ -134,12 +143,19 @@ const ProjectList: React.FC<ProjectListProps> = ({
 
 		// Build menu items from filtered non-recent projects
 		nonRecentProjects.forEach(project => {
+			// Get session counts for this project
+			const projectSessions = globalSessionManager.getProjectSessions(
+				project.path,
+			);
+			const counts = SessionManager.getSessionCounts(projectSessions);
+			const countsFormatted = SessionManager.formatSessionCounts(counts);
+
 			// Only show numbers for first 10 total items (0-9) when not in search mode
 			const numberPrefix =
 				!isSearchMode && currentIndex < 10 ? `${currentIndex} ❯ ` : '❯ ';
 
 			menuItems.push({
-				label: numberPrefix + project.name,
+				label: numberPrefix + project.name + countsFormatted,
 				value: project.path,
 				project,
 			});

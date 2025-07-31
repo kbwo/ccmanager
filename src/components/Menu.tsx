@@ -21,6 +21,7 @@ import {
 } from '../services/recentProjectsService.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import {globalSessionManager} from '../services/globalSessionManager.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -187,9 +188,16 @@ const Menu: React.FC<MenuProps> = ({
 
 				// Add recent projects
 				filteredRecentProjects.forEach((project, index) => {
+					// Get session counts for this project
+					const projectSessions = globalSessionManager.getProjectSessions(
+						project.path,
+					);
+					const counts = SessionManager.getSessionCounts(projectSessions);
+					const countsFormatted = SessionManager.formatSessionCounts(counts);
+
 					menuItems.push({
 						type: 'project',
-						label: `${project.name}`,
+						label: `${project.name}${countsFormatted}`,
 						value: `recent-project-${index}`,
 						recentProject: project,
 					});

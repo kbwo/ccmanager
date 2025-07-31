@@ -4,6 +4,7 @@ import {globalSessionManager} from './globalSessionManager.js';
 interface MockSession {
 	id: string;
 	worktreePath?: string;
+	state?: string;
 }
 
 interface MockSessionManager {
@@ -208,5 +209,49 @@ describe('GlobalSessionManager', () => {
 			id: 'session1',
 			worktreePath: '/project1/main',
 		});
+	});
+
+	it('should get sessions for a specific project', () => {
+		const project1Manager = globalSessionManager.getManagerForProject(
+			'/project1',
+		) as unknown as MockSessionManager;
+		const project2Manager = globalSessionManager.getManagerForProject(
+			'/project2',
+		) as unknown as MockSessionManager;
+
+		// Add mock sessions with different states
+		project1Manager.sessions.set('session1', {
+			id: 'session1',
+			state: 'idle',
+		});
+		project1Manager.sessions.set('session2', {
+			id: 'session2',
+			state: 'busy',
+		});
+		project1Manager.sessions.set('session3', {
+			id: 'session3',
+			state: 'waiting',
+		});
+		project2Manager.sessions.set('session4', {
+			id: 'session4',
+			state: 'idle',
+		});
+
+		const project1Sessions =
+			globalSessionManager.getProjectSessions('/project1');
+		const project2Sessions =
+			globalSessionManager.getProjectSessions('/project2');
+		const project3Sessions =
+			globalSessionManager.getProjectSessions('/project3'); // non-existent
+
+		expect(project1Sessions).toHaveLength(3);
+		expect(project2Sessions).toHaveLength(1);
+		expect(project3Sessions).toHaveLength(0);
+
+		// Verify the sessions are correct
+		const project1Ids = project1Sessions.map(s => (s as MockSession).id);
+		expect(project1Ids).toContain('session1');
+		expect(project1Ids).toContain('session2');
+		expect(project1Ids).toContain('session3');
 	});
 });

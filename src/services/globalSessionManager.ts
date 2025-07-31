@@ -67,6 +67,14 @@ class GlobalSessionManager {
 			this.projectManagers.delete(projectPath);
 		}
 	}
+
+	getProjectSessions(projectPath: string): Session[] {
+		const manager = this.projectManagers.get(projectPath);
+		if (manager) {
+			return manager.getAllSessions();
+		}
+		return [];
+	}
 }
 
 export const globalSessionManager = GlobalSessionManager.getInstance();
