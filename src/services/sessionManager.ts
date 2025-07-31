@@ -140,12 +140,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private setupDataHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
-			// Write data to virtual terminal with error suppression
-			try {
-				session.terminal.write(data);
-			} catch {
-				// Suppress xterm.js parsing errors
-			}
+			// Write data to virtual terminal
+			session.terminal.write(data);
 
 			// Store in output history as Buffer
 			const buffer = Buffer.from(data, 'utf8');
