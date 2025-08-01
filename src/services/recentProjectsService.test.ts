@@ -1,12 +1,53 @@
-import {describe, it, expect, beforeEach} from 'vitest';
-import {RecentProjectsService} from './recentProjectsService.js';
+import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
+import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'fs';
+import {join} from 'path';
+import {
+	RecentProjectsService,
+	recentProjectsService,
+} from './recentProjectsService.js';
 import {GitProject} from '../types/index.js';
+
+// Mock os module
+vi.mock('os', () => ({
+	homedir: vi.fn(),
+}));
 
 describe('RecentProjectsService', () => {
 	let service: RecentProjectsService;
+	let testConfigDir: string;
+	let testDataPath: string;
+	const testDir = join(process.cwd(), '.test-config-recent');
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		// Reset singleton for testing
+		recentProjectsService._resetForTesting();
+
+		// Mock os.homedir to return test directory
+		const os = await import('os');
+		vi.mocked(os.homedir).mockReturnValue(testDir);
+
+		testConfigDir =
+			process.platform === 'win32'
+				? join(testDir, 'AppData', 'Roaming', 'ccmanager')
+				: join(testDir, '.config', 'ccmanager');
+
+		testDataPath = join(testConfigDir, 'recent-projects.json');
+
+		// Clean up any existing test directory
+		if (existsSync(testDir)) {
+			rmSync(testDir, {recursive: true, force: true});
+		}
+
+		// Create the service (this will create the directory)
 		service = new RecentProjectsService();
+	});
+
+	afterEach(() => {
+		// Clean up test directory
+		if (existsSync(testDir)) {
+			rmSync(testDir, {recursive: true, force: true});
+		}
+		vi.restoreAllMocks();
 	});
 
 	describe('getRecentProjects', () => {
@@ -166,6 +207,100 @@ describe('RecentProjectsService', () => {
 			const result = service.getRecentProjects();
 
 			expect(result).toHaveLength(0);
+		});
+	});
+
+	describe('filesystem persistence', () => {
+		it('should create config directory if it does not exist', () => {
+			expect(existsSync(testConfigDir)).toBe(true);
+		});
+
+		it('should persist recent projects to disk', () => {
+			const project: GitProject = {
+				path: '/home/user/project1',
+				name: 'project1',
+				relativePath: 'project1',
+				isValid: true,
+			};
+
+			service.addRecentProject(project);
+
+			// Verify file was created and contains the project
+			expect(existsSync(testDataPath)).toBe(true);
+			const fileContent = readFileSync(testDataPath, 'utf-8');
+			const savedProjects = JSON.parse(fileContent);
+			expect(savedProjects).toHaveLength(1);
+			expect(savedProjects[0].path).toBe('/home/user/project1');
+
+			// Create a new service instance to test loading from disk
+			const newService = new RecentProjectsService();
+			const projects = newService.getRecentProjects();
+
+			expect(projects).toHaveLength(1);
+			expect(projects[0]).toMatchObject({
+				path: '/home/user/project1',
+				name: 'project1',
+			});
+		});
+
+		it('should handle corrupted data file gracefully', () => {
+			// Write invalid JSON to the data file
+			mkdirSync(testConfigDir, {recursive: true});
+			writeFileSync(testDataPath, '{ invalid json }');
+
+			// Spy on console.error to verify error handling
+			const consoleSpy = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+
+			// Create service - should handle the error and start with empty array
+			const corruptedService = new RecentProjectsService();
+			expect(corruptedService.getRecentProjects()).toEqual([]);
+
+			// Verify error was logged
+			expect(consoleSpy).toHaveBeenCalledWith(
+				expect.stringContaining('Failed to load recent projects:'),
+				expect.any(Error),
+			);
+
+			// Should still be able to add projects
+			const project: GitProject = {
+				path: '/home/user/project1',
+				name: 'project1',
+				relativePath: 'project1',
+				isValid: true,
+			};
+			corruptedService.addRecentProject(project);
+			expect(corruptedService.getRecentProjects()).toHaveLength(1);
+
+			consoleSpy.mockRestore();
+		});
+
+		it('should persist clear operation', () => {
+			// Add some projects
+			for (let i = 1; i <= 3; i++) {
+				const project: GitProject = {
+					path: `/home/user/project${i}`,
+					name: `project${i}`,
+					relativePath: `project${i}`,
+					isValid: true,
+				};
+				service.addRecentProject(project);
+			}
+
+			expect(service.getRecentProjects()).toHaveLength(3);
+
+			// Clear all projects
+			service.clearRecentProjects();
+
+			// Verify file was updated
+			const fileContent = readFileSync(testDataPath, 'utf-8');
+			const savedProjects = JSON.parse(fileContent);
+			expect(savedProjects).toEqual([]);
+
+			// Verify persistence
+			const newService = new RecentProjectsService();
+			expect(newService.getRecentProjects()).toHaveLength(0);
 		});
 	});
 });
