@@ -424,11 +424,15 @@ const Menu: React.FC<MenuProps> = ({
 
 	return (
 		<Box flexDirection="column">
-			<Box marginBottom={1}>
+			<Box marginBottom={1} flexDirection="column">
 				<Text bold color="green">
 					CCManager - Claude Code Worktree Manager
-					{projectName ? ` - ${projectName}` : ''}
 				</Text>
+				{projectName && (
+					<Text bold color="green">
+						{projectName}
+					</Text>
+				)}
 			</Box>
 
 			<Box marginBottom={1}>
