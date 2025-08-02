@@ -9,7 +9,7 @@ import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
-import {globalSessionManager} from '../services/globalSessionManager.js';
+import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {
 	Worktree,
@@ -47,7 +47,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		multiProject ? 'project-list' : 'menu',
 	);
 	const [sessionManager, setSessionManager] = useState<SessionManager>(() =>
-		globalSessionManager.getManagerForProject(),
+		globalSessionOrchestrator.getManagerForProject(),
 	);
 	const [worktreeService, setWorktreeService] = useState(
 		() => new WorktreeService(),
@@ -150,7 +150,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				handleBackToProjectList();
 			} else {
 				// Only destroy all sessions when actually exiting the app
-				globalSessionManager.destroyAllSessions();
+				globalSessionOrchestrator.destroyAllSessions();
 				exit();
 			}
 			return;
@@ -314,7 +314,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const handleSelectProject = (project: GitProject) => {
 		// Handle special exit case
 		if (project.path === 'EXIT_APPLICATION') {
-			globalSessionManager.destroyAllSessions();
+			globalSessionOrchestrator.destroyAllSessions();
 			exit();
 			return;
 		}
@@ -323,9 +323,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		setSelectedProject(project);
 		setWorktreeService(new WorktreeService(project.path));
 		// Get or create session manager for this project
-		const projectSessionManager = globalSessionManager.getManagerForProject(
-			project.path,
-		);
+		const projectSessionManager =
+			globalSessionOrchestrator.getManagerForProject(project.path);
 		setSessionManager(projectSessionManager);
 		// Add to recent projects
 		projectManager.addRecentProject(project);
@@ -337,7 +336,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		setSelectedProject(null);
 		setWorktreeService(new WorktreeService()); // Reset to default
 		// Reset to global session manager for project list view
-		setSessionManager(globalSessionManager.getManagerForProject());
+		setSessionManager(globalSessionOrchestrator.getManagerForProject());
 
 		navigateWithClear('project-list', () => {
 			setMenuKey(prev => prev + 1);

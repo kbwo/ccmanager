@@ -43,8 +43,8 @@ vi.mock('../services/projectManager.js', () => ({
 	},
 }));
 
-vi.mock('../services/globalSessionManager.js', () => ({
-	globalSessionManager: {
+vi.mock('../services/globalSessionOrchestrator.js', () => ({
+	globalSessionOrchestrator: {
 		getProjectSessions: vi.fn().mockReturnValue([]),
 	},
 }));

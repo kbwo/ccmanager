@@ -1,8 +1,8 @@
 import {SessionManager} from './sessionManager.js';
 import {Session} from '../types/index.js';
 
-class GlobalSessionManager {
-	private static instance: GlobalSessionManager;
+class GlobalSessionOrchestrator {
+	private static instance: GlobalSessionOrchestrator;
 	private projectManagers: Map<string, SessionManager> = new Map();
 	private globalManager: SessionManager;
 
@@ -11,11 +11,11 @@ class GlobalSessionManager {
 		this.globalManager = new SessionManager();
 	}
 
-	static getInstance(): GlobalSessionManager {
-		if (!GlobalSessionManager.instance) {
-			GlobalSessionManager.instance = new GlobalSessionManager();
+	static getInstance(): GlobalSessionOrchestrator {
+		if (!GlobalSessionOrchestrator.instance) {
+			GlobalSessionOrchestrator.instance = new GlobalSessionOrchestrator();
 		}
-		return GlobalSessionManager.instance;
+		return GlobalSessionOrchestrator.instance;
 	}
 
 	getManagerForProject(projectPath?: string): SessionManager {
@@ -77,4 +77,5 @@ class GlobalSessionManager {
 	}
 }
 
-export const globalSessionManager = GlobalSessionManager.getInstance();
+export const globalSessionOrchestrator =
+	GlobalSessionOrchestrator.getInstance();

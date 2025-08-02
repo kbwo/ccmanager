@@ -1,5 +1,5 @@
 import {describe, it, expect, beforeEach, vi} from 'vitest';
-import {globalSessionManager} from './globalSessionManager.js';
+import {globalSessionOrchestrator} from './globalSessionOrchestrator.js';
 
 interface MockSession {
 	id: string;
@@ -71,37 +71,41 @@ vi.mock('./sessionManager.js', () => {
 describe('GlobalSessionManager', () => {
 	beforeEach(() => {
 		// Clear any existing sessions
-		globalSessionManager.destroyAllSessions();
+		globalSessionOrchestrator.destroyAllSessions();
 	});
 
 	it('should return the same manager instance for the same project', () => {
-		const manager1 = globalSessionManager.getManagerForProject('/project1');
-		const manager2 = globalSessionManager.getManagerForProject('/project1');
+		const manager1 =
+			globalSessionOrchestrator.getManagerForProject('/project1');
+		const manager2 =
+			globalSessionOrchestrator.getManagerForProject('/project1');
 
 		expect(manager1).toBe(manager2);
 	});
 
 	it('should return different managers for different projects', () => {
-		const manager1 = globalSessionManager.getManagerForProject('/project1');
-		const manager2 = globalSessionManager.getManagerForProject('/project2');
+		const manager1 =
+			globalSessionOrchestrator.getManagerForProject('/project1');
+		const manager2 =
+			globalSessionOrchestrator.getManagerForProject('/project2');
 
 		expect(manager1).not.toBe(manager2);
 	});
 
 	it('should return global manager when no project path is provided', () => {
-		const manager1 = globalSessionManager.getManagerForProject();
-		const manager2 = globalSessionManager.getManagerForProject();
+		const manager1 = globalSessionOrchestrator.getManagerForProject();
+		const manager2 = globalSessionOrchestrator.getManagerForProject();
 
 		expect(manager1).toBe(manager2);
 	});
 
 	it('should get all active sessions from all managers', () => {
 		const globalManager =
-			globalSessionManager.getManagerForProject() as unknown as MockSessionManager;
-		const project1Manager = globalSessionManager.getManagerForProject(
+			globalSessionOrchestrator.getManagerForProject() as unknown as MockSessionManager;
+		const project1Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project1',
 		) as unknown as MockSessionManager;
-		const project2Manager = globalSessionManager.getManagerForProject(
+		const project2Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project2',
 		) as unknown as MockSessionManager;
 
@@ -116,7 +120,7 @@ describe('GlobalSessionManager', () => {
 			id: 'project2-session',
 		});
 
-		const allSessions = globalSessionManager.getAllActiveSessions();
+		const allSessions = globalSessionOrchestrator.getAllActiveSessions();
 
 		expect(allSessions).toHaveLength(3);
 		const sessionIds = allSessions.map(s => (s as MockSession).id);
@@ -127,8 +131,8 @@ describe('GlobalSessionManager', () => {
 
 	it('should destroy all sessions when destroyAllSessions is called', () => {
 		const globalManager =
-			globalSessionManager.getManagerForProject() as unknown as MockSessionManager;
-		const project1Manager = globalSessionManager.getManagerForProject(
+			globalSessionOrchestrator.getManagerForProject() as unknown as MockSessionManager;
+		const project1Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project1',
 		) as unknown as MockSessionManager;
 
@@ -140,7 +144,7 @@ describe('GlobalSessionManager', () => {
 			id: 'project1-session',
 		});
 
-		globalSessionManager.destroyAllSessions();
+		globalSessionOrchestrator.destroyAllSessions();
 
 		expect(globalManager.sessions.size).toBe(0);
 		expect(project1Manager.sessions.size).toBe(0);
@@ -148,11 +152,11 @@ describe('GlobalSessionManager', () => {
 
 	it('should destroy only project sessions when destroyProjectSessions is called', () => {
 		const globalManager =
-			globalSessionManager.getManagerForProject() as unknown as MockSessionManager;
-		const project1Manager = globalSessionManager.getManagerForProject(
+			globalSessionOrchestrator.getManagerForProject() as unknown as MockSessionManager;
+		const project1Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project1',
 		) as unknown as MockSessionManager;
-		const project2Manager = globalSessionManager.getManagerForProject(
+		const project2Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project2',
 		) as unknown as MockSessionManager;
 
@@ -167,13 +171,13 @@ describe('GlobalSessionManager', () => {
 			id: 'project2-session',
 		});
 
-		globalSessionManager.destroyProjectSessions('/project1');
+		globalSessionOrchestrator.destroyProjectSessions('/project1');
 
 		// Global and project2 sessions should remain
 		expect(globalManager.sessions.size).toBe(1);
 		expect(project2Manager.sessions.size).toBe(1);
 		// project1 sessions should be cleared
-		const newProject1Manager = globalSessionManager.getManagerForProject(
+		const newProject1Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project1',
 		) as unknown as MockSessionManager;
 		expect(newProject1Manager).not.toBe(project1Manager); // Should be a new instance
@@ -181,7 +185,7 @@ describe('GlobalSessionManager', () => {
 	});
 
 	it('should persist sessions when switching between projects', () => {
-		const project1Manager = globalSessionManager.getManagerForProject(
+		const project1Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project1',
 		) as unknown as MockSessionManager;
 		project1Manager.sessions.set('session1', {
@@ -190,7 +194,7 @@ describe('GlobalSessionManager', () => {
 		});
 
 		// Switch to project2
-		const project2Manager = globalSessionManager.getManagerForProject(
+		const project2Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project2',
 		) as unknown as MockSessionManager;
 		project2Manager.sessions.set('session2', {
@@ -199,7 +203,7 @@ describe('GlobalSessionManager', () => {
 		});
 
 		// Switch back to project1
-		const project1ManagerAgain = globalSessionManager.getManagerForProject(
+		const project1ManagerAgain = globalSessionOrchestrator.getManagerForProject(
 			'/project1',
 		) as unknown as MockSessionManager;
 
@@ -212,10 +216,10 @@ describe('GlobalSessionManager', () => {
 	});
 
 	it('should get sessions for a specific project', () => {
-		const project1Manager = globalSessionManager.getManagerForProject(
+		const project1Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project1',
 		) as unknown as MockSessionManager;
-		const project2Manager = globalSessionManager.getManagerForProject(
+		const project2Manager = globalSessionOrchestrator.getManagerForProject(
 			'/project2',
 		) as unknown as MockSessionManager;
 
@@ -238,11 +242,11 @@ describe('GlobalSessionManager', () => {
 		});
 
 		const project1Sessions =
-			globalSessionManager.getProjectSessions('/project1');
+			globalSessionOrchestrator.getProjectSessions('/project1');
 		const project2Sessions =
-			globalSessionManager.getProjectSessions('/project2');
+			globalSessionOrchestrator.getProjectSessions('/project2');
 		const project3Sessions =
-			globalSessionManager.getProjectSessions('/project3'); // non-existent
+			globalSessionOrchestrator.getProjectSessions('/project3'); // non-existent
 
 		expect(project1Sessions).toHaveLength(3);
 		expect(project2Sessions).toHaveLength(1);

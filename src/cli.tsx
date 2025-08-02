@@ -4,7 +4,7 @@ import {render} from 'ink';
 import meow from 'meow';
 import App from './components/App.js';
 import {worktreeConfigManager} from './services/worktreeConfigManager.js';
-import {globalSessionManager} from './services/globalSessionManager.js';
+import {globalSessionOrchestrator} from './services/globalSessionOrchestrator.js';
 
 const cli = meow(
 	`
@@ -90,13 +90,13 @@ const app = render(<App {...appProps} />);
 
 // Clean up sessions on exit
 process.on('SIGINT', () => {
-	globalSessionManager.destroyAllSessions();
+	globalSessionOrchestrator.destroyAllSessions();
 	app.unmount();
 	process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-	globalSessionManager.destroyAllSessions();
+	globalSessionOrchestrator.destroyAllSessions();
 	app.unmount();
 	process.exit(0);
 });

@@ -7,7 +7,7 @@ import {MENU_ICONS} from '../constants/statusIcons.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {RecentProject} from '../types/index.js';
-import {globalSessionManager} from '../services/globalSessionManager.js';
+import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {SessionManager} from '../services/sessionManager.js';
 
 interface ProjectListProps {
@@ -95,7 +95,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 				const fullProject = projects.find(p => p.path === recentProject.path);
 				if (fullProject) {
 					// Get session counts for this project
-					const projectSessions = globalSessionManager.getProjectSessions(
+					const projectSessions = globalSessionOrchestrator.getProjectSessions(
 						recentProject.path,
 					);
 					const counts = SessionManager.getSessionCounts(projectSessions);
@@ -141,7 +141,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		// Build menu items from filtered non-recent projects
 		nonRecentProjects.forEach(project => {
 			// Get session counts for this project
-			const projectSessions = globalSessionManager.getProjectSessions(
+			const projectSessions = globalSessionOrchestrator.getProjectSessions(
 				project.path,
 			);
 			const counts = SessionManager.getSessionCounts(projectSessions);

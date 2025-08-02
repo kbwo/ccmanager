@@ -19,7 +19,7 @@ import {projectManager} from '../services/projectManager.js';
 import {RecentProject} from '../types/index.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
-import {globalSessionManager} from '../services/globalSessionManager.js';
+import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -191,7 +191,7 @@ const Menu: React.FC<MenuProps> = ({
 
 				filteredRecentProjects.forEach((project, index) => {
 					// Get session counts for this project
-					const projectSessions = globalSessionManager.getProjectSessions(
+					const projectSessions = globalSessionOrchestrator.getProjectSessions(
 						project.path,
 					);
 					const counts = SessionManager.getSessionCounts(projectSessions);
