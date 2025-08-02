@@ -6,12 +6,7 @@ import Confirmation from './Confirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface MergeWorktreeProps {
-	onComplete: (
-		sourceBranch: string,
-		targetBranch: string,
-		deleteAfterMerge: boolean,
-		useRebase: boolean,
-	) => void;
+	onComplete: () => void;
 	onCancel: () => void;
 }
 
@@ -20,6 +15,8 @@ type Step =
 	| 'select-target'
 	| 'select-operation'
 	| 'confirm-merge'
+	| 'executing-merge'
+	| 'merge-error'
 	| 'delete-confirm';
 
 interface BranchItem {
@@ -35,11 +32,15 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	const [sourceBranch, setSourceBranch] = useState<string>('');
 	const [targetBranch, setTargetBranch] = useState<string>('');
 	const [branchItems, setBranchItems] = useState<BranchItem[]>([]);
+	const [originalBranchItems, setOriginalBranchItems] = useState<BranchItem[]>(
+		[],
+	);
 	const [useRebase, setUseRebase] = useState(false);
 	const [operationFocused, setOperationFocused] = useState(false);
+	const [mergeError, setMergeError] = useState<string | null>(null);
+	const [worktreeService] = useState(() => new WorktreeService());
 
 	useEffect(() => {
-		const worktreeService = new WorktreeService();
 		const loadedWorktrees = worktreeService.getWorktrees();
 
 		// Create branch items for selection
@@ -50,7 +51,8 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 			value: wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached',
 		}));
 		setBranchItems(items);
-	}, []);
+		setOriginalBranchItems(items);
+	}, [worktreeService]);
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
@@ -67,12 +69,19 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 				setStep('confirm-merge');
 			}
 		}
+
+		if (step === 'merge-error') {
+			// Any key press returns to menu
+			onCancel();
+		}
 	});
 
 	const handleSelectSource = (item: BranchItem) => {
 		setSourceBranch(item.value);
 		// Filter out the selected source branch for target selection
-		const filteredItems = branchItems.filter(b => b.value !== item.value);
+		const filteredItems = originalBranchItems.filter(
+			b => b.value !== item.value,
+		);
 		setBranchItems(filteredItems);
 		setStep('select-target');
 	};
@@ -81,6 +90,30 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		setTargetBranch(item.value);
 		setStep('select-operation');
 	};
+
+	// Execute the merge operation when step changes to executing-merge
+	useEffect(() => {
+		if (step !== 'executing-merge') return;
+
+		const performMerge = async () => {
+			const result = worktreeService.mergeWorktree(
+				sourceBranch,
+				targetBranch,
+				useRebase,
+			);
+
+			if (result.success) {
+				// Merge successful, ask about deleting source branch
+				setStep('delete-confirm');
+			} else {
+				// Merge failed, show error
+				setMergeError(result.error || 'Merge operation failed');
+				setStep('merge-error');
+			}
+		};
+
+		performMerge();
+	}, [step, sourceBranch, targetBranch, useRebase, worktreeService]);
 
 	if (step === 'select-source') {
 		return (
@@ -214,9 +247,37 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		return (
 			<Confirmation
 				message={confirmMessage}
-				onConfirm={() => setStep('delete-confirm')}
+				onConfirm={() => setStep('executing-merge')}
 				onCancel={onCancel}
 			/>
+		);
+	}
+
+	if (step === 'executing-merge') {
+		return (
+			<Box flexDirection="column">
+				<Text color="green">
+					{useRebase ? 'Rebasing' : 'Merging'} branches...
+				</Text>
+			</Box>
+		);
+	}
+
+	if (step === 'merge-error') {
+		return (
+			<Box flexDirection="column">
+				<Box marginBottom={1}>
+					<Text bold color="red">
+						{useRebase ? 'Rebase' : 'Merge'} Failed
+					</Text>
+				</Box>
+				<Box marginBottom={1}>
+					<Text color="red">{mergeError}</Text>
+				</Box>
+				<Box marginTop={1}>
+					<Text dimColor>Press any key to return to menu</Text>
+				</Box>
+			</Box>
 		);
 	}
 
@@ -239,12 +300,20 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		return (
 			<Confirmation
 				message={deleteMessage}
-				onConfirm={() =>
-					onComplete(sourceBranch, targetBranch, true, useRebase)
-				}
-				onCancel={() =>
-					onComplete(sourceBranch, targetBranch, false, useRebase)
-				}
+				onConfirm={() => {
+					const deleteResult =
+						worktreeService.deleteWorktreeByBranch(sourceBranch);
+					if (deleteResult.success) {
+						onComplete();
+					} else {
+						setMergeError(deleteResult.error || 'Failed to delete worktree');
+						setStep('merge-error');
+					}
+				}}
+				onCancel={() => {
+					// Skip deletion and complete
+					onComplete();
+				}}
 			/>
 		);
 	}

@@ -32,7 +32,6 @@ type View =
 	| 'delete-worktree'
 	| 'deleting-worktree'
 	| 'merge-worktree'
-	| 'merging-worktree'
 	| 'configuration'
 	| 'preset-selector'
 	| 'clearing';
@@ -312,46 +311,6 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		handleReturnToMenu();
 	};
 
-	const handleMergeWorktree = async (
-		sourceBranch: string,
-		targetBranch: string,
-		deleteAfterMerge: boolean,
-		useRebase: boolean,
-	) => {
-		setView('merging-worktree');
-		setError(null);
-
-		// Perform the merge
-		const mergeResult = worktreeService.mergeWorktree(
-			sourceBranch,
-			targetBranch,
-			useRebase,
-		);
-
-		if (mergeResult.success) {
-			// If user wants to delete the merged branch
-			if (deleteAfterMerge) {
-				const deleteResult =
-					worktreeService.deleteWorktreeByBranch(sourceBranch);
-				if (!deleteResult.success) {
-					setError(deleteResult.error || 'Failed to delete merged worktree');
-					setView('merge-worktree');
-					return;
-				}
-			}
-			// Success - return to menu
-			handleReturnToMenu();
-		} else {
-			// Show error
-			setError(mergeResult.error || 'Failed to merge branches');
-			setView('merge-worktree');
-		}
-	};
-
-	const handleCancelMergeWorktree = () => {
-		handleReturnToMenu();
-	};
-
 	const handleSelectProject = (project: GitProject) => {
 		// Handle special exit case
 		if (project.path === 'EXIT_APPLICATION') {
@@ -497,17 +456,9 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 					</Box>
 				)}
 				<MergeWorktree
-					onComplete={handleMergeWorktree}
-					onCancel={handleCancelMergeWorktree}
+					onComplete={handleReturnToMenu}
+					onCancel={handleReturnToMenu}
 				/>
-			</Box>
-		);
-	}
-
-	if (view === 'merging-worktree') {
-		return (
-			<Box flexDirection="column">
-				<Text color="green">Merging worktrees...</Text>
 			</Box>
 		);
 	}
