@@ -43,6 +43,12 @@ vi.mock('../services/recentProjectsService.js', () => ({
 	},
 }));
 
+vi.mock('../services/globalSessionManager.js', () => ({
+	globalSessionManager: {
+		getProjectSessions: vi.fn().mockReturnValue([]),
+	},
+}));
+
 vi.mock('../services/shortcutManager.js', () => ({
 	shortcutManager: {
 		getShortcutDisplay: vi.fn().mockReturnValue('Ctrl+C'),
@@ -155,5 +161,143 @@ describe('Menu component rendering', () => {
 				/Select a worktree to start or resume a Claude Code session:/g,
 			) || [];
 		expect(descMatches.length).toBe(1);
+	});
+
+	it('should display number shortcuts for recent projects when worktrees < 10', async () => {
+		const onSelectWorktree = vi.fn();
+		const onSelectRecentProject = vi.fn();
+
+		// Setup: 3 worktrees
+		const mockWorktrees = [
+			{
+				path: '/test/wt1',
+				branch: 'feature-1',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+			{
+				path: '/test/wt2',
+				branch: 'feature-2',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+			{
+				path: '/test/wt3',
+				branch: 'feature-3',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+		];
+
+		// Setup: 3 recent projects
+		const mockRecentProjects = [
+			{name: 'Project A', path: '/test/project-a', lastAccessed: Date.now()},
+			{name: 'Project B', path: '/test/project-b', lastAccessed: Date.now()},
+			{name: 'Project C', path: '/test/project-c', lastAccessed: Date.now()},
+		];
+
+		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue(mockWorktrees);
+		vi.spyOn(worktreeService, 'getGitRootPath').mockReturnValue(
+			'/test/current',
+		);
+		const {recentProjectsService} = await import(
+			'../services/recentProjectsService.js'
+		);
+		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue(
+			mockRecentProjects,
+		);
+
+		// Mock session counts
+		vi.spyOn(SessionManager, 'getSessionCounts').mockReturnValue({
+			idle: 0,
+			busy: 0,
+			waiting_input: 0,
+			total: 0,
+		});
+		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+				onSelectRecentProject={onSelectRecentProject}
+				multiProject={true}
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Check that worktrees have numbers 0-2
+		expect(output).toContain('0 ❯');
+		expect(output).toContain('1 ❯');
+		expect(output).toContain('2 ❯');
+
+		// Check that recent projects have numbers 3-5
+		expect(output).toContain('3 ❯ Project A');
+		expect(output).toContain('4 ❯ Project B');
+		expect(output).toContain('5 ❯ Project C');
+	});
+
+	it('should not display number shortcuts for recent projects when worktrees >= 10', async () => {
+		const onSelectWorktree = vi.fn();
+		const onSelectRecentProject = vi.fn();
+
+		// Setup: 10 worktrees
+		const mockWorktrees = Array.from({length: 10}, (_, i) => ({
+			path: `/test/wt${i}`,
+			branch: `feature-${i}`,
+			isMainWorktree: false,
+			hasSession: false,
+		}));
+
+		// Setup: 2 recent projects
+		const mockRecentProjects = [
+			{name: 'Project A', path: '/test/project-a', lastAccessed: Date.now()},
+			{name: 'Project B', path: '/test/project-b', lastAccessed: Date.now()},
+		];
+
+		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue(mockWorktrees);
+		vi.spyOn(worktreeService, 'getGitRootPath').mockReturnValue(
+			'/test/current',
+		);
+		const {recentProjectsService} = await import(
+			'../services/recentProjectsService.js'
+		);
+		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue(
+			mockRecentProjects,
+		);
+
+		// Mock session counts
+		vi.spyOn(SessionManager, 'getSessionCounts').mockReturnValue({
+			idle: 0,
+			busy: 0,
+			waiting_input: 0,
+			total: 0,
+		});
+		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+				onSelectRecentProject={onSelectRecentProject}
+				multiProject={true}
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Check that recent projects don't have numbers (just ❯ prefix)
+		expect(output).toContain('❯ Project A');
+		expect(output).toContain('❯ Project B');
+		// Make sure they don't have number prefixes
+		expect(output).not.toContain('10 ❯ Project A');
+		expect(output).not.toContain('11 ❯ Project B');
 	});
 });

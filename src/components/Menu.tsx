@@ -187,6 +187,10 @@ const Menu: React.FC<MenuProps> = ({
 				});
 
 				// Add recent projects
+				// Calculate available number shortcuts for recent projects
+				const worktreeCount = filteredItems.length;
+				const availableNumbersForProjects = worktreeCount < 10;
+
 				filteredRecentProjects.forEach((project, index) => {
 					// Get session counts for this project
 					const projectSessions = globalSessionManager.getProjectSessions(
@@ -195,9 +199,22 @@ const Menu: React.FC<MenuProps> = ({
 					const counts = SessionManager.getSessionCounts(projectSessions);
 					const countsFormatted = SessionManager.formatSessionCounts(counts);
 
+					// Assign number shortcuts to recent projects if worktrees < 10
+					let label = project.name + countsFormatted;
+					if (availableNumbersForProjects) {
+						const projectNumber = worktreeCount + index;
+						if (projectNumber < 10) {
+							label = `${projectNumber} ❯ ${label}`;
+						} else {
+							label = `❯ ${label}`;
+						}
+					} else {
+						label = `❯ ${label}`;
+					}
+
 					menuItems.push({
 						type: 'project',
-						label: `${project.name}${countsFormatted}`,
+						label,
 						value: `recent-project-${index}`,
 						recentProject: project,
 					});
@@ -286,8 +303,24 @@ const Menu: React.FC<MenuProps> = ({
 			const index = parseInt(keyPressed);
 			// Get filtered worktree items
 			const worktreeItems = items.filter(item => item.type === 'worktree');
-			if (index < Math.min(10, worktreeItems.length) && worktreeItems[index]) {
+			const projectItems = items.filter(item => item.type === 'project');
+
+			// Check if it's a worktree
+			if (index < worktreeItems.length && worktreeItems[index]) {
 				onSelectWorktree(worktreeItems[index].worktree);
+				return;
+			}
+
+			// Check if it's a recent project (when worktrees < 10)
+			if (worktreeItems.length < 10) {
+				const projectIndex = index - worktreeItems.length;
+				if (
+					projectIndex >= 0 &&
+					projectIndex < projectItems.length &&
+					projectItems[projectIndex]
+				) {
+					handleSelect(projectItems[projectIndex]);
+				}
 			}
 			return;
 		}
@@ -505,7 +538,7 @@ const Menu: React.FC<MenuProps> = ({
 							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete C-Config ${
 									projectName ? 'B-Back' : 'Q-Quit'
 								}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first 10) /-Search N-New M-Merge D-Delete C-Config ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete C-Config ${
 									projectName ? 'B-Back' : 'Q-Quit'
 								}`}
 				</Text>
