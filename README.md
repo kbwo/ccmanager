@@ -1,6 +1,6 @@
 # CCManager - AI Code Assistant Session Manager
 
-CCManager is a TUI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI) across Git worktrees.
+CCManager is a TUI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI) across Git worktrees and projects.
 
 
 
@@ -11,6 +11,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 ## Features
 
 - Run multiple AI assistant sessions in parallel across different Git worktrees
+- **Multi-project support**: Manage multiple git repositories from a single interface
 - Support for multiple AI coding assistants (Claude Code, Gemini CLI)
 - Switch between sessions seamlessly
 - Visual status indicators for session states (busy, waiting, idle)
@@ -242,6 +243,38 @@ The devcontainer integration requires both commands:
 - **Safe experimentation**: Run commands like `claude --dangerously-skip-permissions` without risk
 
 For detailed setup and configuration, see [docs/devcontainer.md](docs/devcontainer.md).
+
+## Multi-Project Mode
+
+CCManager can manage multiple git repositories from a single interface, allowing you to organize and navigate between different projects and their worktrees efficiently.
+
+### Quick Start
+
+```bash
+# Set the root directory containing your git projects
+export CCMANAGER_MULTI_PROJECT_ROOT="/path/to/your/projects"
+
+# Run CCManager in multi-project mode
+npx ccmanager --multi-project
+```
+
+### Features
+
+- **Automatic project discovery**: Recursively finds all git repositories
+- **Recent projects**: Frequently used projects appear at the top
+- **Vi-like search**: Press `/` to filter projects or worktrees
+- **Session persistence**: Sessions remain active when switching projects
+- **Visual indicators**: See session counts `[active/busy/waiting]` for each project
+
+### Navigation
+
+1. **Project List**: Select from all discovered git repositories
+2. **Worktree Menu**: Manage worktrees for the selected project
+3. **Session View**: Interact with your AI assistant
+
+Use `B` key to navigate back from worktrees to project list.
+
+For detailed configuration and usage, see [docs/multi-project.md](docs/multi-project.md).
 
 ## Git Worktree Configuration
 
