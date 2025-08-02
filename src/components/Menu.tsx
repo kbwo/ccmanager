@@ -157,7 +157,7 @@ const Menu: React.FC<MenuProps> = ({
 			(item, index): WorktreeItem => {
 				const label = assembleWorktreeLabel(item, columnPositions);
 
-				// Only show numbers for first 10 worktrees (0-9) when not in search mode
+				// Only show numbers for worktrees (0-9) when not in search mode
 				const numberPrefix = !isSearchMode && index < 10 ? `${index} ❯ ` : '❯ ';
 
 				return {
@@ -298,7 +298,7 @@ const Menu: React.FC<MenuProps> = ({
 
 		const keyPressed = input.toLowerCase();
 
-		// Handle number keys 0-9 for worktree selection (first 10 only)
+		// Handle number keys 0-9 for worktree selection
 		if (/^[0-9]$/.test(keyPressed)) {
 			const index = parseInt(keyPressed);
 			// Get filtered worktree items

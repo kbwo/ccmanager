@@ -150,7 +150,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 			const counts = SessionManager.getSessionCounts(projectSessions);
 			const countsFormatted = SessionManager.formatSessionCounts(counts);
 
-			// Only show numbers for first 10 total items (0-9) when not in search mode
+			// Only show numbers for total items (0-9) when not in search mode
 			const numberPrefix =
 				!isSearchMode && currentIndex < 10 ? `${currentIndex} ❯ ` : '❯ ';
 
@@ -204,7 +204,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 
 		const keyPressed = input.toLowerCase();
 
-		// Handle number keys 0-9 for project selection (first 10 only)
+		// Handle number keys 0-9 for project selection
 		if (/^[0-9]$/.test(keyPressed)) {
 			const index = parseInt(keyPressed);
 			// Get all selectable items (recent + non-recent projects)
@@ -338,7 +338,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
 							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select R-Refresh Q-Quit`
-							: 'Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first 10) /-Search R-Refresh Q-Quit'}
+							: 'Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search R-Refresh Q-Quit'}
 				</Text>
 			</Box>
 		</Box>
