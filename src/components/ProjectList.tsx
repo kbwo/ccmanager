@@ -327,10 +327,12 @@ const ProjectList: React.FC<ProjectListProps> = ({
 			)}
 
 			<Box marginTop={1} flexDirection="column">
-				<Text dimColor>
-					Projects: {items.filter(item => item.project).length} of{' '}
-					{projects.length} shown
-				</Text>
+				{(isSearchMode || searchQuery) && (
+					<Text dimColor>
+						Projects: {items.filter(item => item.project).length} of{' '}
+						{projects.length} shown
+					</Text>
+				)}
 				<Text dimColor>
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
