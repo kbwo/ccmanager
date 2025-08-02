@@ -978,4 +978,103 @@ describe('SessionManager', () => {
 			expect(session.isPrimaryCommand).toBe(false);
 		});
 	});
+
+	describe('static methods', () => {
+		describe('getSessionCounts', () => {
+			it('should count sessions by state', () => {
+				const sessions: Partial<Session>[] = [
+					{id: '1', state: 'idle'},
+					{id: '2', state: 'busy'},
+					{id: '3', state: 'busy'},
+					{id: '4', state: 'waiting_input'},
+					{id: '5', state: 'idle'},
+				];
+
+				const counts = SessionManager.getSessionCounts(sessions as Session[]);
+
+				expect(counts.idle).toBe(2);
+				expect(counts.busy).toBe(2);
+				expect(counts.waiting_input).toBe(1);
+				expect(counts.total).toBe(5);
+			});
+
+			it('should handle empty sessions array', () => {
+				const counts = SessionManager.getSessionCounts([]);
+
+				expect(counts.idle).toBe(0);
+				expect(counts.busy).toBe(0);
+				expect(counts.waiting_input).toBe(0);
+				expect(counts.total).toBe(0);
+			});
+
+			it('should handle sessions with single state', () => {
+				const sessions: Partial<Session>[] = [
+					{id: '1', state: 'busy'},
+					{id: '2', state: 'busy'},
+					{id: '3', state: 'busy'},
+				];
+
+				const counts = SessionManager.getSessionCounts(sessions as Session[]);
+
+				expect(counts.idle).toBe(0);
+				expect(counts.busy).toBe(3);
+				expect(counts.waiting_input).toBe(0);
+				expect(counts.total).toBe(3);
+			});
+		});
+
+		describe('formatSessionCounts', () => {
+			it('should format counts with all states', () => {
+				const counts = {
+					idle: 1,
+					busy: 2,
+					waiting_input: 1,
+					total: 4,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toBe(' (1 Idle / 2 Busy / 1 Waiting)');
+			});
+
+			it('should format counts with some states', () => {
+				const counts = {
+					idle: 2,
+					busy: 0,
+					waiting_input: 1,
+					total: 3,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toBe(' (2 Idle / 1 Waiting)');
+			});
+
+			it('should format counts with single state', () => {
+				const counts = {
+					idle: 0,
+					busy: 3,
+					waiting_input: 0,
+					total: 3,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toBe(' (3 Busy)');
+			});
+
+			it('should return empty string for zero sessions', () => {
+				const counts = {
+					idle: 0,
+					busy: 0,
+					waiting_input: 0,
+					total: 0,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toBe('');
+			});
+		});
+	});
 });

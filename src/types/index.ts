@@ -108,3 +108,75 @@ export interface ConfigurationData {
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
 }
+
+// Multi-project support interfaces
+export interface GitProject {
+	name: string; // Project name (directory name)
+	path: string; // Full path to the git repository
+	relativePath: string; // Relative path from CCMANAGER_MULTI_PROJECT_ROOT
+	isValid: boolean; // Whether the project is a valid git repository
+	error?: string; // Error message if project is invalid
+}
+
+export interface MultiProjectConfig {
+	enabled: boolean; // Whether multi-project mode is enabled
+	projectsDir: string; // Path to directory containing git projects (from CCMANAGER_MULTI_PROJECT_ROOT)
+	rootMarker?: string; // Optional marker from CCMANAGER_MULTI_PROJECT_ROOT
+}
+
+export type MenuMode = 'normal' | 'multi-project';
+
+export interface IMultiProjectService {
+	discoverProjects(projectsDir: string): Promise<GitProject[]>;
+	validateGitRepository(path: string): Promise<boolean>;
+}
+
+export interface RecentProject {
+	path: string;
+	name: string;
+	lastAccessed: number;
+}
+
+export interface IProjectManager {
+	currentMode: MenuMode;
+	currentProject?: GitProject;
+	projects: GitProject[];
+
+	setMode(mode: MenuMode): void;
+	selectProject(project: GitProject): void;
+	getWorktreeService(projectPath?: string): IWorktreeService;
+	refreshProjects(): Promise<void>;
+
+	// Recent projects methods
+	getRecentProjects(limit?: number): RecentProject[];
+	addRecentProject(project: GitProject): void;
+	clearRecentProjects(): void;
+
+	// Project validation
+	validateGitRepository(path: string): Promise<boolean>;
+}
+
+export interface IWorktreeService {
+	getWorktrees(): Worktree[];
+	getGitRootPath(): string;
+	createWorktree(
+		worktreePath: string,
+		branch: string,
+		baseBranch: string,
+		copySessionData?: boolean,
+		copyClaudeDirectory?: boolean,
+	): {success: boolean; error?: string};
+	deleteWorktree(
+		worktreePath: string,
+		options?: {deleteBranch?: boolean},
+	): {success: boolean; error?: string};
+	mergeWorktree(
+		worktreePath: string,
+		targetBranch?: string,
+	): {
+		success: boolean;
+		mergedBranch?: string;
+		error?: string;
+		deletedWorktree?: boolean;
+	};
+}

@@ -2,7 +2,7 @@
 
 ## Overview
 
-CCManager is a TUI application for managing multiple Claude Code sessions across Git worktrees. It allows you to run Claude Code in parallel across different worktrees, switch between them seamlessly, and manage worktrees directly from the interface.
+CCManager is a TUI application for managing multiple Claude Code sessions across Git worktrees and projects. It allows you to run Claude Code in parallel across different worktrees, switch between them seamlessly, manage worktrees directly from the interface, and organize work across multiple git repositories through its multi-project mode.
 
 ## Project Structure
 
@@ -337,10 +337,82 @@ await sessionManager.createSessionWithDevcontainer(
 - **Customizable Shortcuts**: Configure keyboard shortcuts via UI or JSON file
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 - **Devcontainer Integration**: Run sessions inside containers while managing from host
+- **Multi-Project Support**: Manage multiple git repositories from a single interface
+
+### Multi-Project Features
+
+CCManager supports managing multiple git repositories through multi-project mode:
+
+#### Enabling Multi-Project Mode
+
+```bash
+# Set the root directory for project discovery
+export CCMANAGER_MULTI_PROJECT_ROOT="/path/to/your/projects"
+
+# Run CCManager in multi-project mode
+npx ccmanager --multi-project
+```
+
+#### Project Discovery and Management
+
+- **Automatic Discovery**: Recursively finds all git repositories in the specified root directory
+- **Project Caching**: Discovered projects are cached for improved performance
+- **Recent Projects**: Frequently accessed projects appear at the top of the list
+- **Persistent State**: Recent projects are saved to `~/.config/ccmanager/recent-projects.json`
+
+#### Navigation Flow
+
+1. **Project List View**: Initial screen showing all discovered projects
+   - Recent projects displayed at the top
+   - All other projects listed below
+   - Vi-like search with `/` key
+   - Number keys (0-9) for quick selection
+
+2. **Menu View**: After selecting a project, shows worktrees for that project
+   - Back to project list option (`B` key)
+   - Session counts displayed per project `[active/busy/waiting]`
+   - Standard worktree operations available
+
+3. **Session View**: Terminal emulation with selected Claude Code session
+
+#### Search Functionality
+
+Both Project List and Menu support Vi-like search:
+- Press `/` to enter search mode
+- Type to filter items in real-time
+- Press `ESC` to cancel search
+- Press `Enter` to exit search and keep filter
+
+#### Session Orchestration
+
+- **GlobalSessionOrchestrator**: Manages session state across all projects
+- **Per-Project SessionManagers**: Each project maintains its own session manager
+- **Session Persistence**: Sessions remain active when navigating between projects
+- **Visual Indicators**: Session counts shown as `[2/1/0]` format:
+  - First number: Total active sessions
+  - Second number: Busy sessions
+  - Third number: Waiting sessions
+
+#### Implementation Details
+
+```typescript
+// Project discovery
+const projectManager = new ProjectManager(rootPath);
+const projects = await projectManager.getProjects();
+
+// Session management across projects
+const orchestrator = new GlobalSessionOrchestrator();
+const sessionManager = orchestrator.getOrCreateSessionManager(projectPath);
+
+// Recent projects tracking
+await projectManager.addRecentProject(project);
+const recentProjects = await projectManager.getRecentProjects();
+```
 
 ### User Interface
 
-- **Main Menu**: Lists all worktrees with status indicators
+- **Project List**: Shows all discovered git repositories with search functionality
+- **Main Menu**: Lists all worktrees with status indicators and session counts
 - **Session View**: Full terminal emulation with Claude Code
 - **Forms**: Text input for creating worktrees and configuring settings
 - **Confirmation Dialogs**: Safety prompts for destructive actions

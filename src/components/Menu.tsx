@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import {Worktree, Session} from '../types/index.js';
+import {Worktree, Session, GitProject} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {
@@ -15,38 +15,97 @@ import {
 	calculateColumnPositions,
 	assembleWorktreeLabel,
 } from '../utils/worktreeUtils.js';
+import {projectManager} from '../services/projectManager.js';
+import {RecentProject} from '../types/index.js';
+import TextInputWrapper from './TextInputWrapper.js';
+import {useSearchMode} from '../hooks/useSearchMode.js';
+import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
+	worktreeService: WorktreeService;
 	onSelectWorktree: (worktree: Worktree) => void;
+	onSelectRecentProject?: (project: GitProject) => void;
 	error?: string | null;
 	onDismissError?: () => void;
+	projectName?: string;
+	multiProject?: boolean;
 }
 
-interface MenuItem {
+interface CommonItem {
+	type: 'common';
 	label: string;
 	value: string;
-	worktree?: Worktree;
 }
+
+interface WorktreeItem {
+	type: 'worktree';
+	label: string;
+	value: string;
+	worktree: Worktree;
+}
+
+interface ProjectItem {
+	type: 'project';
+	label: string;
+	value: string;
+	recentProject: RecentProject;
+}
+
+type MenuItem = CommonItem | WorktreeItem | ProjectItem;
+
+const createSeparatorWithText = (
+	text: string,
+	totalWidth: number = 35,
+): string => {
+	const textWithSpaces = ` ${text} `;
+	const textLength = textWithSpaces.length;
+	const remainingWidth = totalWidth - textLength;
+	const leftDashes = Math.floor(remainingWidth / 2);
+	const rightDashes = Math.ceil(remainingWidth / 2);
+
+	return '─'.repeat(leftDashes) + textWithSpaces + '─'.repeat(rightDashes);
+};
 
 const Menu: React.FC<MenuProps> = ({
 	sessionManager,
+	worktreeService,
 	onSelectWorktree,
+	onSelectRecentProject,
 	error,
 	onDismissError,
+	projectName,
+	multiProject = false,
 }) => {
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
 	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
+	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+
+	// Use the search mode hook
+	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
+		useSearchMode(items.length, {
+			isDisabled: !!error,
+		});
 
 	useEffect(() => {
 		// Load worktrees
-		const worktreeService = new WorktreeService();
 		const loadedWorktrees = worktreeService.getWorktrees();
 		setBaseWorktrees(loadedWorktrees);
 		setDefaultBranch(worktreeService.getDefaultBranch());
+
+		// Load recent projects if in multi-project mode
+		if (multiProject) {
+			// Filter out the current project from recent projects
+			const allRecentProjects = projectManager.getRecentProjects();
+			const currentProjectPath = worktreeService.getGitRootPath();
+			const filteredProjects = allRecentProjects.filter(
+				(project: RecentProject) => project.path !== currentProjectPath,
+			);
+			setRecentProjects(filteredProjects);
+		}
 
 		// Update sessions
 		const updateSessions = () => {
@@ -72,70 +131,194 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager]);
+	}, [sessionManager, worktreeService, multiProject]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
 		const items = prepareWorktreeItems(worktrees, sessions);
 		const columnPositions = calculateColumnPositions(items);
 
+		// Filter worktrees based on search query
+		const filteredItems = searchQuery
+			? items.filter(item => {
+					const branchName = item.worktree.branch || '';
+					const searchLower = searchQuery.toLowerCase();
+					return (
+						branchName.toLowerCase().includes(searchLower) ||
+						item.worktree.path.toLowerCase().includes(searchLower)
+					);
+				})
+			: items;
+
 		// Build menu items with proper alignment
-		const menuItems: MenuItem[] = items.map((item, index) => {
-			const label = assembleWorktreeLabel(item, columnPositions);
+		const menuItems: MenuItem[] = filteredItems.map(
+			(item, index): WorktreeItem => {
+				const label = assembleWorktreeLabel(item, columnPositions);
 
-			// Only show numbers for first 10 worktrees (0-9)
-			const numberPrefix = index < 10 ? `${index} ❯ ` : '❯ ';
+				// Only show numbers for worktrees (0-9) when not in search mode
+				const numberPrefix = !isSearchMode && index < 10 ? `${index} ❯ ` : '❯ ';
 
-			return {
-				label: numberPrefix + label,
-				value: item.worktree.path,
-				worktree: item.worktree,
-			};
-		});
+				return {
+					type: 'worktree',
+					label: numberPrefix + label,
+					value: item.worktree.path,
+					worktree: item.worktree,
+				};
+			},
+		);
 
-		// Add menu options
-		menuItems.push({
-			label: '─────────────',
-			value: 'separator',
-		});
-		menuItems.push({
-			label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
-			value: 'new-worktree',
-		});
-		menuItems.push({
-			label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
-			value: 'merge-worktree',
-		});
-		menuItems.push({
-			label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
-			value: 'delete-worktree',
-		});
-		menuItems.push({
-			label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
-			value: 'configuration',
-		});
-		menuItems.push({
-			label: `Q ${MENU_ICONS.EXIT} Exit`,
-			value: 'exit',
-		});
+		// Filter recent projects based on search query
+		const filteredRecentProjects = searchQuery
+			? recentProjects.filter(project =>
+					project.name.toLowerCase().includes(searchQuery.toLowerCase()),
+				)
+			: recentProjects;
+
+		// Add menu options only when not in search mode
+		if (!isSearchMode) {
+			// Add recent projects section if enabled and has recent projects
+			if (multiProject && filteredRecentProjects.length > 0) {
+				menuItems.push({
+					type: 'common',
+					label: createSeparatorWithText('Recent'),
+					value: 'recent-separator',
+				});
+
+				// Add recent projects
+				// Calculate available number shortcuts for recent projects
+				const worktreeCount = filteredItems.length;
+				const availableNumbersForProjects = worktreeCount < 10;
+
+				filteredRecentProjects.forEach((project, index) => {
+					// Get session counts for this project
+					const projectSessions = globalSessionOrchestrator.getProjectSessions(
+						project.path,
+					);
+					const counts = SessionManager.getSessionCounts(projectSessions);
+					const countsFormatted = SessionManager.formatSessionCounts(counts);
+
+					// Assign number shortcuts to recent projects if worktrees < 10
+					let label = project.name + countsFormatted;
+					if (availableNumbersForProjects) {
+						const projectNumber = worktreeCount + index;
+						if (projectNumber < 10) {
+							label = `${projectNumber} ❯ ${label}`;
+						} else {
+							label = `❯ ${label}`;
+						}
+					} else {
+						label = `❯ ${label}`;
+					}
+
+					menuItems.push({
+						type: 'project',
+						label,
+						value: `recent-project-${index}`,
+						recentProject: project,
+					});
+				});
+			}
+
+			// Add menu options
+			const otherMenuItems: MenuItem[] = [
+				{
+					type: 'common',
+					label: createSeparatorWithText('Other'),
+					value: 'other-separator',
+				},
+				{
+					type: 'common',
+					label: `N ${MENU_ICONS.NEW_WORKTREE} New Worktree`,
+					value: 'new-worktree',
+				},
+				{
+					type: 'common',
+					label: `M ${MENU_ICONS.MERGE_WORKTREE} Merge Worktree`,
+					value: 'merge-worktree',
+				},
+				{
+					type: 'common',
+					label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
+					value: 'delete-worktree',
+				},
+				{
+					type: 'common',
+					label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
+					value: 'configuration',
+				},
+			];
+			menuItems.push(...otherMenuItems);
+			if (projectName) {
+				// In multi-project mode, show 'Back to project list'
+				menuItems.push({
+					type: 'common',
+					label: `B 🔙 Back to project list`,
+					value: 'back-to-projects',
+				});
+			} else {
+				// In single-project mode, show 'Exit'
+				menuItems.push({
+					type: 'common',
+					label: `Q ${MENU_ICONS.EXIT} Exit`,
+					value: 'exit',
+				});
+			}
+		}
 		setItems(menuItems);
-	}, [worktrees, sessions, defaultBranch]);
+	}, [
+		worktrees,
+		sessions,
+		defaultBranch,
+		projectName,
+		multiProject,
+		recentProjects,
+		searchQuery,
+		isSearchMode,
+	]);
 
 	// Handle hotkeys
 	useInput((input, _key) => {
+		// Skip in test environment to avoid stdin.ref error
+		if (!process.stdin.setRawMode) {
+			return;
+		}
+
 		// Dismiss error on any key press when error is shown
 		if (error && onDismissError) {
 			onDismissError();
 			return;
 		}
 
+		// Don't process other keys if in search mode (handled by useSearchMode)
+		if (isSearchMode) {
+			return;
+		}
+
 		const keyPressed = input.toLowerCase();
 
-		// Handle number keys 0-9 for worktree selection (first 10 only)
+		// Handle number keys 0-9 for worktree selection
 		if (/^[0-9]$/.test(keyPressed)) {
 			const index = parseInt(keyPressed);
-			if (index < Math.min(10, worktrees.length) && worktrees[index]) {
-				onSelectWorktree(worktrees[index]);
+			// Get filtered worktree items
+			const worktreeItems = items.filter(item => item.type === 'worktree');
+			const projectItems = items.filter(item => item.type === 'project');
+
+			// Check if it's a worktree
+			if (index < worktreeItems.length && worktreeItems[index]) {
+				onSelectWorktree(worktreeItems[index].worktree);
+				return;
+			}
+
+			// Check if it's a recent project (when worktrees < 10)
+			if (worktreeItems.length < 10) {
+				const projectIndex = index - worktreeItems.length;
+				if (
+					projectIndex >= 0 &&
+					projectIndex < projectItems.length &&
+					projectItems[projectIndex]
+				) {
+					handleSelect(projectItems[projectIndex]);
+				}
 			}
 			return;
 		}
@@ -177,22 +360,46 @@ const Menu: React.FC<MenuProps> = ({
 					hasSession: false,
 				});
 				break;
+			case 'b':
+				// In multi-project mode, go back to project list
+				if (projectName) {
+					onSelectWorktree({
+						path: 'EXIT_APPLICATION',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				}
+				break;
 			case 'q':
 			case 'x':
-				// Trigger exit action
-				onSelectWorktree({
-					path: 'EXIT_APPLICATION',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				// Trigger exit action (only in single-project mode)
+				if (!projectName) {
+					onSelectWorktree({
+						path: 'EXIT_APPLICATION',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				}
 				break;
 		}
 	});
 
 	const handleSelect = (item: MenuItem) => {
-		if (item.value === 'separator') {
-			// Do nothing for separator
+		if (item.value.endsWith('-separator') || item.value === 'recent-header') {
+			// Do nothing for separators and headers
+		} else if (item.type === 'project') {
+			// Handle recent project selection
+			if (onSelectRecentProject) {
+				const project: GitProject = {
+					path: item.recentProject.path,
+					name: item.recentProject.name,
+					relativePath: item.recentProject.path,
+					isValid: true,
+				};
+				onSelectRecentProject(project);
+			}
 		} else if (item.value === 'new-worktree') {
 			// Handle in parent component
 			onSelectWorktree({
@@ -233,17 +440,30 @@ const Menu: React.FC<MenuProps> = ({
 				isMainWorktree: false,
 				hasSession: false,
 			});
-		} else if (item.worktree) {
+		} else if (item.value === 'back-to-projects') {
+			// Handle in parent component - use special marker
+			onSelectWorktree({
+				path: 'EXIT_APPLICATION',
+				branch: '',
+				isMainWorktree: false,
+				hasSession: false,
+			});
+		} else if (item.type === 'worktree') {
 			onSelectWorktree(item.worktree);
 		}
 	};
 
 	return (
 		<Box flexDirection="column">
-			<Box marginBottom={1}>
+			<Box marginBottom={1} flexDirection="column">
 				<Text bold color="green">
 					CCManager - Claude Code Worktree Manager
 				</Text>
+				{projectName && (
+					<Text bold color="green">
+						{projectName}
+					</Text>
+				)}
 			</Box>
 
 			<Box marginBottom={1}>
@@ -252,7 +472,43 @@ const Menu: React.FC<MenuProps> = ({
 				</Text>
 			</Box>
 
-			<SelectInput items={items} onSelect={handleSelect} isFocused={!error} />
+			{isSearchMode && (
+				<Box marginBottom={1}>
+					<Text>Search: </Text>
+					<TextInputWrapper
+						value={searchQuery}
+						onChange={setSearchQuery}
+						focus={true}
+						placeholder="Type to filter worktrees..."
+					/>
+				</Box>
+			)}
+
+			{isSearchMode && items.length === 0 ? (
+				<Box>
+					<Text color="yellow">No worktrees match your search</Text>
+				</Box>
+			) : isSearchMode ? (
+				// In search mode, show the items as a list without SelectInput
+				<Box flexDirection="column">
+					{items.map((item, index) => (
+						<Text
+							key={item.value}
+							color={index === selectedIndex ? 'green' : undefined}
+						>
+							{index === selectedIndex ? '❯ ' : '  '}
+							{item.label}
+						</Text>
+					))}
+				</Box>
+			) : (
+				<SelectInput
+					items={items}
+					onSelect={item => handleSelect(item as MenuItem)}
+					isFocused={!error}
+					initialIndex={selectedIndex}
+				/>
+			)}
 
 			{error && (
 				<Box marginTop={1} paddingX={1} borderStyle="round" borderColor="red">
@@ -274,8 +530,15 @@ const Menu: React.FC<MenuProps> = ({
 					{STATUS_LABELS.IDLE}
 				</Text>
 				<Text dimColor>
-					Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select (first
-					10) N-New M-Merge D-Delete C-Config Q-Quit
+					{isSearchMode
+						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
+						: searchQuery
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete C-Config ${
+									projectName ? 'B-Back' : 'Q-Quit'
+								}`
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete C-Config ${
+									projectName ? 'B-Back' : 'Q-Quit'
+								}`}
 				</Text>
 			</Box>
 		</Box>
