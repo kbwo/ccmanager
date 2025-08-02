@@ -2,14 +2,11 @@ import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {GitProject} from '../types/index.js';
-import {MultiProjectService} from '../services/multiProjectService.js';
+import {projectManager} from '../services/projectManager.js';
 import {MENU_ICONS} from '../constants/statusIcons.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
-import {
-	recentProjectsService,
-	RecentProject,
-} from '../services/recentProjectsService.js';
+import {RecentProject} from '../types/index.js';
 import {globalSessionManager} from '../services/globalSessionManager.js';
 import {SessionManager} from '../services/sessionManager.js';
 
@@ -52,12 +49,12 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		setLoadError(null);
 
 		try {
-			const service = new MultiProjectService();
-			const discoveredProjects = await service.discoverProjects(projectsDir);
+			const discoveredProjects =
+				await projectManager.instance.discoverProjects(projectsDir);
 			setProjects(discoveredProjects);
 
 			// Load recent projects with no limit (pass 0)
-			const allRecentProjects = recentProjectsService.getRecentProjects(0);
+			const allRecentProjects = projectManager.getRecentProjects(0);
 			setRecentProjects(allRecentProjects);
 		} catch (err) {
 			setLoadError((err as Error).message);

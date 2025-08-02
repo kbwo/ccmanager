@@ -131,6 +131,12 @@ export interface IMultiProjectService {
 	validateGitRepository(path: string): Promise<boolean>;
 }
 
+export interface RecentProject {
+	path: string;
+	name: string;
+	lastAccessed: number;
+}
+
 export interface IProjectManager {
 	currentMode: MenuMode;
 	currentProject?: GitProject;
@@ -140,6 +146,14 @@ export interface IProjectManager {
 	selectProject(project: GitProject): void;
 	getWorktreeService(projectPath?: string): IWorktreeService;
 	refreshProjects(): Promise<void>;
+
+	// Recent projects methods
+	getRecentProjects(limit?: number): RecentProject[];
+	addRecentProject(project: GitProject): void;
+	clearRecentProjects(): void;
+
+	// Project validation
+	validateGitRepository(path: string): Promise<boolean>;
 }
 
 export interface IWorktreeService {

@@ -3,19 +3,44 @@ import {
 	IProjectManager,
 	IWorktreeService,
 	MenuMode,
+	RecentProject,
 } from '../types/index.js';
 import {WorktreeService} from './worktreeService.js';
-import {MultiProjectService} from './multiProjectService.js';
 import {ENV_VARS} from '../constants/env.js';
+import {promises as fs} from 'fs';
+import path from 'path';
+import {homedir} from 'os';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+
+interface DiscoveryTask {
+	path: string;
+	relativePath: string;
+}
+
+interface DiscoveryResult {
+	path: string;
+	relativePath: string;
+	name: string;
+	error?: string;
+}
 
 export class ProjectManager implements IProjectManager {
 	currentMode: MenuMode;
 	currentProject?: GitProject;
 	projects: GitProject[] = [];
 
-	private multiProjectService: MultiProjectService;
 	private worktreeServiceCache: Map<string, IWorktreeService> = new Map();
 	private projectsDir?: string;
+
+	// Multi-project discovery
+	private projectCache: Map<string, GitProject> = new Map();
+	private discoveryWorkers = 4;
+
+	// Recent projects
+	private static readonly MAX_RECENT_PROJECTS = 5;
+	private recentProjects: RecentProject[] = [];
+	private dataPath: string;
+	private configDir: string;
 
 	constructor() {
 		// Initialize mode based on environment variables
@@ -24,12 +49,29 @@ export class ProjectManager implements IProjectManager {
 
 		// Set initial mode
 		this.currentMode = multiProjectRoot ? 'multi-project' : 'normal';
-		this.multiProjectService = new MultiProjectService();
 
 		// If in multi-project mode but no projects dir, default to normal mode
 		if (this.currentMode === 'multi-project' && !this.projectsDir) {
 			this.currentMode = 'normal';
 		}
+
+		// Initialize recent projects
+		const homeDir = homedir();
+		this.configDir =
+			process.platform === 'win32'
+				? path.join(
+						process.env['APPDATA'] || path.join(homeDir, 'AppData', 'Roaming'),
+						'ccmanager',
+					)
+				: path.join(homeDir, '.config', 'ccmanager');
+
+		// Ensure config directory exists
+		if (!existsSync(this.configDir)) {
+			mkdirSync(this.configDir, {recursive: true});
+		}
+
+		this.dataPath = path.join(this.configDir, 'recent-projects.json');
+		this.loadRecentProjects();
 	}
 
 	setMode(mode: MenuMode): void {
@@ -66,9 +108,7 @@ export class ProjectManager implements IProjectManager {
 		}
 
 		// Discover projects
-		this.projects = await this.multiProjectService.discoverProjects(
-			this.projectsDir,
-		);
+		this.projects = await this.discoverProjects(this.projectsDir);
 
 		// Update current project if it still exists
 		if (this.currentProject) {
@@ -112,4 +152,324 @@ export class ProjectManager implements IProjectManager {
 	getCachedServices(): Map<string, IWorktreeService> {
 		return new Map(this.worktreeServiceCache);
 	}
+
+	// Recent projects methods
+
+	private loadRecentProjects(): void {
+		try {
+			if (existsSync(this.dataPath)) {
+				const data = readFileSync(this.dataPath, 'utf-8');
+				this.recentProjects = JSON.parse(data) || [];
+			}
+		} catch (error) {
+			console.error('Failed to load recent projects:', error);
+			this.recentProjects = [];
+		}
+	}
+
+	private saveRecentProjects(): void {
+		try {
+			writeFileSync(
+				this.dataPath,
+				JSON.stringify(this.recentProjects, null, 2),
+			);
+		} catch (error) {
+			console.error('Failed to save recent projects:', error);
+		}
+	}
+
+	public getRecentProjects(limit?: number): RecentProject[] {
+		// Return recent projects sorted by last accessed
+		const sorted = this.recentProjects.sort(
+			(a, b) => b.lastAccessed - a.lastAccessed,
+		);
+
+		// Apply limit if specified, otherwise use default MAX_RECENT_PROJECTS
+		const maxItems =
+			limit !== undefined ? limit : ProjectManager.MAX_RECENT_PROJECTS;
+		return maxItems > 0 ? sorted.slice(0, maxItems) : sorted;
+	}
+
+	public addRecentProject(project: GitProject): void {
+		if (project.path === 'EXIT_APPLICATION') {
+			return;
+		}
+
+		const existingIndex = this.recentProjects.findIndex(
+			p => p.path === project.path,
+		);
+
+		const recentProject: RecentProject = {
+			path: project.path,
+			name: project.name,
+			lastAccessed: Date.now(),
+		};
+
+		if (existingIndex !== -1) {
+			// Update existing project
+			this.recentProjects[existingIndex] = recentProject;
+		} else {
+			// Add new project
+			this.recentProjects.unshift(recentProject);
+		}
+
+		// Sort by last accessed (newest first)
+		this.recentProjects = this.recentProjects.sort(
+			(a, b) => b.lastAccessed - a.lastAccessed,
+		);
+
+		// Save to disk
+		this.saveRecentProjects();
+	}
+
+	public clearRecentProjects(): void {
+		this.recentProjects = [];
+		this.saveRecentProjects();
+	}
+
+	// Multi-project discovery methods
+
+	async discoverProjects(projectsDir: string): Promise<GitProject[]> {
+		const projects: GitProject[] = [];
+		const projectMap = new Map<string, GitProject>();
+
+		try {
+			// Verify the directory exists
+			await fs.access(projectsDir);
+
+			// Step 1: Fast concurrent directory discovery
+			const directories = await this.discoverDirectories(projectsDir);
+
+			// Step 2: Process directories in parallel to check if they're git repos
+			const results = await this.processDirectoriesInParallel(
+				directories,
+				projectsDir,
+			);
+
+			// Step 3: Create project objects (all results are valid git repos)
+			for (const result of results) {
+				// Handle name conflicts
+				let displayName = result.name;
+				if (projectMap.has(result.name)) {
+					displayName = result.relativePath.replace(/[\\/\\\\]/g, '/');
+				}
+
+				const project: GitProject = {
+					name: displayName,
+					path: result.path,
+					relativePath: result.relativePath,
+					isValid: true,
+					error: result.error,
+				};
+
+				projectMap.set(displayName, project);
+			}
+
+			// Convert to array and sort
+			projects.push(...projectMap.values());
+			projects.sort((a, b) => a.name.localeCompare(b.name));
+
+			// Cache results
+			this.projectCache.clear();
+			projects.forEach(p => this.projectCache.set(p.path, p));
+
+			return projects;
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+				throw new Error(`Projects directory does not exist: ${projectsDir}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Fast directory discovery - similar to ghq's approach
+	 */
+	private async discoverDirectories(
+		rootDir: string,
+		maxDepth: number = 3,
+	): Promise<DiscoveryTask[]> {
+		const tasks: DiscoveryTask[] = [];
+		const seen = new Set<string>();
+
+		const walk = async (dir: string, depth: number): Promise<void> => {
+			if (depth > maxDepth) return;
+
+			try {
+				const entries = await fs.readdir(dir, {withFileTypes: true});
+
+				// Process entries in parallel
+				await Promise.all(
+					entries.map(async entry => {
+						if (!entry.isDirectory()) return;
+						if (entry.name.startsWith('.') && entry.name !== '.git') return;
+
+						const fullPath = path.join(dir, entry.name);
+						const relativePath = path.relative(rootDir, fullPath);
+
+						// Quick check if this is a git repository
+						const hasGitDir = await this.hasGitDirectory(fullPath);
+						if (hasGitDir) {
+							// Found a git repository - add to tasks and skip subdirectories
+							if (!seen.has(fullPath)) {
+								seen.add(fullPath);
+								tasks.push({path: fullPath, relativePath});
+							}
+							return; // Early termination - don't walk subdirectories
+						}
+
+						// Not a git repo, continue walking subdirectories
+						await walk(fullPath, depth + 1);
+					}),
+				);
+			} catch (error) {
+				// Silently skip directories we can't read
+				if ((error as NodeJS.ErrnoException).code !== 'EACCES') {
+					console.error(`Error scanning directory ${dir}:`, error);
+				}
+			}
+		};
+
+		await walk(rootDir, 0);
+		return tasks;
+	}
+
+	/**
+	 * Quick check for .git directory without running git commands
+	 */
+	private async hasGitDirectory(dirPath: string): Promise<boolean> {
+		try {
+			const gitPath = path.join(dirPath, '.git');
+			const stats = await fs.stat(gitPath);
+			return stats.isDirectory() || stats.isFile(); // File for worktrees
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * Process directories in parallel using worker pool pattern
+	 */
+	private async processDirectoriesInParallel(
+		tasks: DiscoveryTask[],
+		rootDir: string,
+	): Promise<DiscoveryResult[]> {
+		const results: DiscoveryResult[] = [];
+		const queue = [...tasks];
+		const workers: Promise<void>[] = [];
+
+		// Create worker function
+		const worker = async (): Promise<void> => {
+			while (queue.length > 0) {
+				const task = queue.shift();
+				if (!task) break;
+
+				const result = await this.processDirectory(task, rootDir);
+				if (result) {
+					results.push(result);
+				}
+			}
+		};
+
+		// Start workers
+		for (let i = 0; i < this.discoveryWorkers; i++) {
+			workers.push(worker());
+		}
+
+		// Wait for all workers to complete
+		await Promise.all(workers);
+
+		return results;
+	}
+
+	/**
+	 * Process a single directory to check if it's a valid git repo
+	 * @param task - The discovery task containing path information
+	 * @param _rootDir - The root directory (unused)
+	 * @returns A DiscoveryResult object if the directory is a valid git repository,
+	 *          or null if it's not a valid git repository (will be filtered out)
+	 */
+	private async processDirectory(
+		task: DiscoveryTask,
+		_rootDir: string,
+	): Promise<DiscoveryResult | null> {
+		const result: DiscoveryResult = {
+			path: task.path,
+			relativePath: task.relativePath,
+			name: path.basename(task.path),
+		};
+
+		try {
+			// Check if directory has .git (already validated in discoverDirectories)
+			// Double-check here to ensure it's still valid
+			const hasGit = await this.hasGitDirectory(task.path);
+			if (!hasGit) {
+				// Not a git repo, return null to filter it out
+				return null;
+			}
+		} catch (error) {
+			result.error = `Failed to process: ${(error as Error).message}`;
+		}
+
+		return result;
+	}
+
+	async validateGitRepository(projectPath: string): Promise<boolean> {
+		// Simply check for .git directory existence
+		return this.hasGitDirectory(projectPath);
+	}
+
+	// Helper method to get a cached project
+	getCachedProject(projectPath: string): GitProject | undefined {
+		return this.projectCache.get(projectPath);
+	}
+
+	// Helper method to refresh a single project
+	async refreshProject(projectPath: string): Promise<GitProject | null> {
+		if (!(await this.validateGitRepository(projectPath))) {
+			this.projectCache.delete(projectPath);
+			return null;
+		}
+
+		const name = path.basename(projectPath);
+		const project: GitProject = {
+			name,
+			path: projectPath,
+			relativePath: name,
+			isValid: true,
+		};
+
+		this.projectCache.set(projectPath, project);
+		return project;
+	}
 }
+
+// Create singleton instance
+let _instance: ProjectManager | null = null;
+
+export const projectManager = {
+	get instance(): ProjectManager {
+		if (!_instance) {
+			_instance = new ProjectManager();
+		}
+		return _instance;
+	},
+
+	// Proxy methods to maintain backward compatibility with recentProjectsService
+	getRecentProjects(limit?: number) {
+		return this.instance.getRecentProjects(limit);
+	},
+
+	addRecentProject(project: GitProject) {
+		return this.instance.addRecentProject(project);
+	},
+
+	clearRecentProjects() {
+		return this.instance.clearRecentProjects();
+	},
+
+	// Reset instance for testing
+	_resetForTesting() {
+		_instance = null;
+	},
+};

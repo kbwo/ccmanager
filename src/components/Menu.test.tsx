@@ -37,8 +37,8 @@ vi.mock('../hooks/useGitStatus.js', () => ({
 	useGitStatus: (worktrees: unknown) => worktrees,
 }));
 
-vi.mock('../services/recentProjectsService.js', () => ({
-	recentProjectsService: {
+vi.mock('../services/projectManager.js', () => ({
+	projectManager: {
 		getRecentProjects: vi.fn().mockReturnValue([]),
 	},
 }));
@@ -200,10 +200,8 @@ describe('Menu component rendering', () => {
 		vi.spyOn(worktreeService, 'getGitRootPath').mockReturnValue(
 			'/test/current',
 		);
-		const {recentProjectsService} = await import(
-			'../services/recentProjectsService.js'
-		);
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue(
+		const {projectManager} = await import('../services/projectManager.js');
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue(
 			mockRecentProjects,
 		);
 
@@ -263,10 +261,8 @@ describe('Menu component rendering', () => {
 		vi.spyOn(worktreeService, 'getGitRootPath').mockReturnValue(
 			'/test/current',
 		);
-		const {recentProjectsService} = await import(
-			'../services/recentProjectsService.js'
-		);
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue(
+		const {projectManager} = await import('../services/projectManager.js');
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue(
 			mockRecentProjects,
 		);
 

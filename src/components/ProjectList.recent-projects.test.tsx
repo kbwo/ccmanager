@@ -2,8 +2,7 @@ import React from 'react';
 import {render} from 'ink-testing-library';
 import {expect, describe, it, vi, beforeEach, afterEach} from 'vitest';
 import ProjectList from './ProjectList.js';
-import {MultiProjectService} from '../services/multiProjectService.js';
-import {recentProjectsService} from '../services/recentProjectsService.js';
+import {projectManager} from '../services/projectManager.js';
 import {GitProject} from '../types/index.js';
 
 // Type for the key parameter in useInput
@@ -51,8 +50,14 @@ vi.mock('ink-select-input', async () => {
 	};
 });
 
-vi.mock('../services/multiProjectService.js');
-vi.mock('../services/recentProjectsService.js');
+vi.mock('../services/projectManager.js', () => ({
+	projectManager: {
+		instance: {
+			discoverProjects: vi.fn(),
+		},
+		getRecentProjects: vi.fn(),
+	},
+}));
 
 describe('ProjectList - Recent Projects', () => {
 	const mockOnSelectProject = vi.fn();
@@ -76,10 +81,10 @@ describe('ProjectList - Recent Projects', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(MultiProjectService.prototype.discoverProjects).mockResolvedValue(
+		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue(
 			mockProjects,
 		);
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([]);
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([]);
 
 		// Mock stdin.setRawMode
 		originalSetRawMode = process.stdin.setRawMode;
@@ -93,7 +98,7 @@ describe('ProjectList - Recent Projects', () => {
 
 	it('should display recent projects at the top when available', async () => {
 		// Mock recent projects
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{
 				name: 'project-c',
 				path: '/home/user/projects/project-c',
@@ -135,7 +140,7 @@ describe('ProjectList - Recent Projects', () => {
 	});
 
 	it('should not show recent projects section when there are none', async () => {
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([]);
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([]);
 
 		const {lastFrame} = render(
 			<ProjectList
@@ -167,7 +172,7 @@ describe('ProjectList - Recent Projects', () => {
 
 	it('should show recent projects with correct number prefixes', async () => {
 		// Mock recent projects that match existing projects
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{
 				name: 'project-c',
 				path: '/home/user/projects/project-c',
@@ -210,7 +215,7 @@ describe('ProjectList - Recent Projects', () => {
 		);
 
 		// Mock discovered projects
-		vi.mocked(MultiProjectService.prototype.discoverProjects).mockResolvedValue(
+		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue(
 			manyProjects,
 		);
 
@@ -220,7 +225,7 @@ describe('ProjectList - Recent Projects', () => {
 			path: `/home/user/projects/project-${i}`,
 			lastAccessed: Date.now() - i * 1000,
 		}));
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue(
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue(
 			manyRecentProjects,
 		);
 
@@ -247,7 +252,7 @@ describe('ProjectList - Recent Projects', () => {
 
 	it('should allow number key selection for recent projects', async () => {
 		// Mock recent projects
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{
 				name: 'project-c',
 				path: '/home/user/projects/project-c',

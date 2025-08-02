@@ -4,7 +4,7 @@ import {render} from 'ink-testing-library';
 import Menu from './Menu.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {recentProjectsService} from '../services/recentProjectsService.js';
+import {projectManager} from '../services/projectManager.js';
 
 // Import the actual component code but skip the useInput hook
 vi.mock('ink', async () => {
@@ -38,8 +38,8 @@ vi.mock('../hooks/useGitStatus.js', () => ({
 	useGitStatus: (worktrees: unknown) => worktrees,
 }));
 
-vi.mock('../services/recentProjectsService.js', () => ({
-	recentProjectsService: {
+vi.mock('../services/projectManager.js', () => ({
+	projectManager: {
 		getRecentProjects: vi.fn(),
 	},
 }));
@@ -87,7 +87,7 @@ describe('Menu - Recent Projects', () => {
 			getGitRootPath: vi.fn().mockReturnValue('/default/project'),
 		} as unknown as WorktreeService;
 
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([]);
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([]);
 	});
 
 	afterEach(() => {
@@ -95,7 +95,7 @@ describe('Menu - Recent Projects', () => {
 	});
 
 	it('should not show recent projects in single-project mode', () => {
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{path: '/project1', name: 'Project 1', lastAccessed: 1000},
 		]);
 
@@ -114,7 +114,7 @@ describe('Menu - Recent Projects', () => {
 	});
 
 	it('should show recent projects in multi-project mode', () => {
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{path: '/project1', name: 'Project 1', lastAccessed: 2000},
 			{path: '/project2', name: 'Project 2', lastAccessed: 1000},
 		]);
@@ -136,7 +136,7 @@ describe('Menu - Recent Projects', () => {
 	});
 
 	it('should not show recent projects section when no recent projects', () => {
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([]);
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([]);
 
 		const {lastFrame} = render(
 			<Menu
@@ -158,9 +158,7 @@ describe('Menu - Recent Projects', () => {
 			name: `Project ${i}`,
 			lastAccessed: i * 1000,
 		}));
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue(
-			manyProjects,
-		);
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue(manyProjects);
 
 		const {lastFrame} = render(
 			<Menu
@@ -187,7 +185,7 @@ describe('Menu - Recent Projects', () => {
 
 	it('should filter out current project from recent projects', async () => {
 		// Setup the initial recent projects
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{path: '/current/project', name: 'Current Project', lastAccessed: 3000},
 			{path: '/project1', name: 'Project 1', lastAccessed: 2000},
 			{path: '/project2', name: 'Project 2', lastAccessed: 1000},
@@ -231,7 +229,7 @@ describe('Menu - Recent Projects', () => {
 	});
 
 	it('should hide recent projects section when all projects are filtered out', () => {
-		vi.mocked(recentProjectsService.getRecentProjects).mockReturnValue([
+		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{
 				path: '/current/project',
 				name: 'Current Project',

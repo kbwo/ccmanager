@@ -15,10 +15,8 @@ import {
 	calculateColumnPositions,
 	assembleWorktreeLabel,
 } from '../utils/worktreeUtils.js';
-import {
-	recentProjectsService,
-	RecentProject,
-} from '../services/recentProjectsService.js';
+import {projectManager} from '../services/projectManager.js';
+import {RecentProject} from '../types/index.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {globalSessionManager} from '../services/globalSessionManager.js';
@@ -101,10 +99,10 @@ const Menu: React.FC<MenuProps> = ({
 		// Load recent projects if in multi-project mode
 		if (multiProject) {
 			// Filter out the current project from recent projects
-			const allRecentProjects = recentProjectsService.getRecentProjects();
+			const allRecentProjects = projectManager.getRecentProjects();
 			const currentProjectPath = worktreeService.getGitRootPath();
 			const filteredProjects = allRecentProjects.filter(
-				project => project.path !== currentProjectPath,
+				(project: RecentProject) => project.path !== currentProjectPath,
 			);
 			setRecentProjects(filteredProjects);
 		}

@@ -21,7 +21,7 @@ import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
-import {recentProjectsService} from '../services/recentProjectsService.js';
+import {projectManager} from '../services/projectManager.js';
 
 type View =
 	| 'menu'
@@ -328,7 +328,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		);
 		setSessionManager(projectSessionManager);
 		// Add to recent projects
-		recentProjectsService.addRecentProject(project);
+		projectManager.addRecentProject(project);
 		navigateWithClear('menu');
 	};
 

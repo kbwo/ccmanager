@@ -60,27 +60,23 @@ vi.mock('./TextInputWrapper.js', async () => {
 	};
 });
 
+// Mock the projectManager
+vi.mock('../services/projectManager.js', () => ({
+	projectManager: {
+		instance: {
+			discoverProjects: vi.fn(),
+		},
+		getRecentProjects: vi.fn().mockReturnValue([]),
+	},
+}));
+
 // Now import after mocking
 const {default: ProjectList} = await import('./ProjectList.js');
-const {MultiProjectService} = await import(
-	'../services/multiProjectService.js'
-);
-
-// Mock the MultiProjectService
-vi.mock('../services/multiProjectService.js', () => {
-	return {
-		MultiProjectService: vi.fn().mockImplementation(() => {
-			return {
-				discoverProjects: vi.fn(),
-			};
-		}),
-	};
-});
+const {projectManager} = await import('../services/projectManager.js');
 
 describe('ProjectList', () => {
 	const mockOnSelectProject = vi.fn();
 	const mockOnDismissError = vi.fn();
-	const mockDiscoverProjects = vi.fn();
 	const mockProjects: GitProject[] = [
 		{
 			name: 'project1',
@@ -104,13 +100,8 @@ describe('ProjectList', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockDiscoverProjects.mockClear();
-		mockDiscoverProjects.mockResolvedValue(mockProjects);
-		vi.mocked(MultiProjectService).mockImplementation(
-			() =>
-				({
-					discoverProjects: mockDiscoverProjects,
-				}) as unknown as InstanceType<typeof MultiProjectService>,
+		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue(
+			mockProjects,
 		);
 	});
 
@@ -130,7 +121,9 @@ describe('ProjectList', () => {
 
 	it('should display loading state initially', () => {
 		// Create a promise that never resolves to keep loading state
-		mockDiscoverProjects.mockReturnValue(new Promise(() => {}));
+		vi.mocked(projectManager.instance.discoverProjects).mockReturnValue(
+			new Promise(() => {}),
+		);
 
 		const {lastFrame} = render(
 			<ProjectList
@@ -327,7 +320,7 @@ describe('ProjectList', () => {
 	});
 
 	it('should show empty state when no projects found', async () => {
-		mockDiscoverProjects.mockResolvedValue([]);
+		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue([]);
 
 		const {lastFrame, rerender} = render(
 			<ProjectList
