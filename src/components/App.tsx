@@ -1,6 +1,7 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {useApp, Box, Text} from 'ink';
 import Menu from './Menu.js';
+import ProjectList from './ProjectList.js';
 import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
@@ -8,17 +9,23 @@ import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
+import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {
 	Worktree,
 	Session as SessionType,
 	DevcontainerConfig,
+	GitProject,
 } from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
+import {ENV_VARS} from '../constants/env.js';
+import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
+import {projectManager} from '../services/projectManager.js';
 
 type View =
 	| 'menu'
+	| 'project-list'
 	| 'session'
 	| 'new-worktree'
 	| 'creating-worktree'
@@ -26,23 +33,54 @@ type View =
 	| 'deleting-worktree'
 	| 'merge-worktree'
 	| 'configuration'
-	| 'preset-selector';
+	| 'preset-selector'
+	| 'clearing';
 
 interface AppProps {
 	devcontainerConfig?: DevcontainerConfig;
+	multiProject?: boolean;
 }
 
-const App: React.FC<AppProps> = ({devcontainerConfig}) => {
+const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const {exit} = useApp();
-	const [view, setView] = useState<View>('menu');
-	const [sessionManager] = useState(() => new SessionManager());
-	const [worktreeService] = useState(() => new WorktreeService());
+	const [view, setView] = useState<View>(
+		multiProject ? 'project-list' : 'menu',
+	);
+	const [sessionManager, setSessionManager] = useState<SessionManager>(() =>
+		globalSessionOrchestrator.getManagerForProject(),
+	);
+	const [worktreeService, setWorktreeService] = useState(
+		() => new WorktreeService(),
+	);
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
+	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
+		null,
+	); // Store selected project in multi-project mode
+
+	// Helper function to clear terminal screen
+	const clearScreen = () => {
+		if (process.stdout.isTTY) {
+			process.stdout.write('\x1B[2J\x1B[H');
+		}
+	};
+
+	// Helper function to navigate with screen clearing
+	const navigateWithClear = useCallback(
+		(newView: View, callback?: () => void) => {
+			clearScreen();
+			setView('clearing');
+			setTimeout(() => {
+				setView(newView);
+				if (callback) callback();
+			}, 10); // Small delay to ensure screen clear is processed
+		},
+		[],
+	);
 
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
@@ -51,17 +89,21 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 			setActiveSession(current => {
 				if (current && session.id === current.id) {
 					// Session that exited is the active one, trigger return to menu
-					setTimeout(() => {
-						setActiveSession(null);
-						setError(null);
-						setView('menu');
+					setActiveSession(null);
+					setError(null);
+
+					const targetView =
+						multiProject && selectedProject
+							? 'menu'
+							: multiProject
+								? 'project-list'
+								: 'menu';
+
+					navigateWithClear(targetView, () => {
 						setMenuKey(prev => prev + 1);
-						if (process.stdout.isTTY) {
-							process.stdout.write('\x1B[2J\x1B[H');
-						}
 						process.stdin.resume();
 						process.stdin.setEncoding('utf8');
-					}, 0);
+					});
 				}
 				return current;
 			});
@@ -69,42 +111,48 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 
 		sessionManager.on('sessionExit', handleSessionExit);
 
-		// Cleanup on unmount
+		// Re-attach listener when session manager changes
 		return () => {
 			sessionManager.off('sessionExit', handleSessionExit);
-			sessionManager.destroy();
+			// Don't destroy sessions on unmount - they persist in memory
 		};
-	}, [sessionManager]);
+	}, [sessionManager, multiProject, selectedProject, navigateWithClear]);
 
 	const handleSelectWorktree = async (worktree: Worktree) => {
 		// Check if this is the new worktree option
 		if (worktree.path === '') {
-			setView('new-worktree');
+			navigateWithClear('new-worktree');
 			return;
 		}
 
 		// Check if this is the delete worktree option
 		if (worktree.path === 'DELETE_WORKTREE') {
-			setView('delete-worktree');
+			navigateWithClear('delete-worktree');
 			return;
 		}
 
 		// Check if this is the merge worktree option
 		if (worktree.path === 'MERGE_WORKTREE') {
-			setView('merge-worktree');
+			navigateWithClear('merge-worktree');
 			return;
 		}
 
 		// Check if this is the configuration option
 		if (worktree.path === 'CONFIGURATION') {
-			setView('configuration');
+			navigateWithClear('configuration');
 			return;
 		}
 
 		// Check if this is the exit application option
 		if (worktree.path === 'EXIT_APPLICATION') {
-			sessionManager.destroy();
-			exit();
+			// In multi-project mode with a selected project, go back to project list
+			if (multiProject && selectedProject) {
+				handleBackToProjectList();
+			} else {
+				// Only destroy all sessions when actually exiting the app
+				globalSessionOrchestrator.destroyAllSessions();
+				exit();
+			}
 			return;
 		}
 
@@ -115,7 +163,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 			// Check if we should show preset selector
 			if (configurationManager.getSelectPresetOnStart()) {
 				setSelectedWorktree(worktree);
-				setView('preset-selector');
+				navigateWithClear('preset-selector');
 				return;
 			}
 
@@ -136,7 +184,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 		}
 
 		setActiveSession(session);
-		setView('session');
+		navigateWithClear('session');
 	};
 
 	const handlePresetSelected = async (presetId: string) => {
@@ -158,7 +206,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 				);
 			}
 			setActiveSession(session);
-			setView('session');
+			navigateWithClear('session');
 			setSelectedWorktree(null);
 		} catch (error) {
 			setError(`Failed to create session: ${error}`);
@@ -169,23 +217,24 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 
 	const handlePresetSelectorCancel = () => {
 		setSelectedWorktree(null);
-		setView('menu');
-		setMenuKey(prev => prev + 1);
+		navigateWithClear('menu', () => {
+			setMenuKey(prev => prev + 1);
+		});
 	};
 
 	const handleReturnToMenu = () => {
 		setActiveSession(null);
 		// Don't clear error here - let user dismiss it manually
 
-		// Add a small delay to ensure Session cleanup completes
-		setTimeout(() => {
-			setView('menu');
-			setMenuKey(prev => prev + 1); // Force menu refresh
+		const targetView =
+			multiProject && selectedProject
+				? 'menu'
+				: multiProject
+					? 'project-list'
+					: 'menu';
 
-			// Clear the screen when returning to menu
-			if (process.stdout.isTTY) {
-				process.stdout.write('\x1B[2J\x1B[H');
-			}
+		navigateWithClear(targetView, () => {
+			setMenuKey(prev => prev + 1); // Force menu refresh
 
 			// Ensure stdin is in a clean state for Ink components
 			if (process.stdin.isTTY) {
@@ -195,7 +244,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 				process.stdin.resume();
 				process.stdin.setEncoding('utf8');
 			}
-		}, 50); // Small delay to ensure proper cleanup
+		});
 	};
 
 	const handleCreateWorktree = async (
@@ -262,14 +311,70 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 		handleReturnToMenu();
 	};
 
+	const handleSelectProject = (project: GitProject) => {
+		// Handle special exit case
+		if (project.path === 'EXIT_APPLICATION') {
+			globalSessionOrchestrator.destroyAllSessions();
+			exit();
+			return;
+		}
+
+		// Set the selected project and update services
+		setSelectedProject(project);
+		setWorktreeService(new WorktreeService(project.path));
+		// Get or create session manager for this project
+		const projectSessionManager =
+			globalSessionOrchestrator.getManagerForProject(project.path);
+		setSessionManager(projectSessionManager);
+		// Add to recent projects
+		projectManager.addRecentProject(project);
+		navigateWithClear('menu');
+	};
+
+	const handleBackToProjectList = () => {
+		// Sessions persist in their project-specific managers
+		setSelectedProject(null);
+		setWorktreeService(new WorktreeService()); // Reset to default
+		// Reset to global session manager for project list view
+		setSessionManager(globalSessionOrchestrator.getManagerForProject());
+
+		navigateWithClear('project-list', () => {
+			setMenuKey(prev => prev + 1);
+		});
+	};
+
+	if (view === 'project-list' && multiProject) {
+		const projectsDir = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		if (!projectsDir) {
+			return (
+				<Box>
+					<Text color="red">Error: {MULTI_PROJECT_ERRORS.NO_PROJECTS_DIR}</Text>
+				</Box>
+			);
+		}
+
+		return (
+			<ProjectList
+				projectsDir={projectsDir}
+				onSelectProject={handleSelectProject}
+				error={error}
+				onDismissError={() => setError(null)}
+			/>
+		);
+	}
+
 	if (view === 'menu') {
 		return (
 			<Menu
 				key={menuKey}
 				sessionManager={sessionManager}
+				worktreeService={worktreeService}
 				onSelectWorktree={handleSelectWorktree}
+				onSelectRecentProject={handleSelectProject}
 				error={error}
 				onDismissError={() => setError(null)}
+				projectName={selectedProject?.name}
+				multiProject={multiProject}
 			/>
 		);
 	}
@@ -368,6 +473,11 @@ const App: React.FC<AppProps> = ({devcontainerConfig}) => {
 				onCancel={handlePresetSelectorCancel}
 			/>
 		);
+	}
+
+	if (view === 'clearing') {
+		// Render nothing during the clearing phase to ensure clean transition
+		return null;
 	}
 
 	return null;

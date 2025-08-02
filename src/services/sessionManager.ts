@@ -16,6 +16,13 @@ import {createStateDetector} from './stateDetector.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 
+export interface SessionCounts {
+	idle: number;
+	busy: number;
+	waiting_input: number;
+	total: number;
+}
+
 export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
@@ -420,5 +427,49 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		for (const worktreePath of this.sessions.keys()) {
 			this.destroySession(worktreePath);
 		}
+	}
+
+	static getSessionCounts(sessions: Session[]): SessionCounts {
+		const counts: SessionCounts = {
+			idle: 0,
+			busy: 0,
+			waiting_input: 0,
+			total: sessions.length,
+		};
+
+		sessions.forEach(session => {
+			switch (session.state) {
+				case 'idle':
+					counts.idle++;
+					break;
+				case 'busy':
+					counts.busy++;
+					break;
+				case 'waiting_input':
+					counts.waiting_input++;
+					break;
+			}
+		});
+
+		return counts;
+	}
+
+	static formatSessionCounts(counts: SessionCounts): string {
+		if (counts.total === 0) {
+			return '';
+		}
+
+		const parts: string[] = [];
+		if (counts.idle > 0) {
+			parts.push(`${counts.idle} Idle`);
+		}
+		if (counts.busy > 0) {
+			parts.push(`${counts.busy} Busy`);
+		}
+		if (counts.waiting_input > 0) {
+			parts.push(`${counts.waiting_input} Waiting`);
+		}
+
+		return parts.length > 0 ? ` (${parts.join(' / ')})` : '';
 	}
 }

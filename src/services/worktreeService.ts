@@ -15,7 +15,7 @@ export class WorktreeService {
 	private gitRootPath: string;
 
 	constructor(rootPath?: string) {
-		this.rootPath = rootPath || process.cwd();
+		this.rootPath = path.resolve(rootPath || process.cwd());
 		// Get the actual git repository root for worktree operations
 		this.gitRootPath = this.getGitRepositoryRoot();
 	}
@@ -28,11 +28,25 @@ export class WorktreeService {
 				encoding: 'utf8',
 			}).trim();
 
-			// The parent of .git is the actual repository root
-			return path.dirname(gitCommonDir);
+			// Make sure we have an absolute path
+			const absoluteGitCommonDir = path.isAbsolute(gitCommonDir)
+				? gitCommonDir
+				: path.resolve(this.rootPath, gitCommonDir);
+
+			// Handle worktree paths: if path contains .git/worktrees, we need to find the real .git parent
+			if (absoluteGitCommonDir.includes('.git/worktrees')) {
+				// Extract the path up to and including .git
+				const gitIndex = absoluteGitCommonDir.indexOf('.git');
+				const gitPath = absoluteGitCommonDir.substring(0, gitIndex + 4);
+				// The parent of .git is the actual repository root
+				return path.dirname(gitPath);
+			}
+
+			// For regular .git directories, the parent is the repository root
+			return path.dirname(absoluteGitCommonDir);
 		} catch {
-			// Fallback to current directory if command fails
-			return this.rootPath;
+			// Fallback to current directory if command fails - ensure it's absolute
+			return path.resolve(this.rootPath);
 		}
 	}
 
@@ -124,6 +138,10 @@ export class WorktreeService {
 
 	isGitRepository(): boolean {
 		return existsSync(path.join(this.rootPath, '.git'));
+	}
+
+	getGitRootPath(): string {
+		return this.gitRootPath;
 	}
 
 	getDefaultBranch(): string {

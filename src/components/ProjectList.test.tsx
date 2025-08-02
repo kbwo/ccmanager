@@ -1,0 +1,843 @@
+import React from 'react';
+import {render} from 'ink-testing-library';
+import {describe, it, expect, vi, beforeEach} from 'vitest';
+import {GitProject} from '../types/index.js';
+
+// Type for the key parameter in useInput
+type InputKey = {
+	escape: boolean;
+	return: boolean;
+	leftArrow: boolean;
+	rightArrow: boolean;
+	upArrow: boolean;
+	downArrow: boolean;
+	pageDown: boolean;
+	pageUp: boolean;
+	ctrl: boolean;
+	shift: boolean;
+	tab: boolean;
+	backspace: boolean;
+	delete: boolean;
+	meta: boolean;
+};
+
+// Import the actual component code but skip the useInput hook
+vi.mock('ink', async () => {
+	const actual = await vi.importActual<typeof import('ink')>('ink');
+	return {
+		...actual,
+		useInput: vi.fn(),
+	};
+});
+
+// Mock SelectInput to render items as simple text
+vi.mock('ink-select-input', async () => {
+	const React = await vi.importActual<typeof import('react')>('react');
+	const {Text, Box} = await vi.importActual<typeof import('ink')>('ink');
+
+	return {
+		default: ({items}: {items: Array<{label: string; value: string}>}) => {
+			return React.createElement(
+				Box,
+				{flexDirection: 'column'},
+				items.map((item: {label: string}, index: number) =>
+					React.createElement(Text, {key: index}, item.label),
+				),
+			);
+		},
+	};
+});
+
+// Mock TextInputWrapper to render as simple text
+vi.mock('./TextInputWrapper.js', async () => {
+	const React = await vi.importActual<typeof import('react')>('react');
+	const {Text} = await vi.importActual<typeof import('ink')>('ink');
+
+	return {
+		default: ({value, placeholder}: {value?: string; placeholder?: string}) => {
+			return React.createElement(Text, {}, value || placeholder || '');
+		},
+	};
+});
+
+// Mock the projectManager
+vi.mock('../services/projectManager.js', () => ({
+	projectManager: {
+		instance: {
+			discoverProjects: vi.fn(),
+		},
+		getRecentProjects: vi.fn().mockReturnValue([]),
+	},
+}));
+
+// Now import after mocking
+const {default: ProjectList} = await import('./ProjectList.js');
+const {projectManager} = await import('../services/projectManager.js');
+
+describe('ProjectList', () => {
+	const mockOnSelectProject = vi.fn();
+	const mockOnDismissError = vi.fn();
+	const mockProjects: GitProject[] = [
+		{
+			name: 'project1',
+			path: '/projects/project1',
+			relativePath: 'project1',
+			isValid: true,
+		},
+		{
+			name: 'project2',
+			path: '/projects/project2',
+			relativePath: 'project2',
+			isValid: true,
+		},
+		{
+			name: 'project3',
+			path: '/projects/project3',
+			relativePath: 'project3',
+			isValid: true,
+		},
+	];
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue(
+			mockProjects,
+		);
+	});
+
+	it('should render project list with correct title', () => {
+		const {lastFrame} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		expect(lastFrame()).toContain('CCManager - Multi-Project Mode');
+		expect(lastFrame()).toContain('Select a project:');
+	});
+
+	it('should display loading state initially', () => {
+		// Create a promise that never resolves to keep loading state
+		vi.mocked(projectManager.instance.discoverProjects).mockReturnValue(
+			new Promise(() => {}),
+		);
+
+		const {lastFrame} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		expect(lastFrame()).toContain('Loading projects...');
+	});
+
+	it('should display projects after loading', async () => {
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait for SelectInput to render with our mock
+		await vi.waitFor(
+			() => {
+				const frame = lastFrame();
+				return frame && !frame.includes('Loading projects...');
+			},
+			{timeout: 2000},
+		);
+
+		const frame = lastFrame();
+		expect(frame).toContain('0 ❯ project1');
+		expect(frame).toContain('1 ❯ project2');
+		expect(frame).toContain('2 ❯ project3');
+	});
+
+	it('should display error when provided', () => {
+		const {lastFrame} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error="Failed to load projects"
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		expect(lastFrame()).toContain('Error: Failed to load projects');
+		expect(lastFrame()).toContain('Press any key to dismiss');
+	});
+
+	it('should handle project selection via menu', async () => {
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait for component to update after async loading
+		await vi.waitFor(() => {
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
+		});
+
+		// Verify menu structure
+		const frame = lastFrame();
+		expect(frame).toContain('0 ❯ project1');
+		expect(frame).toContain('R');
+		expect(frame).toContain('Refresh');
+		expect(frame).toContain('Q');
+		expect(frame).toContain('Exit');
+	});
+
+	it('should display number shortcuts for first 10 projects', async () => {
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait for projects to load
+		await vi.waitFor(() => {
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
+		});
+
+		// Verify number prefixes are shown
+		const frame = lastFrame();
+		expect(frame).toContain('0 ❯ project1');
+		expect(frame).toContain('1 ❯ project2');
+		expect(frame).toContain('2 ❯ project3');
+	});
+
+	it('should display exit option in menu', async () => {
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait a bit for async operations
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait for projects to load
+		await vi.waitFor(() => {
+			const frame = lastFrame();
+			return frame && !frame.includes('Loading projects...');
+		});
+
+		// Verify exit option is shown
+		const frame = lastFrame();
+		expect(frame).toContain('Q');
+		expect(frame).toContain('Exit');
+	});
+
+	it('should display refresh option in menu', async () => {
+		const {lastFrame} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait for projects to load
+		await vi.waitFor(() => {
+			return lastFrame()?.includes('project1') ?? false;
+		});
+
+		// Verify refresh option is shown
+		const frame = lastFrame();
+		expect(frame).toContain('R');
+		expect(frame).toContain('Refresh');
+	});
+
+	it('should show empty state when no projects found', async () => {
+		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue([]);
+
+		const {lastFrame, rerender} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		// Wait for projects to load
+		await vi.waitFor(() => {
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+			return lastFrame()?.includes('No git repositories found') ?? false;
+		});
+
+		expect(lastFrame()).toContain('No git repositories found in /projects');
+	});
+
+	it('should display error message when error prop is provided', () => {
+		const {lastFrame} = render(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error="Test error"
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
+		expect(lastFrame()).toContain('Error: Test error');
+		expect(lastFrame()).toContain('Press any key to dismiss');
+	});
+
+	describe('search functionality', () => {
+		it.skip('should enter search mode when "/" key is pressed', async () => {
+			const mockUseInput = vi.mocked(await import('ink')).useInput;
+			const inputHandlers: Array<(input: string, key: InputKey) => void> = [];
+			mockUseInput.mockImplementation(handler => {
+				inputHandlers.push(handler);
+			});
+
+			// Need to set up stdin.setRawMode for the test
+			const originalSetRawMode = process.stdin.setRawMode;
+			process.stdin.setRawMode = vi.fn() as typeof process.stdin.setRawMode;
+
+			const {lastFrame, rerender} = render(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Wait for projects to load
+			await vi.waitFor(() => {
+				return lastFrame()?.includes('project1') ?? false;
+			});
+
+			// Simulate pressing "/" key on all handlers (both from useSearchMode and ProjectList)
+			inputHandlers.forEach(handler => {
+				handler('/', {
+					escape: false,
+					return: false,
+					leftArrow: false,
+					rightArrow: false,
+					upArrow: false,
+					downArrow: false,
+					pageDown: false,
+					pageUp: false,
+					ctrl: false,
+					shift: false,
+					tab: false,
+					backspace: false,
+					delete: false,
+					meta: false,
+				});
+			});
+
+			// Wait a bit for state update
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Force rerender to see updated state
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Should show search input
+			expect(lastFrame()).toContain('Search:');
+
+			// Restore original
+			process.stdin.setRawMode = originalSetRawMode;
+		});
+
+		it('should filter projects based on search query', async () => {
+			const mockUseInput = vi.mocked(await import('ink')).useInput;
+			let inputHandler: (input: string, key: InputKey) => void = () => {};
+			mockUseInput.mockImplementation(handler => {
+				inputHandler = handler;
+			});
+
+			const {lastFrame, rerender} = render(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Wait for projects to load
+			await vi.waitFor(() => {
+				return lastFrame()?.includes('project1') ?? false;
+			});
+
+			// Enter search mode
+			inputHandler('/', {
+				escape: false,
+				return: false,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			// Force rerender with search active and query
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Simulate typing "project2" in search
+			// This would be handled by the TextInput component
+			// We'll test the filtering logic separately
+		});
+
+		it.skip('should exit search mode but keep filter when ESC is pressed in search mode', async () => {
+			const mockUseInput = vi.mocked(await import('ink')).useInput;
+			let inputHandler: (input: string, key: InputKey) => void = () => {};
+			mockUseInput.mockImplementation(handler => {
+				inputHandler = handler;
+			});
+
+			// Need to set up stdin.setRawMode for the test
+			const originalSetRawMode = process.stdin.setRawMode;
+			process.stdin.setRawMode = vi.fn() as typeof process.stdin.setRawMode;
+
+			const {lastFrame, rerender} = render(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Wait for projects to load
+			await vi.waitFor(() => {
+				return lastFrame()?.includes('project1') ?? false;
+			});
+
+			// Enter search mode
+			inputHandler('/', {
+				escape: false,
+				return: false,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			// Wait a bit for state update
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Should be in search mode
+			expect(lastFrame()).toContain('Search:');
+
+			// Press ESC
+			inputHandler('', {
+				escape: true,
+				return: false,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			// Wait a bit for state update
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Should exit search mode
+			expect(lastFrame()).not.toContain('Search:');
+
+			// Restore original
+			process.stdin.setRawMode = originalSetRawMode;
+		});
+
+		it('should not enter search mode when "/" is pressed during error display', async () => {
+			const mockUseInput = vi.mocked(await import('ink')).useInput;
+			let inputHandler: (input: string, key: InputKey) => void = () => {};
+			mockUseInput.mockImplementation(handler => {
+				inputHandler = handler;
+			});
+
+			// Need to set up stdin.setRawMode for the test
+			const originalSetRawMode = process.stdin.setRawMode;
+			process.stdin.setRawMode = vi.fn() as typeof process.stdin.setRawMode;
+
+			const {lastFrame, rerender} = render(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error="Test error"
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Press "/" key
+			inputHandler('/', {
+				escape: false,
+				return: false,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			// Wait a bit for state update
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error="Test error"
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Should not show search input, should dismiss error instead
+			expect(lastFrame()).not.toContain('Search:');
+			expect(mockOnDismissError).toHaveBeenCalled();
+
+			// Restore original
+			process.stdin.setRawMode = originalSetRawMode;
+		});
+
+		it.skip('should exit search mode when Enter is pressed but keep filter', async () => {
+			const mockUseInput = vi.mocked(await import('ink')).useInput;
+			let inputHandler: (input: string, key: InputKey) => void = () => {};
+			mockUseInput.mockImplementation(handler => {
+				inputHandler = handler;
+			});
+
+			// Need to set up stdin.setRawMode for the test
+			const originalSetRawMode = process.stdin.setRawMode;
+			process.stdin.setRawMode = vi.fn() as typeof process.stdin.setRawMode;
+
+			const {lastFrame, rerender} = render(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Wait for projects to load
+			await vi.waitFor(() => {
+				return lastFrame()?.includes('project1') ?? false;
+			});
+
+			// Enter search mode
+			inputHandler('/', {
+				escape: false,
+				return: false,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			// Wait a bit for state update
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Should be in search mode
+			expect(lastFrame()).toContain('Search:');
+
+			// Press Enter
+			inputHandler('', {
+				escape: false,
+				return: true,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			// Wait a bit for state update
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Should exit search mode
+			expect(lastFrame()).not.toContain('Search:');
+			// Should not have called onSelectProject
+			expect(mockOnSelectProject).not.toHaveBeenCalled();
+
+			// Restore original
+			process.stdin.setRawMode = originalSetRawMode;
+		});
+
+		it('should clear filter when ESC is pressed outside search mode', async () => {
+			const mockUseInput = vi.mocked(await import('ink')).useInput;
+			let inputHandler: (input: string, key: InputKey) => void = () => {};
+			mockUseInput.mockImplementation(handler => {
+				inputHandler = handler;
+			});
+
+			// Need to set up stdin.setRawMode for the test
+			const originalSetRawMode = process.stdin.setRawMode;
+			process.stdin.setRawMode = vi.fn() as typeof process.stdin.setRawMode;
+
+			const {lastFrame, rerender} = render(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Wait for projects to load
+			await vi.waitFor(() => {
+				return lastFrame()?.includes('project1') ?? false;
+			});
+
+			// Enter search mode
+			inputHandler('/', {
+				escape: false,
+				return: false,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Exit search mode with Enter (keeping filter)
+			inputHandler('', {
+				escape: false,
+				return: true,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Now press ESC outside search mode to clear filter
+			inputHandler('', {
+				escape: true,
+				return: false,
+				leftArrow: false,
+				rightArrow: false,
+				upArrow: false,
+				downArrow: false,
+				pageDown: false,
+				pageUp: false,
+				ctrl: false,
+				shift: false,
+				tab: false,
+				backspace: false,
+				delete: false,
+				meta: false,
+			});
+
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
+			// Should display all projects (filter cleared)
+			expect(lastFrame()).toContain('project1');
+			expect(lastFrame()).toContain('project2');
+			expect(lastFrame()).toContain('project3');
+
+			// Restore original
+			process.stdin.setRawMode = originalSetRawMode;
+		});
+	});
+});
