@@ -338,7 +338,7 @@ export class ContextBuilder {
 				devDependencies: packageJson.devDependencies || {},
 				scripts: packageJson.scripts || {},
 			};
-		} catch (error) {
+		} catch (_error) {
 			console.log(`⚠️ No package.json found in ${projectPath}`);
 			return undefined;
 		}

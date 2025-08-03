@@ -10,6 +10,7 @@ export default [
   js.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', '**/integration-tests/**'],
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
