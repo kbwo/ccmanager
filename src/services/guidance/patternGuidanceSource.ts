@@ -4,6 +4,7 @@ import type {
 	GuidanceResult,
 	AutopilotConfig,
 	PatternConfig,
+	PatternCategory,
 } from '../../types/index.js';
 import {PatternDetector} from './patternDetector.js';
 import {GuidanceThrottler} from './guidanceThrottler.js';
@@ -32,7 +33,7 @@ export class PatternGuidanceSource implements GuidanceSource {
 		// Initialize detector with enabled categories
 		const enabledCategories = Object.entries(this.config.categories)
 			.filter(([_, enabled]) => enabled)
-			.map(([category, _]) => category as any);
+			.map(([category, _]) => category as PatternCategory);
 
 		this.detector = new PatternDetector(
 			enabledCategories,
@@ -165,7 +166,7 @@ export class PatternGuidanceSource implements GuidanceSource {
 		// Update detector
 		const enabledCategories = Object.entries(this.config.categories)
 			.filter(([_, enabled]) => enabled)
-			.map(([category, _]) => category as any);
+			.map(([category, _]) => category as PatternCategory);
 
 		this.detector.updateEnabledCategories(enabledCategories);
 		this.detector.updateSensitivityThresholds(this.config.sensitivity);
