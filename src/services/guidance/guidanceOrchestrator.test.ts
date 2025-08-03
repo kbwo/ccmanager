@@ -58,10 +58,11 @@ describe('GuidanceOrchestrator', () => {
 	});
 
 	describe('constructor', () => {
-		it('should initialize with base LLM source', () => {
+		it('should initialize with pattern and LLM sources', () => {
 			const sourceIds = orchestrator.getSourceIds();
 			expect(sourceIds).toContain('base-llm');
-			expect(sourceIds).toHaveLength(1);
+			expect(sourceIds).toContain('pattern-detection');
+			expect(sourceIds).toHaveLength(2);
 		});
 	});
 
@@ -84,7 +85,7 @@ describe('GuidanceOrchestrator', () => {
 
 			const sourceIds = orchestrator.getSourceIds();
 			expect(sourceIds).toContain('test-source');
-			expect(sourceIds).toHaveLength(2);
+			expect(sourceIds).toHaveLength(3);
 		});
 
 		it('should throw error when adding duplicate source ID', () => {
@@ -114,7 +115,7 @@ describe('GuidanceOrchestrator', () => {
 		it('should remove an existing source', () => {
 			const result = orchestrator.removeSource('base-llm');
 			expect(result).toBe(true);
-			expect(orchestrator.getSourceIds()).toHaveLength(0);
+			expect(orchestrator.getSourceIds()).toHaveLength(1);
 		});
 
 		it('should return false when removing non-existent source', () => {
@@ -126,6 +127,7 @@ describe('GuidanceOrchestrator', () => {
 	describe('generateGuidance', () => {
 		it('should return no guidance when no sources available', async () => {
 			orchestrator.removeSource('base-llm');
+			orchestrator.removeSource('pattern-detection');
 
 			const result = await orchestrator.generateGuidance(context);
 
@@ -304,19 +306,14 @@ describe('GuidanceOrchestrator', () => {
 	});
 
 	describe('isAvailable', () => {
-		it('should return base LLM source availability', () => {
-			const baseLLMSource = (orchestrator as any).sources.get('base-llm');
-			baseLLMSource.isAvailable.mockReturnValue(true);
-
+		it('should return true when pattern source exists', () => {
+			// Pattern source always exists and makes orchestrator available
 			expect(orchestrator.isAvailable()).toBe(true);
-
-			baseLLMSource.isAvailable.mockReturnValue(false);
-
-			expect(orchestrator.isAvailable()).toBe(false);
 		});
 
-		it('should return false when base LLM source is not available', () => {
+		it('should return false when no sources available', () => {
 			orchestrator.removeSource('base-llm');
+			orchestrator.removeSource('pattern-detection');
 
 			expect(orchestrator.isAvailable()).toBe(false);
 		});
@@ -327,8 +324,13 @@ describe('GuidanceOrchestrator', () => {
 			const debugInfo = orchestrator.getDebugInfo();
 
 			expect(debugInfo).toEqual({
-				sourceCount: 1,
+				sourceCount: 2,
 				sources: [
+					{
+						id: 'pattern-detection',
+						priority: 10,
+						canShortCircuit: true,
+					},
 					{
 						id: 'base-llm',
 						priority: 100,

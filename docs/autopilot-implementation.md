@@ -159,8 +159,8 @@ Rate limiting and analysis delay use sensible defaults automatically to provide 
 ```typescript
 // Session.tsx integration
 const handleStdinData = (data: string) => {
-  // Auto-pilot toggle with 'p' key
-  if (data === 'p' && autopilotMonitorRef.current) {
+  // Auto-pilot toggle with Ctrl+p key
+  if (data === '\u0010' && autopilotMonitorRef.current) {
     const monitor = autopilotMonitorRef.current;
     if (monitor.isLLMAvailable()) {
       const isActive = monitor.toggle(session);

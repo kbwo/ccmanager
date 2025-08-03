@@ -28,7 +28,7 @@ const Session: React.FC<SessionProps> = ({
 		stdout.write('\x1B[2J\x1B[H');
 
 		// Show help text at the bottom
-		const helpText = `\n? Press ${shortcutManager.getShortcutDisplay('returnToMenu')} to return to menu\n`;
+		const helpText = `\n? Press ${shortcutManager.getShortcutDisplay('returnToMenu')} to return to menu, Ctrl+p to toggle autopilot\n`;
 		stdout.write(helpText);
 
 		// Handle session restoration
@@ -149,8 +149,8 @@ const Session: React.FC<SessionProps> = ({
 		const handleStdinData = (data: string) => {
 			if (isExiting) return;
 
-			// Check for auto-pilot toggle
-			if (data === 'p') {
+			// Check for auto-pilot toggle (Ctrl+p)
+			if (data === '\u0010') {
 				// Toggle autopilot for this session via SessionManager
 				const newState = sessionManager.toggleAutopilotForSession(session.id);
 				const status = newState ? 'ACTIVE' : 'STANDBY';

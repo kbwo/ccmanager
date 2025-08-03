@@ -12,6 +12,7 @@ import {
 	AutopilotConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
+import {PatternLibrary} from './guidance/patternLibrary.js';
 
 export class ConfigurationManager {
 	private configPath: string;
@@ -100,7 +101,17 @@ export class ConfigurationManager {
 				maxGuidancesPerHour: 3,
 				analysisDelayMs: 3000,
 				interventionThreshold: 0.5,
+				learningConfig: {
+					enabled: false,
+					approvalRequired: true,
+					retentionDays: 30,
+					minPatternConfidence: 0.7,
+				},
 				apiKeys: {},
+				patterns: {
+					enabled: true,
+					...PatternLibrary.getDefaultConfig(),
+				},
 			};
 		}
 
@@ -112,6 +123,24 @@ export class ConfigurationManager {
 		// Migrate legacy configs without interventionThreshold
 		if (typeof this.config.autopilot.interventionThreshold === 'undefined') {
 			this.config.autopilot.interventionThreshold = 0.5;
+		}
+
+		// Ensure pattern config exists for existing autopilot configs
+		if (!this.config.autopilot.patterns) {
+			this.config.autopilot.patterns = {
+				enabled: true,
+				...PatternLibrary.getDefaultConfig(),
+			};
+		}
+
+		// Ensure learning config exists for existing autopilot configs
+		if (!this.config.autopilot.learningConfig) {
+			this.config.autopilot.learningConfig = {
+				enabled: false,
+				approvalRequired: true,
+				retentionDays: 30,
+				minPatternConfidence: 0.7,
+			};
 		}
 	}
 
@@ -336,7 +365,17 @@ export class ConfigurationManager {
 				maxGuidancesPerHour: 3,
 				analysisDelayMs: 3000,
 				interventionThreshold: 0.5, // Default moderate threshold
+				learningConfig: {
+					enabled: false,
+					approvalRequired: true,
+					retentionDays: 30,
+					minPatternConfidence: 0.7,
+				},
 				apiKeys: {},
+				patterns: {
+					enabled: true,
+					...PatternLibrary.getDefaultConfig(),
+				},
 			}
 		);
 	}
