@@ -9,6 +9,7 @@ import {
 	CommandConfig,
 	CommandPreset,
 	CommandPresetsConfig,
+	AutopilotConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
 
@@ -89,6 +90,23 @@ export class ConfigurationManager {
 
 		// Migrate legacy command config to presets if needed
 		this.migrateLegacyCommandToPresets();
+
+		// Ensure default autopilot config
+		if (!this.config.autopilot) {
+			this.config.autopilot = {
+				enabled: false,
+				provider: 'openai',
+				model: 'gpt-4.1',
+				maxGuidancesPerHour: 3,
+				analysisDelayMs: 3000,
+				apiKeys: {},
+			};
+		}
+
+		// Ensure apiKeys object exists for existing configs
+		if (!this.config.autopilot.apiKeys) {
+			this.config.autopilot.apiKeys = {};
+		}
 	}
 
 	private migrateLegacyShortcuts(): void {
@@ -301,6 +319,24 @@ export class ConfigurationManager {
 		const presets = this.getCommandPresets();
 		presets.selectPresetOnStart = enabled;
 		this.setCommandPresets(presets);
+	}
+
+	getAutopilotConfig(): AutopilotConfig {
+		return (
+			this.config.autopilot || {
+				enabled: false,
+				provider: 'openai',
+				model: 'gpt-4.1',
+				maxGuidancesPerHour: 3,
+				analysisDelayMs: 3000,
+				apiKeys: {},
+			}
+		);
+	}
+
+	setAutopilotConfig(autopilotConfig: AutopilotConfig): void {
+		this.config.autopilot = autopilotConfig;
+		this.saveConfig();
 	}
 }
 

@@ -17,6 +17,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
 - **Copy Claude Code session data** between worktrees to maintain conversation context
+- **AI-powered Autopilot**: Intelligent monitoring and guidance when Claude gets stuck
 - Configurable keyboard shortcuts
 - Command presets with automatic fallback support
 - Configurable state detection strategies for different CLI tools
@@ -70,6 +71,78 @@ Or run without installing:
 ```bash
 npx ccmanager
 ```
+
+## AI-Powered Autopilot
+
+CCManager includes an intelligent Autopilot feature that monitors your Claude Code sessions and provides guidance when Claude gets stuck, confused, or needs direction.
+
+### ⚡ Quick Setup
+
+Set up your LLM API keys (choose one or both):
+
+```bash
+# For OpenAI models (GPT-4.1, o4-mini, o3)
+export OPENAI_API_KEY="your-openai-api-key-here"
+
+# For Anthropic models (Claude 4 Sonnet, Claude 4 Opus)  
+export ANTHROPIC_API_KEY="your-anthropic-api-key-here"
+```
+
+### 🔑 Getting API Keys
+
+**OpenAI API Key:**
+1. Go to [platform.openai.com](https://platform.openai.com/api-keys)
+2. Sign in or create an account
+3. Click "Create new secret key"
+4. Copy the key and set it as `OPENAI_API_KEY`
+
+**Anthropic API Key:**
+1. Go to [console.anthropic.com](https://console.anthropic.com/)
+2. Sign in or create an account
+3. Navigate to "API Keys" section
+4. Click "Create Key"
+5. Copy the key and set it as `ANTHROPIC_API_KEY`
+
+### 🚀 Using Autopilot
+
+1. **Enable Autopilot**: Press `P` in the main menu or go to Configuration → Configure Autopilot
+2. **Choose Provider**: Select OpenAI or Anthropic (based on your available API keys)
+3. **Select Model**: Pick from available models for your chosen provider
+4. **Start Monitoring**: Autopilot will automatically analyze Claude's output and provide guidance when needed
+
+### ✨ Features
+
+- **Intelligent Detection**: Recognizes when Claude is stuck, making errors, or needs direction
+- **Smart Guidance**: Provides contextual suggestions to help Claude get back on track
+- **Multiple Providers**: Support for both OpenAI and Anthropic models
+- **Rate Limited**: Automatically prevents API overuse (3 guidances per hour by default)
+- **Easy Switching**: Change providers and models on the fly
+- **Zero Interference**: Only activates when Claude truly needs help
+
+### 🔧 Configuration
+
+Access Autopilot settings via: **Main Menu → Configuration (C) → Configure Autopilot (A)**
+
+- **Enable/Disable**: Master switch for autopilot functionality
+- **Provider**: Choose between OpenAI and Anthropic
+- **Model Selection**: Pick specific models within your chosen provider
+
+### 💡 When Autopilot Helps
+
+Autopilot monitors for patterns like:
+- Repetitive behavior or infinite loops
+- Error messages being ignored
+- Confusion or uncertainty in responses  
+- Getting stuck on the same task
+- Making the same mistakes repeatedly
+- Overthinking simple problems
+
+### 🛡️ Privacy & Safety
+
+- Autopilot only analyzes terminal output that's already visible to you
+- No code or sensitive data is sent to LLM providers beyond what Claude Code already displays
+- Rate limiting prevents excessive API usage
+- Can be disabled instantly at any time
 
 ## Keyboard Shortcuts
 

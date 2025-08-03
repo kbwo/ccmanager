@@ -47,11 +47,45 @@ vi.mock('../services/configurationManager.js', () => ({
 			args: [],
 		})),
 		getPresetById: vi.fn(),
+		getAutopilotConfig: vi.fn(() => ({
+			enabled: false,
+			provider: 'openai',
+			model: 'gpt-4.1',
+			maxGuidancesPerHour: 3,
+			analysisDelayMs: 3000,
+			apiKeys: {},
+		})),
 	},
 }));
 
 vi.mock('../services/worktreeService.js', () => ({
 	WorktreeService: vi.fn(),
+}));
+
+// Mock LLMClient
+vi.mock('../services/llmClient.js', () => ({
+	LLMClient: vi.fn().mockImplementation(() => ({
+		isAvailable: vi.fn().mockReturnValue(false),
+		updateConfig: vi.fn(),
+		getCurrentProviderName: vi.fn().mockReturnValue('OpenAI'),
+		getSupportedModels: vi.fn().mockReturnValue(['gpt-4.1', 'o4-mini', 'o3']),
+		analyzeClaudeOutput: vi.fn().mockResolvedValue({
+			shouldIntervene: false,
+			confidence: 0.3,
+			reasoning: 'No intervention needed',
+		}),
+	})),
+}));
+
+// Mock AutopilotMonitor
+vi.mock('../services/autopilotMonitor.js', () => ({
+	AutopilotMonitor: vi.fn().mockImplementation(() => ({
+		enable: vi.fn(),
+		disable: vi.fn(),
+		isLLMAvailable: vi.fn().mockReturnValue(false),
+		updateConfig: vi.fn(),
+		destroy: vi.fn(),
+	})),
 }));
 
 const mockSpawn = vi.mocked(spawn);

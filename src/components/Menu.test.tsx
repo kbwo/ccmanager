@@ -70,6 +70,52 @@ vi.mock('../hooks/useSearchMode.js', () => ({
 	}),
 }));
 
+vi.mock('../services/configurationManager.js', () => ({
+	configurationManager: {
+		getAutopilotConfig: vi.fn().mockReturnValue({
+			enabled: false,
+			provider: 'openai',
+			model: 'gpt-4.1',
+			maxGuidancesPerHour: 3,
+			analysisDelayMs: 3000,
+		}),
+		setAutopilotConfig: vi.fn(),
+	},
+}));
+
+// Mock LLMClient
+vi.mock('../services/llmClient.js', () => {
+	const LLMClientConstructor = vi.fn().mockImplementation(() => ({
+		isAvailable: vi.fn().mockReturnValue(true),
+		updateConfig: vi.fn(),
+		getCurrentProviderName: vi.fn().mockReturnValue('OpenAI'),
+		getSupportedModels: vi.fn().mockReturnValue(['gpt-4.1', 'o4-mini', 'o3']),
+		analyzeClaudeOutput: vi.fn().mockResolvedValue({
+			shouldIntervene: false,
+			confidence: 0.3,
+			reasoning: 'No intervention needed',
+		}),
+	}));
+
+	// Add static methods with proper typing
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	(LLMClientConstructor as any).hasAnyProviderKeys = vi
+		.fn()
+		.mockReturnValue(true);
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	(LLMClientConstructor as any).getAvailableProviderKeys = vi
+		.fn()
+		.mockReturnValue(['openai', 'anthropic']);
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	(LLMClientConstructor as any).isProviderAvailable = vi
+		.fn()
+		.mockReturnValue(true);
+
+	return {
+		LLMClient: LLMClientConstructor,
+	};
+});
+
 describe('Menu component rendering', () => {
 	let sessionManager: SessionManager;
 	let worktreeService: WorktreeService;
@@ -295,5 +341,142 @@ describe('Menu component rendering', () => {
 		// Make sure they don't have number prefixes
 		expect(output).not.toContain('10 ❯ Project A');
 		expect(output).not.toContain('11 ❯ Project B');
+	});
+
+	it('should display autopilot toggle option in menu when not in search mode', async () => {
+		const onSelectWorktree = vi.fn();
+
+		// Ensure API keys are available for this test
+		const {LLMClient} = await import('../services/llmClient.js');
+		vi.mocked(LLMClient.hasAnyProviderKeys).mockReturnValue(true);
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Check that autopilot toggle appears in menu (with ASCII icon)
+		expect(output).toContain('P ⚡ Autopilot: OFF');
+		expect(output).toContain('P-Autopilot');
+	});
+
+	it('should display autopilot as ON when enabled in configuration', async () => {
+		const onSelectWorktree = vi.fn();
+
+		// Ensure API keys are available for this test
+		const {LLMClient} = await import('../services/llmClient.js');
+		vi.mocked(LLMClient.hasAnyProviderKeys).mockImplementation(config => {
+			return Boolean(
+				config && (config.apiKeys?.openai || config.apiKeys?.anthropic),
+			);
+		});
+
+		// Mock autopilot as enabled with API keys
+		const {configurationManager} = await import(
+			'../services/configurationManager.js'
+		);
+		vi.mocked(configurationManager.getAutopilotConfig).mockReturnValue({
+			enabled: true,
+			provider: 'openai',
+			model: 'gpt-4.1',
+			maxGuidancesPerHour: 3,
+			analysisDelayMs: 3000,
+			apiKeys: {
+				openai: 'test-key',
+				anthropic: 'test-key-2',
+			},
+		});
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Check that autopilot toggle shows ON (with ASCII icon)
+		expect(output).toContain('P ⚡ Autopilot: ON');
+	});
+
+	it('should display autopilot as DISABLED when no API keys are available', async () => {
+		const onSelectWorktree = vi.fn();
+
+		// Mock no API keys available
+		const {LLMClient} = await import('../services/llmClient.js');
+		vi.mocked(LLMClient.hasAnyProviderKeys).mockReturnValue(false);
+		vi.mocked(LLMClient.getAvailableProviderKeys).mockReturnValue([]);
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Check that autopilot toggle shows DISABLED
+		expect(output).toContain('P ⚡ Autopilot: DISABLED');
+		// Check status line also shows DISABLED
+		expect(output).toContain('Autopilot: ⚡ DISABLED');
+	});
+
+	it('should toggle autopilot configuration when called directly', async () => {
+		// Test the configurationManager toggle functionality directly
+		const {configurationManager} = await import(
+			'../services/configurationManager.js'
+		);
+		const mockSetAutopilotConfig = vi.mocked(
+			configurationManager.setAutopilotConfig,
+		);
+		const mockGetAutopilotConfig = vi.mocked(
+			configurationManager.getAutopilotConfig,
+		);
+
+		// Clear mocks
+		mockSetAutopilotConfig.mockClear();
+
+		// Set up initial config with enabled: false
+		const initialConfig = {
+			enabled: false,
+			provider: 'openai' as const,
+			model: 'gpt-4.1',
+			maxGuidancesPerHour: 3,
+			analysisDelayMs: 3000,
+			apiKeys: {
+				openai: 'test-key',
+				anthropic: 'test-key-2',
+			},
+		};
+
+		mockGetAutopilotConfig.mockReturnValue(initialConfig);
+
+		// Simulate the toggle logic from Menu component
+		const currentConfig = configurationManager.getAutopilotConfig();
+		if (currentConfig) {
+			const newConfig = {...currentConfig, enabled: !currentConfig.enabled};
+			configurationManager.setAutopilotConfig(newConfig);
+		}
+
+		// Verify that setAutopilotConfig was called with enabled: true
+		expect(mockSetAutopilotConfig).toHaveBeenCalledWith({
+			...initialConfig,
+			enabled: true,
+		});
 	});
 });

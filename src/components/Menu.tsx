@@ -20,6 +20,8 @@ import {RecentProject} from '../types/index.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
+import {configurationManager} from '../services/configurationManager.js';
+import {LLMClient} from '../services/llmClient.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -83,6 +85,8 @@ const Menu: React.FC<MenuProps> = ({
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+	const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
+	const [hasApiKeys, setHasApiKeys] = useState<boolean>(false);
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -106,6 +110,13 @@ const Menu: React.FC<MenuProps> = ({
 			);
 			setRecentProjects(filteredProjects);
 		}
+
+		// Load autopilot configuration
+		const autopilotConfig = configurationManager.getAutopilotConfig();
+		setAutopilotEnabled(autopilotConfig?.enabled || false);
+
+		// Check API key availability
+		setHasApiKeys(LLMClient.hasAnyProviderKeys(autopilotConfig));
 
 		// Update sessions
 		const updateSessions = () => {
@@ -243,6 +254,11 @@ const Menu: React.FC<MenuProps> = ({
 				},
 				{
 					type: 'common',
+					label: `P ${MENU_ICONS.AUTOPILOT} Autopilot: ${!hasApiKeys ? 'DISABLED' : autopilotEnabled ? 'ON' : 'OFF'}`,
+					value: 'toggle-autopilot',
+				},
+				{
+					type: 'common',
 					label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
 					value: 'configuration',
 				},
@@ -274,6 +290,8 @@ const Menu: React.FC<MenuProps> = ({
 		recentProjects,
 		searchQuery,
 		isSearchMode,
+		autopilotEnabled,
+		hasApiKeys,
 	]);
 
 	// Handle hotkeys
@@ -351,6 +369,19 @@ const Menu: React.FC<MenuProps> = ({
 					hasSession: false,
 				});
 				break;
+			case 'p': {
+				// Toggle autopilot (only if API keys are available)
+				if (!hasApiKeys) return;
+				const currentConfig = configurationManager.getAutopilotConfig();
+				if (!currentConfig) return;
+				const newConfig = {...currentConfig, enabled: !currentConfig.enabled};
+				configurationManager.setAutopilotConfig(newConfig);
+				setAutopilotEnabled(newConfig.enabled);
+
+				// Apply to all existing sessions
+				sessionManager.setAutopilotForAllSessions(newConfig.enabled);
+				break;
+			}
 			case 'c':
 				// Trigger configuration action
 				onSelectWorktree({
@@ -424,6 +455,17 @@ const Menu: React.FC<MenuProps> = ({
 				isMainWorktree: false,
 				hasSession: false,
 			});
+		} else if (item.value === 'toggle-autopilot') {
+			// Toggle autopilot (only if API keys are available)
+			if (!hasApiKeys) return;
+			const currentConfig = configurationManager.getAutopilotConfig();
+			if (!currentConfig) return;
+			const newConfig = {...currentConfig, enabled: !currentConfig.enabled};
+			configurationManager.setAutopilotConfig(newConfig);
+			setAutopilotEnabled(newConfig.enabled);
+
+			// Apply to all existing sessions
+			sessionManager.setAutopilotForAllSessions(newConfig.enabled);
 		} else if (item.value === 'configuration') {
 			// Handle in parent component - use special marker
 			onSelectWorktree({
@@ -527,16 +569,17 @@ const Menu: React.FC<MenuProps> = ({
 				<Text dimColor>
 					Status: {STATUS_ICONS.BUSY} {STATUS_LABELS.BUSY}{' '}
 					{STATUS_ICONS.WAITING} {STATUS_LABELS.WAITING} {STATUS_ICONS.IDLE}{' '}
-					{STATUS_LABELS.IDLE}
+					{STATUS_LABELS.IDLE} | Autopilot: {MENU_ICONS.AUTOPILOT}{' '}
+					{!hasApiKeys ? 'DISABLED' : autopilotEnabled ? 'ON' : 'OFF'}
 				</Text>
 				<Text dimColor>
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete C-Config ${
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete P-Autopilot C-Config ${
 									projectName ? 'B-Back' : 'Q-Quit'
 								}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete C-Config ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete P-Autopilot C-Config ${
 									projectName ? 'B-Back' : 'Q-Quit'
 								}`}
 				</Text>

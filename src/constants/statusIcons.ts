@@ -16,6 +16,7 @@ export const MENU_ICONS = {
 	DELETE_WORKTREE: '✕',
 	CONFIGURE_SHORTCUTS: '⌨',
 	EXIT: '⏻',
+	AUTOPILOT: '⚡',
 } as const;
 
 export const getStatusDisplay = (

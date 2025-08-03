@@ -32,6 +32,7 @@ export interface Session {
 	commandConfig?: CommandConfig; // Store command config for fallback
 	detectionStrategy?: StateDetectionStrategy; // State detection strategy for this session
 	devcontainerConfig?: DevcontainerConfig; // Devcontainer configuration if session runs in container
+	autopilotState?: AutopilotMonitorState; // Auto-pilot monitoring state
 }
 
 export interface SessionManager {
@@ -101,12 +102,39 @@ export interface DevcontainerConfig {
 	execCommand: string; // Command to execute in devcontainer
 }
 
+export interface AutopilotConfig {
+	enabled: boolean;
+	provider: 'openai' | 'anthropic';
+	model: string;
+	maxGuidancesPerHour: number;
+	analysisDelayMs: number;
+	apiKeys: {
+		openai?: string;
+		anthropic?: string;
+	};
+}
+
+export interface AutopilotDecision {
+	shouldIntervene: boolean;
+	guidance?: string;
+	confidence: number;
+	reasoning: string;
+}
+
+export interface AutopilotMonitorState {
+	isActive: boolean;
+	guidancesProvided: number;
+	lastGuidanceTime?: Date;
+	analysisInProgress: boolean;
+}
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
 	worktree?: WorktreeConfig;
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
+	autopilot?: AutopilotConfig;
 }
 
 // Multi-project support interfaces

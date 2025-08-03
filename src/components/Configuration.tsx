@@ -5,13 +5,20 @@ import ConfigureShortcuts from './ConfigureShortcuts.js';
 import ConfigureHooks from './ConfigureHooks.js';
 import ConfigureWorktree from './ConfigureWorktree.js';
 import ConfigureCommand from './ConfigureCommand.js';
+import ConfigureAutopilot from './ConfigureAutopilot.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface ConfigurationProps {
 	onComplete: () => void;
 }
 
-type ConfigView = 'menu' | 'shortcuts' | 'hooks' | 'worktree' | 'command';
+type ConfigView =
+	| 'menu'
+	| 'shortcuts'
+	| 'hooks'
+	| 'worktree'
+	| 'command'
+	| 'autopilot';
 
 interface MenuItem {
 	label: string;
@@ -39,6 +46,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			value: 'command',
 		},
 		{
+			label: 'A ✈️  Configure Autopilot',
+			value: 'autopilot',
+		},
+		{
 			label: 'B ← Back to Main Menu',
 			value: 'back',
 		},
@@ -55,6 +66,8 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			setView('worktree');
 		} else if (item.value === 'command') {
 			setView('command');
+		} else if (item.value === 'autopilot') {
+			setView('autopilot');
 		}
 	};
 
@@ -81,6 +94,9 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			case 'c':
 				setView('command');
 				break;
+			case 'a':
+				setView('autopilot');
+				break;
 			case 'b':
 				onComplete();
 				break;
@@ -106,6 +122,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 
 	if (view === 'command') {
 		return <ConfigureCommand onComplete={handleSubMenuComplete} />;
+	}
+
+	if (view === 'autopilot') {
+		return <ConfigureAutopilot onComplete={handleSubMenuComplete} />;
 	}
 
 	return (

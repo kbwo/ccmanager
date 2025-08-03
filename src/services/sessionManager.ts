@@ -13,6 +13,7 @@ import {promisify} from 'util';
 import {configurationManager} from './configurationManager.js';
 import {WorktreeService} from './worktreeService.js';
 import {createStateDetector} from './stateDetector.js';
+import {AutopilotMonitor} from './autopilotMonitor.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 
@@ -27,6 +28,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
+	private globalAutopilotMonitor: AutopilotMonitor | null = null;
 
 	private async spawn(
 		command: string,
@@ -54,6 +56,34 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	constructor() {
 		super();
 		this.sessions = new Map();
+
+		// Initialize global autopilot monitor
+		this.initializeGlobalAutopilot();
+	}
+
+	private initializeGlobalAutopilot(): void {
+		const autopilotConfig = configurationManager.getAutopilotConfig();
+		if (autopilotConfig) {
+			this.globalAutopilotMonitor = new AutopilotMonitor(autopilotConfig);
+
+			// Set up global listener for all session state changes
+			this.on(
+				'sessionStateChanged',
+				(session: Session, oldState: string, newState: string) => {
+					// Only analyze sessions that have autopilot enabled
+					if (session.autopilotState?.isActive && this.globalAutopilotMonitor) {
+						console.log(
+							`🌐 Global autopilot monitoring session ${session.id}: ${oldState} → ${newState}`,
+						);
+						this.globalAutopilotMonitor.onSessionStateChanged(
+							session,
+							oldState,
+							newState,
+						);
+					}
+				},
+			);
+		}
 	}
 
 	private createSessionId(): string {
@@ -154,6 +184,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			// Store in output history as Buffer
 			const buffer = Buffer.from(data, 'utf8');
 			session.outputHistory.push(buffer);
+
+			// Update session.output for autopilot monitoring
+			const lines = data.split('\n');
+			session.output.push(...lines);
+
+			// Keep only recent lines for autopilot analysis (limit memory usage)
+			const MAX_OUTPUT_LINES = 200;
+			if (session.output.length > MAX_OUTPUT_LINES) {
+				session.output = session.output.slice(-MAX_OUTPUT_LINES);
+			}
 
 			// Limit memory usage - keep max 10MB of output history
 			const MAX_HISTORY_SIZE = 10 * 1024 * 1024; // 10MB
@@ -256,7 +296,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (newState !== oldState) {
 				session.state = newState;
 				this.executeStatusHook(oldState, newState, session);
-				this.emit('sessionStateChanged', session);
+				this.emit('sessionStateChanged', session, oldState, newState);
 			}
 		}, 100); // Check every 100ms
 
@@ -270,8 +310,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			clearInterval(session.stateCheckInterval);
 		}
 		// Update state to idle before destroying
+		const oldState = session.state;
 		session.state = 'idle';
-		this.emit('sessionStateChanged', session);
+		this.emit('sessionStateChanged', session, oldState, 'idle');
 		this.destroySession(session.worktreePath);
 		this.emit('sessionExit', session);
 	}
@@ -452,6 +493,105 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		});
 
 		return counts;
+	}
+
+	/**
+	 * Toggle autopilot for a specific session
+	 */
+	toggleAutopilotForSession(sessionId: string): boolean {
+		if (!this.globalAutopilotMonitor) {
+			console.warn('Global autopilot monitor not initialized');
+			return false;
+		}
+
+		const session = Array.from(this.sessions.values()).find(
+			s => s.id === sessionId,
+		);
+		if (!session) {
+			console.warn(`Session ${sessionId} not found`);
+			return false;
+		}
+
+		// Initialize autopilot state if needed
+		if (!session.autopilotState) {
+			session.autopilotState = {
+				isActive: false,
+				guidancesProvided: 0,
+				analysisInProgress: false,
+			};
+		}
+
+		const newState = !session.autopilotState.isActive;
+
+		if (newState) {
+			// Enable autopilot for this session
+			if (this.globalAutopilotMonitor.isLLMAvailable()) {
+				this.globalAutopilotMonitor.enable(session);
+				console.log(`✅ Enabled autopilot for session ${session.id}`);
+			} else {
+				console.log(
+					`❌ Cannot enable autopilot for session ${session.id} - LLM not available`,
+				);
+				return false;
+			}
+		} else {
+			// Disable autopilot for this session
+			this.globalAutopilotMonitor.disable(session);
+			console.log(`❌ Disabled autopilot for session ${session.id}`);
+		}
+
+		return newState;
+	}
+
+	/**
+	 * Enable or disable autopilot for all existing sessions
+	 * This is used when the global autopilot switch is toggled
+	 */
+	setAutopilotForAllSessions(enabled: boolean): void {
+		if (!this.globalAutopilotMonitor) {
+			console.warn('Global autopilot monitor not initialized');
+			return;
+		}
+
+		const sessions = this.getAllSessions();
+		console.log(
+			`🔄 Setting autopilot ${enabled ? 'enabled' : 'disabled'} for ${sessions.length} sessions`,
+		);
+
+		sessions.forEach(session => {
+			// Initialize autopilot state if needed
+			if (!session.autopilotState) {
+				session.autopilotState = {
+					isActive: false,
+					guidancesProvided: 0,
+					analysisInProgress: false,
+				};
+			}
+
+			if (enabled) {
+				// Enable autopilot for this session if not already active
+				if (!session.autopilotState.isActive) {
+					if (this.globalAutopilotMonitor!.isLLMAvailable()) {
+						this.globalAutopilotMonitor!.enable(session);
+						console.log(
+							`✅ Enabled autopilot for session ${session.id} (${session.worktreePath})`,
+						);
+					} else {
+						console.log(
+							`❌ Cannot enable autopilot for session ${session.id} - LLM not available`,
+						);
+					}
+				}
+			} else {
+				// Disable autopilot for this session if currently active
+				if (session.autopilotState.isActive) {
+					this.globalAutopilotMonitor!.disable(session);
+					console.log(
+						`❌ Disabled autopilot for session ${session.id} (${session.worktreePath})`,
+					);
+				}
+			}
+		});
 	}
 
 	static formatSessionCounts(counts: SessionCounts): string {

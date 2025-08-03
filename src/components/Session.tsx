@@ -3,6 +3,7 @@ import {useStdout} from 'ink';
 import {Session as SessionType} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {configurationManager} from '../services/configurationManager.js';
 
 interface SessionProps {
 	session: SessionType;
@@ -17,12 +18,18 @@ const Session: React.FC<SessionProps> = ({
 }) => {
 	const {stdout} = useStdout();
 	const [isExiting, setIsExiting] = useState(false);
+	const [, setAutopilotStatus] = useState<string>('STANDBY');
+	const [, setGuidancesProvided] = useState(0);
 
 	useEffect(() => {
 		if (!stdout) return;
 
 		// Clear screen when entering session
 		stdout.write('\x1B[2J\x1B[H');
+
+		// Show help text at the bottom
+		const helpText = `\n? Press ${shortcutManager.getShortcutDisplay('returnToMenu')} to return to menu\n`;
+		stdout.write(helpText);
 
 		// Handle session restoration
 		const handleSessionRestore = (restoredSession: SessionType) => {
@@ -55,6 +62,29 @@ const Session: React.FC<SessionProps> = ({
 
 		// Mark session as active (this will trigger the restore event)
 		sessionManager.setSessionActive(session.worktreePath, true);
+
+		// Initialize autopilot state if needed
+		if (!session.autopilotState) {
+			session.autopilotState = {
+				isActive: false,
+				guidancesProvided: 0,
+				analysisInProgress: false,
+			};
+		}
+
+		// Auto-enable autopilot if enabled globally
+		const autopilotConfig = configurationManager.getAutopilotConfig();
+		if (autopilotConfig.enabled && !session.autopilotState.isActive) {
+			// Use the global autopilot through SessionManager
+			sessionManager.setAutopilotForAllSessions(true);
+			if (stdout && session.autopilotState.isActive) {
+				stdout.write('\n✈️ Auto-pilot: ACTIVE (globally enabled)\n');
+			}
+		}
+
+		// Update initial state
+		setAutopilotStatus(session.autopilotState.isActive ? 'ACTIVE' : 'STANDBY');
+		setGuidancesProvided(session.autopilotState.guidancesProvided);
 
 		// Immediately resize the PTY and terminal to current dimensions
 		// This fixes rendering issues when terminal width changed while in menu
@@ -119,6 +149,26 @@ const Session: React.FC<SessionProps> = ({
 		const handleStdinData = (data: string) => {
 			if (isExiting) return;
 
+			// Check for auto-pilot toggle
+			if (data === 'p') {
+				// Toggle autopilot for this session via SessionManager
+				const newState = sessionManager.toggleAutopilotForSession(session.id);
+				const status = newState ? 'ACTIVE' : 'STANDBY';
+				setAutopilotStatus(status);
+
+				// Display status message in terminal (not sent to Claude Code)
+				if (stdout) {
+					if (newState || session.autopilotState) {
+						stdout.write(`\n✈️ Auto-pilot: ${status}\n`);
+					} else {
+						stdout.write(
+							'\n✈️ Auto-pilot: API key required (configure in settings)\n',
+						);
+					}
+				}
+				return;
+			}
+
 			// Check for return to menu shortcut
 			const returnToMenuShortcut = shortcutManager.getShortcuts().returnToMenu;
 			const shortcutCode =
@@ -162,6 +212,8 @@ const Session: React.FC<SessionProps> = ({
 				}
 			}
 
+			// Note: Global autopilot monitor is managed by SessionManager, no cleanup needed here
+
 			// Mark session as inactive
 			sessionManager.setSessionActive(session.worktreePath, false);
 
@@ -174,6 +226,7 @@ const Session: React.FC<SessionProps> = ({
 	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
 
 	// Return null to render nothing (PTY output goes directly to stdout)
+	// Auto-pilot status is displayed via the PTY output when toggled
 	return null;
 };
 

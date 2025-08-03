@@ -17,7 +17,6 @@ import {
 	DevcontainerConfig,
 	GitProject,
 } from '../types/index.js';
-import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
@@ -33,8 +32,7 @@ type View =
 	| 'deleting-worktree'
 	| 'merge-worktree'
 	| 'configuration'
-	| 'preset-selector'
-	| 'clearing';
+	| 'preset-selector';
 
 interface AppProps {
 	devcontainerConfig?: DevcontainerConfig;
@@ -73,11 +71,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const navigateWithClear = useCallback(
 		(newView: View, callback?: () => void) => {
 			clearScreen();
-			setView('clearing');
-			setTimeout(() => {
-				setView(newView);
-				if (callback) callback();
-			}, 10); // Small delay to ensure screen clear is processed
+			setView(newView);
+			if (callback) callback();
 		},
 		[],
 	);
@@ -381,20 +376,12 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 	if (view === 'session' && activeSession) {
 		return (
-			<Box flexDirection="column">
-				<Session
-					key={activeSession.id}
-					session={activeSession}
-					sessionManager={sessionManager}
-					onReturnToMenu={handleReturnToMenu}
-				/>
-				<Box marginTop={1}>
-					<Text dimColor>
-						Press {shortcutManager.getShortcutDisplay('returnToMenu')} to return
-						to menu
-					</Text>
-				</Box>
-			</Box>
+			<Session
+				key={activeSession.id}
+				session={activeSession}
+				sessionManager={sessionManager}
+				onReturnToMenu={handleReturnToMenu}
+			/>
 		);
 	}
 
@@ -473,11 +460,6 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				onCancel={handlePresetSelectorCancel}
 			/>
 		);
-	}
-
-	if (view === 'clearing') {
-		// Render nothing during the clearing phase to ensure clean transition
-		return null;
 	}
 
 	return null;
