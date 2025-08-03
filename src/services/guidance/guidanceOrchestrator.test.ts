@@ -58,11 +58,12 @@ describe('GuidanceOrchestrator', () => {
 	});
 
 	describe('constructor', () => {
-		it('should initialize with pattern and LLM sources', () => {
+		it('should initialize with pattern, context-aware, and LLM sources', () => {
 			const sourceIds = orchestrator.getSourceIds();
 			expect(sourceIds).toContain('base-llm');
 			expect(sourceIds).toContain('pattern-detection');
-			expect(sourceIds).toHaveLength(2);
+			expect(sourceIds).toContain('context-aware');
+			expect(sourceIds).toHaveLength(3);
 		});
 	});
 
@@ -85,7 +86,7 @@ describe('GuidanceOrchestrator', () => {
 
 			const sourceIds = orchestrator.getSourceIds();
 			expect(sourceIds).toContain('test-source');
-			expect(sourceIds).toHaveLength(3);
+			expect(sourceIds).toHaveLength(4);
 		});
 
 		it('should throw error when adding duplicate source ID', () => {
@@ -115,7 +116,7 @@ describe('GuidanceOrchestrator', () => {
 		it('should remove an existing source', () => {
 			const result = orchestrator.removeSource('base-llm');
 			expect(result).toBe(true);
-			expect(orchestrator.getSourceIds()).toHaveLength(1);
+			expect(orchestrator.getSourceIds()).toHaveLength(2);
 		});
 
 		it('should return false when removing non-existent source', () => {
@@ -128,6 +129,7 @@ describe('GuidanceOrchestrator', () => {
 		it('should return no guidance when no sources available', async () => {
 			orchestrator.removeSource('base-llm');
 			orchestrator.removeSource('pattern-detection');
+			orchestrator.removeSource('context-aware');
 
 			const result = await orchestrator.generateGuidance(context);
 
@@ -324,11 +326,16 @@ describe('GuidanceOrchestrator', () => {
 			const debugInfo = orchestrator.getDebugInfo();
 
 			expect(debugInfo).toEqual({
-				sourceCount: 2,
+				sourceCount: 3,
 				sources: [
 					{
 						id: 'pattern-detection',
 						priority: 10,
+						canShortCircuit: true,
+					},
+					{
+						id: 'context-aware',
+						priority: 1,
 						canShortCircuit: true,
 					},
 					{

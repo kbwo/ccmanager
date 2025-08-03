@@ -116,6 +116,7 @@ export interface AutopilotConfig {
 		anthropic?: string;
 	};
 	patterns?: PatternConfig; // Pattern-based guidance configuration
+	context?: ContextConfig; // Context-aware intelligence configuration
 }
 
 export interface AutopilotDecision {
@@ -139,6 +140,7 @@ export interface AnalysisContext {
 	sessionState: SessionState;
 	worktreePath: string;
 	userHistory?: UserInputPattern[];
+	projectContext?: ProjectContext;
 	metadata?: Record<string, unknown>;
 }
 
@@ -317,4 +319,74 @@ export interface PatternConfig {
 		criticalBypassThrottling: boolean;
 	};
 	sensitivity: Record<PatternPriority, number>; // 0.0 to 1.0 threshold
+}
+
+// Context-Aware Intelligence Interfaces (PR#4)
+export interface ProjectType {
+	framework:
+		| 'react'
+		| 'node'
+		| 'typescript'
+		| 'vue'
+		| 'next'
+		| 'express'
+		| 'unknown';
+	language: 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'unknown';
+	buildSystem:
+		| 'npm'
+		| 'yarn'
+		| 'pnpm'
+		| 'webpack'
+		| 'vite'
+		| 'rollup'
+		| 'unknown';
+	testFramework?: 'jest' | 'vitest' | 'mocha' | 'cypress' | 'playwright';
+	patterns: ArchitecturalPattern[];
+}
+
+export interface ArchitecturalPattern {
+	type: 'mvc' | 'component-based' | 'microservice' | 'monorepo';
+	confidence: number;
+	indicators: string[];
+}
+
+export interface ProjectContext {
+	projectType: ProjectType;
+	gitStatus?: GitStatus;
+	recentFiles: string[];
+	packageInfo?: PackageInfo;
+	cacheTimestamp: Date;
+	cacheDurationMs: number;
+}
+
+export interface PackageInfo {
+	name?: string;
+	version?: string;
+	dependencies: Record<string, string>;
+	devDependencies: Record<string, string>;
+	scripts: Record<string, string>;
+}
+
+export interface ContextPattern {
+	id: string;
+	name: string;
+	framework: ProjectType['framework'];
+	category:
+		| 'hooks'
+		| 'state-management'
+		| 'performance'
+		| 'testing'
+		| 'routing'
+		| 'styling';
+	pattern: RegExp;
+	guidance: string;
+	confidence: number;
+}
+
+export interface ContextConfig {
+	enabled: boolean;
+	frameworkDetection: boolean;
+	gitIntegration: boolean;
+	cacheRefreshIntervalMs: number;
+	contextPatterns: Record<ProjectType['framework'], ContextPattern[]>;
 }

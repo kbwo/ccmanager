@@ -6,6 +6,7 @@ import type {
 } from '../../types/index.js';
 import {BaseLLMGuidanceSource} from './baseLLMGuidanceSource.js';
 import {PatternGuidanceSource} from './patternGuidanceSource.js';
+import {ContextGuidanceSource} from './contextGuidanceSource.js';
 
 /**
  * Orchestrates multiple guidance sources to provide intelligent, layered analysis
@@ -18,10 +19,13 @@ export class GuidanceOrchestrator {
 	constructor(config: AutopilotConfig) {
 		this.config = config;
 
-		// Initialize with pattern source (higher priority - runs first)
+		// Initialize with pattern source (highest priority - runs first)
 		this.addSource(new PatternGuidanceSource(config));
 
-		// Initialize with base LLM source (lower priority - runs second)
+		// Initialize with context-aware source (medium priority - runs second)
+		this.addSource(new ContextGuidanceSource(config));
+
+		// Initialize with base LLM source (lowest priority - runs last)
 		this.addSource(new BaseLLMGuidanceSource(config));
 	}
 
@@ -216,6 +220,14 @@ export class GuidanceOrchestrator {
 		) as PatternGuidanceSource;
 		if (patternSource) {
 			patternSource.updateConfig(config);
+		}
+
+		// Update context-aware source if it exists
+		const contextSource = this.sources.get(
+			'context-aware',
+		) as ContextGuidanceSource;
+		if (contextSource) {
+			contextSource.updateConfig(config);
 		}
 
 		// Update base LLM source if it exists

@@ -8,6 +8,7 @@ import type {
 	GuidanceResult,
 } from '../types/index.js';
 import {GuidanceOrchestrator} from './guidance/guidanceOrchestrator.js';
+import {contextBuilder} from './contextBuilder.js';
 import stripAnsi from 'strip-ansi';
 
 export class AutopilotMonitor extends EventEmitter {
@@ -151,12 +152,28 @@ export class AutopilotMonitor extends EventEmitter {
 				`📝 Analyzing ${recentOutput.length} characters of output...`,
 			);
 
+			// Build project context if context awareness is enabled
+			let projectContext;
+			if (this.config.context?.enabled) {
+				try {
+					projectContext = await contextBuilder.buildProjectContext(
+						session.worktreePath,
+					);
+					console.log(
+						`📋 Project context: ${projectContext.projectType.framework}/${projectContext.projectType.language}`,
+					);
+				} catch (error) {
+					console.log('⚠️ Failed to build project context:', error);
+				}
+			}
+
 			// Create analysis context for orchestrator
 			const context: AnalysisContext = {
 				terminalOutput: recentOutput,
 				projectPath: session.worktreePath,
 				sessionState: session.state,
 				worktreePath: session.worktreePath,
+				projectContext,
 			};
 
 			// Use guidance orchestrator instead of direct LLM client
