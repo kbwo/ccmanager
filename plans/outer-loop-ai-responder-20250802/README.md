@@ -12,6 +12,7 @@ plans/outer-loop-ai-responder-20250802/
 ├── 02-pr1-basic-autopilot.md     # PR1: Basic auto-pilot core (3 days)
 ├── 03-pr2-pattern-guidance.md    # PR2: Pattern-based guidance (2 days)
 ├── 04-pr3-context-awareness.md   # PR3: Context-aware intelligence (2 days)
+├── 05-context-aware-pr-feature.md # Context-aware PR creation design (4 days)
 ├── 06-modular-architecture.md    # Modular design for portability
 └── 07-extended-roadmap.md        # Advanced PRs for complete system
 ```
@@ -40,6 +41,12 @@ plans/outer-loop-ai-responder-20250802/
 - **PR7**: Analytics dashboard and performance insights
 - **PR8**: Advanced LLM providers and code generation capabilities
 - **Result**: Comprehensive platform ready for team deployment
+
+### **Phase 4: Workflow Automation** (Week 7)
+**Context-aware workflow automation and PR creation**
+
+- **PR9**: Context-aware PR creation with session analysis and compliance validation
+- **Result**: Complete workflow automation that transforms session insights into actionable PRs
 
 ## ✈️ Auto-pilot Quick Start
 
@@ -109,6 +116,11 @@ autopilot.on('guidanceProvided', handleGuidance);
 1. **Analytics**: `07-extended-roadmap.md` - PR7 analytics implementation
 2. **Advanced AI**: `07-extended-roadmap.md` - PR8 multi-provider support
 3. **Deploy**: Enterprise-ready intelligent development platform
+
+### **For Workflow Automation** (Week 7)
+1. **Context-Aware PRs**: `05-context-aware-pr-feature.md` - Detailed design and implementation plan
+2. **GitHub Integration**: `07-extended-roadmap.md` - PR9 implementation guide
+3. **Deploy**: Complete workflow automation with PR creation capabilities
 
 ## 🎯 Key Benefits
 

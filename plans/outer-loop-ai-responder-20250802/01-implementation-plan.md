@@ -198,6 +198,9 @@ AUTOPILOT_MAX_GUIDANCE_PER_HOUR=3  # throttling limit
 - [ ] Custom pattern configuration by users
 - [ ] Integration with Claude Code `-r` resume flag
 - [ ] Multi-session guidance coordination
+- [ ] Context-aware PR creation with session analysis
+- [ ] Automated compliance validation and reporting
+- [ ] Workflow automation based on session insights
 
 ## 🎯 Next Steps
 
