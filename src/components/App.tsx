@@ -233,11 +233,25 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 			// Ensure stdin is in a clean state for Ink components
 			if (process.stdin.isTTY) {
-				// Flush any pending input to prevent escape sequences from leaking
-				process.stdin.read();
+				// Clear any pending input that might cause dual input boxes
+				while (process.stdin.read()) {
+					// Drain input buffer completely
+				}
+
+				// Force disable focus reporting mode that could cause input conflicts
+				process.stdout.write('\x1b[?1004l');
+
+				// Ensure stdin is properly reset for Ink
 				process.stdin.setRawMode(false);
 				process.stdin.resume();
 				process.stdin.setEncoding('utf8');
+
+				// Small delay to ensure terminal state is settled
+				setTimeout(() => {
+					// Additional cleanup in case of timing issues
+					process.stdin.pause();
+					process.stdin.resume();
+				}, 50);
 			}
 		});
 	};

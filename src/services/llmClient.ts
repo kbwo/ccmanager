@@ -116,7 +116,10 @@ export class LLMClient {
 		}));
 	}
 
-	async analyzeClaudeOutput(output: string): Promise<AutopilotDecision> {
+	async analyzeClaudeOutput(
+		output: string,
+		projectPath?: string,
+	): Promise<AutopilotDecision> {
 		if (!this.isAvailable()) {
 			const provider = PROVIDERS[this.config.provider];
 			return {
@@ -158,7 +161,7 @@ export class LLMClient {
 				this.config.model,
 				apiKey,
 			);
-			const prompt = this.buildAnalysisPrompt(output);
+			const prompt = this.buildAnalysisPrompt(output, projectPath);
 
 			const {text} = await generateText({
 				model,
@@ -188,22 +191,71 @@ export class LLMClient {
 		}
 	}
 
-	private buildAnalysisPrompt(output: string): string {
+	private buildAnalysisPrompt(output: string, projectPath?: string): string {
+		let projectContext = '';
+
+		// Try to read project documentation for context
+		if (projectPath) {
+			try {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const fs = require('fs');
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const path = require('path');
+
+				// Look for common documentation files
+				const docFiles = ['CLAUDE.md', 'README.md', 'package.json'];
+				const foundDocs: string[] = [];
+
+				for (const docFile of docFiles) {
+					const filePath = path.join(projectPath, docFile);
+					if (fs.existsSync(filePath)) {
+						try {
+							const content = fs.readFileSync(filePath, 'utf8');
+							// Limit content to prevent prompt bloat
+							const truncated =
+								content.length > 2000
+									? content.substring(0, 2000) + '...'
+									: content;
+							foundDocs.push(`${docFile}:\n${truncated}`);
+						} catch (_e) {
+							// Ignore read errors
+						}
+					}
+				}
+
+				if (foundDocs.length > 0) {
+					projectContext = `\n\nPROJECT CONTEXT:\n${foundDocs.join('\n\n---\n\n')}`;
+				}
+			} catch (_e) {
+				// Ignore any filesystem errors
+			}
+		}
+
 		return `
 You are an AI assistant monitoring Claude Code sessions. Your job is to detect when Claude needs guidance and provide brief, actionable suggestions.
 
 Analyze this Claude Code terminal output and determine if Claude needs guidance:
 
 TERMINAL OUTPUT:
-${output}
+${output}${projectContext}
 
 Look for patterns indicating Claude needs help:
 - Repetitive behavior or loops
-- Error messages being ignored
+- Error messages being ignored  
 - Confusion or uncertainty in responses
 - Getting stuck on the same task
 - Making the same mistakes repeatedly
 - Overthinking simple problems
+- Not following project conventions or patterns
+- Missing obvious solutions based on project structure
+- Struggling with project-specific tools or frameworks
+
+Enhanced Decision Criteria:
+- Consider project context when evaluating if Claude is stuck
+- Look for signs Claude isn't using available project information
+- Detect when Claude is reinventing solutions that already exist in the project
+- Notice if Claude is struggling with project-specific commands or workflows
+- Be more proactive about offering guidance when patterns suggest Claude could benefit
 
 Respond with JSON in this exact format:
 {
@@ -213,11 +265,13 @@ Respond with JSON in this exact format:
   "reasoning": "Why you made this decision"
 }
 
-Guidelines:
-- Only intervene for clear issues (confidence > 0.7)
-- Keep guidance brief and actionable
-- Don't intervene for normal progress or minor issues
-- Focus on patterns, not single mistakes
+Updated Guidelines:
+- The user has configurable intervention thresholds (typically 0.3-0.7)
+- Be more proactive about helping with project-specific issues
+- Consider context from project documentation
+- Help when Claude seems to be working inefficiently relative to project setup
+- Focus on actionable guidance that leverages project knowledge
+- Provide confidence scores that accurately reflect the certainty of your assessment
 `.trim();
 	}
 

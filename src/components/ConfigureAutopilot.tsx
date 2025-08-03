@@ -15,7 +15,8 @@ type ConfigView =
 	| 'provider'
 	| 'model'
 	| 'openai-key'
-	| 'anthropic-key';
+	| 'anthropic-key'
+	| 'threshold';
 
 interface MenuItem {
 	label: string;
@@ -80,6 +81,10 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 		{
 			label: `E 🤖 Enable Autopilot: ${config?.enabled ? 'ON' : 'OFF'}`,
 			value: 'toggle-enabled',
+		},
+		{
+			label: `T 🎯 Intervention Threshold: ${config?.interventionThreshold?.toFixed(2) || '0.50'}`,
+			value: 'threshold',
 		},
 		{
 			label: `O 🔑 OpenAI API Key: ${config?.apiKeys?.openai ? '***set***' : 'not set'}`,
@@ -152,6 +157,9 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 			}
 		} else if (item.value === 'toggle-enabled') {
 			saveConfig({...config, enabled: !config.enabled});
+		} else if (item.value === 'threshold') {
+			setInputValue(config.interventionThreshold?.toString() || '0.5');
+			setView('threshold');
 		} else if (item.value === 'openai-key') {
 			setInputValue(config.apiKeys?.openai || '');
 			setView('openai-key');
@@ -190,6 +198,10 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 				if (config && hasAnyKeys) {
 					saveConfig({...config, enabled: !config.enabled});
 				}
+				break;
+			case 't':
+				setInputValue(config?.interventionThreshold?.toString() || '0.5');
+				setView('threshold');
 				break;
 			case 'o':
 				setInputValue(config?.apiKeys?.openai || '');
@@ -263,7 +275,11 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 
 	// Handle escape key for API key input views
 	useInput((input, key) => {
-		if (view === 'openai-key' || view === 'anthropic-key') {
+		if (
+			view === 'openai-key' ||
+			view === 'anthropic-key' ||
+			view === 'threshold'
+		) {
 			if (key.escape) {
 				setView('menu');
 			}
@@ -399,6 +415,46 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 
 				<Box marginTop={1}>
 					<Text dimColor>Press Enter to save, Escape to cancel</Text>
+				</Box>
+			</Box>
+		);
+	}
+
+	if (view === 'threshold') {
+		return (
+			<Box flexDirection="column">
+				<Box marginBottom={1}>
+					<Text bold color="green">
+						Intervention Threshold
+					</Text>
+				</Box>
+
+				<Box marginBottom={1}>
+					<Text dimColor>
+						Set confidence threshold for autopilot intervention (0.0 = always
+						intervene, 1.0 = never intervene):
+					</Text>
+				</Box>
+
+				<TextInput
+					value={inputValue}
+					onChange={setInputValue}
+					onSubmit={value => {
+						const threshold = parseFloat(value);
+						if (!isNaN(threshold) && threshold >= 0 && threshold <= 1) {
+							saveConfig({...config, interventionThreshold: threshold});
+							setView('menu');
+						}
+					}}
+					placeholder="0.50"
+					focus={true}
+				/>
+
+				<Box marginTop={1}>
+					<Text dimColor>
+						Enter a value between 0.0 and 1.0. Press Enter to save, Escape to
+						cancel
+					</Text>
 				</Box>
 			</Box>
 		);

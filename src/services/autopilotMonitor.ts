@@ -150,14 +150,36 @@ export class AutopilotMonitor extends EventEmitter {
 			console.log(
 				`📝 Analyzing ${recentOutput.length} characters of output...`,
 			);
-			const decision = await this.llmClient.analyzeClaudeOutput(recentOutput);
+			const decision = await this.llmClient.analyzeClaudeOutput(
+				recentOutput,
+				session.worktreePath,
+			);
 
 			console.log(
 				`🤖 LLM decision: shouldIntervene=${decision.shouldIntervene}, confidence=${decision.confidence}`,
 			);
 
-			if (decision.shouldIntervene && decision.guidance) {
+			// Use configurable intervention threshold
+			const threshold = this.config.interventionThreshold;
+
+			if (
+				decision.shouldIntervene &&
+				decision.confidence >= threshold &&
+				decision.guidance
+			) {
 				this.provideGuidance(session, decision);
+			} else if (decision.shouldIntervene && decision.confidence < threshold) {
+				console.log(
+					`⚠️ Autopilot: intervention suggested but confidence too low (${decision.confidence} < ${threshold})`,
+				);
+			} else if (decision.shouldIntervene && !decision.guidance) {
+				console.log(
+					`⚠️ Autopilot: intervention suggested but no guidance provided`,
+				);
+			} else {
+				console.log(
+					`ℹ️ Autopilot: no intervention needed (shouldIntervene: ${decision.shouldIntervene}, confidence: ${decision.confidence}, reasoning: ${decision.reasoning})`,
+				);
 			}
 
 			this.emit('analysisComplete', session, decision);
@@ -189,13 +211,23 @@ export class AutopilotMonitor extends EventEmitter {
 	}
 
 	private getRecentOutput(session: Session): string {
-		// Get last few lines of output for analysis
-		const recentLines = session.output.slice(-10);
+		// Get more lines for better context (20 instead of 10)
+		const recentLines = session.output.slice(-20);
 		const output = recentLines.join('\n');
 		const stripped = stripAnsi(output);
 		console.log(
 			`📖 Session output: ${session.output.length} lines, recent: ${recentLines.length} lines, stripped: ${stripped.length} chars`,
 		);
+
+		// If output is too short, try to get more context
+		if (stripped.length < 200 && session.output.length > 20) {
+			const moreLines = session.output.slice(-50);
+			const moreOutput = moreLines.join('\n');
+			const moreStripped = stripAnsi(moreOutput);
+			console.log(`📖 Extended context: ${moreStripped.length} chars`);
+			return moreStripped;
+		}
+
 		return stripped;
 	}
 

@@ -78,6 +78,7 @@ vi.mock('../services/configurationManager.js', () => ({
 			model: 'gpt-4.1',
 			maxGuidancesPerHour: 3,
 			analysisDelayMs: 3000,
+			interventionThreshold: 0.5,
 		}),
 		setAutopilotConfig: vi.fn(),
 	},
@@ -388,6 +389,7 @@ describe('Menu component rendering', () => {
 			model: 'gpt-4.1',
 			maxGuidancesPerHour: 3,
 			analysisDelayMs: 3000,
+			interventionThreshold: 0.5,
 			apiKeys: {
 				openai: 'test-key',
 				anthropic: 'test-key-2',
@@ -458,6 +460,7 @@ describe('Menu component rendering', () => {
 			model: 'gpt-4.1',
 			maxGuidancesPerHour: 3,
 			analysisDelayMs: 3000,
+			interventionThreshold: 0.5,
 			apiKeys: {
 				openai: 'test-key',
 				anthropic: 'test-key-2',

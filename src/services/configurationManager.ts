@@ -99,6 +99,7 @@ export class ConfigurationManager {
 				model: 'gpt-4.1',
 				maxGuidancesPerHour: 3,
 				analysisDelayMs: 3000,
+				interventionThreshold: 0.5,
 				apiKeys: {},
 			};
 		}
@@ -106,6 +107,11 @@ export class ConfigurationManager {
 		// Ensure apiKeys object exists for existing configs
 		if (!this.config.autopilot.apiKeys) {
 			this.config.autopilot.apiKeys = {};
+		}
+
+		// Migrate legacy configs without interventionThreshold
+		if (typeof this.config.autopilot.interventionThreshold === 'undefined') {
+			this.config.autopilot.interventionThreshold = 0.5;
 		}
 	}
 
@@ -329,6 +335,7 @@ export class ConfigurationManager {
 				model: 'gpt-4.1',
 				maxGuidancesPerHour: 3,
 				analysisDelayMs: 3000,
+				interventionThreshold: 0.5, // Default moderate threshold
 				apiKeys: {},
 			}
 		);

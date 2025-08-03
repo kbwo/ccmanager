@@ -37,6 +37,7 @@ describe('LLMClient', () => {
 			model: 'gpt-4.1',
 			maxGuidancesPerHour: 3,
 			analysisDelayMs: 3000,
+			interventionThreshold: 0.5,
 			apiKeys: {
 				openai: 'test-openai-key',
 				anthropic: 'test-anthropic-key',
@@ -238,6 +239,7 @@ describe('LLMClient', () => {
 				model: 'claude-4-sonnet',
 				maxGuidancesPerHour: 5,
 				analysisDelayMs: 2000,
+				interventionThreshold: 0.7,
 				apiKeys: {
 					anthropic: 'test-anthropic-key',
 				},

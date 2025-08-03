@@ -91,6 +91,7 @@ describe('ConfigureAutopilot component', () => {
 		model: 'gpt-4.1',
 		maxGuidancesPerHour: 3,
 		analysisDelayMs: 3000,
+		interventionThreshold: 0.5,
 		apiKeys: {
 			openai: 'test-openai-key',
 			anthropic: 'test-anthropic-key',

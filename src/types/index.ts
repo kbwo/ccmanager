@@ -108,6 +108,7 @@ export interface AutopilotConfig {
 	model: string;
 	maxGuidancesPerHour: number;
 	analysisDelayMs: number;
+	interventionThreshold: number; // Confidence threshold for intervention (0.0 = always intervene, 1.0 = never intervene)
 	apiKeys: {
 		openai?: string;
 		anthropic?: string;
