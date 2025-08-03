@@ -12,6 +12,7 @@ import {
 	AutopilotConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
+import {PatternLibrary} from './guidance/patternLibrary.js';
 
 export class ConfigurationManager {
 	private configPath: string;
@@ -101,6 +102,10 @@ export class ConfigurationManager {
 				analysisDelayMs: 3000,
 				interventionThreshold: 0.5,
 				apiKeys: {},
+				patterns: {
+					enabled: true,
+					...PatternLibrary.getDefaultConfig(),
+				},
 			};
 		}
 
@@ -112,6 +117,14 @@ export class ConfigurationManager {
 		// Migrate legacy configs without interventionThreshold
 		if (typeof this.config.autopilot.interventionThreshold === 'undefined') {
 			this.config.autopilot.interventionThreshold = 0.5;
+		}
+
+		// Ensure pattern config exists for existing autopilot configs
+		if (!this.config.autopilot.patterns) {
+			this.config.autopilot.patterns = {
+				enabled: true,
+				...PatternLibrary.getDefaultConfig(),
+			};
 		}
 	}
 

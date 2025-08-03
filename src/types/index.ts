@@ -113,6 +113,7 @@ export interface AutopilotConfig {
 		openai?: string;
 		anthropic?: string;
 	};
+	patterns?: PatternConfig; // Pattern-based guidance configuration
 }
 
 export interface AutopilotDecision {
@@ -245,4 +246,56 @@ export interface IWorktreeService {
 		error?: string;
 		deletedWorktree?: boolean;
 	};
+}
+
+// Pattern Detection System Interfaces
+export interface DetectionPattern {
+	id: string;
+	name: string;
+	description: string;
+	category: PatternCategory;
+	priority: PatternPriority;
+	pattern: RegExp;
+	guidance: string;
+	enabled: boolean;
+	minMatches?: number; // Minimum matches required to trigger
+	cooldownMs?: number; // Cooldown period for this specific pattern
+}
+
+export type PatternCategory =
+	| 'repetitive_behavior'
+	| 'error_detection'
+	| 'overthinking'
+	| 'code_quality'
+	| 'git_workflow'
+	| 'security'
+	| 'performance';
+
+export type PatternPriority = 'critical' | 'high' | 'medium' | 'low';
+
+export interface PatternMatch {
+	pattern: DetectionPattern;
+	matches: RegExpMatchArray[];
+	confidence: number;
+	timestamp: Date;
+	severity: PatternPriority;
+}
+
+export interface ThrottleEntry {
+	patternId: string;
+	lastTriggered: Date;
+	triggerCount: number;
+	category: PatternCategory;
+}
+
+export interface PatternConfig {
+	enabled: boolean;
+	categories: Record<PatternCategory, boolean>;
+	throttling: {
+		maxGuidancesPerHour: number;
+		minSpacingMs: number;
+		patternRepeatLimit: number;
+		criticalBypassThrottling: boolean;
+	};
+	sensitivity: Record<PatternPriority, number>; // 0.0 to 1.0 threshold
 }
