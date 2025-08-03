@@ -192,11 +192,13 @@ describe('column alignment', () => {
 			fileChanges: '\x1b[32m+10\x1b[0m \x1b[31m-5\x1b[0m',
 			aheadBehind: '\x1b[33m↑2 ↓3\x1b[0m',
 			parentBranch: '',
+			projectContext: '[react/ts]',
 			lengths: {
 				base: 19, // 'feature/test-branch'.length
 				fileChanges: 6, // '+10 -5'.length
 				aheadBehind: 5, // '↑2 ↓3'.length
 				parentBranch: 0,
+				projectContext: 10, // '[react/ts]'.length
 			},
 		},
 		{
@@ -205,18 +207,21 @@ describe('column alignment', () => {
 			fileChanges: '\x1b[32m+2\x1b[0m \x1b[31m-1\x1b[0m',
 			aheadBehind: '\x1b[33m↑1\x1b[0m',
 			parentBranch: '',
+			projectContext: '[node/js]',
 			lengths: {
 				base: 4, // 'main'.length
 				fileChanges: 5, // '+2 -1'.length
 				aheadBehind: 2, // '↑1'.length
 				parentBranch: 0,
+				projectContext: 9, // '[node/js]'.length
 			},
 		},
 	];
 
 	it('should calculate column positions from items', () => {
 		const positions = calculateColumnPositions(mockItems);
-		expect(positions.fileChanges).toBe(21); // 19 + 2 padding
+		expect(positions.projectContext).toBe(21); // 19 + 2 padding
+		expect(positions.fileChanges).toBeGreaterThan(positions.projectContext);
 		expect(positions.aheadBehind).toBeGreaterThan(positions.fileChanges);
 		expect(positions.parentBranch).toBeGreaterThan(positions.aheadBehind);
 	});

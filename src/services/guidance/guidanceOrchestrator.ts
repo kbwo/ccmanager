@@ -5,6 +5,7 @@ import type {
 	AutopilotConfig,
 } from '../../types/index.js';
 import {BaseLLMGuidanceSource} from './baseLLMGuidanceSource.js';
+import {ContextAwareGuidanceSource} from './contextAwareGuidanceSource.js';
 
 /**
  * Orchestrates multiple guidance sources to provide intelligent, layered analysis
@@ -17,7 +18,10 @@ export class GuidanceOrchestrator {
 	constructor(config: AutopilotConfig) {
 		this.config = config;
 
-		// Initialize with base LLM source
+		// Initialize with context-aware source (higher priority)
+		this.addSource(new ContextAwareGuidanceSource(config));
+
+		// Initialize with base LLM source (fallback)
 		this.addSource(new BaseLLMGuidanceSource(config));
 	}
 
@@ -205,6 +209,12 @@ export class GuidanceOrchestrator {
 	 */
 	updateConfig(config: AutopilotConfig): void {
 		this.config = config;
+
+		// Update context-aware source if it exists
+		const contextAwareSource = this.sources.get('context-aware') as ContextAwareGuidanceSource;
+		if (contextAwareSource) {
+			contextAwareSource.updateConfig(config);
+		}
 
 		// Update base LLM source if it exists
 		const baseLLMSource = this.sources.get('base-llm') as BaseLLMGuidanceSource;

@@ -173,6 +173,7 @@ export interface ConfigurationData {
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
 	autopilot?: AutopilotConfig;
+	contextAware?: ContextAwareConfig; // Context-aware intelligence config
 }
 
 // Multi-project support interfaces
@@ -245,4 +246,47 @@ export interface IWorktreeService {
 		error?: string;
 		deletedWorktree?: boolean;
 	};
+}
+
+// Context-Aware Intelligence Types (PR#4)
+export interface ProjectType {
+	framework: 'react' | 'node' | 'typescript' | 'vue' | 'next' | 'express' | 'nestjs' | 'unknown';
+	language: 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'unknown';
+	buildSystem: 'npm' | 'yarn' | 'pnpm' | 'webpack' | 'vite' | 'rollup' | 'unknown';
+	testFramework?: 'jest' | 'vitest' | 'mocha' | 'cypress' | 'playwright';
+	patterns: ArchitecturalPattern[];
+}
+
+export interface ArchitecturalPattern {
+	type: 'mvc' | 'component-based' | 'microservice' | 'monorepo';
+	confidence: number;
+	indicators: string[];
+}
+
+export interface ProjectContext {
+	projectType: ProjectType;
+	gitStatus?: GitStatus;
+	recentFiles: string[];
+	hasTests: boolean;
+	hasDocumentation: boolean;
+	dependencies: string[];
+	devDependencies: string[];
+	cacheTimestamp?: Date;
+}
+
+export interface CompliancePattern {
+	id: string;
+	pattern: RegExp | string;
+	severity: 'error' | 'warning' | 'info';
+	message: string;
+	category: 'security' | 'performance' | 'maintainability' | 'style';
+	framework?: string;
+}
+
+export interface ContextAwareConfig {
+	enabled: boolean;
+	enableFrameworkDetection: boolean;
+	enableGitIntegration: boolean;
+	cacheIntervalMinutes: number;
+	frameworkPatterns: Record<string, CompliancePattern[]>;
 }
