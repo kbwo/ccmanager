@@ -4,29 +4,31 @@ import type {
 	AutopilotConfig,
 	AutopilotDecision,
 	AutopilotMonitorState,
+	AnalysisContext,
+	GuidanceResult,
 } from '../types/index.js';
-import {LLMClient} from './llmClient.js';
+import {GuidanceOrchestrator} from './guidance/guidanceOrchestrator.js';
 import stripAnsi from 'strip-ansi';
 
 export class AutopilotMonitor extends EventEmitter {
-	private llmClient: LLMClient;
+	private guidanceOrchestrator: GuidanceOrchestrator;
 	private config: AutopilotConfig;
 
 	constructor(config: AutopilotConfig) {
 		super();
 		this.config = config;
-		this.llmClient = new LLMClient(config);
+		this.guidanceOrchestrator = new GuidanceOrchestrator(config);
 	}
 
 	isLLMAvailable(): boolean {
-		const available = this.llmClient.isAvailable();
-		console.log(`🔌 LLM availability check: ${available}`);
+		const available = this.guidanceOrchestrator.isAvailable();
+		console.log(`🔌 Guidance orchestrator availability check: ${available}`);
 		return available;
 	}
 
 	updateConfig(config: AutopilotConfig): void {
 		this.config = config;
-		this.llmClient.updateConfig(config);
+		this.guidanceOrchestrator.updateConfig(config);
 	}
 
 	enable(session: Session): void {
@@ -105,11 +107,9 @@ export class AutopilotMonitor extends EventEmitter {
 			return;
 		}
 
-		// Only analyze when Claude Code has finished responding
-		// Trigger analysis when transitioning from 'busy' to 'waiting_input' or 'idle'
-		const shouldAnalyze =
-			oldState === 'busy' &&
-			(newState === 'waiting_input' || newState === 'idle');
+		// Only analyze when Claude Code has finished responding and is idle
+		// NOT when Claude is waiting for user input (that's not the right time for guidance)
+		const shouldAnalyze = oldState === 'busy' && newState === 'idle';
 
 		if (shouldAnalyze) {
 			console.log(`🎯 Autopilot triggered: ${oldState} → ${newState}`);
@@ -119,7 +119,7 @@ export class AutopilotMonitor extends EventEmitter {
 			}, this.config.analysisDelayMs);
 		} else {
 			console.log(
-				`⚠️ Autopilot not triggered: ${oldState} → ${newState} (need busy → waiting_input/idle)`,
+				`⚠️ Autopilot not triggered: ${oldState} → ${newState} (need busy → idle)`,
 			);
 		}
 	}
@@ -150,13 +150,24 @@ export class AutopilotMonitor extends EventEmitter {
 			console.log(
 				`📝 Analyzing ${recentOutput.length} characters of output...`,
 			);
-			const decision = await this.llmClient.analyzeClaudeOutput(
-				recentOutput,
-				session.worktreePath,
-			);
+
+			// Create analysis context for orchestrator
+			const context: AnalysisContext = {
+				terminalOutput: recentOutput,
+				projectPath: session.worktreePath,
+				sessionState: session.state,
+				worktreePath: session.worktreePath,
+			};
+
+			// Use guidance orchestrator instead of direct LLM client
+			const guidanceResult =
+				await this.guidanceOrchestrator.generateGuidance(context);
+
+			// Convert back to AutopilotDecision for backward compatibility
+			const decision = this.convertGuidanceResultToDecision(guidanceResult);
 
 			console.log(
-				`🤖 LLM decision: shouldIntervene=${decision.shouldIntervene}, confidence=${decision.confidence}`,
+				`🤖 Guidance decision: shouldIntervene=${decision.shouldIntervene}, confidence=${decision.confidence}, source=${guidanceResult.source}`,
 			);
 
 			// Use configurable intervention threshold
@@ -247,6 +258,27 @@ export class AutopilotMonitor extends EventEmitter {
 		session.autopilotState.lastGuidanceTime = new Date();
 
 		this.emit('guidanceProvided', session, decision);
+	}
+
+	/**
+	 * Convert GuidanceResult back to AutopilotDecision for backward compatibility
+	 */
+	private convertGuidanceResultToDecision(
+		guidanceResult: GuidanceResult,
+	): AutopilotDecision {
+		return {
+			shouldIntervene: guidanceResult.shouldIntervene,
+			confidence: guidanceResult.confidence,
+			guidance: guidanceResult.guidance,
+			reasoning: guidanceResult.reasoning,
+		};
+	}
+
+	/**
+	 * Get debug information about the guidance orchestrator
+	 */
+	getGuidanceDebugInfo(): object {
+		return this.guidanceOrchestrator.getDebugInfo();
 	}
 
 	destroy(): void {

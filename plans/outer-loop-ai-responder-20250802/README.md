@@ -10,9 +10,10 @@ plans/outer-loop-ai-responder-20250802/
 ├── 00-autopilot-overview.md       # Feature overview and concept
 ├── 01-implementation-plan.md      # Complete implementation roadmap
 ├── 02-pr1-basic-autopilot.md     # PR1: Basic auto-pilot core (3 days)
-├── 03-pr2-pattern-guidance.md    # PR2: Pattern-based guidance (2 days)
-├── 04-pr3-context-awareness.md   # PR3: Context-aware intelligence (2 days)
+├── 03-pr2-guide-prompt.md        # PR2: User guide prompt & self-updating (5 days)
+├── 04-pr3-pattern-guidance.md    # PR3: Pattern-based guidance (2 days)
 ├── 05-context-aware-pr-feature.md # Context-aware PR creation design (4 days)
+├── 05-pr4-context-awareness.md   # PR4: Context-aware intelligence (2 days)
 ├── 06-modular-architecture.md    # Modular design for portability
 └── 07-extended-roadmap.md        # Advanced PRs for complete system
 ```
@@ -23,30 +24,26 @@ plans/outer-loop-ai-responder-20250802/
 **Ready-to-ship auto-pilot for CCManager**
 
 - **PR1**: Basic auto-pilot toggle and LLM monitoring
-- **PR2**: Fast pattern detection and smart guidance  
-- **PR3**: Context-aware intelligence and project understanding
-- **Result**: Working auto-pilot that helps Claude Code sessions stay productive
+- **PR2**: User guide prompts with self-updating intelligence
+- **PR3**: Fast pattern detection and smart guidance  
+- **PR4**: Context-aware intelligence and project understanding
+- **Result**: Working auto-pilot that learns user preferences and helps Claude Code sessions stay productive
 
-### **Phase 2: Modular System** (Weeks 3-4)
-**Portable, extensible intelligence platform**
+### **Phase 2: Workflow Automation** (Weeks 3-4)
+**Context-aware workflow automation and enhanced intelligence**
 
-- **PR4**: Plugin system and advanced framework patterns
-- **PR5**: Multi-session intelligence coordination
-- **PR6**: Learning and adaptation from user feedback  
-- **Result**: Sophisticated system that improves over time and works across projects
+- **PR5**: Context-aware PR creation design
+- **PR6**: Plugin system and advanced framework patterns
+- **PR7**: Multi-session intelligence coordination
+- **Result**: Automated workflow assistance with intelligent PR creation
 
 ### **Phase 3: Production Platform** (Weeks 5-6)
 **Enterprise-ready intelligent development assistant**
 
-- **PR7**: Analytics dashboard and performance insights
-- **PR8**: Advanced LLM providers and code generation capabilities
+- **PR8**: Advanced learning and adaptation from user feedback
+- **PR9**: Analytics dashboard and performance insights
+- **PR10**: Advanced LLM providers and code generation capabilities
 - **Result**: Comprehensive platform ready for team deployment
-
-### **Phase 4: Workflow Automation** (Week 7)
-**Context-aware workflow automation and PR creation**
-
-- **PR9**: Context-aware PR creation with session analysis and compliance validation
-- **Result**: Complete workflow automation that transforms session insights into actionable PRs
 
 ## ✈️ Auto-pilot Quick Start
 
@@ -104,23 +101,19 @@ autopilot.on('guidanceProvided', handleGuidance);
 ### **For MVP Implementation** (Weeks 1-2)
 1. **Start**: `00-autopilot-overview.md` - Understand the concept
 2. **Plan**: `01-implementation-plan.md` - Review complete roadmap  
-3. **Implement**: `02-pr1` → `03-pr2` → `04-pr3` - Follow PR sequence
+3. **Implement**: `02-pr1` → `03-pr2` → `04-pr3` → `05-pr4` - Follow PR sequence
 4. **Deploy**: Ready-to-ship auto-pilot feature!
 
-### **For Modular System** (Weeks 3-4)
-1. **Architecture**: `06-modular-architecture.md` - Understand modular design
-2. **Advanced Features**: `07-extended-roadmap.md` - Review PR4-PR6 plans
-3. **Implement**: Follow extended PR sequence for plugins and coordination
+### **For Workflow Automation** (Weeks 3-4)
+1. **Context-Aware PRs**: `05-context-aware-pr-feature.md` - Detailed design and implementation plan
+2. **Architecture**: `06-modular-architecture.md` - Understand modular design
+3. **Advanced Features**: `07-extended-roadmap.md` - Review PR6-PR7 plans
+4. **Implement**: Follow extended PR sequence for plugins and coordination
 
 ### **For Production Platform** (Weeks 5-6)  
-1. **Analytics**: `07-extended-roadmap.md` - PR7 analytics implementation
-2. **Advanced AI**: `07-extended-roadmap.md` - PR8 multi-provider support
+1. **Analytics**: `07-extended-roadmap.md` - PR9 analytics implementation
+2. **Advanced AI**: `07-extended-roadmap.md` - PR10 multi-provider support
 3. **Deploy**: Enterprise-ready intelligent development platform
-
-### **For Workflow Automation** (Week 7)
-1. **Context-Aware PRs**: `05-context-aware-pr-feature.md` - Detailed design and implementation plan
-2. **GitHub Integration**: `07-extended-roadmap.md` - PR9 implementation guide
-3. **Deploy**: Complete workflow automation with PR creation capabilities
 
 ## 🎯 Key Benefits
 

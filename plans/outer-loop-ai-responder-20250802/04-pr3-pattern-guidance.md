@@ -1,4 +1,4 @@
-# PR2: Pattern-Based Guidance
+# PR3: Pattern-Based Guidance
 
 ## 🎯 Goal
 Add fast pattern recognition for common Claude Code issues and smart guidance delivery.

@@ -1,4 +1,4 @@
-# PR3: Context-Aware Intelligence
+# PR4: Context-Aware Intelligence
 
 ## 🎯 Goal
 Make auto-pilot aware of project context to provide smarter, framework-specific guidance and enable future workflow automation features like context-aware PR creation.

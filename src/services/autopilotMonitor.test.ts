@@ -3,17 +3,22 @@ import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
 import {AutopilotMonitor} from './autopilotMonitor.js';
 import type {Session, AutopilotConfig} from '../types/index.js';
 
-// Mock LLMClient
-vi.mock('./llmClient.js', () => ({
-	LLMClient: vi.fn().mockImplementation(() => ({
+// Mock GuidanceOrchestrator
+vi.mock('./guidance/guidanceOrchestrator.js', () => ({
+	GuidanceOrchestrator: vi.fn().mockImplementation(() => ({
 		isAvailable: vi.fn().mockReturnValue(true),
 		updateConfig: vi.fn(),
-		getCurrentProviderName: vi.fn().mockReturnValue('OpenAI'),
-		getSupportedModels: vi.fn().mockReturnValue(['gpt-4.1', 'o4-mini', 'o3']),
-		analyzeClaudeOutput: vi.fn().mockResolvedValue({
+		getDebugInfo: vi.fn().mockReturnValue({
+			sourceCount: 1,
+			sources: [{id: 'base-llm', priority: 100, canShortCircuit: false}],
+			isAvailable: true,
+		}),
+		generateGuidance: vi.fn().mockResolvedValue({
 			shouldIntervene: false,
 			confidence: 0.3,
 			reasoning: 'No intervention needed',
+			source: 'base-llm',
+			priority: 100,
 		}),
 	})),
 }));
@@ -110,13 +115,15 @@ describe('AutopilotMonitor', () => {
 	describe('rate limiting', () => {
 		beforeEach(() => {
 			autopilotMonitor.enable(mockSession);
-			// Mock the analyzeClaudeOutput to return intervention
-			const llmClient = (autopilotMonitor as any).llmClient;
-			llmClient.analyzeClaudeOutput.mockResolvedValue({
+			// Mock the guidance orchestrator to return intervention
+			const orchestrator = (autopilotMonitor as any).guidanceOrchestrator;
+			orchestrator.generateGuidance.mockResolvedValue({
 				shouldIntervene: true,
 				guidance: 'Test guidance',
 				confidence: 0.8,
 				reasoning: 'Test reasoning',
+				source: 'base-llm',
+				priority: 100,
 			});
 		});
 
@@ -147,12 +154,14 @@ describe('AutopilotMonitor', () => {
 
 	describe('guidance provision', () => {
 		it('should provide guidance to session when intervention is needed', async () => {
-			const llmClient = (autopilotMonitor as any).llmClient;
-			llmClient.analyzeClaudeOutput.mockResolvedValue({
+			const orchestrator = (autopilotMonitor as any).guidanceOrchestrator;
+			orchestrator.generateGuidance.mockResolvedValue({
 				shouldIntervene: true,
 				guidance: 'Try a different approach',
 				confidence: 0.9,
 				reasoning: 'Claude seems stuck',
+				source: 'base-llm',
+				priority: 100,
 			});
 
 			autopilotMonitor.enable(mockSession);
@@ -167,11 +176,13 @@ describe('AutopilotMonitor', () => {
 		});
 
 		it('should not provide guidance when no intervention is needed', async () => {
-			const llmClient = (autopilotMonitor as any).llmClient;
-			llmClient.analyzeClaudeOutput.mockResolvedValue({
+			const orchestrator = (autopilotMonitor as any).guidanceOrchestrator;
+			orchestrator.generateGuidance.mockResolvedValue({
 				shouldIntervene: false,
 				confidence: 0.3,
 				reasoning: 'Everything looks fine',
+				source: 'base-llm',
+				priority: 100,
 			});
 
 			autopilotMonitor.enable(mockSession);
@@ -185,7 +196,7 @@ describe('AutopilotMonitor', () => {
 	});
 
 	describe('state change triggering', () => {
-		it('should trigger analysis when state changes from busy to waiting_input', async () => {
+		it('should NOT trigger analysis when state changes from busy to waiting_input', async () => {
 			autopilotMonitor.enable(mockSession);
 
 			// Spy on analyzeSession method
@@ -194,17 +205,17 @@ describe('AutopilotMonitor', () => {
 				'analyzeSession',
 			);
 
-			// Simulate state change from busy to waiting_input (should trigger)
+			// Simulate state change from busy to waiting_input (should NOT trigger)
 			autopilotMonitor.onSessionStateChanged(
 				mockSession,
 				'busy',
 				'waiting_input',
 			);
 
-			// Wait for the delayed analysis
+			// Wait to ensure no delayed analysis
 			await new Promise(resolve => setTimeout(resolve, 1100));
 
-			expect(analyzeSessionSpy).toHaveBeenCalledWith(mockSession);
+			expect(analyzeSessionSpy).not.toHaveBeenCalled();
 		});
 
 		it('should trigger analysis when state changes from busy to idle', async () => {
@@ -275,9 +286,9 @@ describe('AutopilotMonitor', () => {
 	});
 
 	describe('error handling', () => {
-		it('should handle LLM analysis errors gracefully', async () => {
-			const llmClient = (autopilotMonitor as any).llmClient;
-			llmClient.analyzeClaudeOutput.mockRejectedValue(new Error('API Error'));
+		it('should handle guidance orchestrator errors gracefully', async () => {
+			const orchestrator = (autopilotMonitor as any).guidanceOrchestrator;
+			orchestrator.generateGuidance.mockRejectedValue(new Error('API Error'));
 
 			const errorSpy = vi.fn();
 			autopilotMonitor.on('analysisError', errorSpy);

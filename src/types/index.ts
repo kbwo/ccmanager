@@ -129,6 +129,43 @@ export interface AutopilotMonitorState {
 	analysisInProgress: boolean;
 }
 
+// Guidance Orchestration System Interfaces
+export interface AnalysisContext {
+	terminalOutput: string;
+	projectPath?: string;
+	sessionState: SessionState;
+	worktreePath: string;
+	userHistory?: UserInputPattern[];
+	metadata?: Record<string, unknown>;
+}
+
+export interface GuidanceResult {
+	shouldIntervene: boolean;
+	confidence: number;
+	guidance?: string;
+	reasoning: string;
+	source: string;
+	priority: number;
+	metadata?: Record<string, unknown>;
+}
+
+export interface GuidanceSource {
+	readonly id: string;
+	readonly priority: number;
+	readonly canShortCircuit: boolean;
+
+	analyze(context: AnalysisContext): Promise<GuidanceResult>;
+}
+
+export interface UserInputPattern {
+	sessionId: string;
+	timestamp: Date;
+	input: string;
+	context: string;
+	inputType: 'instruction' | 'correction' | 'question';
+	isGuidanceRelated?: boolean;
+}
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;

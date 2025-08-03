@@ -2,13 +2,13 @@
 
 ## 🚀 Final Implementation Plan
 
-**Ready-to-ship auto-pilot feature for CCManager in 1-2 weeks**
+**Ready-to-ship auto-pilot feature for CCManager in 2-3 weeks**
 
 Clean, focused implementation that adds intelligent LLM-based guidance to Claude Code sessions with minimal code changes and maximum user value.
 
 ## 📋 Complete Implementation Roadmap
 
-### Week 1: Core Auto-pilot (5 days)
+### Week 1: Core Auto-pilot (8 days)
 
 **PR1: Basic Auto-pilot Core** (3 days)
 - ✈️ Auto-pilot toggle with `'p'` keystroke
@@ -16,21 +16,27 @@ Clean, focused implementation that adds intelligent LLM-based guidance to Claude
 - Simple intervention delivery to PTY terminal
 - Status indicator: `✈️ Auto-pilot: ACTIVE/STANDBY`
 
-**PR2: Pattern-Based Guidance** (2 days)
+**PR2: User Guide Prompt & Self-Updating** (5 days)
+- 🎨 Configurable guide prompts for personalized guidance
+- 🧠 LLM-based pattern learning from user interactions
+- 🔄 Self-updating prompts that evolve with user behavior
+- 🔒 Privacy controls with user review and approval
+
+### Week 2: Advanced Intelligence (4 days)
+
+**PR3: Pattern-Based Guidance** (2 days)
 - ⚡ Lightning-fast pattern detection (< 10ms)
 - 🚨 Error detection with immediate guidance
 - 🤔 Overthinking detection and progress nudges
 - Smart throttling: max 3 guidances/hour, critical always allowed
 
-### Week 2: Intelligence & Polish (5 days)
-
-**PR3: Context-Aware Intelligence** (2 days)  
+**PR4: Context-Aware Intelligence** (2 days)  
 - 🔍 Project type detection (React, Node.js, TypeScript, etc.)
 - 🛠 Framework-specific guidance patterns
 - 📊 Git status awareness and file change context
 - 🎯 Targeted guidance based on project characteristics
 
-**Testing & Polish** (3 days)
+### Week 3: Testing & Polish (3 days)
 - Comprehensive testing across project types
 - Performance optimization and error handling
 - Documentation and user experience refinement
