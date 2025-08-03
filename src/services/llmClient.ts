@@ -193,6 +193,15 @@ export class LLMClient {
 
 	private buildAnalysisPrompt(output: string, projectPath?: string): string {
 		let projectContext = '';
+		let userGuidance = '';
+
+		// Add user's custom guidance if available
+		if (this.config.guidePrompt) {
+			userGuidance = `\n\nUSER'S GUIDANCE INSTRUCTIONS:
+${this.config.guidePrompt}
+
+Focus guidance on these user preferences while maintaining general helpfulness.`;
+		}
 
 		// Try to read project documentation for context
 		if (projectPath) {
@@ -237,7 +246,7 @@ You are an AI assistant monitoring Claude Code sessions. Your job is to detect w
 Analyze this Claude Code terminal output and determine if Claude needs guidance:
 
 TERMINAL OUTPUT:
-${output}${projectContext}
+${output}${projectContext}${userGuidance}
 
 Look for patterns indicating Claude needs help:
 - Repetitive behavior or loops

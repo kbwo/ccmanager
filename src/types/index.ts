@@ -109,6 +109,8 @@ export interface AutopilotConfig {
 	maxGuidancesPerHour: number;
 	analysisDelayMs: number;
 	interventionThreshold: number; // Confidence threshold for intervention (0.0 = always intervene, 1.0 = never intervene)
+	guidePrompt?: string; // Manual guidance instructions from user
+	learningConfig?: LearningConfig; // Self-updating intelligence configuration
 	apiKeys: {
 		openai?: string;
 		anthropic?: string;
@@ -164,6 +166,23 @@ export interface UserInputPattern {
 	context: string;
 	inputType: 'instruction' | 'correction' | 'question';
 	isGuidanceRelated?: boolean;
+}
+
+export interface LearningConfig {
+	enabled: boolean; // Opt-in learning
+	approvalRequired: boolean; // Always true for now
+	retentionDays: number; // Default 30 days
+	minPatternConfidence: number; // Default 0.7
+}
+
+export interface LearnedPattern {
+	id: string;
+	category: 'style' | 'workflow' | 'testing' | 'architecture' | 'communication';
+	instruction: string;
+	confidence: number;
+	frequency: number;
+	lastSeen: Date;
+	approved: boolean;
 }
 
 export interface ConfigurationData {
