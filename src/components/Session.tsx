@@ -175,15 +175,25 @@ const Session: React.FC<SessionProps> = ({
 				shortcutManager.getShortcutCode(returnToMenuShortcut);
 
 			if (shortcutCode && data === shortcutCode) {
-				// Disable focus reporting mode before returning to menu
-				if (stdout) {
-					stdout.write('\x1b[?1004l');
-				}
-				// Restore stdin state before returning to menu
+				// Comprehensive cleanup before returning to menu
 				stdin.removeListener('data', handleStdinData);
+
+				// Disable focus reporting mode and clear terminal modes
+				if (stdout) {
+					stdout.write('\x1b[?1004l'); // Disable focus reporting
+					stdout.write('\x1b[?1006l'); // Disable SGR mouse mode
+					stdout.write('\x1b[?1015l'); // Disable urxvt mouse mode
+					stdout.write('\x1b[?1002l'); // Disable button event mouse tracking
+				}
+
+				// Completely drain and reset stdin
 				stdin.setRawMode(false);
 				stdin.pause();
-				onReturnToMenu();
+
+				// Small delay to ensure cleanup is complete before returning
+				setTimeout(() => {
+					onReturnToMenu();
+				}, 10);
 				return;
 			}
 

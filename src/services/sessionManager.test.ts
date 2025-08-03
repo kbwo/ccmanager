@@ -1179,6 +1179,7 @@ describe('SessionManager', () => {
 				model: 'gpt-4',
 				maxGuidancesPerHour: 5,
 				analysisDelayMs: 2000,
+				interventionThreshold: 0.5,
 				apiKeys: {
 					openai: 'test-key',
 				},

@@ -35,6 +35,7 @@ describe('AutopilotMonitor', () => {
 			model: 'gpt-4.1',
 			maxGuidancesPerHour: 3,
 			analysisDelayMs: 1000,
+			interventionThreshold: 0.5,
 			apiKeys: {
 				openai: 'test-openai-key',
 				anthropic: 'test-anthropic-key',
@@ -261,6 +262,7 @@ describe('AutopilotMonitor', () => {
 				model: 'claude-4-sonnet',
 				maxGuidancesPerHour: 5,
 				analysisDelayMs: 2000,
+				interventionThreshold: 0.7,
 				apiKeys: {
 					anthropic: 'test-anthropic-key',
 				},
