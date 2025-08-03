@@ -16,7 +16,9 @@ type ConfigView =
 	| 'model'
 	| 'openai-key'
 	| 'anthropic-key'
-	| 'threshold';
+	| 'threshold'
+	| 'guide-prompt'
+	| 'learning-config';
 
 interface MenuItem {
 	label: string;
@@ -81,6 +83,14 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 		{
 			label: `E 🤖 Enable Autopilot: ${config?.enabled ? 'ON' : 'OFF'}`,
 			value: 'toggle-enabled',
+		},
+		{
+			label: `G 📝 Guide Prompt: ${config?.guidePrompt ? 'configured' : 'not set'}`,
+			value: 'guide-prompt',
+		},
+		{
+			label: `L 🧠 Learning: ${config?.learningConfig?.enabled ? 'ENABLED' : 'DISABLED'}`,
+			value: 'learning-config',
 		},
 		{
 			label: `T 🎯 Intervention Threshold: ${config?.interventionThreshold?.toFixed(2) || '0.50'}`,
@@ -157,6 +167,11 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 			}
 		} else if (item.value === 'toggle-enabled') {
 			saveConfig({...config, enabled: !config.enabled});
+		} else if (item.value === 'guide-prompt') {
+			setInputValue(config.guidePrompt || '');
+			setView('guide-prompt');
+		} else if (item.value === 'learning-config') {
+			setView('learning-config');
 		} else if (item.value === 'threshold') {
 			setInputValue(config.interventionThreshold?.toString() || '0.5');
 			setView('threshold');
@@ -198,6 +213,13 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 				if (config && hasAnyKeys) {
 					saveConfig({...config, enabled: !config.enabled});
 				}
+				break;
+			case 'g':
+				setInputValue(config?.guidePrompt || '');
+				setView('guide-prompt');
+				break;
+			case 'l':
+				setView('learning-config');
 				break;
 			case 't':
 				setInputValue(config?.interventionThreshold?.toString() || '0.5');
@@ -273,12 +295,14 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 		setView('menu');
 	};
 
-	// Handle escape key for API key input views
+	// Handle escape key for input views
 	useInput((input, key) => {
 		if (
 			view === 'openai-key' ||
 			view === 'anthropic-key' ||
-			view === 'threshold'
+			view === 'threshold' ||
+			view === 'guide-prompt' ||
+			view === 'learning-config'
 		) {
 			if (key.escape) {
 				setView('menu');
@@ -410,6 +434,128 @@ const ConfigureAutopilot: React.FC<ConfigureAutopilotProps> = ({
 					onChange={setInputValue}
 					onSubmit={value => handleApiKeySubmit(value, 'anthropic')}
 					placeholder="sk-ant-..."
+					focus={true}
+				/>
+
+				<Box marginTop={1}>
+					<Text dimColor>Press Enter to save, Escape to cancel</Text>
+				</Box>
+			</Box>
+		);
+	}
+
+	if (view === 'learning-config') {
+		const learningItems = [
+			{
+				label: `Enable Learning: ${config?.learningConfig?.enabled ? 'ON' : 'OFF'}`,
+				value: 'toggle-learning',
+			},
+			{
+				label: `Retention Days: ${config?.learningConfig?.retentionDays || 30} (auto-cleanup old patterns)`,
+				value: 'retention-days',
+			},
+			{
+				label: `Min Confidence: ${config?.learningConfig?.minPatternConfidence || 0.7} (pattern quality threshold)`,
+				value: 'min-confidence',
+			},
+			{
+				label: '← Back to Main Menu',
+				value: 'back',
+			},
+		];
+
+		return (
+			<Box flexDirection="column">
+				<Box marginBottom={1}>
+					<Text bold color="green">
+						Learning Configuration
+					</Text>
+				</Box>
+
+				<Box marginBottom={1}>
+					<Text dimColor>
+						Configure how autopilot learns from your guidance patterns:
+					</Text>
+				</Box>
+
+				{!config?.learningConfig?.enabled && (
+					<Box marginBottom={1}>
+						<Text color="yellow">
+							⚠️ Learning is disabled. Enable to start tracking guidance
+							patterns.
+						</Text>
+					</Box>
+				)}
+
+				<SelectInput
+					items={learningItems}
+					onSelect={item => {
+						if (!config) return;
+
+						if (item.value === 'back') {
+							setView('menu');
+						} else if (item.value === 'toggle-learning') {
+							const learningConfig = config.learningConfig || {
+								enabled: false,
+								approvalRequired: false,
+								retentionDays: 30,
+								minPatternConfidence: 0.7,
+							};
+							saveConfig({
+								...config,
+								learningConfig: {
+									...learningConfig,
+									enabled: !learningConfig.enabled,
+								},
+							});
+						}
+						// Note: retention-days and min-confidence would need text input views
+						// For now, they're display-only
+					}}
+					isFocused={true}
+				/>
+
+				<Box marginTop={1}>
+					<Text dimColor>
+						Learning automatically tracks your guidance patterns and improves
+						the guide prompt. Patterns are auto-approved when confidence meets
+						the threshold.
+					</Text>
+				</Box>
+			</Box>
+		);
+	}
+
+	if (view === 'guide-prompt') {
+		return (
+			<Box flexDirection="column">
+				<Box marginBottom={1}>
+					<Text bold color="green">
+						Guide Prompt
+					</Text>
+				</Box>
+
+				<Box marginBottom={1}>
+					<Text dimColor>
+						Enter custom guidance instructions for autopilot:
+					</Text>
+				</Box>
+
+				<Box marginBottom={1}>
+					<Text dimColor>
+						Examples: Always check for existing utility functions, Prefer
+						TypeScript strict mode, Write tests first
+					</Text>
+				</Box>
+
+				<TextInput
+					value={inputValue}
+					onChange={setInputValue}
+					onSubmit={value => {
+						saveConfig({...config, guidePrompt: value.trim() || undefined});
+						setView('menu');
+					}}
+					placeholder="Enter guidance instructions..."
 					focus={true}
 				/>
 
