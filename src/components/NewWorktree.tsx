@@ -6,6 +6,7 @@ import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {useSearchMode} from '../hooks/useSearchMode.js';
 
 interface NewWorktreeProps {
 	onComplete: (
@@ -56,7 +57,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	}, []); // Empty deps array - only initialize once
 
 	// Create branch items with default branch first (memoized)
-	const branchItems: BranchItem[] = useMemo(
+	const allBranchItems: BranchItem[] = useMemo(
 		() => [
 			{label: `${defaultBranch} (default)`, value: defaultBranch},
 			...branches
@@ -66,9 +67,30 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 		[branches, defaultBranch],
 	);
 
+	// Use search mode for base branch selection
+	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
+		useSearchMode(allBranchItems.length, {
+			isDisabled: step !== 'base-branch',
+		});
+
+	// Filter branch items based on search query
+	const branchItems = useMemo(() => {
+		if (!searchQuery) return allBranchItems;
+		return allBranchItems.filter(item =>
+			item.value.toLowerCase().includes(searchQuery.toLowerCase()),
+		);
+	}, [allBranchItems, searchQuery]);
+
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
+		}
+
+		// Handle arrow key navigation in search mode for base branch selection
+		if (step === 'base-branch' && isSearchMode) {
+			// Don't handle any keys here - let useSearchMode handle them
+			// The hook will handle arrow keys for navigation and Enter to exit search mode
+			return;
 		}
 	});
 
@@ -192,12 +214,48 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 							Select base branch for <Text color="cyan">{branch}</Text>:
 						</Text>
 					</Box>
-					<SelectInput
-						items={branchItems}
-						onSelect={handleBaseBranchSelect}
-						initialIndex={0}
-						limit={10}
-					/>
+					{isSearchMode && (
+						<Box marginBottom={1}>
+							<Text>Search: </Text>
+							<TextInputWrapper
+								value={searchQuery}
+								onChange={setSearchQuery}
+								focus={true}
+								placeholder="Type to filter branches..."
+							/>
+						</Box>
+					)}
+					{isSearchMode && branchItems.length === 0 ? (
+						<Box>
+							<Text color="yellow">No branches match your search</Text>
+						</Box>
+					) : isSearchMode ? (
+						// In search mode, show the items as a list without SelectInput
+						<Box flexDirection="column">
+							{branchItems.map((item, index) => (
+								<Text
+									key={item.value}
+									color={index === selectedIndex ? 'green' : undefined}
+								>
+									{index === selectedIndex ? '❯ ' : '  '}
+									{item.label}
+								</Text>
+							))}
+						</Box>
+					) : (
+						<SelectInput
+							items={branchItems}
+							onSelect={handleBaseBranchSelect}
+							initialIndex={selectedIndex}
+							limit={10}
+							isFocused={!isSearchMode}
+						/>
+					)}
+					{!isSearchMode && (
+						<Box marginTop={1}>
+							<Text dimColor>Press / to search</Text>
+						</Box>
+					)}
 				</Box>
 			)}
 
