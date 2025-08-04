@@ -34,6 +34,7 @@ interface BranchItem {
 const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	const worktreeConfig = configurationManager.getWorktreeConfig();
 	const isAutoDirectory = worktreeConfig.autoDirectory;
+	const limit = 10;
 
 	// Adjust initial step based on auto directory mode
 	const [step, setStep] = useState<Step>(isAutoDirectory ? 'branch' : 'path');
@@ -232,7 +233,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 					) : isSearchMode ? (
 						// In search mode, show the items as a list without SelectInput
 						<Box flexDirection="column">
-							{branchItems.map((item, index) => (
+							{branchItems.slice(0, limit).map((item, index) => (
 								<Text
 									key={item.value}
 									color={index === selectedIndex ? 'green' : undefined}
@@ -247,7 +248,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 							items={branchItems}
 							onSelect={handleBaseBranchSelect}
 							initialIndex={selectedIndex}
-							limit={10}
+							limit={limit}
 							isFocused={!isSearchMode}
 						/>
 					)}

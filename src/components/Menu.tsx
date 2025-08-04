@@ -83,6 +83,7 @@ const Menu: React.FC<MenuProps> = ({
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+	const limit = 10;
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -491,7 +492,7 @@ const Menu: React.FC<MenuProps> = ({
 			) : isSearchMode ? (
 				// In search mode, show the items as a list without SelectInput
 				<Box flexDirection="column">
-					{items.map((item, index) => (
+					{items.slice(0, limit).map((item, index) => (
 						<Text
 							key={item.value}
 							color={index === selectedIndex ? 'green' : undefined}
@@ -507,6 +508,7 @@ const Menu: React.FC<MenuProps> = ({
 					onSelect={item => handleSelect(item as MenuItem)}
 					isFocused={!error}
 					initialIndex={selectedIndex}
+					limit={limit}
 				/>
 			)}
 
