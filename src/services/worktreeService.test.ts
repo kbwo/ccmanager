@@ -1,7 +1,9 @@
-import {describe, it, expect, beforeEach, vi} from 'vitest';
+import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
 import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
+import {configurationManager} from './configurationManager.js';
+import {HookExecutor} from '../utils/hookExecutor.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -18,10 +20,28 @@ vi.mock('./worktreeConfigManager.js', () => ({
 	},
 }));
 
+// Mock configurationManager
+vi.mock('./configurationManager.js', () => ({
+	configurationManager: {
+		getWorktreeHooks: vi.fn(),
+	},
+}));
+
+// Mock HookExecutor
+vi.mock('../utils/hookExecutor.js', () => ({
+	HookExecutor: {
+		executeWorktreePostCreationHook: vi.fn(),
+	},
+}));
+
 // Get the mocked function with proper typing
 const mockedExecSync = vi.mocked(execSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
+const mockedGetWorktreeHooks = vi.mocked(configurationManager.getWorktreeHooks);
+const mockedExecuteHook = vi.mocked(
+	HookExecutor.executeWorktreePostCreationHook,
+);
 
 describe('WorktreeService', () => {
 	let service: WorktreeService;
@@ -35,6 +55,8 @@ describe('WorktreeService', () => {
 			}
 			throw new Error('Command not mocked: ' + cmd);
 		});
+		// Default mock for getWorktreeHooks to return empty config
+		mockedGetWorktreeHooks.mockReturnValue({});
 		service = new WorktreeService('/fake/path');
 	});
 
@@ -507,6 +529,192 @@ branch refs/heads/other-branch
 
 			expect(result).toBe(true);
 			expect(existsSync).toHaveBeenCalledWith('/fake/path/.claude');
+		});
+	});
+
+	describe('Worktree Hook Execution', () => {
+		afterEach(() => {
+			vi.clearAllMocks();
+		});
+
+		it('should execute post-creation hook when worktree is created', async () => {
+			// Arrange
+			const hookCommand = 'echo "Worktree created: $CCMANAGER_WORKTREE_PATH"';
+			mockedGetWorktreeHooks.mockReturnValue({
+				post_creation: {
+					command: hookCommand,
+					enabled: true,
+				},
+			});
+
+			mockedExecuteHook.mockResolvedValue(undefined);
+
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('git worktree list')) {
+						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+					if (cmd.includes('git rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+				}
+				return '';
+			});
+
+			// Act
+			const result = service.createWorktree(
+				'feature-branch-dir',
+				'feature-branch',
+				'main',
+				false,
+				false,
+			);
+
+			// Assert
+			expect(result.success).toBe(true);
+			expect(mockedGetWorktreeHooks).toHaveBeenCalled();
+			expect(mockedExecuteHook).toHaveBeenCalledWith(
+				hookCommand,
+				expect.objectContaining({
+					path: '/fake/path/feature-branch-dir',
+					branch: 'feature-branch',
+					isMainWorktree: false,
+					hasSession: false,
+				}),
+				'/fake/path',
+				'main',
+			);
+		});
+
+		it('should not execute hook when disabled', () => {
+			// Arrange
+			mockedGetWorktreeHooks.mockReturnValue({
+				post_creation: {
+					command: 'echo "Should not run"',
+					enabled: false,
+				},
+			});
+
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('git worktree list')) {
+						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+					if (cmd.includes('git rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+				}
+				return '';
+			});
+
+			// Act
+			const result = service.createWorktree(
+				'feature-branch-dir',
+				'feature-branch',
+				'main',
+				false,
+				false,
+			);
+
+			// Assert
+			expect(result.success).toBe(true);
+			expect(mockedGetWorktreeHooks).toHaveBeenCalled();
+			expect(mockedExecuteHook).not.toHaveBeenCalled();
+		});
+
+		it('should not execute hook when not configured', () => {
+			// Arrange
+			mockedGetWorktreeHooks.mockReturnValue({});
+
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('git worktree list')) {
+						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+					if (cmd.includes('git rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+				}
+				return '';
+			});
+
+			// Act
+			const result = service.createWorktree(
+				'feature-branch-dir',
+				'feature-branch',
+				'main',
+				false,
+				false,
+			);
+
+			// Assert
+			expect(result.success).toBe(true);
+			expect(mockedGetWorktreeHooks).toHaveBeenCalled();
+			expect(mockedExecuteHook).not.toHaveBeenCalled();
+		});
+
+		it('should not fail worktree creation if hook execution fails', async () => {
+			// Arrange
+			mockedGetWorktreeHooks.mockReturnValue({
+				post_creation: {
+					command: 'failing-command',
+					enabled: true,
+				},
+			});
+
+			mockedExecuteHook.mockRejectedValue(new Error('Hook failed'));
+
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('git worktree list')) {
+						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+					if (cmd.includes('git rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+				}
+				return '';
+			});
+
+			// Act
+			const result = service.createWorktree(
+				'feature-branch-dir',
+				'feature-branch',
+				'main',
+				false,
+				false,
+			);
+
+			// Allow async operations to complete
+			await new Promise(resolve => setTimeout(resolve, 10));
+
+			// Assert
+			expect(result.success).toBe(true);
+			expect(mockedExecuteHook).toHaveBeenCalled();
 		});
 	});
 });
