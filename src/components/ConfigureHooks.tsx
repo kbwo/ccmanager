@@ -3,13 +3,18 @@ import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
-import {StatusHookConfig, SessionState} from '../types/index.js';
+import {
+	StatusHookConfig,
+	WorktreeHookConfig,
+	SessionState,
+} from '../types/index.js';
 
 interface ConfigureHooksProps {
 	onComplete: () => void;
 }
 
 type View = 'menu' | 'edit';
+type HookType = 'status' | 'worktree';
 
 interface MenuItem {
 	label: string;
@@ -25,13 +30,16 @@ const STATUS_LABELS: Record<SessionState, string> = {
 const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 	const [view, setView] = useState<View>('menu');
 	const [selectedStatus, setSelectedStatus] = useState<SessionState>('idle');
-	const [hooks, setHooks] = useState<StatusHookConfig>({});
+	const [selectedHookType, setSelectedHookType] = useState<HookType>('status');
+	const [statusHooks, setStatusHooks] = useState<StatusHookConfig>({});
+	const [worktreeHooks, setWorktreeHooks] = useState<WorktreeHookConfig>({});
 	const [currentCommand, setCurrentCommand] = useState('');
 	const [currentEnabled, setCurrentEnabled] = useState(false);
 	const [showSaveMessage, setShowSaveMessage] = useState(false);
 
 	useEffect(() => {
-		setHooks(configurationManager.getStatusHooks());
+		setStatusHooks(configurationManager.getStatusHooks());
+		setWorktreeHooks(configurationManager.getWorktreeHooks());
 	}, []);
 
 	useInput((input, key) => {
@@ -49,20 +57,45 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 	const getMenuItems = (): MenuItem[] => {
 		const items: MenuItem[] = [];
 
+		// Add section header for status hooks
+		items.push({
+			label: '━━━ Status Change Hooks ━━━',
+			value: 'status_header',
+		});
+
 		// Add status hook items
 		(['idle', 'busy', 'waiting_input'] as SessionState[]).forEach(status => {
-			const hook = hooks[status];
+			const hook = statusHooks[status];
 			const enabled = hook?.enabled ? '✓' : '✗';
 			const command = hook?.command || '(not set)';
 			items.push({
 				label: `${STATUS_LABELS[status]}: ${enabled} ${command}`,
-				value: status,
+				value: `status:${status}`,
 			});
 		});
 
+		// Add section header for worktree hooks
 		items.push({
-			label: '─────────────',
-			value: 'separator',
+			label: '',
+			value: 'separator1',
+		});
+		items.push({
+			label: '━━━ Worktree Hooks ━━━',
+			value: 'worktree_header',
+		});
+
+		// Add worktree hook items
+		const postCreationHook = worktreeHooks.post_creation;
+		const postCreationEnabled = postCreationHook?.enabled ? '✓' : '✗';
+		const postCreationCommand = postCreationHook?.command || '(not set)';
+		items.push({
+			label: `Post Creation: ${postCreationEnabled} ${postCreationCommand}`,
+			value: 'worktree:post_creation',
+		});
+
+		items.push({
+			label: '',
+			value: 'separator2',
 		});
 
 		items.push({
@@ -80,31 +113,54 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 
 	const handleMenuSelect = (item: MenuItem) => {
 		if (item.value === 'save') {
-			configurationManager.setStatusHooks(hooks);
+			configurationManager.setStatusHooks(statusHooks);
+			configurationManager.setWorktreeHooks(worktreeHooks);
 			setShowSaveMessage(true);
 			setTimeout(() => {
 				onComplete();
 			}, 1000);
 		} else if (item.value === 'cancel') {
 			onComplete();
-		} else if (item.value !== 'separator') {
-			const status = item.value as SessionState;
-			setSelectedStatus(status);
-			const hook = hooks[status];
-			setCurrentCommand(hook?.command || '');
-			setCurrentEnabled(hook?.enabled ?? true); // Default to true if not set
-			setView('edit');
+		} else if (
+			!item.value.includes('separator') &&
+			!item.value.includes('header')
+		) {
+			if (item.value.startsWith('status:')) {
+				const status = item.value.split(':')[1] as SessionState;
+				setSelectedStatus(status);
+				setSelectedHookType('status');
+				const hook = statusHooks[status];
+				setCurrentCommand(hook?.command || '');
+				setCurrentEnabled(hook?.enabled ?? true);
+				setView('edit');
+			} else if (item.value === 'worktree:post_creation') {
+				setSelectedHookType('worktree');
+				const hook = worktreeHooks.post_creation;
+				setCurrentCommand(hook?.command || '');
+				setCurrentEnabled(hook?.enabled ?? true);
+				setView('edit');
+			}
 		}
 	};
 
 	const handleCommandSubmit = (value: string) => {
-		setHooks(prev => ({
-			...prev,
-			[selectedStatus]: {
-				command: value,
-				enabled: currentEnabled,
-			},
-		}));
+		if (selectedHookType === 'status') {
+			setStatusHooks(prev => ({
+				...prev,
+				[selectedStatus]: {
+					command: value,
+					enabled: currentEnabled,
+				},
+			}));
+		} else if (selectedHookType === 'worktree') {
+			setWorktreeHooks(prev => ({
+				...prev,
+				post_creation: {
+					command: value,
+					enabled: currentEnabled,
+				},
+			}));
+		}
 		setView('menu');
 	};
 
@@ -125,14 +181,17 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 			<Box flexDirection="column">
 				<Box marginBottom={1}>
 					<Text bold color="green">
-						Configure {STATUS_LABELS[selectedStatus]} Hook
+						{selectedHookType === 'status'
+							? `Configure ${STATUS_LABELS[selectedStatus]} Hook`
+							: 'Configure Post Worktree Creation Hook'}
 					</Text>
 				</Box>
 
 				<Box marginBottom={1}>
 					<Text>
-						Command to execute when status changes to{' '}
-						{STATUS_LABELS[selectedStatus]}:
+						{selectedHookType === 'status'
+							? `Command to execute when status changes to ${STATUS_LABELS[selectedStatus]}:`
+							: 'Command to execute after creating a new worktree:'}
 					</Text>
 				</Box>
 
@@ -151,17 +210,34 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 					</Text>
 				</Box>
 
-				<Box marginTop={1}>
-					<Text dimColor>
-						Environment variables available: CCMANAGER_OLD_STATE,
-						CCMANAGER_NEW_STATE,
-					</Text>
-				</Box>
-				<Box>
-					<Text dimColor>
-						CCMANAGER_WORKTREE, CCMANAGER_WORKTREE_BRANCH, CCMANAGER_SESSION_ID
-					</Text>
-				</Box>
+				{selectedHookType === 'status' ? (
+					<>
+						<Box marginTop={1}>
+							<Text dimColor>
+								Environment variables available: CCMANAGER_OLD_STATE,
+								CCMANAGER_NEW_STATE,
+							</Text>
+						</Box>
+						<Box>
+							<Text dimColor>
+								CCMANAGER_WORKTREE, CCMANAGER_WORKTREE_BRANCH,
+								CCMANAGER_SESSION_ID
+							</Text>
+						</Box>
+					</>
+				) : (
+					<>
+						<Box marginTop={1}>
+							<Text dimColor>
+								Environment variables available: CCMANAGER_WORKTREE,
+								CCMANAGER_WORKTREE_BRANCH,
+							</Text>
+						</Box>
+						<Box>
+							<Text dimColor>CCMANAGER_BASE_BRANCH, CCMANAGER_GIT_ROOT</Text>
+						</Box>
+					</>
+				)}
 
 				<Box marginTop={1}>
 					<Text dimColor>
@@ -176,14 +252,12 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Configure Status Change Hooks
+					Configure Hooks
 				</Text>
 			</Box>
 
 			<Box marginBottom={1}>
-				<Text dimColor>
-					Set commands to run when Claude Code session status changes:
-				</Text>
+				<Text dimColor>Set commands to run on various events:</Text>
 			</Box>
 
 			<SelectInput

@@ -4,6 +4,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
 import {
 	ConfigurationData,
 	StatusHookConfig,
+	WorktreeHookConfig,
 	ShortcutConfig,
 	WorktreeConfig,
 	CommandConfig,
@@ -66,6 +67,9 @@ export class ConfigurationManager {
 		}
 		if (!this.config.statusHooks) {
 			this.config.statusHooks = {};
+		}
+		if (!this.config.worktreeHooks) {
+			this.config.worktreeHooks = {};
 		}
 		if (!this.config.worktree) {
 			this.config.worktree = {
@@ -135,6 +139,15 @@ export class ConfigurationManager {
 
 	setStatusHooks(hooks: StatusHookConfig): void {
 		this.config.statusHooks = hooks;
+		this.saveConfig();
+	}
+
+	getWorktreeHooks(): WorktreeHookConfig {
+		return this.config.worktreeHooks || {};
+	}
+
+	setWorktreeHooks(hooks: WorktreeHookConfig): void {
+		this.config.worktreeHooks = hooks;
 		this.saveConfig();
 	}
 

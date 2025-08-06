@@ -69,6 +69,15 @@ export interface StatusHookConfig {
 	waiting_input?: StatusHook;
 }
 
+export interface WorktreeHook {
+	command: string;
+	enabled: boolean;
+}
+
+export interface WorktreeHookConfig {
+	post_creation?: WorktreeHook;
+}
+
 export interface WorktreeConfig {
 	autoDirectory: boolean;
 	autoDirectoryPattern?: string; // Optional pattern for directory generation
@@ -104,6 +113,7 @@ export interface DevcontainerConfig {
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
+	worktreeHooks?: WorktreeHookConfig;
 	worktree?: WorktreeConfig;
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
