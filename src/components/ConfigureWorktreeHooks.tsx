@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
@@ -20,14 +20,12 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 	onComplete,
 }) => {
 	const [view, setView] = useState<View>('menu');
-	const [worktreeHooks, setWorktreeHooks] = useState<WorktreeHookConfig>({});
+	const [worktreeHooks, setWorktreeHooks] = useState<WorktreeHookConfig>(
+		configurationManager.getWorktreeHooks(),
+	);
 	const [currentCommand, setCurrentCommand] = useState('');
 	const [currentEnabled, setCurrentEnabled] = useState(false);
 	const [showSaveMessage, setShowSaveMessage] = useState(false);
-
-	useEffect(() => {
-		setWorktreeHooks(configurationManager.getWorktreeHooks());
-	}, []);
 
 	useInput((input, key) => {
 		if (key.escape) {

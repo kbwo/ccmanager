@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
@@ -27,14 +27,12 @@ const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
 }) => {
 	const [view, setView] = useState<View>('menu');
 	const [selectedStatus, setSelectedStatus] = useState<SessionState>('idle');
-	const [statusHooks, setStatusHooks] = useState<StatusHookConfig>({});
+	const [statusHooks, setStatusHooks] = useState<StatusHookConfig>(
+		configurationManager.getStatusHooks(),
+	);
 	const [currentCommand, setCurrentCommand] = useState('');
 	const [currentEnabled, setCurrentEnabled] = useState(false);
 	const [showSaveMessage, setShowSaveMessage] = useState(false);
-
-	useEffect(() => {
-		setStatusHooks(configurationManager.getStatusHooks());
-	}, []);
 
 	useInput((input, key) => {
 		if (key.escape) {
