@@ -23,6 +23,16 @@ The `post_creation` hook is executed after a new worktree is successfully create
 }
 ```
 
+## Execution Context
+
+By default, hooks are executed in the newly created worktree directory. This means your commands will run with the worktree path as the current working directory.
+
+If you need to execute commands in the git root directory instead, you can use the `CCMANAGER_GIT_ROOT` environment variable:
+
+```bash
+cd "$CCMANAGER_GIT_ROOT" && your-command-here
+```
+
 ## Environment Variables
 
 When a worktree hook is executed, the following environment variables are available:
@@ -48,7 +58,7 @@ osascript -e "display notification \"Branch: $CCMANAGER_WORKTREE_BRANCH\" with t
 
 ```bash
 #!/bin/bash
-cd "$CCMANAGER_WORKTREE_PATH"
+# Note: Already running in the worktree directory
 
 # Install dependencies
 npm install
@@ -66,9 +76,9 @@ echo "Development environment ready for $CCMANAGER_WORKTREE_BRANCH"
 
 ```bash
 #!/bin/bash
-# Create VS Code workspace settings
-mkdir -p "$CCMANAGER_WORKTREE_PATH/.vscode"
-cat > "$CCMANAGER_WORKTREE_PATH/.vscode/settings.json" << EOF
+# Create VS Code workspace settings (already in worktree directory)
+mkdir -p .vscode
+cat > .vscode/settings.json << EOF
 {
   "window.title": "\${activeEditorShort} - $CCMANAGER_WORKTREE_BRANCH",
   "workbench.colorCustomizations": {
@@ -82,7 +92,7 @@ EOF
 
 ```bash
 #!/bin/bash
-cd "$CCMANAGER_WORKTREE_PATH"
+# Already in worktree directory
 
 # Set branch-specific git config
 git config user.email "branch-$CCMANAGER_WORKTREE_BRANCH@example.com"
@@ -106,13 +116,31 @@ curl -X POST https://api.example.com/tasks \
   }"
 ```
 
+### 6. Working with Git Root Directory
+
+```bash
+#!/bin/bash
+# Example: Update a shared configuration file in the git root
+
+# Switch to git root directory
+cd "$CCMANAGER_GIT_ROOT"
+
+# Update a tracking file
+echo "$CCMANAGER_WORKTREE_BRANCH: $CCMANAGER_WORKTREE_PATH" >> .worktrees.txt
+
+# Return to worktree for local setup
+cd "$CCMANAGER_WORKTREE_PATH"
+npm install
+```
+
 ## Best Practices
 
 1. **Keep hooks fast**: Hooks should complete quickly to avoid delaying the worktree creation process
 2. **Handle errors gracefully**: Hook failures won't prevent worktree creation, but should log meaningful errors
-3. **Use absolute paths**: Always use absolute paths in your scripts, don't rely on relative paths
-4. **Check for dependencies**: Verify required tools are installed before using them
-5. **Make hooks idempotent**: Hooks should be safe to run multiple times
+3. **Know your working directory**: Hooks execute in the worktree directory by default; use `cd "$CCMANAGER_GIT_ROOT"` if you need to work in the git root
+4. **Use environment variables**: Prefer `$CCMANAGER_WORKTREE_PATH` and `$CCMANAGER_GIT_ROOT` over hardcoded paths
+5. **Check for dependencies**: Verify required tools are installed before using them
+6. **Make hooks idempotent**: Hooks should be safe to run multiple times
 
 ## Debugging
 
