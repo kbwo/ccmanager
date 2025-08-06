@@ -2,7 +2,8 @@ import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import ConfigureShortcuts from './ConfigureShortcuts.js';
-import ConfigureHooks from './ConfigureHooks.js';
+import ConfigureStatusHooks from './ConfigureStatusHooks.js';
+import ConfigureWorktreeHooks from './ConfigureWorktreeHooks.js';
 import ConfigureWorktree from './ConfigureWorktree.js';
 import ConfigureCommand from './ConfigureCommand.js';
 import {shortcutManager} from '../services/shortcutManager.js';
@@ -11,7 +12,13 @@ interface ConfigurationProps {
 	onComplete: () => void;
 }
 
-type ConfigView = 'menu' | 'shortcuts' | 'hooks' | 'worktree' | 'command';
+type ConfigView =
+	| 'menu'
+	| 'shortcuts'
+	| 'statusHooks'
+	| 'worktreeHooks'
+	| 'worktree'
+	| 'command';
 
 interface MenuItem {
 	label: string;
@@ -28,7 +35,11 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 		},
 		{
 			label: 'H 🔧  Configure Status Hooks',
-			value: 'hooks',
+			value: 'statusHooks',
+		},
+		{
+			label: 'T 🔨  Configure Worktree Hooks',
+			value: 'worktreeHooks',
 		},
 		{
 			label: 'W 📁  Configure Worktree Settings',
@@ -49,8 +60,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			onComplete();
 		} else if (item.value === 'shortcuts') {
 			setView('shortcuts');
-		} else if (item.value === 'hooks') {
-			setView('hooks');
+		} else if (item.value === 'statusHooks') {
+			setView('statusHooks');
+		} else if (item.value === 'worktreeHooks') {
+			setView('worktreeHooks');
 		} else if (item.value === 'worktree') {
 			setView('worktree');
 		} else if (item.value === 'command') {
@@ -73,7 +86,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 				setView('shortcuts');
 				break;
 			case 'h':
-				setView('hooks');
+				setView('statusHooks');
+				break;
+			case 't':
+				setView('worktreeHooks');
 				break;
 			case 'w':
 				setView('worktree');
@@ -96,8 +112,12 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 		return <ConfigureShortcuts onComplete={handleSubMenuComplete} />;
 	}
 
-	if (view === 'hooks') {
-		return <ConfigureHooks onComplete={handleSubMenuComplete} />;
+	if (view === 'statusHooks') {
+		return <ConfigureStatusHooks onComplete={handleSubMenuComplete} />;
+	}
+
+	if (view === 'worktreeHooks') {
+		return <ConfigureWorktreeHooks onComplete={handleSubMenuComplete} />;
 	}
 
 	if (view === 'worktree') {

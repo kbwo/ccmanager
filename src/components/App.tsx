@@ -247,7 +247,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		});
 	};
 
-	const handleCreateWorktree = async (
+	const handleCreateWorktree = (
 		path: string,
 		branch: string,
 		baseBranch: string,
