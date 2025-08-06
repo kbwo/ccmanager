@@ -3,7 +3,7 @@ import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
 import {configurationManager} from './configurationManager.js';
-import {HookExecutor} from '../utils/hookExecutor.js';
+import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -29,9 +29,7 @@ vi.mock('./configurationManager.js', () => ({
 
 // Mock HookExecutor
 vi.mock('../utils/hookExecutor.js', () => ({
-	HookExecutor: {
-		executeWorktreePostCreationHook: vi.fn(),
-	},
+	executeWorktreePostCreationHook: vi.fn(),
 }));
 
 // Get the mocked function with proper typing
@@ -39,9 +37,7 @@ const mockedExecSync = vi.mocked(execSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
 const mockedGetWorktreeHooks = vi.mocked(configurationManager.getWorktreeHooks);
-const mockedExecuteHook = vi.mocked(
-	HookExecutor.executeWorktreePostCreationHook,
-);
+const mockedExecuteHook = vi.mocked(executeWorktreePostCreationHook);
 
 describe('WorktreeService', () => {
 	let service: WorktreeService;

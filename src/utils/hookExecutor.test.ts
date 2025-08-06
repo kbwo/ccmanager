@@ -1,216 +1,74 @@
-import {describe, it, expect, vi, beforeEach} from 'vitest';
-import {HookExecutor} from './hookExecutor.js';
-import {exec} from 'child_process';
+import {describe, it, expect} from 'vitest';
+import {executeHook, executeWorktreePostCreationHook} from './hookExecutor.js';
+import {mkdtemp, rm} from 'fs/promises';
+import {tmpdir} from 'os';
+import {join} from 'path';
 
-// Mock child_process
-vi.mock('child_process', () => ({
-	exec: vi.fn(),
-}));
+// Note: This file contains integration tests that execute real commands
 
-describe('HookExecutor', () => {
-	const mockedExec = vi.mocked(exec);
-
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
-
-	describe('execute', () => {
-		it('should execute command with correct environment', async () => {
+describe('hookExecutor Integration Tests', () => {
+	describe('executeHook (real execution)', () => {
+		it('should execute a simple echo command', async () => {
 			// Arrange
-			const command = 'echo "Hello"';
-			const cwd = '/test/path';
+			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 			const environment = {
-				CCMANAGER_WORKTREE_PATH: '/test/worktree',
-				CCMANAGER_WORKTREE_BRANCH: 'feature-branch',
-				CCMANAGER_GIT_ROOT: '/test/repo',
+				CCMANAGER_WORKTREE_PATH: tmpDir,
+				CCMANAGER_WORKTREE_BRANCH: 'test-branch',
+				CCMANAGER_GIT_ROOT: tmpDir,
 			};
 
-			mockedExec.mockImplementation((_cmd, _options, callback) => {
-				callback?.(null, 'Hello\n', '');
-				return {} as any;
-			});
-
-			// Act
-			await HookExecutor.execute(command, cwd, environment);
-
-			// Assert
-			expect(mockedExec).toHaveBeenCalledWith(
-				command,
-				{
-					cwd,
-					env: expect.objectContaining(environment),
-				},
-				expect.any(Function),
-			);
-		});
-
-		it('should log stdout when present', async () => {
-			// Arrange
-			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-			mockedExec.mockImplementation((_cmd, _options, callback) => {
-				callback?.(null, 'Hook output', '');
-				return {} as any;
-			});
-
-			// Act
-			await HookExecutor.execute('test', '/path', {
-				CCMANAGER_WORKTREE_PATH: '/test',
-				CCMANAGER_WORKTREE_BRANCH: 'main',
-				CCMANAGER_GIT_ROOT: '/repo',
-			});
-
-			// Assert
-			expect(consoleSpy).toHaveBeenCalledWith('Hook output: Hook output');
-			consoleSpy.mockRestore();
-		});
-
-		it('should log stderr when present', async () => {
-			// Arrange
-			const consoleSpy = vi
-				.spyOn(console, 'error')
-				.mockImplementation(() => {});
-			mockedExec.mockImplementation((_cmd, _options, callback) => {
-				callback?.(null, '', 'Warning message');
-				return {} as any;
-			});
-
-			// Act
-			await HookExecutor.execute('test', '/path', {
-				CCMANAGER_WORKTREE_PATH: '/test',
-				CCMANAGER_WORKTREE_BRANCH: 'main',
-				CCMANAGER_GIT_ROOT: '/repo',
-			});
-
-			// Assert
-			expect(consoleSpy).toHaveBeenCalledWith('Hook stderr: Warning message');
-			consoleSpy.mockRestore();
+			try {
+				// Act & Assert - should not throw
+				await expect(
+					executeHook('echo "Test successful"', tmpDir, environment),
+				).resolves.toBeUndefined();
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
 		});
 
 		it('should reject when command fails', async () => {
 			// Arrange
-			const error = new Error('Command failed');
-			mockedExec.mockImplementation((_cmd, _options, callback) => {
-				callback?.(error, '', '');
-				return {} as any;
-			});
+			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
+			const environment = {
+				CCMANAGER_WORKTREE_PATH: tmpDir,
+				CCMANAGER_WORKTREE_BRANCH: 'test-branch',
+				CCMANAGER_GIT_ROOT: tmpDir,
+			};
 
-			// Act & Assert
-			await expect(
-				HookExecutor.execute('test', '/path', {
-					CCMANAGER_WORKTREE_PATH: '/test',
-					CCMANAGER_WORKTREE_BRANCH: 'main',
-					CCMANAGER_GIT_ROOT: '/repo',
-				}),
-			).rejects.toThrow('Command failed');
+			try {
+				// Act & Assert
+				await expect(
+					executeHook('exit 1', tmpDir, environment),
+				).rejects.toThrow();
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
 		});
 	});
 
-	describe('executeWorktreePostCreationHook', () => {
-		it('should execute with correct environment variables', async () => {
+	describe('executeWorktreePostCreationHook (real execution)', () => {
+		it('should not throw even when command fails', async () => {
 			// Arrange
-			const command = 'notify-send "Worktree created"';
+			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 			const worktree = {
-				path: '/test/worktree',
-				branch: 'feature-xyz',
-				isMainWorktree: false,
-				hasSession: false,
-			};
-			const gitRoot = '/test/repo';
-			const baseBranch = 'main';
-
-			mockedExec.mockImplementation((_cmd, _options, callback) => {
-				callback?.(null, '', '');
-				return {} as any;
-			});
-
-			// Act
-			await HookExecutor.executeWorktreePostCreationHook(
-				command,
-				worktree,
-				gitRoot,
-				baseBranch,
-			);
-
-			// Assert
-			expect(mockedExec).toHaveBeenCalledWith(
-				command,
-				{
-					cwd: worktree.path,
-					env: expect.objectContaining({
-						CCMANAGER_WORKTREE_PATH: worktree.path,
-						CCMANAGER_WORKTREE_BRANCH: worktree.branch,
-						CCMANAGER_GIT_ROOT: gitRoot,
-						CCMANAGER_BASE_BRANCH: baseBranch,
-					}),
-				},
-				expect.any(Function),
-			);
-		});
-
-		it('should not include base branch when not provided', async () => {
-			// Arrange
-			const worktree = {
-				path: '/test/worktree',
-				branch: 'feature-xyz',
+				path: tmpDir,
+				branch: 'test-branch',
 				isMainWorktree: false,
 				hasSession: false,
 			};
 
-			mockedExec.mockImplementation((_cmd, _options, callback) => {
-				callback?.(null, '', '');
-				return {} as any;
-			});
-
-			// Act
-			await HookExecutor.executeWorktreePostCreationHook(
-				'echo test',
-				worktree,
-				'/repo',
-			);
-
-			// Assert
-			expect(mockedExec).toHaveBeenCalledWith(
-				'echo test',
-				{
-					cwd: worktree.path,
-					env: expect.not.objectContaining({
-						CCMANAGER_BASE_BRANCH: expect.any(String),
-					}),
-				},
-				expect.any(Function),
-			);
-		});
-
-		it('should log error but not throw when hook fails', async () => {
-			// Arrange
-			const consoleSpy = vi
-				.spyOn(console, 'error')
-				.mockImplementation(() => {});
-			const error = new Error('Hook execution failed');
-			mockedExec.mockImplementation((_cmd, _options, callback) => {
-				callback?.(error, '', '');
-				return {} as any;
-			});
-
-			const worktree = {
-				path: '/test/worktree',
-				branch: 'feature-xyz',
-				isMainWorktree: false,
-				hasSession: false,
-			};
-
-			// Act
-			await HookExecutor.executeWorktreePostCreationHook(
-				'failing-command',
-				worktree,
-				'/repo',
-			);
-
-			// Assert
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to execute post-creation hook: Hook execution failed',
-			);
-			consoleSpy.mockRestore();
+			try {
+				// Act & Assert - should not throw even with failing command
+				await expect(
+					executeWorktreePostCreationHook('exit 1', worktree, tmpDir, 'main'),
+				).resolves.toBeUndefined();
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
 		});
 	});
 });

@@ -7,7 +7,7 @@ import {
 	getClaudeProjectsDir,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
-import {HookExecutor} from '../utils/hookExecutor.js';
+import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
 import {configurationManager} from './configurationManager.js';
 
 const CLAUDE_DIR = '.claude';
@@ -291,7 +291,7 @@ export class WorktreeService {
 				};
 
 				// Execute the hook asynchronously (non-blocking)
-				HookExecutor.executeWorktreePostCreationHook(
+				executeWorktreePostCreationHook(
 					worktreeHooks.post_creation.command,
 					newWorktree,
 					this.gitRootPath,
