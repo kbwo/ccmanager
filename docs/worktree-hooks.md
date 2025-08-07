@@ -42,125 +42,104 @@ When a worktree hook is executed, the following environment variables are availa
 - `CCMANAGER_GIT_ROOT`: The root path of the git repository
 - `CCMANAGER_BASE_BRANCH`: The base branch used to create the worktree (optional)
 
-## Examples
+## Post Creation Hook Examples
 
-### 1. Send Desktop Notification
-
-```bash
-# Linux (using notify-send)
-notify-send "Worktree Created" "Branch: $CCMANAGER_WORKTREE_BRANCH"
-
-# macOS (using osascript)
-osascript -e "display notification \"Branch: $CCMANAGER_WORKTREE_BRANCH\" with title \"Worktree Created\""
-```
-
-### 2. Setup Development Environment
+### 1. Install dependencies
 
 ```bash
-#!/bin/bash
-# Note: Already running in the worktree directory
-
-# Install dependencies
-npm install
-
-# Copy environment files
-cp .env.example .env
-
-# Run database migrations
-npm run migrate
-
-echo "Development environment ready for $CCMANAGER_WORKTREE_BRANCH"
-```
-
-### 3. Create IDE Configuration
-
-```bash
-#!/bin/bash
-# Create VS Code workspace settings (already in worktree directory)
-mkdir -p .vscode
-cat > .vscode/settings.json << EOF
-{
-  "window.title": "\${activeEditorShort} - $CCMANAGER_WORKTREE_BRANCH",
-  "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#$(echo $CCMANAGER_WORKTREE_BRANCH | md5sum | cut -c1-6)"
-  }
-}
-EOF
-```
-
-### 4. Git Configuration
-
-```bash
-#!/bin/bash
-# Already in worktree directory
-
-# Set branch-specific git config
-git config user.email "branch-$CCMANAGER_WORKTREE_BRANCH@example.com"
-
-# Setup pre-commit hooks
-ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-```
-
-### 5. Integration with Task Management
-
-```bash
-#!/bin/bash
-# Create a task in your project management tool
-curl -X POST https://api.example.com/tasks \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"title\": \"Working on $CCMANAGER_WORKTREE_BRANCH\",
-    \"description\": \"Worktree created at $CCMANAGER_WORKTREE_PATH\",
-    \"project\": \"$CCMANAGER_GIT_ROOT\"
-  }"
-```
-
-### 6. Working with Git Root Directory
-
-```bash
-#!/bin/bash
-# Example: Update a shared configuration file in the git root
-
-# Switch to git root directory
-cd "$CCMANAGER_GIT_ROOT"
-
-# Update a tracking file
-echo "$CCMANAGER_WORKTREE_BRANCH: $CCMANAGER_WORKTREE_PATH" >> .worktrees.txt
-
-# Return to worktree for local setup
-cd "$CCMANAGER_WORKTREE_PATH"
 npm install
 ```
 
-## Best Practices
+### 2. Copy .gitignore files
 
-1. **Keep hooks fast**: Hooks should complete quickly to avoid delaying the worktree creation process
-2. **Handle errors gracefully**: Hook failures won't prevent worktree creation, but should log meaningful errors
-3. **Know your working directory**: Hooks execute in the worktree directory by default; use `cd "$CCMANAGER_GIT_ROOT"` if you need to work in the git root
-4. **Use environment variables**: Prefer `$CCMANAGER_WORKTREE_PATH` and `$CCMANAGER_GIT_ROOT` over hardcoded paths
-5. **Check for dependencies**: Verify required tools are installed before using them
-6. **Make hooks idempotent**: Hooks should be safe to run multiple times
+```extract-untracked.sh
+#!/bin/bash
 
-## Debugging
+# Check if two arguments are provided
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <source_git_root> <destination_directory>"
+    echo "  source_git_root: Directory where 'git ls-files' will be executed"
+    echo "  destination_directory: Directory where files will be copied to"
+    exit 1
+fi
 
-Hook output (stdout and stderr) is displayed in the CCManager console. To debug hooks:
+SOURCE_DIR="$1"
+DEST_DIR="$2"
 
-1. Add echo statements to track execution
-2. Redirect output to a log file: `echo "Debug: $CCMANAGER_WORKTREE_PATH" >> /tmp/ccmanager-hook.log`
-3. Use `set -x` in bash scripts to trace execution
+# Check if source directory exists
+if [ ! -d "$SOURCE_DIR" ]; then
+    echo "Error: Source directory '$SOURCE_DIR' does not exist"
+    exit 1
+fi
 
-## Security Considerations
+# Check if source directory is a git repository
+if [ ! -d "$SOURCE_DIR/.git" ]; then
+    echo "Error: '$SOURCE_DIR' is not a git repository"
+    exit 1
+fi
 
-- Hooks are executed with the same permissions as CCManager
-- Be cautious with hooks that accept user input or interact with external services
-- Store sensitive data (API tokens, passwords) in environment variables or secure storage, not in the hook commands
+# Create destination directory if it doesn't exist
+mkdir -p "$DEST_DIR"
 
-## Comparison with Status Hooks
+# Change to source directory
+cd "$SOURCE_DIR" || exit 1
 
-| Feature | Status Hooks | Worktree Hooks |
-|---------|-------------|----------------|
-| Trigger | Session state changes | Worktree operations |
-| Frequency | Multiple times per session | Once per worktree |
-| Context | Session and worktree info | Worktree and git info |
-| Use Cases | Monitoring, notifications | Setup, configuration |
+# Get list of untracked directories
+UNTRACKED_DIRS=$(git ls-files --others --directory)
+
+# Get list of all untracked files
+UNTRACKED_FILES=$(git ls-files --others)
+
+# Copy untracked directories
+if [ -n "$UNTRACKED_DIRS" ]; then
+    echo "Copying untracked directories..."
+    while IFS= read -r dir; do
+        if [ -n "$dir" ]; then
+            # Remove trailing slash if present
+            dir="${dir%/}"
+            echo "  Copying directory: $dir"
+            mkdir -p "$DEST_DIR/$(dirname "$dir")"
+            cp -r "$dir" "$DEST_DIR/$(dirname "$dir")/"
+        fi
+    done <<< "$UNTRACKED_DIRS"
+fi
+
+# Copy untracked files (excluding those in untracked directories)
+if [ -n "$UNTRACKED_FILES" ]; then
+    echo "Copying untracked files..."
+    while IFS= read -r file; do
+        if [ -n "$file" ]; then
+            # Check if the file is inside any untracked directory
+            is_in_dir=false
+            if [ -n "$UNTRACKED_DIRS" ]; then
+                while IFS= read -r dir; do
+                    if [ -n "$dir" ]; then
+                        # Remove trailing slash if present
+                        dir="${dir%/}"
+                        # Check if file starts with directory path
+                        if [[ "$file" == "$dir/"* ]]; then
+                            is_in_dir=true
+                            break
+                        fi
+                    fi
+                done <<< "$UNTRACKED_DIRS"
+            fi
+            
+            # Copy file only if it's not in an untracked directory
+            if [ "$is_in_dir" = false ]; then
+                echo "  Copying file: $file"
+                # Create parent directory if needed
+                mkdir -p "$DEST_DIR/$(dirname "$file")"
+                cp "$file" "$DEST_DIR/$file"
+            fi
+        fi
+    done <<< "$UNTRACKED_FILES"
+fi
+
+echo "Done! Untracked files and directories have been copied to '$DEST_DIR'"
+
+```
+
+```bash
+<path to extract-untracked.sh> $CCMANAGER_GIT_ROOT $CCMANAGER_WORKTREE_PATH
+```
