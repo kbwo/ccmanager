@@ -213,13 +213,13 @@ export class WorktreeService {
 		}
 	}
 
-	createWorktree(
+	async createWorktree(
 		worktreePath: string,
 		branch: string,
 		baseBranch: string,
 		copySessionData = false,
 		copyClaudeDirectory: boolean = false,
-	): {success: boolean; error?: string} {
+	): Promise<{success: boolean; error?: string}> {
 		try {
 			// Resolve the worktree path relative to the git repository root
 			const resolvedPath = path.isAbsolute(worktreePath)
@@ -290,15 +290,14 @@ export class WorktreeService {
 					hasSession: false,
 				};
 
-				// Execute the hook asynchronously (non-blocking)
-				executeWorktreePostCreationHook(
+				// Execute the hook synchronously (blocking)
+				// Wait for the hook to complete before returning
+				await executeWorktreePostCreationHook(
 					worktreeHooks.post_creation.command,
 					newWorktree,
 					this.gitRootPath,
 					baseBranch,
-				).catch(error => {
-					console.error('Error executing post-creation hook:', error);
-				});
+				);
 			}
 
 			return {success: true};

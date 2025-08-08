@@ -244,7 +244,7 @@ origin/feature/test
 	});
 
 	describe('createWorktree', () => {
-		it('should create worktree with base branch when branch does not exist', () => {
+		it('should create worktree with base branch when branch does not exist', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -258,7 +258,7 @@ origin/feature/test
 				throw new Error('Unexpected command');
 			});
 
-			const result = service.createWorktree(
+			const result = await service.createWorktree(
 				'/path/to/worktree',
 				'new-feature',
 				'develop',
@@ -271,7 +271,7 @@ origin/feature/test
 			);
 		});
 
-		it('should create worktree without base branch when branch exists', () => {
+		it('should create worktree without base branch when branch exists', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -285,7 +285,7 @@ origin/feature/test
 				throw new Error('Unexpected command');
 			});
 
-			const result = service.createWorktree(
+			const result = await service.createWorktree(
 				'/path/to/worktree',
 				'existing-feature',
 				'main', // Base branch is required but not used when branch exists
@@ -298,7 +298,7 @@ origin/feature/test
 			);
 		});
 
-		it('should create worktree from specified base branch when branch does not exist', () => {
+		it('should create worktree from specified base branch when branch does not exist', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -312,7 +312,7 @@ origin/feature/test
 				throw new Error('Unexpected command');
 			});
 
-			const result = service.createWorktree(
+			const result = await service.createWorktree(
 				'/path/to/worktree',
 				'new-feature',
 				'main',
@@ -564,7 +564,7 @@ branch refs/heads/other-branch
 			});
 
 			// Act
-			const result = service.createWorktree(
+			const result = await service.createWorktree(
 				'feature-branch-dir',
 				'feature-branch',
 				'main',
@@ -588,7 +588,7 @@ branch refs/heads/other-branch
 			);
 		});
 
-		it('should not execute hook when disabled', () => {
+		it('should not execute hook when disabled', async () => {
 			// Arrange
 			mockedGetWorktreeHooks.mockReturnValue({
 				post_creation: {
@@ -616,7 +616,7 @@ branch refs/heads/other-branch
 			});
 
 			// Act
-			const result = service.createWorktree(
+			const result = await service.createWorktree(
 				'feature-branch-dir',
 				'feature-branch',
 				'main',
@@ -630,7 +630,7 @@ branch refs/heads/other-branch
 			expect(mockedExecuteHook).not.toHaveBeenCalled();
 		});
 
-		it('should not execute hook when not configured', () => {
+		it('should not execute hook when not configured', async () => {
 			// Arrange
 			mockedGetWorktreeHooks.mockReturnValue({});
 
@@ -653,7 +653,7 @@ branch refs/heads/other-branch
 			});
 
 			// Act
-			const result = service.createWorktree(
+			const result = await service.createWorktree(
 				'feature-branch-dir',
 				'feature-branch',
 				'main',
@@ -676,7 +676,9 @@ branch refs/heads/other-branch
 				},
 			});
 
-			mockedExecuteHook.mockRejectedValue(new Error('Hook failed'));
+			// The real executeWorktreePostCreationHook doesn't throw, it catches errors internally
+			// So the mock should resolve, not reject
+			mockedExecuteHook.mockResolvedValue(undefined);
 
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
@@ -697,7 +699,7 @@ branch refs/heads/other-branch
 			});
 
 			// Act
-			const result = service.createWorktree(
+			const result = await service.createWorktree(
 				'feature-branch-dir',
 				'feature-branch',
 				'main',

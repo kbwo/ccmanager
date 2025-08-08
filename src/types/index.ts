@@ -175,7 +175,7 @@ export interface IWorktreeService {
 		baseBranch: string,
 		copySessionData?: boolean,
 		copyClaudeDirectory?: boolean,
-	): {success: boolean; error?: string};
+	): Promise<{success: boolean; error?: string}>;
 	deleteWorktree(
 		worktreePath: string,
 		options?: {deleteBranch?: boolean},
