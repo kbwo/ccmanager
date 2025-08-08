@@ -11,7 +11,7 @@ import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {promisify} from 'util';
 import {configurationManager} from './configurationManager.js';
-import {WorktreeService} from './worktreeService.js';
+import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
@@ -255,7 +255,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			if (newState !== oldState) {
 				session.state = newState;
-				this.executeStatusHook(oldState, newState, session);
+				executeStatusHook(oldState, newState, session);
 				this.emit('sessionStateChanged', session);
 			}
 		}, 100); // Check every 100ms
@@ -318,49 +318,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	getAllSessions(): Session[] {
 		return Array.from(this.sessions.values());
-	}
-
-	private executeStatusHook(
-		oldState: SessionState,
-		newState: SessionState,
-		session: Session,
-	): void {
-		const statusHooks = configurationManager.getStatusHooks();
-		const hook = statusHooks[newState];
-
-		if (hook && hook.enabled && hook.command) {
-			// Get branch information
-			const worktreeService = new WorktreeService();
-			const worktrees = worktreeService.getWorktrees();
-			const worktree = worktrees.find(wt => wt.path === session.worktreePath);
-			const branch = worktree?.branch || 'unknown';
-
-			// Execute the hook command in the session's worktree directory
-			exec(
-				hook.command,
-				{
-					cwd: session.worktreePath,
-					env: {
-						...process.env,
-						CCMANAGER_OLD_STATE: oldState,
-						CCMANAGER_NEW_STATE: newState,
-						CCMANAGER_WORKTREE: session.worktreePath,
-						CCMANAGER_WORKTREE_BRANCH: branch,
-						CCMANAGER_SESSION_ID: session.id,
-					},
-				},
-				(error, _stdout, stderr) => {
-					if (error) {
-						console.error(
-							`Failed to execute ${newState} hook: ${error.message}`,
-						);
-					}
-					if (stderr) {
-						console.error(`Hook stderr: ${stderr}`);
-					}
-				},
-			);
-		}
 	}
 
 	async createSessionWithDevcontainer(

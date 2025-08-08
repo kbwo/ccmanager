@@ -1,5 +1,7 @@
 import {exec} from 'child_process';
-import {Worktree} from '../types/index.js';
+import {Worktree, Session, SessionState} from '../types/index.js';
+import {WorktreeService} from '../services/worktreeService.js';
+import {configurationManager} from '../services/configurationManager.js';
 
 export interface HookEnvironment {
 	CCMANAGER_WORKTREE_PATH: string;
@@ -27,7 +29,7 @@ export function executeHook(
 					...environment,
 				},
 			},
-			(error, stdout, stderr) => {
+			(error, _stdout, stderr) => {
 				if (error) {
 					console.error(`Hook execution failed: ${error.message}`);
 					reject(error);
@@ -35,9 +37,6 @@ export function executeHook(
 				}
 				if (stderr) {
 					console.error(`Hook stderr: ${stderr}`);
-				}
-				if (stdout) {
-					console.log(`Hook output: ${stdout}`);
 				}
 				resolve();
 			},
@@ -72,6 +71,48 @@ export async function executeWorktreePostCreationHook(
 			`Failed to execute post-creation hook: ${
 				error instanceof Error ? error.message : String(error)
 			}`,
+		);
+	}
+}
+
+/**
+ * Execute a session status change hook
+ */
+export function executeStatusHook(
+	oldState: SessionState,
+	newState: SessionState,
+	session: Session,
+): void {
+	const statusHooks = configurationManager.getStatusHooks();
+	const hook = statusHooks[newState];
+
+	if (hook && hook.enabled && hook.command) {
+		// Get branch information
+		const worktreeService = new WorktreeService();
+		const worktrees = worktreeService.getWorktrees();
+		const worktree = worktrees.find(wt => wt.path === session.worktreePath);
+		const branch = worktree?.branch || 'unknown';
+
+		// Build environment for status hook
+		const environment: HookEnvironment = {
+			CCMANAGER_WORKTREE_PATH: session.worktreePath,
+			CCMANAGER_WORKTREE_BRANCH: branch,
+			CCMANAGER_GIT_ROOT: session.worktreePath, // For status hooks, we use worktree path as cwd
+			CCMANAGER_OLD_STATE: oldState,
+			CCMANAGER_NEW_STATE: newState,
+			CCMANAGER_SESSION_ID: session.id,
+		};
+
+		// Execute the hook command in the session's worktree directory
+		// Note: We don't await this as it's fire-and-forget for status hooks
+		executeHook(hook.command, session.worktreePath, environment).catch(
+			error => {
+				console.error(
+					`Failed to execute ${newState} hook: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				);
+			},
 		);
 	}
 }
