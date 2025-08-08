@@ -1,4 +1,4 @@
-import {exec} from 'child_process';
+import {spawn} from 'child_process';
 import {Worktree, Session, SessionState} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {configurationManager} from '../services/configurationManager.js';
@@ -20,27 +20,47 @@ export function executeHook(
 	environment: HookEnvironment,
 ): Promise<void> {
 	return new Promise((resolve, reject) => {
-		exec(
-			command,
-			{
-				cwd,
-				env: {
-					...process.env,
-					...environment,
-				},
+		// Use spawn with shell to execute the command and wait for all child processes
+		const child = spawn(command, [], {
+			cwd,
+			env: {
+				...process.env,
+				...environment,
 			},
-			(error, _stdout, stderr) => {
-				if (error) {
-					console.error(`Hook execution failed: ${error.message}`);
-					reject(error);
-					return;
-				}
+			shell: true,
+			stdio: ['ignore', 'pipe', 'pipe'],
+		});
+
+		let stderr = '';
+
+		// Collect stderr for logging
+		child.stderr?.on('data', data => {
+			stderr += data.toString();
+		});
+
+		// Wait for the process and all its children to exit
+		child.on('exit', (code, signal) => {
+			if (code !== 0 || signal) {
+				let errorMessage = signal
+					? `Hook terminated by signal ${signal}`
+					: `Hook exited with code ${code}`;
+
+				// Include stderr in the error message when exit code is not 0
 				if (stderr) {
-					console.error(`Hook stderr: ${stderr}`);
+					errorMessage += `\nStderr: ${stderr}`;
 				}
-				resolve();
-			},
-		);
+
+				reject(new Error(errorMessage));
+				return;
+			}
+			// When exit code is 0, ignore stderr and resolve successfully
+			resolve();
+		});
+
+		// Handle errors in spawning the process
+		child.on('error', error => {
+			reject(error);
+		});
 	});
 }
 
@@ -78,11 +98,11 @@ export async function executeWorktreePostCreationHook(
 /**
  * Execute a session status change hook
  */
-export function executeStatusHook(
+export async function executeStatusHook(
 	oldState: SessionState,
 	newState: SessionState,
 	session: Session,
-): void {
+): Promise<void> {
 	const statusHooks = configurationManager.getStatusHooks();
 	const hook = statusHooks[newState];
 
@@ -104,15 +124,15 @@ export function executeStatusHook(
 		};
 
 		// Execute the hook command in the session's worktree directory
-		// Note: We don't await this as it's fire-and-forget for status hooks
-		executeHook(hook.command, session.worktreePath, environment).catch(
-			error => {
-				console.error(
-					`Failed to execute ${newState} hook: ${
-						error instanceof Error ? error.message : String(error)
-					}`,
-				);
-			},
-		);
+		try {
+			await executeHook(hook.command, session.worktreePath, environment);
+		} catch (error) {
+			// Log error but don't throw - hooks should not break the main flow
+			console.error(
+				`Failed to execute ${newState} hook: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
+		}
 	}
 }

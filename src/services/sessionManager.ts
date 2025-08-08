@@ -255,7 +255,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			if (newState !== oldState) {
 				session.state = newState;
-				executeStatusHook(oldState, newState, session);
+				// Execute status hook asynchronously - fire and forget
+				// We don't await this as hooks should not block state updates
+				void executeStatusHook(oldState, newState, session);
 				this.emit('sessionStateChanged', session);
 			}
 		}, 100); // Check every 100ms
