@@ -248,17 +248,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Setup data handler
 		this.setupDataHandler(session);
 
-		session.stateCheckInterval = setInterval(async () => {
+		session.stateCheckInterval = setInterval(() => {
 			const oldState = session.state;
 			const newState = this.detectTerminalState(session);
 
 			if (newState !== oldState) {
 				session.state = newState;
-				try {
-					await executeStatusHook(oldState, newState, session);
-				} catch (error) {
-					console.error('Error executing status hook:', error);
-				}
+				// Execute status hook asynchronously (non-blocking)
+				void executeStatusHook(oldState, newState, session);
 				this.emit('sessionStateChanged', session);
 			}
 		}, 100); // Check every 100ms
