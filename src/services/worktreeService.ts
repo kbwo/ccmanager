@@ -7,6 +7,8 @@ import {
 	getClaudeProjectsDir,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
+import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
+import {configurationManager} from './configurationManager.js';
 
 const CLAUDE_DIR = '.claude';
 
@@ -211,13 +213,13 @@ export class WorktreeService {
 		}
 	}
 
-	createWorktree(
+	async createWorktree(
 		worktreePath: string,
 		branch: string,
 		baseBranch: string,
 		copySessionData = false,
 		copyClaudeDirectory: boolean = false,
-	): {success: boolean; error?: string} {
+	): Promise<{success: boolean; error?: string}> {
 		try {
 			// Resolve the worktree path relative to the git repository root
 			const resolvedPath = path.isAbsolute(worktreePath)
@@ -272,6 +274,30 @@ export class WorktreeService {
 				} catch (error) {
 					console.error('Warning: Failed to copy .claude directory:', error);
 				}
+			}
+
+			// Execute post-creation hook if configured
+			const worktreeHooks = configurationManager.getWorktreeHooks();
+			if (
+				worktreeHooks.post_creation?.enabled &&
+				worktreeHooks.post_creation?.command
+			) {
+				// Create a worktree object for the hook
+				const newWorktree: Worktree = {
+					path: resolvedPath,
+					branch: branch,
+					isMainWorktree: false,
+					hasSession: false,
+				};
+
+				// Execute the hook synchronously (blocking)
+				// Wait for the hook to complete before returning
+				await executeWorktreePostCreationHook(
+					worktreeHooks.post_creation.command,
+					newWorktree,
+					this.gitRootPath,
+					baseBranch,
+				);
 			}
 
 			return {success: true};

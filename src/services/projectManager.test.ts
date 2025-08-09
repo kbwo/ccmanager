@@ -1,19 +1,21 @@
 import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Mock modules before any other imports that might use them
+vi.mock('fs');
+vi.mock('os', () => ({
+	homedir: vi.fn(() => '/home/user'),
+	platform: vi.fn(() => 'linux'),
+}));
+
+// Now import modules that depend on the mocked modules
 import {ProjectManager} from './projectManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {GitProject} from '../types/index.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-
-// Mock fs module
-vi.mock('fs');
-vi.mock('os');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockFs = fs as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockOs = os as any;
 
 describe('ProjectManager', () => {
 	let projectManager: ProjectManager;
@@ -26,9 +28,6 @@ describe('ProjectManager', () => {
 		vi.clearAllMocks();
 		// Reset environment variables
 		delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
-
-		// Mock os.homedir
-		mockOs.homedir.mockReturnValue('/home/user');
 
 		// Mock fs methods for config directory
 		mockFs.existsSync.mockImplementation((path: string) => {

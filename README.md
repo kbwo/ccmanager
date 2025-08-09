@@ -205,6 +205,24 @@ Status hooks allow you to:
 
 For detailed setup instructions, see [docs/state-hooks.md](docs/status-hooks.md).
 
+## Worktree Hooks
+
+Worktree hooks execute custom commands when worktrees are created, enabling automation of development environment setup.
+
+### Features
+- **Post-creation hook**: Run commands after a worktree is created
+- **Environment variables**: Access worktree path, branch name, and git root
+- **Non-blocking execution**: Hooks run asynchronously without delaying operations
+- **Error resilience**: Hook failures don't prevent worktree creation
+
+### Use Cases
+- Set up development dependencies (`npm install`, `bundle install`)
+- Configure IDE settings per branch
+- Send notifications when worktrees are created
+- Initialize branch-specific configurations
+
+For configuration and examples, see [docs/worktree-hooks.md](docs/worktree-hooks.md).
+
 ## Automatic Worktree Directory Generation
 
 CCManager can automatically generate worktree directory paths based on branch names, streamlining the worktree creation process.

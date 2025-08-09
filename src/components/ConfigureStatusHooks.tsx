@@ -1,11 +1,11 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {StatusHookConfig, SessionState} from '../types/index.js';
 
-interface ConfigureHooksProps {
+interface ConfigureStatusHooksProps {
 	onComplete: () => void;
 }
 
@@ -22,17 +22,17 @@ const STATUS_LABELS: Record<SessionState, string> = {
 	waiting_input: 'Waiting for Input',
 };
 
-const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
+const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
+	onComplete,
+}) => {
 	const [view, setView] = useState<View>('menu');
 	const [selectedStatus, setSelectedStatus] = useState<SessionState>('idle');
-	const [hooks, setHooks] = useState<StatusHookConfig>({});
+	const [statusHooks, setStatusHooks] = useState<StatusHookConfig>(
+		configurationManager.getStatusHooks(),
+	);
 	const [currentCommand, setCurrentCommand] = useState('');
 	const [currentEnabled, setCurrentEnabled] = useState(false);
 	const [showSaveMessage, setShowSaveMessage] = useState(false);
-
-	useEffect(() => {
-		setHooks(configurationManager.getStatusHooks());
-	}, []);
 
 	useInput((input, key) => {
 		if (key.escape) {
@@ -51,17 +51,17 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 
 		// Add status hook items
 		(['idle', 'busy', 'waiting_input'] as SessionState[]).forEach(status => {
-			const hook = hooks[status];
+			const hook = statusHooks[status];
 			const enabled = hook?.enabled ? '✓' : '✗';
 			const command = hook?.command || '(not set)';
 			items.push({
 				label: `${STATUS_LABELS[status]}: ${enabled} ${command}`,
-				value: status,
+				value: `status:${status}`,
 			});
 		});
 
 		items.push({
-			label: '─────────────',
+			label: '',
 			value: 'separator',
 		});
 
@@ -80,25 +80,28 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 
 	const handleMenuSelect = (item: MenuItem) => {
 		if (item.value === 'save') {
-			configurationManager.setStatusHooks(hooks);
+			configurationManager.setStatusHooks(statusHooks);
 			setShowSaveMessage(true);
 			setTimeout(() => {
 				onComplete();
 			}, 1000);
 		} else if (item.value === 'cancel') {
 			onComplete();
-		} else if (item.value !== 'separator') {
-			const status = item.value as SessionState;
+		} else if (
+			!item.value.includes('separator') &&
+			item.value.startsWith('status:')
+		) {
+			const status = item.value.split(':')[1] as SessionState;
 			setSelectedStatus(status);
-			const hook = hooks[status];
+			const hook = statusHooks[status];
 			setCurrentCommand(hook?.command || '');
-			setCurrentEnabled(hook?.enabled ?? true); // Default to true if not set
+			setCurrentEnabled(hook?.enabled ?? true);
 			setView('edit');
 		}
 	};
 
 	const handleCommandSubmit = (value: string) => {
-		setHooks(prev => ({
+		setStatusHooks(prev => ({
 			...prev,
 			[selectedStatus]: {
 				command: value,
@@ -176,14 +179,12 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Configure Status Change Hooks
+					Configure Status Hooks
 				</Text>
 			</Box>
 
 			<Box marginBottom={1}>
-				<Text dimColor>
-					Set commands to run when Claude Code session status changes:
-				</Text>
+				<Text dimColor>Set commands to run when session status changes:</Text>
 			</Box>
 
 			<SelectInput
@@ -200,4 +201,4 @@ const ConfigureHooks: React.FC<ConfigureHooksProps> = ({onComplete}) => {
 	);
 };
 
-export default ConfigureHooks;
+export default ConfigureStatusHooks;
