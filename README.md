@@ -1,5 +1,7 @@
 # CCManager - AI Code Assistant Session Manager
 
+[![Mentioned in Awesome Gemini CLI](https://awesome.re/mentioned-badge.svg)](https://github.com/Piebald-AI/awesome-gemini-cli)
+
 CCManager is a TUI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI) across Git worktrees and projects.
 
 
