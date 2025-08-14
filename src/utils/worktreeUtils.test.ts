@@ -154,6 +154,13 @@ describe('prepareWorktreeItems', () => {
 		lastActivity: new Date(),
 		isActive: true,
 		terminal: {} as Session['terminal'],
+		stateCheckInterval: null,
+		isPrimaryCommand: true,
+		commandConfig: null,
+		detectionStrategy: 'claude',
+		devcontainerConfig: null,
+		pendingState: null,
+		pendingStateStart: null,
 	};
 
 	it('should prepare basic worktree without git status', () => {

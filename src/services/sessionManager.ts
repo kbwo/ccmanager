@@ -100,10 +100,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
+			stateCheckInterval: null, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			commandConfig,
 			detectionStrategy: options.detectionStrategy ?? 'claude',
-			devcontainerConfig: options.devcontainerConfig,
+			devcontainerConfig: options.devcontainerConfig ?? null,
 			pendingState: null,
 			pendingStateStart: null,
 		};
@@ -298,7 +299,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Clear the state check interval
 		if (session.stateCheckInterval) {
 			clearInterval(session.stateCheckInterval);
-			session.stateCheckInterval = undefined;
+			session.stateCheckInterval = null;
 		}
 		// Clear any pending state
 		session.pendingState = null;
