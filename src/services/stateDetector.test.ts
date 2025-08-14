@@ -44,7 +44,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('waiting_input');
@@ -59,7 +59,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('waiting_input');
@@ -73,7 +73,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('busy');
@@ -87,7 +87,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('busy');
@@ -102,7 +102,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -113,7 +113,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal([]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -137,7 +137,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(lines);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle'); // Should not detect the old prompt
@@ -152,7 +152,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('waiting_input'); // waiting_input should take precedence
@@ -198,7 +198,7 @@ describe('GeminiStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('waiting_input');
@@ -213,7 +213,7 @@ describe('GeminiStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('waiting_input');
@@ -228,7 +228,7 @@ describe('GeminiStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('waiting_input');
@@ -242,7 +242,7 @@ describe('GeminiStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('busy');
@@ -256,7 +256,7 @@ describe('GeminiStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('busy');
@@ -270,7 +270,7 @@ describe('GeminiStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -281,7 +281,7 @@ describe('GeminiStateDetector', () => {
 			terminal = createMockTerminal([]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -296,7 +296,7 @@ describe('GeminiStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal);
+			const state = detector.detectState(terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('waiting_input'); // waiting_input should take precedence
@@ -336,7 +336,7 @@ describe('CodexStateDetector', () => {
 		terminal = createMockTerminal(['Some output', '│Allow execution?', '│ > ']);
 
 		// Act
-		const state = detector.detectState(terminal);
+		const state = detector.detectState(terminal, 'idle');
 
 		// Assert
 		expect(state).toBe('waiting_input');
@@ -347,7 +347,7 @@ describe('CodexStateDetector', () => {
 		terminal = createMockTerminal(['Some output', 'Continue? [y/N]', '> ']);
 
 		// Act
-		const state = detector.detectState(terminal);
+		const state = detector.detectState(terminal, 'idle');
 
 		// Assert
 		expect(state).toBe('waiting_input');
@@ -361,7 +361,7 @@ describe('CodexStateDetector', () => {
 		]);
 
 		// Act
-		const state = detector.detectState(terminal);
+		const state = detector.detectState(terminal, 'idle');
 
 		// Assert
 		expect(state).toBe('waiting_input');
@@ -376,7 +376,7 @@ describe('CodexStateDetector', () => {
 		]);
 
 		// Act
-		const state = detector.detectState(terminal);
+		const state = detector.detectState(terminal, 'idle');
 
 		// Assert
 		expect(state).toBe('busy');
@@ -391,7 +391,7 @@ describe('CodexStateDetector', () => {
 		]);
 
 		// Act
-		const state = detector.detectState(terminal);
+		const state = detector.detectState(terminal, 'idle');
 
 		// Assert
 		expect(state).toBe('busy');
@@ -402,7 +402,7 @@ describe('CodexStateDetector', () => {
 		terminal = createMockTerminal(['Normal output', 'Some message', 'Ready']);
 
 		// Act
-		const state = detector.detectState(terminal);
+		const state = detector.detectState(terminal, 'idle');
 
 		// Assert
 		expect(state).toBe('idle');
@@ -413,7 +413,7 @@ describe('CodexStateDetector', () => {
 		terminal = createMockTerminal(['press esc to cancel', '[y/N]']);
 
 		// Act
-		const state = detector.detectState(terminal);
+		const state = detector.detectState(terminal, 'idle');
 
 		// Assert
 		expect(state).toBe('waiting_input');
