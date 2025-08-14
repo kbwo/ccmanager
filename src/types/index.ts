@@ -32,6 +32,8 @@ export interface Session {
 	commandConfig?: CommandConfig; // Store command config for fallback
 	detectionStrategy?: StateDetectionStrategy; // State detection strategy for this session
 	devcontainerConfig?: DevcontainerConfig; // Devcontainer configuration if session runs in container
+	pendingState?: SessionState | null; // State that's been detected but not yet confirmed
+	pendingStateStart?: number | null; // Timestamp when pending state was first detected
 }
 
 export interface SessionManager {

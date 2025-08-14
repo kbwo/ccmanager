@@ -13,6 +13,10 @@ import {promisify} from 'util';
 import {configurationManager} from './configurationManager.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector.js';
+import {
+	STATE_PERSISTENCE_DURATION_MS,
+	STATE_CHECK_INTERVAL_MS,
+} from '../constants/statePersistence.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 
@@ -100,6 +104,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			commandConfig,
 			detectionStrategy: options.detectionStrategy ?? 'claude',
 			devcontainerConfig: options.devcontainerConfig,
+			pendingState: null,
+			pendingStateStart: null,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -248,17 +254,41 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Setup data handler
 		this.setupDataHandler(session);
 
+		// Set up interval-based state detection with persistence
 		session.stateCheckInterval = setInterval(() => {
 			const oldState = session.state;
-			const newState = this.detectTerminalState(session);
+			const detectedState = this.detectTerminalState(session);
+			const now = Date.now();
 
-			if (newState !== oldState) {
-				session.state = newState;
-				// Execute status hook asynchronously (non-blocking)
-				void executeStatusHook(oldState, newState, session);
-				this.emit('sessionStateChanged', session);
+			// If detected state is different from current state
+			if (detectedState !== oldState) {
+				// If this is a new pending state or the pending state changed
+				if (session.pendingState !== detectedState) {
+					session.pendingState = detectedState;
+					session.pendingStateStart = now;
+				} else if (
+					session.pendingState !== null &&
+					session.pendingStateStart !== null &&
+					session.pendingStateStart !== undefined
+				) {
+					// Check if the pending state has persisted long enough
+					const duration = now - session.pendingStateStart;
+					if (duration >= STATE_PERSISTENCE_DURATION_MS) {
+						// Confirm the state change
+						session.state = detectedState;
+						session.pendingState = null;
+						session.pendingStateStart = null;
+						// Execute status hook asynchronously (non-blocking)
+						void executeStatusHook(oldState, detectedState, session);
+						this.emit('sessionStateChanged', session);
+					}
+				}
+			} else {
+				// Detected state matches current state, clear any pending state
+				session.pendingState = null;
+				session.pendingStateStart = null;
 			}
-		}, 100); // Check every 100ms
+		}, STATE_CHECK_INTERVAL_MS);
 
 		// Setup exit handler
 		this.setupExitHandler(session);
@@ -268,7 +298,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Clear the state check interval
 		if (session.stateCheckInterval) {
 			clearInterval(session.stateCheckInterval);
+			session.stateCheckInterval = undefined;
 		}
+		// Clear any pending state
+		session.pendingState = null;
+		session.pendingStateStart = null;
 		// Update state to idle before destroying
 		session.state = 'idle';
 		this.emit('sessionStateChanged', session);
