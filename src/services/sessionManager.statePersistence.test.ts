@@ -136,8 +136,8 @@ describe('SessionManager - State Persistence', () => {
 
 		// State should now be changed
 		expect(session.state).toBe('idle');
-		expect(session.pendingState).toBeNull();
-		expect(session.pendingStateStart).toBeNull();
+		expect(session.pendingState).toBeUndefined();
+		expect(session.pendingStateStart).toBeUndefined();
 		expect(stateChangeHandler).toHaveBeenCalledWith(session);
 	});
 
@@ -189,8 +189,8 @@ describe('SessionManager - State Persistence', () => {
 
 		// Pending state should be cleared
 		expect(session.state).toBe('busy');
-		expect(session.pendingState).toBeNull();
-		expect(session.pendingStateStart).toBeNull();
+		expect(session.pendingState).toBeUndefined();
+		expect(session.pendingStateStart).toBeUndefined();
 	});
 
 	it('should not confirm state changes that do not persist long enough', async () => {
@@ -281,8 +281,8 @@ describe('SessionManager - State Persistence', () => {
 
 		// Both should now be in their new states
 		expect(session1.state).toBe('idle');
-		expect(session1.pendingState).toBeNull();
+		expect(session1.pendingState).toBeUndefined();
 		expect(session2.state).toBe('waiting_input');
-		expect(session2.pendingState).toBeNull();
+		expect(session2.pendingState).toBeUndefined();
 	});
 });

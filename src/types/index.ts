@@ -27,13 +27,13 @@ export interface Session {
 	lastActivity: Date;
 	isActive: boolean;
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
-	stateCheckInterval: NodeJS.Timeout | null; // Interval for checking terminal state
+	stateCheckInterval: NodeJS.Timeout | undefined; // Interval for checking terminal state
 	isPrimaryCommand: boolean; // Track if process was started with main command args
-	commandConfig: CommandConfig | null; // Store command config for fallback
-	detectionStrategy: StateDetectionStrategy | null; // State detection strategy for this session
-	devcontainerConfig: DevcontainerConfig | null; // Devcontainer configuration if session runs in container
-	pendingState: SessionState | null; // State that's been detected but not yet confirmed
-	pendingStateStart: number | null; // Timestamp when pending state was first detected
+	commandConfig: CommandConfig | undefined; // Store command config for fallback
+	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
+	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
+	pendingState: SessionState | undefined; // State that's been detected but not yet confirmed
+	pendingStateStart: number | undefined; // Timestamp when pending state was first detected
 }
 
 export interface SessionManager {

@@ -100,13 +100,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
-			stateCheckInterval: null, // Will be set in setupBackgroundHandler
+			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			commandConfig,
 			detectionStrategy: options.detectionStrategy ?? 'claude',
-			devcontainerConfig: options.devcontainerConfig ?? null,
-			pendingState: null,
-			pendingStateStart: null,
+			devcontainerConfig: options.devcontainerConfig ?? undefined,
+			pendingState: undefined,
+			pendingStateStart: undefined,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -268,8 +268,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					session.pendingState = detectedState;
 					session.pendingStateStart = now;
 				} else if (
-					session.pendingState !== null &&
-					session.pendingStateStart !== null &&
+					session.pendingState !== undefined &&
 					session.pendingStateStart !== undefined
 				) {
 					// Check if the pending state has persisted long enough
@@ -277,8 +276,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					if (duration >= STATE_PERSISTENCE_DURATION_MS) {
 						// Confirm the state change
 						session.state = detectedState;
-						session.pendingState = null;
-						session.pendingStateStart = null;
+						session.pendingState = undefined;
+						session.pendingStateStart = undefined;
 						// Execute status hook asynchronously (non-blocking)
 						void executeStatusHook(oldState, detectedState, session);
 						this.emit('sessionStateChanged', session);
@@ -286,8 +285,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 			} else {
 				// Detected state matches current state, clear any pending state
-				session.pendingState = null;
-				session.pendingStateStart = null;
+				session.pendingState = undefined;
+				session.pendingStateStart = undefined;
 			}
 		}, STATE_CHECK_INTERVAL_MS);
 
@@ -299,11 +298,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Clear the state check interval
 		if (session.stateCheckInterval) {
 			clearInterval(session.stateCheckInterval);
-			session.stateCheckInterval = null;
+			session.stateCheckInterval = undefined;
 		}
 		// Clear any pending state
-		session.pendingState = null;
-		session.pendingStateStart = null;
+		session.pendingState = undefined;
+		session.pendingStateStart = undefined;
 		// Update state to idle before destroying
 		session.state = 'idle';
 		this.emit('sessionStateChanged', session);
