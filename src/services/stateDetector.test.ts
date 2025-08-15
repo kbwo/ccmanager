@@ -157,6 +157,45 @@ describe('ClaudeStateDetector', () => {
 			// Assert
 			expect(state).toBe('waiting_input'); // waiting_input should take precedence
 		});
+
+		it('should maintain current state when "ctrl+r to toggle" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some output',
+				'Press Ctrl+R to toggle history search',
+				'More output',
+			]);
+
+			// Act - test with different current states
+			const idleState = detector.detectState(terminal, 'idle');
+			const busyState = detector.detectState(terminal, 'busy');
+			const waitingState = detector.detectState(terminal, 'waiting_input');
+
+			// Assert - should maintain whatever the current state was
+			expect(idleState).toBe('idle');
+			expect(busyState).toBe('busy');
+			expect(waitingState).toBe('waiting_input');
+		});
+
+		it('should maintain current state for various "ctrl+r" patterns', () => {
+			// Arrange - test different case variations
+			const patterns = [
+				'ctrl+r to toggle',
+				'CTRL+R TO TOGGLE',
+				'Ctrl+R to toggle history',
+				'Press ctrl+r to toggle the search',
+			];
+
+			for (const pattern of patterns) {
+				terminal = createMockTerminal(['Some output', pattern]);
+
+				// Act
+				const state = detector.detectState(terminal, 'busy');
+
+				// Assert - should maintain the current state
+				expect(state).toBe('busy');
+			}
+		});
 	});
 });
 

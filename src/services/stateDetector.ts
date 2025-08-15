@@ -60,9 +60,14 @@ export abstract class BaseStateDetector implements StateDetector {
 }
 
 export class ClaudeStateDetector extends BaseStateDetector {
-	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
+	detectState(terminal: Terminal, currentState: SessionState): SessionState {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
+
+		// Check for ctrl+r toggle prompt - maintain current state
+		if (lowerContent.includes('ctrl+r to toggle')) {
+			return currentState;
+		}
 
 		// Check for waiting prompts with box character
 		if (
