@@ -5,7 +5,7 @@ import {
 } from '../types/index.js';
 
 export interface StateDetector {
-	detectState(terminal: Terminal): SessionState;
+	detectState(terminal: Terminal, currentState: SessionState): SessionState;
 }
 
 export function createStateDetector(
@@ -24,7 +24,10 @@ export function createStateDetector(
 }
 
 export abstract class BaseStateDetector implements StateDetector {
-	abstract detectState(terminal: Terminal): SessionState;
+	abstract detectState(
+		terminal: Terminal,
+		currentState: SessionState,
+	): SessionState;
 
 	protected getTerminalLines(
 		terminal: Terminal,
@@ -57,9 +60,14 @@ export abstract class BaseStateDetector implements StateDetector {
 }
 
 export class ClaudeStateDetector extends BaseStateDetector {
-	detectState(terminal: Terminal): SessionState {
+	detectState(terminal: Terminal, currentState: SessionState): SessionState {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
+
+		// Check for ctrl+r toggle prompt - maintain current state
+		if (lowerContent.includes('ctrl+r to toggle')) {
+			return currentState;
+		}
 
 		// Check for waiting prompts with box character
 		if (
@@ -81,7 +89,7 @@ export class ClaudeStateDetector extends BaseStateDetector {
 
 // https://github.com/google-gemini/gemini-cli/blob/main/packages/cli/src/ui/components/messages/ToolConfirmationMessage.tsx
 export class GeminiStateDetector extends BaseStateDetector {
-	detectState(terminal: Terminal): SessionState {
+	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
 
@@ -105,7 +113,7 @@ export class GeminiStateDetector extends BaseStateDetector {
 }
 
 export class CodexStateDetector extends BaseStateDetector {
-	detectState(terminal: Terminal): SessionState {
+	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
 

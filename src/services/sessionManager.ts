@@ -52,7 +52,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Create a detector based on the session's detection strategy
 		const strategy = session.detectionStrategy || 'claude';
 		const detector = createStateDetector(strategy);
-		return detector.detectState(session.terminal);
+		return detector.detectState(session.terminal, session.state);
 	}
 
 	constructor() {
