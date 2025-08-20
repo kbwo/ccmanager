@@ -2,8 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {WorktreeService} from '../services/worktreeService.js';
-import {Confirmation} from './ConfirmationView.js';
-import ConfirmationView from './ConfirmationView.js';
+import Confirmation, {SimpleConfirmation} from './Confirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface MergeWorktreeProps {
@@ -198,7 +197,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		};
 
 		return (
-			<ConfirmationView
+			<Confirmation
 				title={title}
 				message={message}
 				options={[
@@ -231,7 +230,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		);
 
 		return (
-			<Confirmation
+			<SimpleConfirmation
 				message={confirmMessage}
 				onConfirm={() => setStep('executing-merge')}
 				onCancel={onCancel}
@@ -284,7 +283,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		);
 
 		return (
-			<Confirmation
+			<SimpleConfirmation
 				message={deleteMessage}
 				onConfirm={() => {
 					const deleteResult =

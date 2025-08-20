@@ -9,7 +9,7 @@ export interface ConfirmationOption {
 	color?: string;
 }
 
-interface ConfirmationViewProps {
+interface ConfirmationProps {
 	title?: React.ReactNode;
 	message?: React.ReactNode;
 	options: ConfirmationOption[];
@@ -23,9 +23,9 @@ interface ConfirmationViewProps {
 }
 
 /**
- * Reusable confirmation view component with SelectInput UI pattern
+ * Reusable confirmation component with SelectInput UI pattern
  */
-const ConfirmationView: React.FC<ConfirmationViewProps> = ({
+const Confirmation: React.FC<ConfirmationProps> = ({
 	title,
 	message,
 	options,
@@ -103,10 +103,10 @@ const ConfirmationView: React.FC<ConfirmationViewProps> = ({
 	);
 };
 
-export default ConfirmationView;
+export default Confirmation;
 
-// Confirmation component for backward compatibility
-interface ConfirmationProps {
+// SimpleConfirmation component for backward compatibility
+interface SimpleConfirmationProps {
 	message: string | React.ReactNode;
 	onConfirm: () => void;
 	onCancel: () => void;
@@ -116,7 +116,7 @@ interface ConfirmationProps {
 	cancelColor?: string;
 }
 
-export const Confirmation: React.FC<ConfirmationProps> = ({
+export const SimpleConfirmation: React.FC<SimpleConfirmationProps> = ({
 	message,
 	onConfirm,
 	onCancel,
@@ -146,7 +146,7 @@ export const Confirmation: React.FC<ConfirmationProps> = ({
 	);
 
 	return (
-		<ConfirmationView
+		<Confirmation
 			message={message}
 			options={options}
 			onSelect={handleSelect}

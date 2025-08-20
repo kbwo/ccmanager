@@ -4,7 +4,7 @@ import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
-import ConfirmationView from './ConfirmationView.js';
+import Confirmation from './Confirmation.js';
 import {CommandPreset} from '../types/index.js';
 
 interface ConfigureCommandProps {
@@ -511,7 +511,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		);
 
 		return (
-			<ConfirmationView
+			<Confirmation
 				title={title}
 				message={message}
 				options={[

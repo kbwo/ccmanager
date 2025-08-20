@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
-import ConfirmationView from './ConfirmationView.js';
+import Confirmation from './Confirmation.js';
 
 interface DeleteConfirmationProps {
 	worktrees: Array<{path: string; branch?: string}>;
@@ -185,7 +185,7 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	);
 
 	return (
-		<ConfirmationView
+		<Confirmation
 			title={title}
 			message={confirmMessage}
 			options={[
