@@ -4,6 +4,7 @@ import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import ConfirmationView from './ConfirmationView.js';
 import {CommandPreset} from '../types/index.js';
 
 interface ConfigureCommandProps {
@@ -488,13 +489,8 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	if (viewMode === 'delete-confirm') {
 		const preset = presets.find(p => p.id === selectedPresetId);
 
-		const confirmItems = [
-			{label: 'Yes, delete', value: 'yes'},
-			{label: 'Cancel', value: 'cancel'},
-		];
-
-		const handleConfirmSelect = (item: {value: string}) => {
-			if (item.value === 'yes') {
+		const handleConfirmSelect = (value: string) => {
+			if (value === 'yes') {
 				handleDeleteConfirm();
 			} else {
 				setViewMode('edit');
@@ -502,49 +498,31 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			}
 		};
 
+		const title = (
+			<Text bold color="red">
+				Confirm Delete
+			</Text>
+		);
+
+		const message = <Text>Delete preset &quot;{preset?.name}&quot;?</Text>;
+
+		const hint = (
+			<Text dimColor>Press ↑↓/j/k to navigate, Enter to confirm</Text>
+		);
+
 		return (
-			<Box flexDirection="column">
-				<Box marginBottom={1}>
-					<Text bold color="red">
-						Confirm Delete
-					</Text>
-				</Box>
-
-				<Box marginBottom={1}>
-					<Text>Delete preset &quot;{preset?.name}&quot;?</Text>
-				</Box>
-
-				<SelectInput
-					items={confirmItems}
-					onSelect={handleConfirmSelect}
-					initialIndex={1} // Default to Cancel
-					indicatorComponent={({isSelected}) => (
-						<Text color={isSelected ? 'red' : undefined}>
-							{isSelected ? '>' : ' '}
-						</Text>
-					)}
-					itemComponent={({isSelected, label}) => (
-						<Text
-							color={
-								label === 'Yes, delete'
-									? isSelected
-										? 'red'
-										: undefined
-									: isSelected
-										? 'cyan'
-										: undefined
-							}
-							inverse={isSelected}
-						>
-							{label}
-						</Text>
-					)}
-				/>
-
-				<Box marginTop={1}>
-					<Text dimColor>Press ↑↓/j/k to navigate, Enter to confirm</Text>
-				</Box>
-			</Box>
+			<ConfirmationView
+				title={title}
+				message={message}
+				options={[
+					{label: 'Yes, delete', value: 'yes', color: 'red'},
+					{label: 'Cancel', value: 'cancel', color: 'cyan'},
+				]}
+				onSelect={handleConfirmSelect}
+				initialIndex={1} // Default to Cancel
+				indicatorColor="red"
+				hint={hint}
+			/>
 		);
 	}
 
