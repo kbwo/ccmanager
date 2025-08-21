@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {WorktreeService} from '../services/worktreeService.js';
-import Confirmation from './Confirmation.js';
+import Confirmation, {SimpleConfirmation} from './Confirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface MergeWorktreeProps {
@@ -36,7 +36,6 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		[],
 	);
 	const [useRebase, setUseRebase] = useState(false);
-	const [operationFocused, setOperationFocused] = useState(false);
 	const [mergeError, setMergeError] = useState<string | null>(null);
 	const [worktreeService] = useState(() => new WorktreeService());
 
@@ -60,15 +59,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 			return;
 		}
 
-		if (step === 'select-operation') {
-			if (key.leftArrow || key.rightArrow) {
-				const newOperationFocused = !operationFocused;
-				setOperationFocused(newOperationFocused);
-				setUseRebase(newOperationFocused);
-			} else if (key.return) {
-				setStep('confirm-merge');
-			}
-		}
+		// Operation selection is now handled by ConfirmationView
 
 		if (step === 'merge-error') {
 			// Any key press returns to menu
@@ -180,49 +171,43 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	}
 
 	if (step === 'select-operation') {
+		const title = (
+			<Text bold color="green">
+				Select Operation
+			</Text>
+		);
+
+		const message = (
+			<Text>
+				Choose how to integrate <Text color="yellow">{sourceBranch}</Text> into{' '}
+				<Text color="yellow">{targetBranch}</Text>:
+			</Text>
+		);
+
+		const hint = (
+			<Text dimColor>
+				Use ↑↓/j/k to navigate, Enter to select,{' '}
+				{shortcutManager.getShortcutDisplay('cancel')} to cancel
+			</Text>
+		);
+
+		const handleOperationSelect = (value: string) => {
+			setUseRebase(value === 'rebase');
+			setStep('confirm-merge');
+		};
+
 		return (
-			<Box flexDirection="column">
-				<Box marginBottom={1}>
-					<Text bold color="green">
-						Select Operation
-					</Text>
-				</Box>
-
-				<Box marginBottom={1}>
-					<Text>
-						Choose how to integrate <Text color="yellow">{sourceBranch}</Text>{' '}
-						into <Text color="yellow">{targetBranch}</Text>:
-					</Text>
-				</Box>
-
-				<Box>
-					<Box marginRight={2}>
-						<Text
-							color={!operationFocused ? 'green' : 'white'}
-							inverse={!operationFocused}
-						>
-							{' '}
-							Merge{' '}
-						</Text>
-					</Box>
-					<Box>
-						<Text
-							color={operationFocused ? 'blue' : 'white'}
-							inverse={operationFocused}
-						>
-							{' '}
-							Rebase{' '}
-						</Text>
-					</Box>
-				</Box>
-
-				<Box marginTop={1}>
-					<Text dimColor>
-						Use ← → to navigate, Enter to select,{' '}
-						{shortcutManager.getShortcutDisplay('cancel')} to cancel
-					</Text>
-				</Box>
-			</Box>
+			<Confirmation
+				title={title}
+				message={message}
+				options={[
+					{label: 'Merge', value: 'merge', color: 'green'},
+					{label: 'Rebase', value: 'rebase', color: 'blue'},
+				]}
+				onSelect={handleOperationSelect}
+				initialIndex={0}
+				hint={hint}
+			/>
 		);
 	}
 
@@ -245,7 +230,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		);
 
 		return (
-			<Confirmation
+			<SimpleConfirmation
 				message={confirmMessage}
 				onConfirm={() => setStep('executing-merge')}
 				onCancel={onCancel}
@@ -298,7 +283,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		);
 
 		return (
-			<Confirmation
+			<SimpleConfirmation
 				message={deleteMessage}
 				onConfirm={() => {
 					const deleteResult =
