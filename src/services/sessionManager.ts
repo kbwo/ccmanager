@@ -38,7 +38,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		worktreePath: string,
 	): Promise<IPty> {
 		const spawnOptions = {
-			name: 'xterm-color',
+			name: 'xterm-256color',
 			cols: process.stdout.columns || 80,
 			rows: process.stdout.rows || 24,
 			cwd: worktreePath,

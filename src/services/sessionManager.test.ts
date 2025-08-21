@@ -96,7 +96,7 @@ describe('SessionManager', () => {
 
 			// Verify spawn was called with preset config
 			expect(spawn).toHaveBeenCalledWith('claude', ['--preset-arg'], {
-				name: 'xterm-color',
+				name: 'xterm-256color',
 				cols: expect.any(Number),
 				rows: expect.any(Number),
 				cwd: '/test/worktree',
@@ -125,7 +125,7 @@ describe('SessionManager', () => {
 
 			// Verify spawn was called with preset config
 			expect(spawn).toHaveBeenCalledWith('claude', ['--resume', '--dev'], {
-				name: 'xterm-color',
+				name: 'xterm-256color',
 				cols: expect.any(Number),
 				rows: expect.any(Number),
 				cwd: '/test/worktree',
