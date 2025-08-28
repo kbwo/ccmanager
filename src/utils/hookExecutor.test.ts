@@ -4,7 +4,7 @@ import {
 	executeWorktreePostCreationHook,
 	executeStatusHook,
 } from './hookExecutor.js';
-import {mkdtemp, rm, readFile} from 'fs/promises';
+import {mkdtemp, rm, readFile, realpath} from 'fs/promises';
 import {tmpdir} from 'os';
 import {join} from 'path';
 import type {SessionState, Session} from '../types/index.js';
@@ -175,7 +175,9 @@ describe('hookExecutor Integration Tests', () => {
 				const output = await readFile(outputFile, 'utf-8');
 
 				// Assert - should be executed in tmpDir
-				expect(output.trim()).toBe(tmpDir);
+				const expectedPath = await realpath(tmpDir);
+				const actualPath = await realpath(output.trim());
+				expect(actualPath).toBe(expectedPath);
 			} finally {
 				// Cleanup
 				await rm(tmpDir, {recursive: true});
@@ -231,7 +233,11 @@ describe('hookExecutor Integration Tests', () => {
 				const output = await readFile(outputFile, 'utf-8');
 
 				// Assert - should be executed in worktree path, not git root
-				expect(output.trim()).toBe(tmpDir);
+				const expectedPath = await realpath(tmpDir);
+				const actualPath = await realpath(output.trim());
+				expect(actualPath).toBe(expectedPath);
+
+				// Also verify it's not the git root path
 				expect(output.trim()).not.toBe(gitRoot);
 			} finally {
 				// Cleanup
