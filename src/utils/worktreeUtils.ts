@@ -1,4 +1,5 @@
 import path from 'path';
+import {execSync} from 'child_process';
 import stripAnsi from 'strip-ansi';
 import {Worktree, Session} from '../types/index.js';
 import {getStatusDisplay} from '../constants/statusIcons.js';
@@ -38,7 +39,27 @@ export function truncateString(str: string, maxLength: number): string {
 	return str.substring(0, maxLength - 3) + '...';
 }
 
+function getGitRepositoryName(projectPath: string): string {
+	try {
+		const gitCommonDir = execSync('git rev-parse --git-common-dir', {
+			cwd: projectPath,
+			encoding: 'utf8',
+		}).trim();
+
+		const absoluteGitCommonDir = path.isAbsolute(gitCommonDir)
+			? gitCommonDir
+			: path.resolve(projectPath, gitCommonDir);
+
+		const mainWorkingDir = path.dirname(absoluteGitCommonDir);
+
+		return path.basename(mainWorkingDir);
+	} catch {
+		return path.basename(projectPath);
+	}
+}
+
 export function generateWorktreeDirectory(
+	projectPath: string,
 	branchName: string,
 	pattern?: string,
 ): string {
@@ -46,18 +67,28 @@ export function generateWorktreeDirectory(
 	const defaultPattern = '../{branch}';
 	const activePattern = pattern || defaultPattern;
 
-	// Sanitize branch name for filesystem
-	// Replace slashes with dashes, remove special characters
-	const sanitizedBranch = branchName
-		.replace(/\//g, '-') // Replace forward slashes with dashes
-		.replace(/[^a-zA-Z0-9-_.]/g, '') // Remove special characters except dash, dot, underscore
-		.replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
-		.toLowerCase(); // Convert to lowercase for consistency
+	let sanitizedBranch: string | undefined;
+	let projectName: string | undefined;
 
-	// Replace placeholders in pattern
-	const directory = activePattern
-		.replace('{branch}', sanitizedBranch)
-		.replace('{branch-name}', sanitizedBranch);
+	const directory = activePattern.replace(/{(\w+)}/g, (placeholder, name) => {
+		switch (name) {
+			case 'branch':
+			case 'branch-name':
+				// Sanitize branch name for filesystem
+				sanitizedBranch ??= branchName
+					.replace(/\//g, '-') // Replace forward slashes with dashes
+					.replace(/[^a-zA-Z0-9-_.]+/g, '') // Remove special characters except dash, dot, underscore
+					.replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+					.toLowerCase(); // Convert to lowercase for consistency
+
+				return sanitizedBranch;
+			case 'project':
+				projectName ??= getGitRepositoryName(projectPath);
+				return projectName;
+			default:
+				return placeholder;
+		}
+	});
 
 	// Ensure the path is relative to the repository root
 	return path.normalize(directory);

@@ -4,6 +4,7 @@ import SelectInput from 'ink-select-input';
 import TextInputWrapper from './TextInputWrapper.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 
 interface ConfigureWorktreeProps {
 	onComplete: () => void;
@@ -29,6 +30,10 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	);
 	const [editMode, setEditMode] = useState<EditMode>('menu');
 	const [tempPattern, setTempPattern] = useState(pattern);
+
+	// Example values for preview
+	const exampleProjectPath = '/home/user/src/myproject';
+	const exampleBranchName = 'feature/my-feature';
 
 	useInput((input, key) => {
 		if (
@@ -111,7 +116,8 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 
 				<Box marginBottom={1}>
 					<Text dimColor>
-						Available placeholders: {'{branch}'} - full branch name
+						Available placeholders: {'{branch}'} - full branch name,{' '}
+						{'{project}'} - repository name
 					</Text>
 				</Box>
 
@@ -147,8 +153,14 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			{autoDirectory && (
 				<Box marginBottom={1}>
 					<Text>
-						Example: branch &quot;feature/my-feature&quot; → directory &quot;
-						{pattern.replace('{branch}', 'feature-my-feature')}&quot;
+						Example: project &quot;{exampleProjectPath}&quot;, branch &quot;
+						{exampleBranchName}&quot; → directory &quot;
+						{generateWorktreeDirectory(
+							exampleProjectPath,
+							exampleBranchName,
+							pattern,
+						)}
+						&quot;
 					</Text>
 				</Box>
 			)}

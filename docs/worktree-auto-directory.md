@@ -38,6 +38,7 @@ Edit `~/.config/ccmanager/config.json`:
 
 The pattern supports the following placeholders:
 - `{branch}` or `{branch-name}`: Replaced with the sanitized branch name
+- `{project}`: Replaced with the Git repository name (main working directory basename)
 
 ## Branch Name Sanitization
 
@@ -62,13 +63,15 @@ Branch names are automatically sanitized for filesystem compatibility:
 
 ## Pattern Examples
 
-| Pattern | Branch Name | Generated Directory |
-|---------|-------------|-------------------|
-| `../{branch}` | `feature/login` | `../feature-login` |
-| `.git/tasks/{branch}` | `fix/bug-123` | `.git/tasks/fix-bug-123` |
-| `worktrees/{branch}` | `hotfix/v1.2.3` | `worktrees/hotfix-v1.2.3` |
-| `~/work/{branch}` | `feature/new-ui` | `~/work/feature-new-ui` |
-| `../{branch}-wt` | `develop` | `../develop-wt` |
+| Pattern                     | Branch Name      | Generated Directory         |
+| --------------------------- | ---------------- | --------------------------- |
+| `../{branch}`               | `feature/login`  | `../feature-login`          |
+| `.git/tasks/{branch}`       | `fix/bug-123`    | `.git/tasks/fix-bug-123`    |
+| `worktrees/{branch}`        | `hotfix/v1.2.3`  | `worktrees/hotfix-v1.2.3`   |
+| `~/work/{branch}`           | `feature/new-ui` | `~/work/feature-new-ui`     |
+| `../{branch}-wt`            | `develop`        | `../develop-wt`             |
+| `../{project}-{branch}`     | `feature/auth`   | `../myproject-feature-auth` |
+| `~/work/{project}/{branch}` | `fix/typo`       | `~/work/myproject/fix-typo` |
 
 ## User Experience
 

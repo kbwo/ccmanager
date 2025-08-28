@@ -407,6 +407,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 					</Box>
 				)}
 				<NewWorktree
+					projectPath={selectedProject?.path || process.cwd()}
 					onComplete={handleCreateWorktree}
 					onCancel={handleCancelNewWorktree}
 				/>
