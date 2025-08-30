@@ -119,15 +119,15 @@ export class CodexStateDetector extends BaseStateDetector {
 
 		// Check for waiting prompts
 		if (
-			content.includes('│Allow') ||
-			content.includes('[y/N]') ||
-			content.includes('Press any key')
+			lowerContent.includes('allow command?') ||
+			lowerContent.includes('[y/n]') ||
+			lowerContent.includes('yes (y)')
 		) {
 			return 'waiting_input';
 		}
 
 		// Check for busy state
-		if (lowerContent.includes('press esc')) {
+		if (/esc.*interrupt/i.test(lowerContent)) {
 			return 'busy';
 		}
 
