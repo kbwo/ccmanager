@@ -370,9 +370,9 @@ describe('CodexStateDetector', () => {
 		detector = new CodexStateDetector();
 	});
 
-	it('should detect waiting_input state for │Allow pattern', () => {
+	it('should detect waiting_input state for Allow command? pattern', () => {
 		// Arrange
-		terminal = createMockTerminal(['Some output', '│Allow execution?', '│ > ']);
+		terminal = createMockTerminal(['Some output', 'Allow command?', '│ > ']);
 
 		// Act
 		const state = detector.detectState(terminal, 'idle');
@@ -381,9 +381,9 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
-	it('should detect waiting_input state for [y/N] pattern', () => {
+	it('should detect waiting_input state for [y/n] pattern', () => {
 		// Arrange
-		terminal = createMockTerminal(['Some output', 'Continue? [y/N]', '> ']);
+		terminal = createMockTerminal(['Some output', 'Continue? [y/n]', '> ']);
 
 		// Act
 		const state = detector.detectState(terminal, 'idle');
@@ -392,11 +392,11 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
-	it('should detect waiting_input state for Press any key pattern', () => {
+	it('should detect waiting_input state for yes (y) pattern', () => {
 		// Arrange
 		terminal = createMockTerminal([
 			'Some output',
-			'Press any key to continue...',
+			'Apply changes? yes (y) / no (n)',
 		]);
 
 		// Act
@@ -406,11 +406,11 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
-	it('should detect busy state for press esc pattern', () => {
+	it('should detect busy state for Esc to interrupt pattern', () => {
 		// Arrange
 		terminal = createMockTerminal([
 			'Processing...',
-			'press esc to cancel',
+			'Esc to interrupt',
 			'Working...',
 		]);
 
@@ -421,11 +421,11 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('busy');
 	});
 
-	it('should detect busy state for PRESS ESC (uppercase)', () => {
+	it('should detect busy state for ESC INTERRUPT (uppercase)', () => {
 		// Arrange
 		terminal = createMockTerminal([
 			'Processing...',
-			'PRESS ESC to stop',
+			'PRESS ESC TO INTERRUPT',
 			'Working...',
 		]);
 
@@ -449,7 +449,7 @@ describe('CodexStateDetector', () => {
 
 	it('should prioritize waiting_input over busy', () => {
 		// Arrange
-		terminal = createMockTerminal(['press esc to cancel', '[y/N]']);
+		terminal = createMockTerminal(['press esc to interrupt', '[y/n]']);
 
 		// Act
 		const state = detector.detectState(terminal, 'idle');
