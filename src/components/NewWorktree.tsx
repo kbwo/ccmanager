@@ -9,6 +9,7 @@ import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 
 interface NewWorktreeProps {
+	projectPath?: string;
 	onComplete: (
 		path: string,
 		branch: string,
@@ -31,7 +32,11 @@ interface BranchItem {
 	value: string;
 }
 
-const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
+const NewWorktree: React.FC<NewWorktreeProps> = ({
+	projectPath,
+	onComplete,
+	onCancel,
+}) => {
 	const worktreeConfig = configurationManager.getWorktreeConfig();
 	const isAutoDirectory = worktreeConfig.autoDirectory;
 	const limit = 10;
@@ -126,6 +131,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 		if (isAutoDirectory) {
 			// Generate path from branch name
 			const autoPath = generateWorktreeDirectory(
+				projectPath || process.cwd(),
 				branch,
 				worktreeConfig.autoDirectoryPattern,
 			);
@@ -138,9 +144,18 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({onComplete, onCancel}) => {
 	// Calculate generated path for preview (memoized to avoid expensive recalculations)
 	const generatedPath = useMemo(() => {
 		return isAutoDirectory && branch
-			? generateWorktreeDirectory(branch, worktreeConfig.autoDirectoryPattern)
+			? generateWorktreeDirectory(
+					projectPath || process.cwd(),
+					branch,
+					worktreeConfig.autoDirectoryPattern,
+				)
 			: '';
-	}, [isAutoDirectory, branch, worktreeConfig.autoDirectoryPattern]);
+	}, [
+		isAutoDirectory,
+		branch,
+		worktreeConfig.autoDirectoryPattern,
+		projectPath,
+	]);
 
 	return (
 		<Box flexDirection="column">

@@ -1,4 +1,4 @@
-import {describe, it, expect} from 'vitest';
+import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {
 	generateWorktreeDirectory,
 	extractBranchParts,
@@ -8,41 +8,62 @@ import {
 	assembleWorktreeLabel,
 } from './worktreeUtils.js';
 import {Worktree, Session} from '../types/index.js';
+import {execSync} from 'child_process';
+
+// Mock child_process module
+vi.mock('child_process');
 
 describe('generateWorktreeDirectory', () => {
+	const mockedExecSync = vi.mocked(execSync);
+	const projectPath = '/home/user/src/myproject';
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
 	describe('with default pattern', () => {
 		it('should generate directory with sanitized branch name', () => {
-			expect(generateWorktreeDirectory('feature/my-feature')).toBe(
+			expect(generateWorktreeDirectory(projectPath, 'feature/my-feature')).toBe(
 				'../feature-my-feature',
 			);
-			expect(generateWorktreeDirectory('bugfix/fix-123')).toBe(
+			expect(generateWorktreeDirectory(projectPath, 'bugfix/fix-123')).toBe(
 				'../bugfix-fix-123',
 			);
-			expect(generateWorktreeDirectory('release/v1.0.0')).toBe(
+			expect(generateWorktreeDirectory(projectPath, 'release/v1.0.0')).toBe(
 				'../release-v1.0.0',
 			);
 		});
 
 		it('should handle branch names without slashes', () => {
-			expect(generateWorktreeDirectory('main')).toBe('../main');
-			expect(generateWorktreeDirectory('develop')).toBe('../develop');
-			expect(generateWorktreeDirectory('my-feature')).toBe('../my-feature');
+			expect(generateWorktreeDirectory(projectPath, 'main')).toBe('../main');
+			expect(generateWorktreeDirectory(projectPath, 'develop')).toBe(
+				'../develop',
+			);
+			expect(generateWorktreeDirectory(projectPath, 'my-feature')).toBe(
+				'../my-feature',
+			);
 		});
 
 		it('should remove special characters', () => {
-			expect(generateWorktreeDirectory('feature/my@feature!')).toBe(
-				'../feature-myfeature',
+			expect(
+				generateWorktreeDirectory(projectPath, 'feature/my@feature!'),
+			).toBe('../feature-myfeature');
+			expect(generateWorktreeDirectory(projectPath, 'bugfix/#123')).toBe(
+				'../bugfix-123',
 			);
-			expect(generateWorktreeDirectory('bugfix/#123')).toBe('../bugfix-123');
-			expect(generateWorktreeDirectory('release/v1.0.0-beta')).toBe(
-				'../release-v1.0.0-beta',
-			);
+			expect(
+				generateWorktreeDirectory(projectPath, 'release/v1.0.0-beta'),
+			).toBe('../release-v1.0.0-beta');
 		});
 
 		it('should handle edge cases', () => {
-			expect(generateWorktreeDirectory('//feature//')).toBe('../feature');
-			expect(generateWorktreeDirectory('-feature-')).toBe('../feature');
-			expect(generateWorktreeDirectory('FEATURE/UPPERCASE')).toBe(
+			expect(generateWorktreeDirectory(projectPath, '//feature//')).toBe(
+				'../feature',
+			);
+			expect(generateWorktreeDirectory(projectPath, '-feature-')).toBe(
+				'../feature',
+			);
+			expect(generateWorktreeDirectory(projectPath, 'FEATURE/UPPERCASE')).toBe(
 				'../feature-uppercase',
 			);
 		});
@@ -52,27 +73,91 @@ describe('generateWorktreeDirectory', () => {
 		it('should use custom pattern with {branch} placeholder', () => {
 			expect(
 				generateWorktreeDirectory(
+					projectPath,
 					'feature/my-feature',
 					'../worktrees/{branch}',
 				),
 			).toBe('../worktrees/feature-my-feature');
-			expect(generateWorktreeDirectory('bugfix/123', '/tmp/{branch}-wt')).toBe(
-				'/tmp/bugfix-123-wt',
-			);
+			expect(
+				generateWorktreeDirectory(
+					projectPath,
+					'bugfix/123',
+					'/tmp/{branch}-wt',
+				),
+			).toBe('/tmp/bugfix-123-wt');
+		});
+
+		it('should use git repository name when in main working directory', () => {
+			mockedExecSync.mockReturnValue('.git');
+
+			expect(
+				generateWorktreeDirectory(
+					'/home/user/src/main-repo',
+					'feature/test',
+					'../worktrees/{project}-{branch}',
+				),
+			).toBe('../worktrees/main-repo-feature-test');
+		});
+
+		it('should use git repository name when git command succeeds (worktree case)', () => {
+			mockedExecSync.mockReturnValue('/home/user/src/main-repo/.git');
+
+			expect(
+				generateWorktreeDirectory(
+					'/home/user/src/worktree-branch',
+					'feature/test',
+					'../worktrees/{project}-{branch}',
+				),
+			).toBe('../worktrees/main-repo-feature-test');
+		});
+
+		it('should use custom pattern with {project} placeholder (fallback case)', () => {
+			mockedExecSync.mockImplementation(() => {
+				throw new Error(
+					'fatal: not a git repository (or any of the parent directories): .git',
+				);
+			});
+
+			expect(
+				generateWorktreeDirectory(
+					'/home/user/src/myproject',
+					'feature/test',
+					'../worktrees/{project}-{branch}',
+				),
+			).toBe('../worktrees/myproject-feature-test');
+			expect(
+				generateWorktreeDirectory(
+					'/home/user/src/foo',
+					'main',
+					'/tmp/{project}',
+				),
+			).toBe('/tmp/foo');
 		});
 
 		it('should handle patterns without placeholders', () => {
 			expect(
-				generateWorktreeDirectory('feature/test', '../fixed-directory'),
+				generateWorktreeDirectory(
+					projectPath,
+					'feature/test',
+					'../fixed-directory',
+				),
 			).toBe('../fixed-directory');
 		});
 
 		it('should normalize paths', () => {
 			expect(
-				generateWorktreeDirectory('feature/test', '../foo/../bar/{branch}'),
+				generateWorktreeDirectory(
+					projectPath,
+					'feature/test',
+					'../foo/../bar/{branch}',
+				),
 			).toBe('../bar/feature-test');
 			expect(
-				generateWorktreeDirectory('feature/test', './worktrees/{branch}'),
+				generateWorktreeDirectory(
+					projectPath,
+					'feature/test',
+					'./worktrees/{branch}',
+				),
 			).toBe('worktrees/feature-test');
 		});
 	});
