@@ -17,7 +17,6 @@ import {
 	DevcontainerConfig,
 	GitProject,
 } from '../types/index.js';
-import {shortcutManager} from '../services/shortcutManager.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
@@ -388,12 +387,6 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 					sessionManager={sessionManager}
 					onReturnToMenu={handleReturnToMenu}
 				/>
-				<Box marginTop={1}>
-					<Text dimColor>
-						Press {shortcutManager.getShortcutDisplay('returnToMenu')} to return
-						to menu
-					</Text>
-				</Box>
 			</Box>
 		);
 	}
