@@ -22,8 +22,9 @@ interface NewWorktreeProps {
 
 type Step =
 	| 'path'
-	| 'branch'
 	| 'base-branch'
+	| 'branch-strategy'
+	| 'branch'
 	| 'copy-settings'
 	| 'copy-session';
 
@@ -42,7 +43,9 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const limit = 10;
 
 	// Adjust initial step based on auto directory mode
-	const [step, setStep] = useState<Step>(isAutoDirectory ? 'branch' : 'path');
+	const [step, setStep] = useState<Step>(
+		isAutoDirectory ? 'base-branch' : 'path',
+	);
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
 	const [baseBranch, setBaseBranch] = useState('');
@@ -103,20 +106,32 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const handlePathSubmit = (value: string) => {
 		if (value.trim()) {
 			setPath(value.trim());
-			setStep('branch');
+			setStep('base-branch');
 		}
 	};
 
 	const handleBranchSubmit = (value: string) => {
 		if (value.trim()) {
 			setBranch(value.trim());
-			setStep('base-branch');
+			setStep('copy-settings');
 		}
 	};
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
 		setBaseBranch(item.value);
-		setStep('copy-settings');
+		setStep('branch-strategy');
+	};
+
+	const handleBranchStrategySelect = (item: {label: string; value: string}) => {
+		const useExisting = item.value === 'existing';
+		if (useExisting) {
+			// Use the base branch as the branch name for existing branch
+			setBranch(baseBranch);
+			setStep('copy-settings');
+		} else {
+			// Need to input new branch name
+			setStep('branch');
+		}
 	};
 
 	const handleCopySettingsSelect = (item: {label: string; value: boolean}) => {
@@ -180,55 +195,12 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 						/>
 					</Box>
 				</Box>
-			) : step === 'branch' && !isAutoDirectory ? (
-				<Box flexDirection="column">
-					<Box marginBottom={1}>
-						<Text>
-							Enter branch name for worktree at <Text color="cyan">{path}</Text>
-							:
-						</Text>
-					</Box>
-					<Box>
-						<Text color="cyan">{'> '}</Text>
-						<TextInputWrapper
-							value={branch}
-							onChange={setBranch}
-							onSubmit={handleBranchSubmit}
-							placeholder="e.g., feature/new-feature"
-						/>
-					</Box>
-				</Box>
-			) : step === 'branch' ? (
-				<Box flexDirection="column">
-					<Box marginBottom={1}>
-						<Text>Enter branch name (directory will be auto-generated):</Text>
-					</Box>
-					<Box>
-						<Text color="cyan">{'> '}</Text>
-						<TextInputWrapper
-							value={branch}
-							onChange={setBranch}
-							onSubmit={handleBranchSubmit}
-							placeholder="e.g., feature/new-feature"
-						/>
-					</Box>
-					{generatedPath && (
-						<Box marginTop={1}>
-							<Text dimColor>
-								Worktree will be created at:{' '}
-								<Text color="green">{generatedPath}</Text>
-							</Text>
-						</Box>
-					)}
-				</Box>
 			) : null}
 
 			{step === 'base-branch' && (
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
-						<Text>
-							Select base branch for <Text color="cyan">{branch}</Text>:
-						</Text>
+						<Text>Select base branch for the worktree:</Text>
 					</Box>
 					{isSearchMode && (
 						<Box marginBottom={1}>
@@ -270,6 +242,61 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					{!isSearchMode && (
 						<Box marginTop={1}>
 							<Text dimColor>Press / to search</Text>
+						</Box>
+					)}
+				</Box>
+			)}
+
+			{step === 'branch-strategy' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>
+							Base branch: <Text color="cyan">{baseBranch}</Text>
+						</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text>Choose branch creation strategy:</Text>
+					</Box>
+					<SelectInput
+						items={[
+							{
+								label: 'Create new branch from base branch',
+								value: 'new',
+							},
+							{
+								label: 'Use existing base branch',
+								value: 'existing',
+							},
+						]}
+						onSelect={handleBranchStrategySelect}
+						initialIndex={0}
+					/>
+				</Box>
+			)}
+
+			{step === 'branch' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>
+							Enter new branch name (will be created from{' '}
+							<Text color="cyan">{baseBranch}</Text>):
+						</Text>
+					</Box>
+					<Box>
+						<Text color="cyan">{'> '}</Text>
+						<TextInputWrapper
+							value={branch}
+							onChange={setBranch}
+							onSubmit={handleBranchSubmit}
+							placeholder="e.g., feature/new-feature"
+						/>
+					</Box>
+					{isAutoDirectory && generatedPath && (
+						<Box marginTop={1}>
+							<Text dimColor>
+								Worktree will be created at:{' '}
+								<Text color="green">{generatedPath}</Text>
+							</Text>
 						</Box>
 					)}
 				</Box>
