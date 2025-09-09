@@ -8,6 +8,7 @@ import DeleteWorktree from './DeleteWorktree.js';
 import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
+import RemoteBranchSelector from './RemoteBranchSelector.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -16,6 +17,8 @@ import {
 	Session as SessionType,
 	DevcontainerConfig,
 	GitProject,
+	AmbiguousBranchError,
+	RemoteBranchMatch,
 } from '../types/index.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {ENV_VARS} from '../constants/env.js';
@@ -33,6 +36,7 @@ type View =
 	| 'merge-worktree'
 	| 'configuration'
 	| 'preset-selector'
+	| 'remote-branch-selector'
 	| 'clearing';
 
 interface AppProps {
@@ -60,6 +64,16 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
 		null,
 	); // Store selected project in multi-project mode
+	
+	// State for remote branch disambiguation
+	const [pendingWorktreeCreation, setPendingWorktreeCreation] = useState<{
+		path: string;
+		branch: string;
+		baseBranch: string;
+		copySessionData: boolean;
+		copyClaudeDirectory: boolean;
+		ambiguousError: AmbiguousBranchError;
+	} | null>(null);
 
 	// Helper function to clear terminal screen
 	const clearScreen = () => {
@@ -269,14 +283,89 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 			// Success - return to menu
 			handleReturnToMenu();
 		} else {
-			// Show error
-			setError(result.error || 'Failed to create worktree');
-			setView('new-worktree');
+			// Check if this is an ambiguous branch error by parsing the error message
+			const errorMessage = result.error || 'Failed to create worktree';
+			const ambiguousBranchMatch = errorMessage.match(
+				/Ambiguous branch '(.+?)' found in multiple remotes: (.+?)\. Please specify which remote to use\./
+			);
+			
+			if (ambiguousBranchMatch) {
+				// Parse the error to extract branch matches
+				const branchName = ambiguousBranchMatch[1]!;
+				const remoteRefsText = ambiguousBranchMatch[2]!;
+				const remoteRefs = remoteRefsText.split(', ');
+				
+				// Create RemoteBranchMatch objects from the refs
+				const matches: RemoteBranchMatch[] = remoteRefs.map(fullRef => {
+					const parts = fullRef.split('/');
+					const remote = parts[0]!;
+					const branch = parts.slice(1).join('/');
+					return {
+						remote,
+						branch,
+						fullRef,
+					};
+				});
+				
+				// Create a mock AmbiguousBranchError for the UI
+				const ambiguousError = new AmbiguousBranchError(branchName, matches);
+				
+				// Store the pending creation data and show disambiguation UI
+				setPendingWorktreeCreation({
+					path,
+					branch,
+					baseBranch,
+					copySessionData,
+					copyClaudeDirectory,
+					ambiguousError,
+				});
+				
+				navigateWithClear('remote-branch-selector');
+			} else {
+				// Show regular error
+				setError(errorMessage);
+				setView('new-worktree');
+			}
 		}
 	};
 
 	const handleCancelNewWorktree = () => {
 		handleReturnToMenu();
+	};
+
+	const handleRemoteBranchSelected = async (selectedRemoteRef: string) => {
+		if (!pendingWorktreeCreation) return;
+
+		// Clear the pending creation data
+		const creationData = pendingWorktreeCreation;
+		setPendingWorktreeCreation(null);
+
+		// Retry worktree creation with the resolved base branch
+		setView('creating-worktree');
+		setError(null);
+
+		const result = await worktreeService.createWorktree(
+			creationData.path,
+			creationData.branch,
+			selectedRemoteRef, // Use the selected remote reference
+			creationData.copySessionData,
+			creationData.copyClaudeDirectory,
+		);
+
+		if (result.success) {
+			// Success - return to menu
+			handleReturnToMenu();
+		} else {
+			// Show error and return to new worktree form
+			setError(result.error || 'Failed to create worktree');
+			setView('new-worktree');
+		}
+	};
+
+	const handleRemoteBranchSelectorCancel = () => {
+		// Clear pending data and return to new worktree form
+		setPendingWorktreeCreation(null);
+		setView('new-worktree');
 	};
 
 	const handleDeleteWorktrees = async (
@@ -465,6 +554,17 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 			<PresetSelector
 				onSelect={handlePresetSelected}
 				onCancel={handlePresetSelectorCancel}
+			/>
+		);
+	}
+
+	if (view === 'remote-branch-selector' && pendingWorktreeCreation) {
+		return (
+			<RemoteBranchSelector
+				branchName={pendingWorktreeCreation.ambiguousError.branchName}
+				matches={pendingWorktreeCreation.ambiguousError.matches}
+				onSelect={handleRemoteBranchSelected}
+				onCancel={handleRemoteBranchSelectorCancel}
 			/>
 		);
 	}

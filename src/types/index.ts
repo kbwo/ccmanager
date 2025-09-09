@@ -168,6 +168,27 @@ export interface IProjectManager {
 	validateGitRepository(path: string): Promise<boolean>;
 }
 
+// Branch resolution types
+export interface RemoteBranchMatch {
+	remote: string;
+	branch: string;
+	fullRef: string; // e.g., "origin/foo/bar-xyz"
+}
+
+export class AmbiguousBranchError extends Error {
+	constructor(
+		public branchName: string,
+		public matches: RemoteBranchMatch[],
+	) {
+		super(
+			`Ambiguous branch '${branchName}' found in multiple remotes: ${matches
+				.map(m => m.fullRef)
+				.join(', ')}. Please specify which remote to use.`,
+		);
+		this.name = 'AmbiguousBranchError';
+	}
+}
+
 export interface IWorktreeService {
 	getWorktrees(): Worktree[];
 	getGitRootPath(): string;
