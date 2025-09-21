@@ -131,6 +131,70 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		};
 	}, [sessionManager, multiProject, selectedProject, navigateWithClear]);
 
+	// Helper function to parse ambiguous branch error and create AmbiguousBranchError
+	const parseAmbiguousBranchError = (
+		errorMessage: string,
+	): AmbiguousBranchError | null => {
+		const pattern =
+			/Ambiguous branch '(.+?)' found in multiple remotes: (.+?)\. Please specify which remote to use\./;
+		const match = errorMessage.match(pattern);
+
+		if (!match) {
+			return null;
+		}
+
+		const branchName = match[1]!;
+		const remoteRefsText = match[2]!;
+		const remoteRefs = remoteRefsText.split(', ');
+
+		// Parse remote refs into RemoteBranchMatch objects
+		const matches: RemoteBranchMatch[] = remoteRefs.map(fullRef => {
+			const parts = fullRef.split('/');
+			const remote = parts[0]!;
+			const branch = parts.slice(1).join('/');
+			return {
+				remote,
+				branch,
+				fullRef,
+			};
+		});
+
+		return new AmbiguousBranchError(branchName, matches);
+	};
+
+	// Helper function to handle worktree creation results
+	const handleWorktreeCreationResult = (
+		result: {success: boolean; error?: string},
+		creationData: {
+			path: string;
+			branch: string;
+			baseBranch: string;
+			copySessionData: boolean;
+			copyClaudeDirectory: boolean;
+		},
+	) => {
+		if (result.success) {
+			handleReturnToMenu();
+			return;
+		}
+
+		const errorMessage = result.error || 'Failed to create worktree';
+		const ambiguousError = parseAmbiguousBranchError(errorMessage);
+
+		if (ambiguousError) {
+			// Handle ambiguous branch error
+			setPendingWorktreeCreation({
+				...creationData,
+				ambiguousError,
+			});
+			navigateWithClear('remote-branch-selector');
+		} else {
+			// Handle regular error
+			setError(errorMessage);
+			setView('new-worktree');
+		}
+	};
+
 	const handleSelectWorktree = async (worktree: Worktree) => {
 		// Check if this is the new worktree option
 		if (worktree.path === '') {
@@ -279,54 +343,14 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 			copyClaudeDirectory,
 		);
 
-		if (result.success) {
-			// Success - return to menu
-			handleReturnToMenu();
-		} else {
-			// Check if this is an ambiguous branch error by parsing the error message
-			const errorMessage = result.error || 'Failed to create worktree';
-			const ambiguousBranchMatch = errorMessage.match(
-				/Ambiguous branch '(.+?)' found in multiple remotes: (.+?)\. Please specify which remote to use\./,
-			);
-
-			if (ambiguousBranchMatch) {
-				// Parse the error to extract branch matches
-				const branchName = ambiguousBranchMatch[1]!;
-				const remoteRefsText = ambiguousBranchMatch[2]!;
-				const remoteRefs = remoteRefsText.split(', ');
-
-				// Create RemoteBranchMatch objects from the refs
-				const matches: RemoteBranchMatch[] = remoteRefs.map(fullRef => {
-					const parts = fullRef.split('/');
-					const remote = parts[0]!;
-					const branch = parts.slice(1).join('/');
-					return {
-						remote,
-						branch,
-						fullRef,
-					};
-				});
-
-				// Create a mock AmbiguousBranchError for the UI
-				const ambiguousError = new AmbiguousBranchError(branchName, matches);
-
-				// Store the pending creation data and show disambiguation UI
-				setPendingWorktreeCreation({
-					path,
-					branch,
-					baseBranch,
-					copySessionData,
-					copyClaudeDirectory,
-					ambiguousError,
-				});
-
-				navigateWithClear('remote-branch-selector');
-			} else {
-				// Show regular error
-				setError(errorMessage);
-				setView('new-worktree');
-			}
-		}
+		// Handle the result using the helper function
+		handleWorktreeCreationResult(result, {
+			path,
+			branch,
+			baseBranch,
+			copySessionData,
+			copyClaudeDirectory,
+		});
 	};
 
 	const handleCancelNewWorktree = () => {
