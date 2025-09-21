@@ -250,13 +250,16 @@ origin/feature/test
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')) {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
 						return ''; // Local branch exists
 					}
 				}
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const result = (service as any).resolveBranchReference('foo/bar-xyz');
 			expect(result).toBe('foo/bar-xyz');
 		});
@@ -267,22 +270,33 @@ origin/feature/test
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')) {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\nupstream\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						)
+					) {
 						return ''; // Remote branch exists in origin
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
 						throw new Error('Remote branch not found in upstream');
 					}
 				}
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const result = (service as any).resolveBranchReference('foo/bar-xyz');
 			expect(result).toBe('origin/foo/bar-xyz');
 		});
@@ -293,14 +307,22 @@ origin/feature/test
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')) {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\nupstream\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz') ||
-						cmd.includes('show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
 						return ''; // Both remotes have the branch
 					}
 				}
@@ -308,8 +330,11 @@ origin/feature/test
 			});
 
 			expect(() => {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				(service as any).resolveBranchReference('foo/bar-xyz');
-			}).toThrow('Ambiguous branch \'foo/bar-xyz\' found in multiple remotes: origin/foo/bar-xyz, upstream/foo/bar-xyz. Please specify which remote to use.');
+			}).toThrow(
+				"Ambiguous branch 'foo/bar-xyz' found in multiple remotes: origin/foo/bar-xyz, upstream/foo/bar-xyz. Please specify which remote to use.",
+			);
 		});
 
 		it('should return original branch name when no branches exist', () => {
@@ -325,7 +350,10 @@ origin/feature/test
 				throw new Error('Branch not found');
 			});
 
-			const result = (service as any).resolveBranchReference('nonexistent-branch');
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const result = (service as any).resolveBranchReference(
+				'nonexistent-branch',
+			);
 			expect(result).toBe('nonexistent-branch');
 		});
 
@@ -342,6 +370,7 @@ origin/feature/test
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const result = (service as any).resolveBranchReference('some-branch');
 			expect(result).toBe('some-branch');
 		});
@@ -352,7 +381,9 @@ origin/feature/test
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')) {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
 						return ''; // Local branch exists
 					}
 					// Remote commands should not be called when local exists
@@ -360,6 +391,7 @@ origin/feature/test
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const result = (service as any).resolveBranchReference('foo/bar-xyz');
 			expect(result).toBe('foo/bar-xyz');
 		});
@@ -429,14 +461,22 @@ origin/feature/test
 					if (cmd.includes('rev-parse --verify new-feature')) {
 						throw new Error('Branch not found');
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')) {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\nupstream\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz') ||
-						cmd.includes('show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
 						return ''; // Both remotes have the branch
 					}
 				}
@@ -450,8 +490,12 @@ origin/feature/test
 			);
 
 			expect(result.success).toBe(false);
-			expect(result.error).toContain('Ambiguous branch \'foo/bar-xyz\' found in multiple remotes');
-			expect(result.error).toContain('origin/foo/bar-xyz, upstream/foo/bar-xyz');
+			expect(result.error).toContain(
+				"Ambiguous branch 'foo/bar-xyz' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/foo/bar-xyz, upstream/foo/bar-xyz',
+			);
 		});
 
 		it('should create worktree from specified base branch when branch does not exist', async () => {
@@ -882,14 +926,24 @@ branch refs/heads/other-branch
 					if (cmd.includes('rev-parse --verify new-feature')) {
 						throw new Error('Branch not found');
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/ambiguous-branch')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/ambiguous-branch',
+						)
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\nupstream\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/ambiguous-branch') ||
-						cmd.includes('show-ref --verify --quiet refs/remotes/upstream/ambiguous-branch')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/ambiguous-branch',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/ambiguous-branch',
+						)
+					) {
 						return ''; // Both remotes have the branch
 					}
 				}
@@ -903,8 +957,12 @@ branch refs/heads/other-branch
 			);
 
 			expect(result.success).toBe(false);
-			expect(result.error).toContain('Ambiguous branch \'ambiguous-branch\' found in multiple remotes');
-			expect(result.error).toContain('origin/ambiguous-branch, upstream/ambiguous-branch');
+			expect(result.error).toContain(
+				"Ambiguous branch 'ambiguous-branch' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/ambiguous-branch, upstream/ambiguous-branch',
+			);
 			expect(result.error).toContain('Please specify which remote to use');
 		});
 
@@ -918,17 +976,29 @@ branch refs/heads/other-branch
 						throw new Error('Branch not found');
 					}
 					// Simulate resolved reference (origin/ambiguous-branch) exists
-					if (cmd.includes('show-ref --verify --quiet refs/heads/origin/ambiguous-branch')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/origin/ambiguous-branch',
+						)
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/origin/ambiguous-branch')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/origin/ambiguous-branch',
+						)
+					) {
 						throw new Error('Remote branch not found'); // This is expected for resolved reference
 					}
 					// Mock successful worktree creation with resolved reference
-					if (cmd.includes('git worktree add -b "new-feature" "/path/to/worktree" "origin/ambiguous-branch"')) {
+					if (
+						cmd.includes(
+							'git worktree add -b "new-feature" "/path/to/worktree" "origin/ambiguous-branch"',
+						)
+					) {
 						return '';
 					}
 				}
@@ -959,16 +1029,28 @@ branch refs/heads/other-branch
 					if (cmd.includes('rev-parse --verify test-branch')) {
 						throw new Error('Branch not found');
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/three-way-branch')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/three-way-branch',
+						)
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\nupstream\nfork\n';
 					}
 					// All three remotes have the branch
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/three-way-branch') ||
-						cmd.includes('show-ref --verify --quiet refs/remotes/upstream/three-way-branch') ||
-						cmd.includes('show-ref --verify --quiet refs/remotes/fork/three-way-branch')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/three-way-branch',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/three-way-branch',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/fork/three-way-branch',
+						)
+					) {
 						return '';
 					}
 				}
@@ -982,8 +1064,12 @@ branch refs/heads/other-branch
 			);
 
 			expect(result.success).toBe(false);
-			expect(result.error).toContain('Ambiguous branch \'three-way-branch\' found in multiple remotes');
-			expect(result.error).toContain('origin/three-way-branch, upstream/three-way-branch, fork/three-way-branch');
+			expect(result.error).toContain(
+				"Ambiguous branch 'three-way-branch' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/three-way-branch, upstream/three-way-branch, fork/three-way-branch',
+			);
 		});
 
 		it('should handle complex branch names with slashes in ambiguous scenario', async () => {
@@ -995,14 +1081,24 @@ branch refs/heads/other-branch
 					if (cmd.includes('rev-parse --verify new-feature')) {
 						throw new Error('Branch not found');
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/feature/sub/complex-name')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/feature/sub/complex-name',
+						)
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\nfork\n';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/feature/sub/complex-name') ||
-						cmd.includes('show-ref --verify --quiet refs/remotes/fork/feature/sub/complex-name')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/feature/sub/complex-name',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/fork/feature/sub/complex-name',
+						)
+					) {
 						return '';
 					}
 				}
@@ -1016,8 +1112,12 @@ branch refs/heads/other-branch
 			);
 
 			expect(result.success).toBe(false);
-			expect(result.error).toContain('Ambiguous branch \'feature/sub/complex-name\' found in multiple remotes');
-			expect(result.error).toContain('origin/feature/sub/complex-name, fork/feature/sub/complex-name');
+			expect(result.error).toContain(
+				"Ambiguous branch 'feature/sub/complex-name' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/feature/sub/complex-name, fork/feature/sub/complex-name',
+			);
 		});
 
 		it('should successfully resolve single remote branch with slashes', async () => {
@@ -1029,21 +1129,37 @@ branch refs/heads/other-branch
 					if (cmd.includes('rev-parse --verify new-feature')) {
 						throw new Error('Branch not found');
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/heads/feature/auto-resolve')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/feature/auto-resolve',
+						)
+					) {
 						throw new Error('Local branch not found');
 					}
 					if (cmd === 'git remote') {
 						return 'origin\nupstream\n';
 					}
 					// Only origin has this branch
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/origin/feature/auto-resolve')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/feature/auto-resolve',
+						)
+					) {
 						return '';
 					}
-					if (cmd.includes('show-ref --verify --quiet refs/remotes/upstream/feature/auto-resolve')) {
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/feature/auto-resolve',
+						)
+					) {
 						throw new Error('Remote branch not found');
 					}
 					// Mock successful worktree creation with auto-resolved reference
-					if (cmd.includes('git worktree add -b "new-feature" "/path/to/worktree" "origin/feature/auto-resolve"')) {
+					if (
+						cmd.includes(
+							'git worktree add -b "new-feature" "/path/to/worktree" "origin/feature/auto-resolve"',
+						)
+					) {
 						return '';
 					}
 				}
@@ -1075,12 +1191,18 @@ branch refs/heads/other-branch
 						throw new Error('Branch not found');
 					}
 					// Local branch exists (highest priority)
-					if (cmd.includes('show-ref --verify --quiet refs/heads/local-priority')) {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/local-priority')
+					) {
 						return '';
 					}
 					// Remote checks should not be executed when local exists
 					// Mock successful worktree creation with local branch
-					if (cmd.includes('git worktree add -b "new-feature" "/path/to/worktree" "local-priority"')) {
+					if (
+						cmd.includes(
+							'git worktree add -b "new-feature" "/path/to/worktree" "local-priority"',
+						)
+					) {
 						return '';
 					}
 				}

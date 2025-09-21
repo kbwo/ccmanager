@@ -64,7 +64,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
 		null,
 	); // Store selected project in multi-project mode
-	
+
 	// State for remote branch disambiguation
 	const [pendingWorktreeCreation, setPendingWorktreeCreation] = useState<{
 		path: string;
@@ -286,15 +286,15 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 			// Check if this is an ambiguous branch error by parsing the error message
 			const errorMessage = result.error || 'Failed to create worktree';
 			const ambiguousBranchMatch = errorMessage.match(
-				/Ambiguous branch '(.+?)' found in multiple remotes: (.+?)\. Please specify which remote to use\./
+				/Ambiguous branch '(.+?)' found in multiple remotes: (.+?)\. Please specify which remote to use\./,
 			);
-			
+
 			if (ambiguousBranchMatch) {
 				// Parse the error to extract branch matches
 				const branchName = ambiguousBranchMatch[1]!;
 				const remoteRefsText = ambiguousBranchMatch[2]!;
 				const remoteRefs = remoteRefsText.split(', ');
-				
+
 				// Create RemoteBranchMatch objects from the refs
 				const matches: RemoteBranchMatch[] = remoteRefs.map(fullRef => {
 					const parts = fullRef.split('/');
@@ -306,10 +306,10 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 						fullRef,
 					};
 				});
-				
+
 				// Create a mock AmbiguousBranchError for the UI
 				const ambiguousError = new AmbiguousBranchError(branchName, matches);
-				
+
 				// Store the pending creation data and show disambiguation UI
 				setPendingWorktreeCreation({
 					path,
@@ -319,7 +319,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 					copyClaudeDirectory,
 					ambiguousError,
 				});
-				
+
 				navigateWithClear('remote-branch-selector');
 			} else {
 				// Show regular error

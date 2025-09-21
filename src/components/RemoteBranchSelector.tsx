@@ -43,13 +43,14 @@ const RemoteBranchSelector: React.FC<RemoteBranchSelectorProps> = ({
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="yellow">
-					⚠️  Ambiguous Branch Reference
+					⚠️ Ambiguous Branch Reference
 				</Text>
 			</Box>
 
 			<Box marginBottom={1}>
 				<Text>
-					Branch <Text color="cyan">'{branchName}'</Text> exists in multiple remotes.
+					Branch <Text color="cyan">&apos;{branchName}&apos;</Text> exists in
+					multiple remotes.
 				</Text>
 			</Box>
 
@@ -67,7 +68,8 @@ const RemoteBranchSelector: React.FC<RemoteBranchSelectorProps> = ({
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Press ↑↓ to navigate, Enter to select, {shortcutManager.getShortcutDisplay('cancel')} to cancel
+					Press ↑↓ to navigate, Enter to select,{' '}
+					{shortcutManager.getShortcutDisplay('cancel')} to cancel
 				</Text>
 			</Box>
 		</Box>

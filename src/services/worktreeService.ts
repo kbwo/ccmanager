@@ -1,7 +1,11 @@
 import {execSync} from 'child_process';
 import {existsSync, statSync, cpSync} from 'fs';
 import path from 'path';
-import {Worktree, AmbiguousBranchError, RemoteBranchMatch} from '../types/index.js';
+import {
+	Worktree,
+	AmbiguousBranchError,
+	RemoteBranchMatch,
+} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 import {
 	getClaudeProjectsDir,
@@ -216,7 +220,7 @@ export class WorktreeService {
 	/**
 	 * Resolves a branch name to its proper git reference.
 	 * Handles multiple remotes and throws AmbiguousBranchError when disambiguation is needed.
-	 * 
+	 *
 	 * Priority order:
 	 * 1. Local branch exists -> return as-is
 	 * 2. Single remote branch -> return remote/branch
@@ -244,10 +248,13 @@ export class WorktreeService {
 			// Check each remote for the branch
 			for (const remote of remotes) {
 				try {
-					execSync(`git show-ref --verify --quiet refs/remotes/${remote}/${branchName}`, {
-						cwd: this.rootPath,
-						encoding: 'utf8',
-					});
+					execSync(
+						`git show-ref --verify --quiet refs/remotes/${remote}/${branchName}`,
+						{
+							cwd: this.rootPath,
+							encoding: 'utf8',
+						},
+					);
 					// Remote branch exists
 					remoteBranchMatches.push({
 						remote,
@@ -289,7 +296,7 @@ export class WorktreeService {
 				cwd: this.rootPath,
 				encoding: 'utf8',
 			});
-			
+
 			return output
 				.trim()
 				.split('\n')

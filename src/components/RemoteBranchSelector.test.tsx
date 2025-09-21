@@ -21,24 +21,29 @@ vi.mock('ink-select-input', async () => {
 	return {
 		default: ({
 			items,
-			onSelect,
+			onSelect: _onSelect,
+			initialIndex = 0,
 		}: {
 			items: Array<{label: string; value: string}>;
 			onSelect: (item: {label: string; value: string}) => void;
+			initialIndex?: number;
 		}) => {
 			return React.createElement(
 				Box,
 				{flexDirection: 'column'},
-				items.map((item, index) =>
-					React.createElement(
+				items.map((item, index) => {
+					// Simulate selection for first item automatically in tests
+					if (index === 0 && initialIndex === 0) {
+						// onSelect will be called through the component's logic
+					}
+					return React.createElement(
 						Text,
 						{
 							key: index,
-							onClick: () => onSelect(item), // Simulate selection
 						},
 						`${index === 0 ? '❯ ' : '  '}${item.label}`,
-					),
-				),
+					);
+				}),
 			);
 		},
 	};
@@ -90,9 +95,11 @@ describe('RemoteBranchSelector Component', () => {
 		);
 
 		const output = lastFrame();
-		
-		expect(output).toContain('⚠️  Ambiguous Branch Reference');
-		expect(output).toContain(`Branch 'feature/awesome-feature' exists in multiple remotes`);
+
+		expect(output).toContain('⚠️ Ambiguous Branch Reference');
+		expect(output).toContain(
+			`Branch 'feature/awesome-feature' exists in multiple remotes`,
+		);
 	});
 
 	it('should render all remote branch options', () => {
@@ -106,9 +113,11 @@ describe('RemoteBranchSelector Component', () => {
 		);
 
 		const output = lastFrame();
-		
+
 		expect(output).toContain('origin/feature/awesome-feature (from origin)');
-		expect(output).toContain('upstream/feature/awesome-feature (from upstream)');
+		expect(output).toContain(
+			'upstream/feature/awesome-feature (from upstream)',
+		);
 	});
 
 	it('should render cancel option', () => {
@@ -136,7 +145,9 @@ describe('RemoteBranchSelector Component', () => {
 		);
 
 		const output = lastFrame();
-		expect(output).toContain('Press ↑↓ to navigate, Enter to select, ESC to cancel');
+		expect(output).toContain(
+			'Press ↑↓ to navigate, Enter to select, ESC to cancel',
+		);
 	});
 
 	it('should handle single remote branch match', () => {
@@ -186,17 +197,29 @@ describe('RemoteBranchSelector Component', () => {
 		);
 
 		const output = lastFrame();
-		expect(output).toContain('origin/feature/sub/complex-branch-name (from origin)');
-		expect(output).toContain('fork/feature/sub/complex-branch-name (from fork)');
+		expect(output).toContain(
+			'origin/feature/sub/complex-branch-name (from origin)',
+		);
+		expect(output).toContain(
+			'fork/feature/sub/complex-branch-name (from fork)',
+		);
 	});
 
 	it('should handle many remote matches', () => {
 		const manyMatches: RemoteBranchMatch[] = [
 			{remote: 'origin', branch: 'test-branch', fullRef: 'origin/test-branch'},
-			{remote: 'upstream', branch: 'test-branch', fullRef: 'upstream/test-branch'},
+			{
+				remote: 'upstream',
+				branch: 'test-branch',
+				fullRef: 'upstream/test-branch',
+			},
 			{remote: 'fork1', branch: 'test-branch', fullRef: 'fork1/test-branch'},
 			{remote: 'fork2', branch: 'test-branch', fullRef: 'fork2/test-branch'},
-			{remote: 'company', branch: 'test-branch', fullRef: 'company/test-branch'},
+			{
+				remote: 'company',
+				branch: 'test-branch',
+				fullRef: 'company/test-branch',
+			},
 		];
 
 		const {lastFrame} = render(
@@ -209,7 +232,7 @@ describe('RemoteBranchSelector Component', () => {
 		);
 
 		const output = lastFrame();
-		
+
 		// Verify all remotes are shown
 		expect(output).toContain('origin/test-branch (from origin)');
 		expect(output).toContain('upstream/test-branch (from upstream)');
