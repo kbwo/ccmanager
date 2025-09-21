@@ -243,6 +243,160 @@ origin/feature/test
 		});
 	});
 
+	describe('resolveBranchReference', () => {
+		it('should return local branch when it exists', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
+						return ''; // Local branch exists
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const result = (service as any).resolveBranchReference('foo/bar-xyz');
+			expect(result).toBe('foo/bar-xyz');
+		});
+
+		it('should return single remote branch when local does not exist', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						)
+					) {
+						return ''; // Remote branch exists in origin
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
+						throw new Error('Remote branch not found in upstream');
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const result = (service as any).resolveBranchReference('foo/bar-xyz');
+			expect(result).toBe('origin/foo/bar-xyz');
+		});
+
+		it('should throw AmbiguousBranchError when multiple remotes have the branch', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
+						return ''; // Both remotes have the branch
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			expect(() => {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				(service as any).resolveBranchReference('foo/bar-xyz');
+			}).toThrow(
+				"Ambiguous branch 'foo/bar-xyz' found in multiple remotes: origin/foo/bar-xyz, upstream/foo/bar-xyz. Please specify which remote to use.",
+			);
+		});
+
+		it('should return original branch name when no branches exist', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git remote') {
+						return 'origin\n';
+					}
+				}
+				throw new Error('Branch not found');
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const result = (service as any).resolveBranchReference(
+				'nonexistent-branch',
+			);
+			expect(result).toBe('nonexistent-branch');
+		});
+
+		it('should handle no remotes gracefully', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git remote') {
+						return ''; // No remotes
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const result = (service as any).resolveBranchReference('some-branch');
+			expect(result).toBe('some-branch');
+		});
+
+		it('should prefer local branch over remote branches', () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
+						return ''; // Local branch exists
+					}
+					// Remote commands should not be called when local exists
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const result = (service as any).resolveBranchReference('foo/bar-xyz');
+			expect(result).toBe('foo/bar-xyz');
+		});
+	});
+
 	describe('createWorktree', () => {
 		it('should create worktree with base branch when branch does not exist', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
@@ -295,6 +449,52 @@ origin/feature/test
 			expect(execSync).toHaveBeenCalledWith(
 				'git worktree add "/path/to/worktree" "existing-feature"',
 				expect.any(Object),
+			);
+		});
+
+		it('should handle ambiguous branch error gracefully', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify new-feature')) {
+						throw new Error('Branch not found');
+					}
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
+						return ''; // Both remotes have the branch
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const result = await service.createWorktree(
+				'/path/to/worktree',
+				'new-feature',
+				'foo/bar-xyz', // This will trigger the ambiguous branch error
+			);
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain(
+				"Ambiguous branch 'foo/bar-xyz' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/foo/bar-xyz, upstream/foo/bar-xyz',
 			);
 		});
 
@@ -713,6 +913,320 @@ branch refs/heads/other-branch
 			// Assert
 			expect(result.success).toBe(true);
 			expect(mockedExecuteHook).toHaveBeenCalled();
+		});
+	});
+
+	describe('AmbiguousBranchError Integration', () => {
+		it('should return error message when createWorktree encounters ambiguous branch', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify new-feature')) {
+						throw new Error('Branch not found');
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/ambiguous-branch',
+						)
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/ambiguous-branch',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/ambiguous-branch',
+						)
+					) {
+						return ''; // Both remotes have the branch
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const result = await service.createWorktree(
+				'/path/to/worktree',
+				'new-feature',
+				'ambiguous-branch', // This will trigger the ambiguous branch error
+			);
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain(
+				"Ambiguous branch 'ambiguous-branch' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/ambiguous-branch, upstream/ambiguous-branch',
+			);
+			expect(result.error).toContain('Please specify which remote to use');
+		});
+
+		it('should successfully create worktree with resolved remote reference', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify new-feature')) {
+						throw new Error('Branch not found');
+					}
+					// Simulate resolved reference (origin/ambiguous-branch) exists
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/origin/ambiguous-branch',
+						)
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/origin/ambiguous-branch',
+						)
+					) {
+						throw new Error('Remote branch not found'); // This is expected for resolved reference
+					}
+					// Mock successful worktree creation with resolved reference
+					if (
+						cmd.includes(
+							'git worktree add -b "new-feature" "/path/to/worktree" "origin/ambiguous-branch"',
+						)
+					) {
+						return '';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockReturnValue(false);
+
+			const result = await service.createWorktree(
+				'/path/to/worktree',
+				'new-feature',
+				'origin/ambiguous-branch', // Pre-resolved reference
+			);
+
+			expect(result.success).toBe(true);
+			expect(mockedExecSync).toHaveBeenCalledWith(
+				'git worktree add -b "new-feature" "/path/to/worktree" "origin/ambiguous-branch"',
+				{cwd: '/fake/path', encoding: 'utf8'},
+			);
+		});
+
+		it('should handle three-way ambiguous branch scenario', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify test-branch')) {
+						throw new Error('Branch not found');
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/three-way-branch',
+						)
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\nfork\n';
+					}
+					// All three remotes have the branch
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/three-way-branch',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/three-way-branch',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/fork/three-way-branch',
+						)
+					) {
+						return '';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const result = await service.createWorktree(
+				'/path/to/worktree',
+				'test-branch',
+				'three-way-branch',
+			);
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain(
+				"Ambiguous branch 'three-way-branch' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/three-way-branch, upstream/three-way-branch, fork/three-way-branch',
+			);
+		});
+
+		it('should handle complex branch names with slashes in ambiguous scenario', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify new-feature')) {
+						throw new Error('Branch not found');
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/feature/sub/complex-name',
+						)
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nfork\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/feature/sub/complex-name',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/fork/feature/sub/complex-name',
+						)
+					) {
+						return '';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const result = await service.createWorktree(
+				'/path/to/worktree',
+				'new-feature',
+				'feature/sub/complex-name',
+			);
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain(
+				"Ambiguous branch 'feature/sub/complex-name' found in multiple remotes",
+			);
+			expect(result.error).toContain(
+				'origin/feature/sub/complex-name, fork/feature/sub/complex-name',
+			);
+		});
+
+		it('should successfully resolve single remote branch with slashes', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify new-feature')) {
+						throw new Error('Branch not found');
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/heads/feature/auto-resolve',
+						)
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\n';
+					}
+					// Only origin has this branch
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/feature/auto-resolve',
+						)
+					) {
+						return '';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/feature/auto-resolve',
+						)
+					) {
+						throw new Error('Remote branch not found');
+					}
+					// Mock successful worktree creation with auto-resolved reference
+					if (
+						cmd.includes(
+							'git worktree add -b "new-feature" "/path/to/worktree" "origin/feature/auto-resolve"',
+						)
+					) {
+						return '';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockReturnValue(false);
+
+			const result = await service.createWorktree(
+				'/path/to/worktree',
+				'new-feature',
+				'feature/auto-resolve', // Should auto-resolve to origin/feature/auto-resolve
+			);
+
+			expect(result.success).toBe(true);
+			expect(mockedExecSync).toHaveBeenCalledWith(
+				'git worktree add -b "new-feature" "/path/to/worktree" "origin/feature/auto-resolve"',
+				{cwd: '/fake/path', encoding: 'utf8'},
+			);
+		});
+
+		it('should prioritize local branch over remote branches', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify new-feature')) {
+						throw new Error('Branch not found');
+					}
+					// Local branch exists (highest priority)
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/local-priority')
+					) {
+						return '';
+					}
+					// Remote checks should not be executed when local exists
+					// Mock successful worktree creation with local branch
+					if (
+						cmd.includes(
+							'git worktree add -b "new-feature" "/path/to/worktree" "local-priority"',
+						)
+					) {
+						return '';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			mockedExistsSync.mockReturnValue(false);
+
+			const result = await service.createWorktree(
+				'/path/to/worktree',
+				'new-feature',
+				'local-priority',
+			);
+
+			expect(result.success).toBe(true);
+			expect(mockedExecSync).toHaveBeenCalledWith(
+				'git worktree add -b "new-feature" "/path/to/worktree" "local-priority"',
+				{cwd: '/fake/path', encoding: 'utf8'},
+			);
+			// Verify remote command was never called since local branch exists
+			expect(mockedExecSync).not.toHaveBeenCalledWith(
+				'git remote',
+				expect.any(Object),
+			);
 		});
 	});
 });

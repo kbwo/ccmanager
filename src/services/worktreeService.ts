@@ -1,7 +1,11 @@
 import {execSync} from 'child_process';
 import {existsSync, statSync, cpSync} from 'fs';
 import path from 'path';
-import {Worktree} from '../types/index.js';
+import {
+	Worktree,
+	AmbiguousBranchError,
+	RemoteBranchMatch,
+} from '../types/index.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 import {
 	getClaudeProjectsDir,
@@ -213,6 +217,96 @@ export class WorktreeService {
 		}
 	}
 
+	/**
+	 * Resolves a branch name to its proper git reference.
+	 * Handles multiple remotes and throws AmbiguousBranchError when disambiguation is needed.
+	 *
+	 * Priority order:
+	 * 1. Local branch exists -> return as-is
+	 * 2. Single remote branch -> return remote/branch
+	 * 3. Multiple remote branches -> throw AmbiguousBranchError
+	 * 4. No branches found -> return original (let git handle error)
+	 */
+	private resolveBranchReference(branchName: string): string {
+		try {
+			// First check if local branch exists (highest priority)
+			try {
+				execSync(`git show-ref --verify --quiet refs/heads/${branchName}`, {
+					cwd: this.rootPath,
+					encoding: 'utf8',
+				});
+				// Local branch exists, use it as-is
+				return branchName;
+			} catch {
+				// Local branch doesn't exist, check remotes
+			}
+
+			// Get all remotes
+			const remotes = this.getAllRemotes();
+			const remoteBranchMatches: RemoteBranchMatch[] = [];
+
+			// Check each remote for the branch
+			for (const remote of remotes) {
+				try {
+					execSync(
+						`git show-ref --verify --quiet refs/remotes/${remote}/${branchName}`,
+						{
+							cwd: this.rootPath,
+							encoding: 'utf8',
+						},
+					);
+					// Remote branch exists
+					remoteBranchMatches.push({
+						remote,
+						branch: branchName,
+						fullRef: `${remote}/${branchName}`,
+					});
+				} catch {
+					// This remote doesn't have the branch, continue
+				}
+			}
+
+			// Handle results based on number of matches
+			if (remoteBranchMatches.length === 0) {
+				// No remote branches found, return original (let git handle the error)
+				return branchName;
+			} else if (remoteBranchMatches.length === 1) {
+				// Single remote branch found, use it
+				return remoteBranchMatches[0]!.fullRef;
+			} else {
+				// Multiple remote branches found, throw ambiguous error
+				throw new AmbiguousBranchError(branchName, remoteBranchMatches);
+			}
+		} catch (error) {
+			// Re-throw AmbiguousBranchError as-is
+			if (error instanceof AmbiguousBranchError) {
+				throw error;
+			}
+			// For any other error, return original branch name
+			return branchName;
+		}
+	}
+
+	/**
+	 * Gets all git remotes for this repository.
+	 */
+	private getAllRemotes(): string[] {
+		try {
+			const output = execSync('git remote', {
+				cwd: this.rootPath,
+				encoding: 'utf8',
+			});
+
+			return output
+				.trim()
+				.split('\n')
+				.filter(remote => remote.length > 0);
+		} catch {
+			// If git remote fails, return empty array
+			return [];
+		}
+	}
+
 	async createWorktree(
 		worktreePath: string,
 		branch: string,
@@ -243,8 +337,26 @@ export class WorktreeService {
 			if (branchExists) {
 				command = `git worktree add "${resolvedPath}" "${branch}"`;
 			} else {
-				// Create new branch from specified base branch
-				command = `git worktree add -b "${branch}" "${resolvedPath}" "${baseBranch}"`;
+				// Resolve the base branch to its proper git reference
+				try {
+					const resolvedBaseBranch = this.resolveBranchReference(baseBranch);
+					// Create new branch from specified base branch
+					command = `git worktree add -b "${branch}" "${resolvedPath}" "${resolvedBaseBranch}"`;
+				} catch (error) {
+					if (error instanceof AmbiguousBranchError) {
+						// TODO: Future enhancement - show disambiguation modal in UI
+						// The UI should present the available remote options to the user:
+						// - origin/foo/bar-xyz
+						// - upstream/foo/bar-xyz
+						// For now, return error message to be displayed to user
+						return {
+							success: false,
+							error: error.message,
+						};
+					}
+					// Re-throw any other errors
+					throw error;
+				}
 			}
 
 			execSync(command, {
