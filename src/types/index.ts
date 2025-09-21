@@ -6,7 +6,7 @@ export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
-export type StateDetectionStrategy = 'claude' | 'gemini' | 'codex';
+export type StateDetectionStrategy = 'claude' | 'gemini' | 'codex' | 'cursor';
 
 export interface Worktree {
 	path: string;
