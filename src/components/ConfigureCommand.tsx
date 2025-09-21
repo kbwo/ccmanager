@@ -5,7 +5,33 @@ import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import Confirmation from './Confirmation.js';
-import {CommandPreset} from '../types/index.js';
+import {CommandPreset, StateDetectionStrategy} from '../types/index.js';
+
+// Helper type to create a record that requires all strategies
+type AllStrategiesRecord = Record<
+	StateDetectionStrategy,
+	{label: string; value: StateDetectionStrategy}
+>;
+
+// This function ensures all strategies are included at compile time
+const createStrategyItems = (): {
+	label: string;
+	value: StateDetectionStrategy;
+}[] => {
+	// This object MUST include all StateDetectionStrategy values as keys
+	// If any are missing, TypeScript will error
+	const strategies: AllStrategiesRecord = {
+		claude: {label: 'Claude', value: 'claude'},
+		gemini: {label: 'Gemini', value: 'gemini'},
+		codex: {label: 'Codex', value: 'codex'},
+		cursor: {label: 'Cursor Agent', value: 'cursor'},
+	};
+
+	return Object.values(strategies);
+};
+
+// Type-safe strategy items that ensures all StateDetectionStrategy values are included
+const ALL_STRATEGY_ITEMS = createStrategyItems();
 
 interface ConfigureCommandProps {
 	onComplete: () => void;
@@ -26,6 +52,8 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 			return 'Gemini';
 		case 'codex':
 			return 'Codex';
+		case 'cursor':
+			return 'Cursor';
 		default:
 			return 'Claude';
 	}
@@ -309,11 +337,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		const preset = presets.find(p => p.id === selectedPresetId);
 		if (!preset) return null;
 
-		const strategyItems = [
-			{label: 'Claude', value: 'claude'},
-			{label: 'Gemini', value: 'gemini'},
-			{label: 'Codex', value: 'codex'},
-		];
+		const strategyItems = ALL_STRATEGY_ITEMS;
 
 		const currentStrategy = preset.detectionStrategy || 'claude';
 		const initialIndex = strategyItems.findIndex(
@@ -401,11 +425,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	// Render add preset form
 	if (viewMode === 'add') {
 		if (isSelectingStrategyInAdd) {
-			const strategyItems = [
-				{label: 'Claude', value: 'claude'},
-				{label: 'Gemini', value: 'gemini'},
-				{label: 'Codex', value: 'codex'},
-			];
+			const strategyItems = ALL_STRATEGY_ITEMS;
 
 			return (
 				<Box flexDirection="column">
