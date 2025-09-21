@@ -17,13 +17,13 @@ const RemoteBranchSelector: React.FC<RemoteBranchSelectorProps> = ({
 	onSelect,
 	onCancel,
 }) => {
-	const selectItems = matches.map(match => ({
-		label: `${match.fullRef} (from ${match.remote})`,
-		value: match.fullRef,
-	}));
-
-	// Add cancel option
-	selectItems.push({label: '← Cancel', value: 'cancel'});
+	const selectItems = [
+		...matches.map(match => ({
+			label: `${match.fullRef} (from ${match.remote})`,
+			value: match.fullRef,
+		})),
+		{label: '← Cancel', value: 'cancel'},
+	];
 
 	const handleSelectItem = (item: {label: string; value: string}) => {
 		if (item.value === 'cancel') {
