@@ -1,5 +1,4 @@
-import React, {useEffect, useState} from 'react';
-import {useStdout} from 'ink';
+import React, {useEffect} from 'react';
 import {Session as SessionType} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
@@ -15,14 +14,25 @@ const Session: React.FC<SessionProps> = ({
 	sessionManager,
 	onReturnToMenu,
 }) => {
-	const {stdout} = useStdout();
-	const [isExiting, setIsExiting] = useState(false);
+	// Note:
+	// - Ink re-renders the app tree on terminal resize by listening to `stdout` "resize"
+	//   and calling `calculateLayout()` + `onRender()`.
+	//   Evidence (Ink source):
+	//   https://github.com/vadimdemedes/ink/blob/master/src/ink.tsx#L126-L149
+	//   This shows: `options.stdout.on('resize', this.resized);` and `resized = () => { this.calculateLayout(); this.onRender(); }`.
+	// - Node.js TTY docs for the "resize" event on WriteStream (e.g. process.stdout):
+	//   https://nodejs.org/api/tty.html#event-resize
+	// Using `process.stdout` directly here ensures our effect doesn’t get tied to Ink’s
+	// context/hook dependencies and avoids accidental re-execution on resize.
+	const output = process.stdout; // Use process.stdout to avoid identity changes on resize
 
+	// Main lifecycle effect for the session. Runs once per session mount.
 	useEffect(() => {
-		if (!stdout) return;
+		// Only run once per session mount. Avoid depending on stdout or callbacks.
+		if (!output) return;
 
 		// Clear screen when entering session
-		stdout.write('\x1B[2J\x1B[H');
+		output.write('\x1B[2J\x1B[H');
 
 		// Handle session restoration
 		const handleSessionRestore = (restoredSession: SessionType) => {
@@ -41,10 +51,10 @@ const Session: React.FC<SessionProps> = ({
 							.replace(/\x1B\[2J/g, '')
 							.replace(/\x1B\[H/g, '');
 						if (cleaned.length > 0) {
-							stdout.write(Buffer.from(cleaned, 'utf8'));
+							output.write(Buffer.from(cleaned, 'utf8'));
 						}
 					} else {
-						stdout.write(buffer);
+						output.write(buffer);
 					}
 				}
 			}
@@ -59,8 +69,8 @@ const Session: React.FC<SessionProps> = ({
 		// Immediately resize the PTY and terminal to current dimensions
 		// This fixes rendering issues when terminal width changed while in menu
 		// https://github.com/kbwo/ccmanager/issues/2
-		const currentCols = process.stdout.columns || 80;
-		const currentRows = process.stdout.rows || 24;
+		const currentCols = output.columns || 80;
+		const currentRows = output.rows || 24;
 
 		// Do not delete try-catch
 		// Prevent ccmanager from exiting when claude process has already exited
@@ -76,25 +86,25 @@ const Session: React.FC<SessionProps> = ({
 		// Listen for session data events
 		const handleSessionData = (activeSession: SessionType, data: string) => {
 			// Only handle data for our session
-			if (activeSession.id === session.id && !isExiting) {
-				stdout.write(data);
+			if (activeSession.id === session.id) {
+				output.write(data);
 			}
 		};
 
 		const handleSessionExit = (exitedSession: SessionType) => {
 			if (exitedSession.id === session.id) {
-				setIsExiting(true);
-				// Don't call onReturnToMenu here - App component handles it
+				// Preemptively stop forwarding input; App handles returning to menu
+				stdin.removeListener('data', handleStdinData);
 			}
 		};
 
 		sessionManager.on('sessionData', handleSessionData);
 		sessionManager.on('sessionExit', handleSessionExit);
 
-		// Handle terminal resize
+		// Handle terminal resize (listen on process.stdout to avoid Ink stdout identity changes)
 		const handleResize = () => {
-			const cols = process.stdout.columns || 80;
-			const rows = process.stdout.rows || 24;
+			const cols = output.columns || 80;
+			const rows = output.rows || 24;
 			session.process.resize(cols, rows);
 			// Also resize the virtual terminal
 			if (session.terminal) {
@@ -102,7 +112,7 @@ const Session: React.FC<SessionProps> = ({
 			}
 		};
 
-		stdout.on('resize', handleResize);
+		output.on('resize', handleResize);
 
 		// Set up raw input handling
 		const stdin = process.stdin;
@@ -117,8 +127,6 @@ const Session: React.FC<SessionProps> = ({
 		stdin.setEncoding('utf8');
 
 		const handleStdinData = (data: string) => {
-			if (isExiting) return;
-
 			// Check for return to menu shortcut
 			const returnToMenuShortcut = shortcutManager.getShortcuts().returnToMenu;
 			const shortcutCode =
@@ -126,9 +134,7 @@ const Session: React.FC<SessionProps> = ({
 
 			if (shortcutCode && data === shortcutCode) {
 				// Disable focus reporting mode before returning to menu
-				if (stdout) {
-					stdout.write('\x1b[?1004l');
-				}
+				output.write('\x1b[?1004l');
 				// Restore stdin state before returning to menu
 				stdin.removeListener('data', handleStdinData);
 				stdin.setRawMode(false);
@@ -148,9 +154,7 @@ const Session: React.FC<SessionProps> = ({
 			stdin.removeListener('data', handleStdinData);
 
 			// Disable focus reporting mode that might have been enabled by the PTY
-			if (stdout) {
-				stdout.write('\x1b[?1004l');
-			}
+			output.write('\x1b[?1004l');
 
 			// Restore stdin to its original state
 			if (stdin.isTTY) {
@@ -169,9 +173,9 @@ const Session: React.FC<SessionProps> = ({
 			sessionManager.off('sessionRestore', handleSessionRestore);
 			sessionManager.off('sessionData', handleSessionData);
 			sessionManager.off('sessionExit', handleSessionExit);
-			stdout.off('resize', handleResize);
+			output.off('resize', handleResize);
 		};
-	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
+	}, [session.id, sessionManager]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Return null to render nothing (PTY output goes directly to stdout)
 	return null;

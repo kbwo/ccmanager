@@ -299,7 +299,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		});
 	};
 
-	const handleReturnToMenu = () => {
+	const handleReturnToMenu = useCallback(() => {
 		setActiveSession(null);
 		// Don't clear error here - let user dismiss it manually
 
@@ -322,7 +322,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				process.stdin.setEncoding('utf8');
 			}
 		});
-	};
+	}, [multiProject, selectedProject, navigateWithClear]);
 
 	const handleCreateWorktree = async (
 		path: string,
