@@ -24,7 +24,7 @@ Alternative arguments to use if the command fails with the main arguments. This 
 Configure CCManager to use the `--resume` flag with automatic fallback:
 
 1. Run `ccmanager`
-2. Navigate to **Configuration** → **Configure Command**
+2. Navigate to **Configuration** → **Configure Command Presets**
 3. Set up the following:
 
 **Command:** `claude`

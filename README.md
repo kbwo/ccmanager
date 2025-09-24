@@ -146,7 +146,7 @@ CCManager supports configuring the command and arguments used to run Claude Code
 
 ### Quick Start
 
-1. Navigate to **Configuration** → **Configure Command**
+1. Navigate to **Configuration** → **Configure Command Presets**
 2. Set your desired arguments (e.g., `--resume` for resuming sessions)
 3. Optionally set fallback arguments
 4. Save changes

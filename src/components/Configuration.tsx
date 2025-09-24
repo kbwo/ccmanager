@@ -18,7 +18,7 @@ type ConfigView =
 	| 'statusHooks'
 	| 'worktreeHooks'
 	| 'worktree'
-	| 'command';
+	| 'presets';
 
 interface MenuItem {
 	label: string;
@@ -46,8 +46,8 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			value: 'worktree',
 		},
 		{
-			label: 'C 🚀  Configure Command',
-			value: 'command',
+			label: 'C 🚀  Configure Command Presets',
+			value: 'presets',
 		},
 		{
 			label: 'B ← Back to Main Menu',
@@ -66,8 +66,8 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			setView('worktreeHooks');
 		} else if (item.value === 'worktree') {
 			setView('worktree');
-		} else if (item.value === 'command') {
-			setView('command');
+		} else if (item.value === 'presets') {
+			setView('presets');
 		}
 	};
 
@@ -95,7 +95,7 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 				setView('worktree');
 				break;
 			case 'c':
-				setView('command');
+				setView('presets');
 				break;
 			case 'b':
 				onComplete();
@@ -124,7 +124,7 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 		return <ConfigureWorktree onComplete={handleSubMenuComplete} />;
 	}
 
-	if (view === 'command') {
+	if (view === 'presets') {
 		return <ConfigureCommand onComplete={handleSubMenuComplete} />;
 	}
 

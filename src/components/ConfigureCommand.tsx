@@ -683,7 +683,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Command Presets
+					Command Command Presets
 				</Text>
 			</Box>
 
