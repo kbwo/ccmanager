@@ -6,7 +6,12 @@ export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
-export type StateDetectionStrategy = 'claude' | 'gemini' | 'codex' | 'cursor';
+export type StateDetectionStrategy =
+	| 'claude'
+	| 'gemini'
+	| 'codex'
+	| 'cursor'
+	| 'github-copilot';
 
 export interface Worktree {
 	path: string;
