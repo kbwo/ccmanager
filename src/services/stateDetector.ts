@@ -20,6 +20,8 @@ export function createStateDetector(
 			return new CodexStateDetector();
 		case 'cursor':
 			return new CursorStateDetector();
+		case 'github-copilot':
+			return new GitHubCopilotStateDetector();
 		default:
 			return new ClaudeStateDetector();
 	}
@@ -158,6 +160,26 @@ export class CursorStateDetector extends BaseStateDetector {
 		}
 
 		// Otherwise idle - Priority 3
+		return 'idle';
+	}
+}
+
+export class GitHubCopilotStateDetector extends BaseStateDetector {
+	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
+		const content = this.getTerminalContent(terminal);
+		const lowerContent = content.toLowerCase();
+
+		// Waiting prompt has priority 1
+		if (lowerContent.includes('│ do you want')) {
+			return 'waiting_input';
+		}
+
+		// Busy state detection has priority 2
+		if (lowerContent.includes('esc to cancel')) {
+			return 'busy';
+		}
+
+		// Otherwise idle as priority 3
 		return 'idle';
 	}
 }

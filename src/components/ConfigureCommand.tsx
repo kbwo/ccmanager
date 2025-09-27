@@ -25,6 +25,10 @@ const createStrategyItems = (): {
 		gemini: {label: 'Gemini', value: 'gemini'},
 		codex: {label: 'Codex', value: 'codex'},
 		cursor: {label: 'Cursor Agent', value: 'cursor'},
+		'github-copilot': {
+			label: 'GitHub Copilot CLI',
+			value: 'github-copilot',
+		},
 	};
 
 	return Object.values(strategies);
@@ -54,6 +58,8 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 			return 'Codex';
 		case 'cursor':
 			return 'Cursor';
+		case 'github-copilot':
+			return 'GitHub Copilot CLI';
 		default:
 			return 'Claude';
 	}
