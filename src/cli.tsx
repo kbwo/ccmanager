@@ -49,7 +49,7 @@ if (!!cli.flags.devcUpCommand !== !!cli.flags.devcExecCommand) {
 }
 
 // Check if we're in a TTY environment
-if (!process.stdin.isTTY || !process.stdout.isTTY) {
+if (!process.env['CI'] && (!process.stdin.isTTY || !process.stdout.isTTY)) {
 	console.error(
 		'Error: ccmanager must be run in an interactive terminal (TTY)',
 	);

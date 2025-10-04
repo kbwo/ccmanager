@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export CI=true
+
 if [ -z "$1" ]; then
   echo "Usage: $0 <command>"
   exit 1
