@@ -39,3 +39,6 @@ jobs:
     
     - name: Build
       run: npm run build
+
+    - name: Check CLI startup
+      run: ./scripts/check-cli-startup.sh "node dist/cli.js"
