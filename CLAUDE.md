@@ -417,6 +417,10 @@ const recentProjects = await projectManager.getRecentProjects();
 - **Forms**: Text input for creating worktrees and configuring settings
 - **Confirmation Dialogs**: Safety prompts for destructive actions
 
+## Active Specifications
+
+- **result-pattern-error-handling-2**: Replace try-catch based error handling with Result pattern for more effective and type-safe error management
+
 ## Future Enhancements
 
 - Session recording and playback

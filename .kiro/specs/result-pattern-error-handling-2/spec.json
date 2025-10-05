@@ -1,0 +1,22 @@
+{
+  "feature_name": "result-pattern-error-handling-2",
+  "created_at": "2025-10-05T01:36:00Z",
+  "updated_at": "2025-10-05T15:42:00Z",
+  "language": "en",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
