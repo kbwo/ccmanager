@@ -80,7 +80,7 @@
   - Maintain existing class-based service structure
   - _Requirements: 5.1, 5.5, 5.7, 3.1, 3.2, 3.4, 3.6_
 
-- [ ] 3.2 Convert ConfigurationManager to Effect-based operations
+- [x] 3.2 Convert ConfigurationManager to Effect-based operations
   - Transform configuration loading to return Effect with FileSystemError or ConfigError
   - Transform configuration saving to return Effect with FileSystemError
   - Implement synchronous validation using Either with ValidationError
