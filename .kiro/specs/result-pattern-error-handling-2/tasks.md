@@ -35,8 +35,8 @@
   - Document when to use Effect vs Either for different operation types
   - _Requirements: 11.1, 11.3, 11.4, 11.5_
 
-- [ ] 2. Migrate utility layer to Effect types
-- [ ] 2.1 Convert Git status utilities to Effect-based error handling
+- [x] 2. Migrate utility layer to Effect types
+- [x] 2.1 Convert Git status utilities to Effect-based error handling
   - Replace GitOperationResult return type with Effect type for status queries
   - Convert Promise-based exec calls to Effect.tryPromise
   - Wrap git command failures in GitError with command details and exit codes
@@ -46,14 +46,14 @@
   - Create temporary adapter for legacy callers during migration
   - _Requirements: 6.1, 6.5, 3.4, 2.1_
 
-- [ ] 2.2 Convert worktree configuration utilities to Effect-based operations
+- [x] 2.2 Convert worktree configuration utilities to Effect-based operations
   - Transform git config read operations to return Effect with GitError
   - Transform git config write operations to return Effect with GitError
   - Handle missing config as success case returning null (not error)
   - Use Effect.tryPromise for asynchronous git config commands
   - _Requirements: 6.2, 6.5, 3.4_
 
-- [ ] 2.3 Convert hook executor utilities to Effect-based execution
+- [x] 2.3 Convert hook executor utilities to Effect-based execution
   - Wrap hook spawn operations in Effect.tryPromise
   - Capture hook failures in ProcessError with exit code and stderr
   - Implement error logging without propagating failures (hooks shouldn't break main flow)
@@ -62,7 +62,7 @@
   - Update session status change hook execution to return Effect
   - _Requirements: 6.3, 6.5, 3.4_
 
-- [ ] 2.4 Convert Claude directory utilities to Effect and Either types
+- [x] 2.4 Convert Claude directory utilities to Effect and Either types
   - Implement directory path resolution using Either for synchronous validation
   - Use Effect for asynchronous directory existence checks
   - Wrap FileSystemError for file system access failures

@@ -83,7 +83,7 @@ node dist/cli.js                # Direct execution
 ### Testing & Quality
 ```bash
 npm test                        # Run tests in watch mode
-npm run test:run                # Single test run
+npm run test                # Single test run
 npm run lint                    # Run ESLint
 npm run lint:fix                # Auto-fix linting issues
 npm run typecheck               # TypeScript type checking

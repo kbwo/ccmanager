@@ -1,10 +1,15 @@
 import {promisify} from 'util';
-import {exec, execFile} from 'child_process';
+import {execFile, type ExecException} from 'child_process';
+import {Cause, Effect, Either, Exit, Option} from 'effect';
+import {pipe} from 'effect/Function';
+import {GitError} from '../types/errors.js';
 import {getWorktreeParentBranch} from './worktreeConfig.js';
-import {createConcurrencyLimited} from './concurrencyLimit.js';
+import {
+	createConcurrencyLimited,
+	createEffectConcurrencyLimited,
+} from './concurrencyLimit.js';
 
-const execp = promisify(exec);
-const execFilePromisified = promisify(execFile);
+const execFileAsync = promisify(execFile);
 
 export interface GitStatus {
 	filesAdded: number;
@@ -21,101 +26,117 @@ export interface GitOperationResult<T> {
 	skipped?: boolean;
 }
 
-export async function getGitStatus(
-	worktreePath: string,
-	signal: AbortSignal,
-): Promise<GitOperationResult<GitStatus>> {
-	try {
-		// Get unstaged changes
-		const [diffResult, stagedResult, branchResult, parentBranch] =
-			await Promise.all([
-				execp('git diff --shortstat', {cwd: worktreePath, signal}).catch(
-					() => EMPTY_EXEC_RESULT,
-				),
-				execp('git diff --staged --shortstat', {
-					cwd: worktreePath,
-					signal,
-				}).catch(() => EMPTY_EXEC_RESULT),
-				execp('git branch --show-current', {cwd: worktreePath, signal}).catch(
-					() => EMPTY_EXEC_RESULT,
-				),
-				getWorktreeParentBranch(worktreePath, signal),
-			]);
-
-		// Parse file changes
-		let filesAdded = 0;
-		let filesDeleted = 0;
-
-		if (diffResult.stdout) {
-			const stats = parseGitStats(diffResult.stdout);
-			filesAdded += stats.insertions;
-			filesDeleted += stats.deletions;
-		}
-		if (stagedResult.stdout) {
-			const stats = parseGitStats(stagedResult.stdout);
-			filesAdded += stats.insertions;
-			filesDeleted += stats.deletions;
-		}
-
-		// Get ahead/behind counts
-		let aheadCount = 0;
-		let behindCount = 0;
-
-		const currentBranch = branchResult.stdout.trim();
-		if (currentBranch && parentBranch && currentBranch !== parentBranch) {
-			try {
-				const aheadBehindResult = await execFilePromisified(
-					'git',
-					['rev-list', '--left-right', '--count', `${parentBranch}...HEAD`],
-					{cwd: worktreePath, signal},
-				);
-
-				const [behind, ahead] = aheadBehindResult.stdout
-					.trim()
-					.split('\t')
-					.map(n => parseInt(n, 10));
-				aheadCount = ahead || 0;
-				behindCount = behind || 0;
-			} catch {
-				// Branch comparison might fail
-			}
-		}
-
-		return {
-			success: true,
-			data: {
-				filesAdded,
-				filesDeleted,
-				aheadCount,
-				behindCount,
-				parentBranch,
-			},
-		};
-	} catch (error) {
-		let errorMessage = '';
-		if (error instanceof Error) {
-			errorMessage = error.message;
-		} else {
-			errorMessage = String(error);
-		}
-		return {
-			success: false,
-			error: errorMessage,
-		};
-	}
+interface ExecResult {
+	stdout: string;
+	stderr: string;
 }
 
-// Split git status formatting into file changes and ahead/behind
+interface GitStats {
+	insertions: number;
+	deletions: number;
+}
+
+const DEFAULT_GIT_STATS: GitStats = {insertions: 0, deletions: 0};
+
+export const getGitStatus = (
+	worktreePath: string,
+): Effect.Effect<GitStatus, GitError> =>
+	Effect.gen(function* () {
+		const diffResult = yield* runGit(
+			['diff', '--shortstat'],
+			worktreePath,
+		);
+		const stagedResult = yield* runGit(
+			['diff', '--staged', '--shortstat'],
+			worktreePath,
+		);
+		const branchResult = yield* runGit(
+			['branch', '--show-current'],
+			worktreePath,
+		);
+		const parentBranch = yield* fetchParentBranch(worktreePath);
+
+		const diffStats = decodeGitStats(diffResult.stdout);
+		const stagedStats = decodeGitStats(stagedResult.stdout);
+
+		const filesAdded = diffStats.insertions + stagedStats.insertions;
+		const filesDeleted = diffStats.deletions + stagedStats.deletions;
+
+		const {aheadCount, behindCount} = yield* computeAheadBehind({
+			worktreePath,
+			currentBranch: branchResult.stdout.trim(),
+			parentBranch,
+		});
+
+		return {
+			filesAdded,
+			filesDeleted,
+			aheadCount,
+			behindCount,
+			parentBranch,
+		};
+	});
+
+export const getGitStatusLimited = createEffectConcurrencyLimited(
+	(worktreePath: string) => getGitStatus(worktreePath),
+	10,
+);
+
+/**
+ * Temporary adapter for legacy promise-based callers
+ */
+export async function getGitStatusLegacy(
+	worktreePath: string,
+	signal?: AbortSignal,
+): Promise<GitOperationResult<GitStatus>> {
+	const exit = await Effect.runPromiseExit(getGitStatus(worktreePath), {
+		signal,
+	});
+
+	if (Exit.isSuccess(exit)) {
+		return {
+			success: true,
+			data: exit.value,
+		};
+	}
+
+	if (Exit.isInterrupted(exit)) {
+		return {
+			success: false,
+			skipped: true,
+			error: 'Git status request was interrupted',
+		};
+	}
+
+	const failure = Cause.failureOption(exit.cause);
+	if (Option.isSome(failure)) {
+		const gitError = failure.value;
+		return {
+			success: false,
+			error: gitErrorToMessage(gitError),
+		};
+	}
+
+	return {
+		success: false,
+		error: Cause.pretty(exit.cause),
+	};
+}
+
+export const getGitStatusLegacyLimited = createConcurrencyLimited(
+	getGitStatusLegacy,
+	10,
+);
+
 export function formatGitFileChanges(status: GitStatus): string {
 	const parts: string[] = [];
 
 	const colors = {
-		green: '\x1b[32m',
-		red: '\x1b[31m',
-		reset: '\x1b[0m',
+		green: '\\x1b[32m',
+		red: '\\x1b[31m',
+		reset: '\\x1b[0m',
 	};
 
-	// File changes
 	if (status.filesAdded > 0) {
 		parts.push(`${colors.green}+${status.filesAdded}${colors.reset}`);
 	}
@@ -130,12 +151,11 @@ export function formatGitAheadBehind(status: GitStatus): string {
 	const parts: string[] = [];
 
 	const colors = {
-		cyan: '\x1b[36m',
-		magenta: '\x1b[35m',
-		reset: '\x1b[0m',
+		cyan: '\\x1b[36m',
+		magenta: '\\x1b[35m',
+		reset: '\\x1b[0m',
 	};
 
-	// Ahead/behind - compact format with arrows
 	if (status.aheadCount > 0) {
 		parts.push(`${colors.cyan}↑${status.aheadCount}${colors.reset}`);
 	}
@@ -146,7 +166,6 @@ export function formatGitAheadBehind(status: GitStatus): string {
 	return parts.join(' ');
 }
 
-// Keep the original function for backward compatibility
 export function formatGitStatus(status: GitStatus): string {
 	const fileChanges = formatGitFileChanges(status);
 	const aheadBehind = formatGitAheadBehind(status);
@@ -162,43 +181,218 @@ export function formatParentBranch(
 	parentBranch: string | null,
 	currentBranch: string,
 ): string {
-	// Only show parent branch if it exists and is different from current branch
 	if (!parentBranch || parentBranch === currentBranch) {
 		return '';
 	}
 
 	const colors = {
-		dim: '\x1b[90m',
-		reset: '\x1b[0m',
+		dim: '\\x1b[90m',
+		reset: '\\x1b[0m',
 	};
 
 	return `${colors.dim}(${parentBranch})${colors.reset}`;
 }
 
-const EMPTY_EXEC_RESULT = {stdout: '', stderr: ''};
-
-interface GitStats {
-	insertions: number;
-	deletions: number;
+function runGit(
+	args: string[],
+	worktreePath: string,
+): Effect.Effect<ExecResult, GitError> {
+	const command = `git ${args.join(' ')}`.trim();
+	return Effect.catchAll(
+		Effect.tryPromise({
+			try: signal =>
+				execFileAsync('git', args, {
+					cwd: worktreePath,
+					encoding: 'utf8',
+					maxBuffer: 5 * 1024 * 1024,
+					signal,
+				}),
+			catch: error => error,
+		}),
+		error => handleExecFailure(command, error),
+	);
 }
 
-function parseGitStats(statLine: string): GitStats {
-	let insertions = 0;
-	let deletions = 0;
+function fetchParentBranch(
+	worktreePath: string,
+): Effect.Effect<string | null> {
+	return Effect.catchAll(
+		getWorktreeParentBranch(worktreePath),
+		() => Effect.succeed<string | null>(null),
+	);
+}
 
-	// Parse git diff --shortstat output
-	// Example: " 3 files changed, 42 insertions(+), 10 deletions(-)"
+function computeAheadBehind({
+	worktreePath,
+	currentBranch,
+	parentBranch,
+}: {
+	worktreePath: string;
+	currentBranch: string;
+	parentBranch: string | null;
+}): Effect.Effect<{aheadCount: number; behindCount: number}, GitError> {
+	if (!currentBranch || !parentBranch || currentBranch === parentBranch) {
+		return Effect.succeed({aheadCount: 0, behindCount: 0});
+	}
+
+	return Effect.map(
+		Effect.catchAll(
+			runGit(
+				['rev-list', '--left-right', '--count', `${parentBranch}...HEAD`],
+				worktreePath,
+			),
+			() => Effect.succeed<ExecResult>({stdout: '', stderr: ''}),
+		),
+		result => decodeAheadBehind(result.stdout),
+	);
+}
+
+function parseGitStats(statLine: string): Either.Either<string, GitStats> {
 	const insertMatch = statLine.match(/(\d+) insertion/);
 	const deleteMatch = statLine.match(/(\d+) deletion/);
 
-	if (insertMatch && insertMatch[1]) {
-		insertions = parseInt(insertMatch[1], 10);
-	}
-	if (deleteMatch && deleteMatch[1]) {
-		deletions = parseInt(deleteMatch[1], 10);
+	const insertions = insertMatch?.[1] ? Number.parseInt(insertMatch[1]!, 10) : 0;
+	const deletions = deleteMatch?.[1] ? Number.parseInt(deleteMatch[1]!, 10) : 0;
+
+	if (Number.isNaN(insertions) || Number.isNaN(deletions)) {
+		return Either.left(`Unable to parse git diff stats from "${statLine.trim()}"`);
 	}
 
-	return {insertions, deletions};
+	return Either.right({insertions, deletions});
 }
 
-export const getGitStatusLimited = createConcurrencyLimited(getGitStatus, 10);
+function decodeGitStats(statLine: string): GitStats {
+	return pipe(
+		parseGitStats(statLine),
+		Either.getOrElse(() => DEFAULT_GIT_STATS),
+	);
+}
+
+function parseAheadBehind(
+	stats: string,
+): Either.Either<string, {aheadCount: number; behindCount: number}> {
+	const trimmed = stats.trim();
+	if (!trimmed) {
+		return Either.right({aheadCount: 0, behindCount: 0});
+	}
+
+	const [behindRaw, aheadRaw] = trimmed.split('\t');
+	const behind = behindRaw ? Number.parseInt(behindRaw, 10) : 0;
+	const ahead = aheadRaw ? Number.parseInt(aheadRaw, 10) : 0;
+
+	if (Number.isNaN(behind) || Number.isNaN(ahead)) {
+		return Either.left(`Unable to parse ahead/behind stats from "${trimmed}"`);
+	}
+
+	return Either.right({
+		aheadCount: Math.max(ahead, 0),
+		behindCount: Math.max(behind, 0),
+	});
+}
+
+function decodeAheadBehind(stats: string): {aheadCount: number; behindCount: number} {
+	return pipe(
+		parseAheadBehind(stats),
+		Either.getOrElse(() => ({aheadCount: 0, behindCount: 0})),
+	);
+}
+
+function handleExecFailure(
+	command: string,
+	error: unknown,
+): Effect.Effect<ExecResult, GitError> {
+	if (isAbortError(error)) {
+		return Effect.interrupt as Effect.Effect<ExecResult, GitError>;
+	}
+
+	return Effect.fail(toGitError(command, error));
+}
+
+function isExecError(error: unknown): error is ExecException & {
+	stdout?: string;
+	stderr?: string;
+	code?: string | number | null;
+	killed?: boolean;
+	signal?: NodeJS.Signals;
+} {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		'message' in error &&
+		'code' in error
+	);
+}
+
+function isAbortError(error: unknown): boolean {
+	if (error instanceof Error && error.name === 'AbortError') {
+		return true;
+	}
+
+	if (
+		typeof error === 'object' &&
+		error !== null &&
+		'code' in error &&
+		(error as {code?: unknown}).code === 'ABORT_ERR'
+	) {
+		return true;
+	}
+
+	if (isExecError(error)) {
+		return Boolean(error.killed && error.signal);
+	}
+
+	return false;
+}
+
+function toGitError(command: string, error: unknown): GitError {
+	if (error instanceof GitError) {
+		return error;
+	}
+
+	if (isExecError(error)) {
+		const exitCodeRaw = error.code;
+		const exitCode =
+			typeof exitCodeRaw === 'number'
+				? exitCodeRaw
+				: Number.parseInt(String(exitCodeRaw ?? '-1'), 10) || -1;
+		const stderr =
+			typeof error.stderr === 'string'
+				? error.stderr
+				: error.message ?? '';
+
+		return new GitError({
+			command,
+			exitCode,
+			stderr,
+			stdout:
+				typeof error.stdout === 'string' && error.stdout.length > 0
+					? error.stdout
+					: undefined,
+		});
+	}
+
+	if (error instanceof Error) {
+		return new GitError({
+			command,
+			exitCode: -1,
+			stderr: error.message,
+		});
+	}
+
+	return new GitError({
+		command,
+		exitCode: -1,
+		stderr: String(error),
+	});
+}
+
+function gitErrorToMessage(error: GitError): string {
+	const exitCode = Number.isFinite(error.exitCode) ? error.exitCode : -1;
+	const details = [error.stderr, error.stdout]
+		.filter(part => typeof part === 'string' && part.trim().length > 0)
+		.map(part => part!.trim());
+	const detail = details[0] ?? '';
+	return detail
+		? `git command "${error.command}" failed (exit code ${exitCode}): ${detail}`
+		: `git command "${error.command}" failed (exit code ${exitCode})`;
+}

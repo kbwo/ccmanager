@@ -1,8 +1,8 @@
 import {describe, it, expect, vi} from 'vitest';
 import {
-	executeHook,
-	executeWorktreePostCreationHook,
-	executeStatusHook,
+	executeHookLegacy as executeHook,
+	executeWorktreePostCreationHookLegacy as executeWorktreePostCreationHook,
+	executeStatusHookLegacy as executeStatusHook,
 } from './hookExecutor.js';
 import {mkdtemp, rm, readFile, realpath} from 'fs/promises';
 import {tmpdir} from 'os';

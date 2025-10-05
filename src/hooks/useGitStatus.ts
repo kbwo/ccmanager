@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {Worktree} from '../types/index.js';
-import {getGitStatusLimited} from '../utils/gitStatus.js';
+import {getGitStatusLegacyLimited} from '../utils/gitStatus.js';
 
 export function useGitStatus(
 	worktrees: Worktree[],
@@ -23,7 +23,7 @@ export function useGitStatus(
 			abortController: AbortController,
 		) => {
 			try {
-				const result = await getGitStatusLimited(
+				const result = await getGitStatusLegacyLimited(
 					worktree.path,
 					abortController.signal,
 				);

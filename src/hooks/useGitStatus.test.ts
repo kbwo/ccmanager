@@ -4,15 +4,16 @@ import {render, cleanup} from 'ink-testing-library';
 import {Text} from 'ink';
 import {useGitStatus} from './useGitStatus.js';
 import type {Worktree} from '../types/index.js';
-import {getGitStatusLimited, type GitStatus} from '../utils/gitStatus.js';
+import {getGitStatusLegacyLimited, type GitStatus} from '../utils/gitStatus.js';
 
 // Mock the gitStatus module
 vi.mock('../utils/gitStatus.js', () => ({
-	getGitStatusLimited: vi.fn(),
+	getGitStatusLegacyLimited: vi.fn(),
 }));
 
 describe('useGitStatus', () => {
-	const mockGetGitStatus = getGitStatusLimited as ReturnType<typeof vi.fn>;
+	const mockGetGitStatus =
+		getGitStatusLegacyLimited as ReturnType<typeof vi.fn>;
 
 	const createWorktree = (path: string): Worktree => ({
 		path,

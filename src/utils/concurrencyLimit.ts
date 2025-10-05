@@ -1,3 +1,5 @@
+import {Effect} from 'effect';
+
 /**
  * Create a function that limits concurrent executions
  */
@@ -33,4 +35,21 @@ export function createConcurrencyLimited<TArgs extends unknown[], TResult>(
 			}
 		}
 	};
+}
+
+/**
+ * Create a function that limits concurrent Effect executions
+ */
+export function createEffectConcurrencyLimited<TArgs extends unknown[], A, E>(
+	fn: (...args: TArgs) => Effect.Effect<A, E>,
+	maxConcurrent: number,
+): (...args: TArgs) => Effect.Effect<A, E> {
+	if (maxConcurrent < 1) {
+		throw new RangeError('maxConcurrent must be at least 1');
+	}
+
+	const semaphore = Effect.unsafeMakeSemaphore(maxConcurrent);
+
+	return (...args: TArgs): Effect.Effect<A, E> =>
+		semaphore.withPermits(1)(fn(...args));
 }

@@ -6,12 +6,12 @@ import {
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
-import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
+import {setWorktreeParentBranchLegacy} from '../utils/worktreeConfig.js';
 import {
-	getClaudeProjectsDir,
+	getClaudeProjectsDirLegacy as getClaudeProjectsDir,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
-import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
+import {executeWorktreePostCreationHookLegacy as executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
 import {configurationManager} from './configurationManager.js';
 
 const CLAUDE_DIR = '.claude';
@@ -371,7 +371,7 @@ export class WorktreeService {
 
 			// Store the parent branch in worktree config
 			try {
-				setWorktreeParentBranch(resolvedPath, baseBranch);
+				setWorktreeParentBranchLegacy(resolvedPath, baseBranch);
 			} catch (error) {
 				console.error(
 					'Warning: Failed to set parent branch in worktree config:',

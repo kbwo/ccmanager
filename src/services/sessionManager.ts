@@ -11,7 +11,7 @@ import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {promisify} from 'util';
 import {configurationManager} from './configurationManager.js';
-import {executeStatusHook} from '../utils/hookExecutor.js';
+import {executeStatusHookLegacy as executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector.js';
 import {
 	STATE_PERSISTENCE_DURATION_MS,
