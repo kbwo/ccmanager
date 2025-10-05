@@ -53,7 +53,9 @@ export function executeHook(
 							command,
 							exitCode: code ?? undefined,
 							signal: signal ?? undefined,
-							message: stderr ? `${errorMessage}\nStderr: ${stderr}` : errorMessage,
+							message: stderr
+								? `${errorMessage}\nStderr: ${stderr}`
+								: errorMessage,
 						}),
 					),
 				);
@@ -88,8 +90,9 @@ export function executeHookLegacy(
 	environment: HookEnvironment,
 ): Promise<void> {
 	return Effect.runPromise(
-		Effect.mapError(executeHook(command, cwd, environment), error =>
-			new Error(error.message),
+		Effect.mapError(
+			executeHook(command, cwd, environment),
+			error => new Error(error.message),
 		),
 	);
 }

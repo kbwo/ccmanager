@@ -1,4 +1,4 @@
-import { Data } from 'effect';
+import {Data} from 'effect';
 
 /**
  * Git operation errors

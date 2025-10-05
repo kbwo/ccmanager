@@ -70,7 +70,7 @@
   - _Requirements: 6.4, 6.6, 2.1, 2.2_
 
 - [ ] 3. Migrate service layer to Effect types
-- [ ] 3.1 Convert WorktreeService to Effect-based operations
+- [x] 3.1 Convert WorktreeService to Effect-based operations
   - Transform worktree listing to return Effect with GitError
   - Transform worktree creation to return Effect with GitError or FileSystemError
   - Transform worktree deletion to return Effect with GitError

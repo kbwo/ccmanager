@@ -1,11 +1,13 @@
 import {execSync} from 'child_process';
 import {existsSync, statSync, cpSync} from 'fs';
 import path from 'path';
+import {Effect} from 'effect';
 import {
 	Worktree,
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
+import {GitError, FileSystemError} from '../types/errors.js';
 import {setWorktreeParentBranchLegacy} from '../utils/worktreeConfig.js';
 import {
 	getClaudeProjectsDirLegacy as getClaudeProjectsDir,
@@ -679,5 +681,469 @@ export class WorktreeService {
 		// Copy .claude directory to new worktree
 		const targetClaudeDir = path.join(worktreePath, CLAUDE_DIR);
 		cpSync(sourceClaudeDir, targetClaudeDir, {recursive: true});
+	}
+
+	/**
+	 * Effect-based getWorktrees operation
+	 * Returns Effect that may fail with GitError
+	 */
+	getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+		return Effect.catchAll(
+			Effect.try({
+				try: () => {
+					const output = execSync('git worktree list --porcelain', {
+						cwd: self.rootPath,
+						encoding: 'utf8',
+					});
+
+					const worktrees: Worktree[] = [];
+					const lines = output.trim().split('\n');
+
+					const parseWorktree = (
+						lines: string[],
+						startIndex: number,
+					): [Worktree | null, number] => {
+						const worktreeLine = lines[startIndex];
+						if (!worktreeLine?.startsWith('worktree ')) {
+							return [null, startIndex];
+						}
+
+						const worktree: Worktree = {
+							path: worktreeLine.substring(9),
+							isMainWorktree: false,
+							hasSession: false,
+						};
+
+						let i = startIndex + 1;
+						while (
+							i < lines.length &&
+							lines[i] &&
+							!lines[i]!.startsWith('worktree ')
+						) {
+							const line = lines[i];
+							if (line && line.startsWith('branch ')) {
+								const branch = line.substring(7);
+								worktree.branch = branch.startsWith('refs/heads/')
+									? branch.substring(11)
+									: branch;
+							} else if (line === 'bare') {
+								worktree.isMainWorktree = true;
+							}
+							i++;
+						}
+
+						return [worktree, i];
+					};
+
+					let index = 0;
+					while (index < lines.length) {
+						const [worktree, nextIndex] = parseWorktree(lines, index);
+						if (worktree) {
+							worktrees.push(worktree);
+						}
+						index = nextIndex > index ? nextIndex : index + 1;
+					}
+
+					// Mark the first worktree as main if none are marked
+					if (worktrees.length > 0 && !worktrees.some(w => w.isMainWorktree)) {
+						worktrees[0]!.isMainWorktree = true;
+					}
+
+					return worktrees;
+				},
+				catch: (error: unknown) => error,
+			}),
+			(error: unknown) => {
+				// If git worktree command not supported, fallback to single worktree
+				const execError = error as {
+					status?: number;
+					stderr?: string;
+					stdout?: string;
+				};
+				if (
+					execError.status === 1 ||
+					execError.stderr?.includes('unknown command')
+				) {
+					return Effect.succeed([
+						{
+							path: self.rootPath,
+							branch: self.getCurrentBranch(),
+							isMainWorktree: true,
+							hasSession: false,
+						},
+					]);
+				}
+
+				// For other errors, wrap in GitError
+				return Effect.fail(
+					new GitError({
+						command: 'git worktree list --porcelain',
+						exitCode: execError.status || 1,
+						stderr: execError.stderr || String(error),
+						stdout: execError.stdout,
+					}),
+				);
+			},
+		);
+	}
+
+	/**
+	 * Effect-based createWorktree operation
+	 * May fail with GitError or FileSystemError
+	 */
+	createWorktreeEffect(
+		worktreePath: string,
+		branch: string,
+		baseBranch: string,
+		copySessionData = false,
+		copyClaudeDirectory = false,
+	): Effect.Effect<Worktree, GitError | FileSystemError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+
+		return Effect.gen(function* () {
+			// Resolve the worktree path relative to the git repository root
+			const gitRootPath = yield* Effect.sync(() =>
+				execSync('git rev-parse --git-common-dir', {
+					cwd: self.rootPath,
+					encoding: 'utf8',
+				}).trim(),
+			);
+
+			const absoluteGitRoot = path.isAbsolute(gitRootPath)
+				? path.dirname(gitRootPath)
+				: path.resolve(self.rootPath, path.dirname(gitRootPath));
+
+			const resolvedPath = path.isAbsolute(worktreePath)
+				? worktreePath
+				: path.join(absoluteGitRoot, worktreePath);
+
+			// Check if branch exists
+			const branchExists = yield* Effect.catchAll(
+				Effect.try({
+					try: () => {
+						execSync(`git rev-parse --verify ${branch}`, {
+							cwd: self.rootPath,
+							encoding: 'utf8',
+						});
+						return true;
+					},
+					catch: (error: unknown) => error,
+				}),
+				() => Effect.succeed(false),
+			);
+
+			// Create the worktree command
+			let command: string;
+			if (branchExists) {
+				command = `git worktree add "${resolvedPath}" "${branch}"`;
+			} else {
+				// Resolve the base branch to its proper git reference
+				const resolvedBaseBranch = self.resolveBranchReference(baseBranch);
+				command = `git worktree add -b "${branch}" "${resolvedPath}" "${resolvedBaseBranch}"`;
+			}
+
+			// Execute the worktree creation command
+			yield* Effect.try({
+				try: () => {
+					execSync(command, {
+						cwd: absoluteGitRoot,
+						encoding: 'utf8',
+					});
+				},
+				catch: (error: unknown) => {
+					const execError = error as {
+						status?: number;
+						stderr?: string;
+						stdout?: string;
+					};
+					return new GitError({
+						command,
+						exitCode: execError.status || 1,
+						stderr: execError.stderr || String(error),
+						stdout: execError.stdout,
+					});
+				},
+			});
+
+			// Copy session data if requested
+			if (copySessionData) {
+				yield* Effect.try({
+					try: () => self.copyClaudeSessionData(self.rootPath, resolvedPath),
+					catch: (error: unknown) =>
+						new FileSystemError({
+							operation: 'write',
+							path: resolvedPath,
+							cause: String(error),
+						}),
+				});
+			}
+
+			// Store the parent branch in worktree config
+			yield* Effect.catchAll(
+				Effect.try({
+					try: () => setWorktreeParentBranchLegacy(resolvedPath, baseBranch),
+					catch: (error: unknown) => error,
+				}),
+				(_error: unknown) => {
+					// Log warning but don't fail
+					console.error(
+						'Warning: Failed to set parent branch in worktree config:',
+						_error,
+					);
+					return Effect.succeed(undefined);
+				},
+			);
+
+			// Copy .claude directory if requested
+			if (copyClaudeDirectory) {
+				yield* Effect.catchAll(
+					Effect.try({
+						try: () =>
+							self.copyClaudeDirectoryFromBaseBranch(resolvedPath, baseBranch),
+						catch: (error: unknown) => error,
+					}),
+					(error: unknown) => {
+						console.error('Warning: Failed to copy .claude directory:', error);
+						return Effect.succeed(undefined);
+					},
+				);
+			}
+
+			// Execute post-creation hook if configured
+			const worktreeHooks = configurationManager.getWorktreeHooks();
+			if (
+				worktreeHooks.post_creation?.enabled &&
+				worktreeHooks.post_creation?.command
+			) {
+				const newWorktree: Worktree = {
+					path: resolvedPath,
+					branch: branch,
+					isMainWorktree: false,
+					hasSession: false,
+				};
+
+				yield* Effect.promise(() =>
+					executeWorktreePostCreationHook(
+						worktreeHooks.post_creation!.command,
+						newWorktree,
+						absoluteGitRoot,
+						baseBranch,
+					),
+				);
+			}
+
+			return {
+				path: resolvedPath,
+				branch,
+				isMainWorktree: false,
+				hasSession: false,
+			};
+		});
+	}
+
+	/**
+	 * Effect-based deleteWorktree operation
+	 * May fail with GitError
+	 */
+	deleteWorktreeEffect(
+		worktreePath: string,
+		options?: {deleteBranch?: boolean},
+	): Effect.Effect<void, GitError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+
+		return Effect.gen(function* () {
+			// Get the worktree info to find the branch
+			const worktrees = yield* self.getWorktreesEffect();
+			const worktree = worktrees.find(wt => wt.path === worktreePath);
+
+			if (!worktree) {
+				return yield* Effect.fail(
+					new GitError({
+						command: 'git worktree remove',
+						exitCode: 1,
+						stderr: 'Worktree not found',
+					}),
+				);
+			}
+
+			if (worktree.isMainWorktree) {
+				return yield* Effect.fail(
+					new GitError({
+						command: 'git worktree remove',
+						exitCode: 1,
+						stderr: 'Cannot delete the main worktree',
+					}),
+				);
+			}
+
+			// Remove the worktree
+			yield* Effect.try({
+				try: () => {
+					execSync(`git worktree remove "${worktreePath}" --force`, {
+						cwd: self.rootPath,
+						encoding: 'utf8',
+					});
+				},
+				catch: (error: unknown) => {
+					const execError = error as {
+						status?: number;
+						stderr?: string;
+						stdout?: string;
+					};
+					return new GitError({
+						command: `git worktree remove "${worktreePath}" --force`,
+						exitCode: execError.status || 1,
+						stderr: execError.stderr || String(error),
+						stdout: execError.stdout,
+					});
+				},
+			});
+
+			// Delete the branch if requested (default to true for backward compatibility)
+			const deleteBranch = options?.deleteBranch ?? true;
+			if (deleteBranch && worktree.branch) {
+				const branchName = worktree.branch.replace('refs/heads/', '');
+				yield* Effect.catchAll(
+					Effect.try({
+						try: () => {
+							execSync(`git branch -D "${branchName}"`, {
+								cwd: self.rootPath,
+								encoding: 'utf8',
+							});
+						},
+						catch: (error: unknown) => error,
+					}),
+					(_error: unknown) => {
+						// Branch might not exist or might be checked out elsewhere
+						// This is not a fatal error
+						return Effect.succeed(undefined);
+					},
+				);
+			}
+		});
+	}
+
+	/**
+	 * Effect-based mergeWorktree operation
+	 * May fail with GitError
+	 */
+	mergeWorktreeEffect(
+		sourceBranch: string,
+		targetBranch: string,
+		useRebase = false,
+	): Effect.Effect<void, GitError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+
+		return Effect.gen(function* () {
+			// Get worktrees to find the target worktree path
+			const worktrees = yield* self.getWorktreesEffect();
+			const targetWorktree = worktrees.find(
+				wt =>
+					wt.branch && wt.branch.replace('refs/heads/', '') === targetBranch,
+			);
+
+			if (!targetWorktree) {
+				return yield* Effect.fail(
+					new GitError({
+						command: useRebase ? 'git rebase' : 'git merge',
+						exitCode: 1,
+						stderr: 'Target branch worktree not found',
+					}),
+				);
+			}
+
+			// Perform the merge or rebase in the target worktree
+			if (useRebase) {
+				// For rebase, we need to checkout source branch and rebase it onto target
+				const sourceWorktree = worktrees.find(
+					wt =>
+						wt.branch && wt.branch.replace('refs/heads/', '') === sourceBranch,
+				);
+
+				if (!sourceWorktree) {
+					return yield* Effect.fail(
+						new GitError({
+							command: 'git rebase',
+							exitCode: 1,
+							stderr: 'Source branch worktree not found',
+						}),
+					);
+				}
+
+				// Rebase source branch onto target branch
+				yield* Effect.try({
+					try: () => {
+						execSync(`git rebase "${targetBranch}"`, {
+							cwd: sourceWorktree.path,
+							encoding: 'utf8',
+						});
+					},
+					catch: (error: unknown) => {
+						const execError = error as {
+							status?: number;
+							stderr?: string;
+							stdout?: string;
+						};
+						return new GitError({
+							command: `git rebase "${targetBranch}"`,
+							exitCode: execError.status || 1,
+							stderr: execError.stderr || String(error),
+							stdout: execError.stdout,
+						});
+					},
+				});
+
+				// After rebase, merge the rebased source branch into target branch
+				yield* Effect.try({
+					try: () => {
+						execSync(`git merge --ff-only "${sourceBranch}"`, {
+							cwd: targetWorktree.path,
+							encoding: 'utf8',
+						});
+					},
+					catch: (error: unknown) => {
+						const execError = error as {
+							status?: number;
+							stderr?: string;
+							stdout?: string;
+						};
+						return new GitError({
+							command: `git merge --ff-only "${sourceBranch}"`,
+							exitCode: execError.status || 1,
+							stderr: execError.stderr || String(error),
+							stdout: execError.stdout,
+						});
+					},
+				});
+			} else {
+				// Regular merge
+				yield* Effect.try({
+					try: () => {
+						execSync(`git merge --no-ff "${sourceBranch}"`, {
+							cwd: targetWorktree.path,
+							encoding: 'utf8',
+						});
+					},
+					catch: (error: unknown) => {
+						const execError = error as {
+							status?: number;
+							stderr?: string;
+							stdout?: string;
+						};
+						return new GitError({
+							command: `git merge --no-ff "${sourceBranch}"`,
+							exitCode: execError.status || 1,
+							stderr: execError.stderr || String(error),
+							stdout: execError.stdout,
+						});
+					},
+				});
+			}
+		});
 	}
 }

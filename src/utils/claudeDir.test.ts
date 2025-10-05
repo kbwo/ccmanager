@@ -6,7 +6,6 @@ import {
 	pathToClaudeProjectName,
 	claudeDirExists,
 } from './claudeDir.js';
-import {ValidationError, FileSystemError} from '../types/errors.js';
 
 describe('claudeDir', () => {
 	const originalEnv = process.env;
@@ -21,7 +20,7 @@ describe('claudeDir', () => {
 
 	describe('getClaudeDir', () => {
 		it('should return Either.right with CLAUDE_CONFIG_DIR when set', () => {
-			process.env.CLAUDE_CONFIG_DIR = '/custom/claude';
+			process.env['CLAUDE_CONFIG_DIR'] = '/custom/claude';
 
 			const result = getClaudeDir();
 
@@ -32,7 +31,7 @@ describe('claudeDir', () => {
 		});
 
 		it('should trim whitespace from CLAUDE_CONFIG_DIR', () => {
-			process.env.CLAUDE_CONFIG_DIR = '  /custom/claude  ';
+			process.env['CLAUDE_CONFIG_DIR'] = '  /custom/claude  ';
 
 			const result = getClaudeDir();
 
@@ -43,7 +42,7 @@ describe('claudeDir', () => {
 		});
 
 		it('should return Either.right with default ~/.claude when env var not set', () => {
-			delete process.env.CLAUDE_CONFIG_DIR;
+			delete process.env['CLAUDE_CONFIG_DIR'];
 
 			const result = getClaudeDir();
 
@@ -54,9 +53,9 @@ describe('claudeDir', () => {
 		});
 
 		it('should return Either.right even when HOME vars deleted (os.homedir has fallbacks)', () => {
-			delete process.env.CLAUDE_CONFIG_DIR;
-			delete process.env.HOME;
-			delete process.env.USERPROFILE;
+			delete process.env['CLAUDE_CONFIG_DIR'];
+			delete process.env['HOME'];
+			delete process.env['USERPROFILE'];
 
 			const result = getClaudeDir();
 
@@ -67,7 +66,7 @@ describe('claudeDir', () => {
 
 	describe('getClaudeProjectsDir', () => {
 		it('should return Either.right with projects subdirectory', () => {
-			process.env.CLAUDE_CONFIG_DIR = '/custom/claude';
+			process.env['CLAUDE_CONFIG_DIR'] = '/custom/claude';
 
 			const result = getClaudeProjectsDir();
 
@@ -78,9 +77,9 @@ describe('claudeDir', () => {
 		});
 
 		it('should return Either.right from getClaudeDir fallbacks', () => {
-			delete process.env.CLAUDE_CONFIG_DIR;
-			delete process.env.HOME;
-			delete process.env.USERPROFILE;
+			delete process.env['CLAUDE_CONFIG_DIR'];
+			delete process.env['HOME'];
+			delete process.env['USERPROFILE'];
 
 			const result = getClaudeProjectsDir();
 
@@ -137,7 +136,6 @@ describe('claudeDir', () => {
 		it('should fail with FileSystemError on access error', async () => {
 			// Mock fs.stat to throw a non-ENOENT error
 			const {promises: fs} = await import('fs');
-			const originalStat = fs.stat;
 			vi.spyOn(fs, 'stat').mockRejectedValue(
 				Object.assign(new Error('Permission denied'), {code: 'EACCES'}),
 			);

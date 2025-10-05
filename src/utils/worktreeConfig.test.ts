@@ -1,8 +1,5 @@
 import {describe, it, expect, vi, beforeEach} from 'vitest';
-import {Effect, Exit, Cause, Option} from 'effect';
-import {
-	isWorktreeConfigEnabled,
-} from './worktreeConfig.js';
+import {isWorktreeConfigEnabled} from './worktreeConfig.js';
 import * as cp from 'child_process';
 
 vi.mock('child_process');

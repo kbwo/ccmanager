@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import type { AppError } from './errors.js';
+import {describe, it, expect} from 'vitest';
+import type {AppError} from './errors.js';
 
 /**
  * Tests for structured error types using Effect-ts Data.TaggedError
@@ -7,7 +7,7 @@ import type { AppError } from './errors.js';
 describe('Error Types', () => {
 	describe('GitError', () => {
 		it('should create GitError with required fields', async () => {
-			const { GitError } = await import('./errors.js');
+			const {GitError} = await import('./errors.js');
 
 			const error = new GitError({
 				command: 'git worktree add',
@@ -23,7 +23,7 @@ describe('Error Types', () => {
 		});
 
 		it('should create GitError with optional stdout', async () => {
-			const { GitError } = await import('./errors.js');
+			const {GitError} = await import('./errors.js');
 
 			const error = new GitError({
 				command: 'git status',
@@ -36,7 +36,7 @@ describe('Error Types', () => {
 		});
 
 		it('should have stack trace', async () => {
-			const { GitError } = await import('./errors.js');
+			const {GitError} = await import('./errors.js');
 
 			const error = new GitError({
 				command: 'git log',
@@ -50,7 +50,7 @@ describe('Error Types', () => {
 
 	describe('FileSystemError', () => {
 		it('should create FileSystemError with required fields', async () => {
-			const { FileSystemError } = await import('./errors.js');
+			const {FileSystemError} = await import('./errors.js');
 
 			const error = new FileSystemError({
 				operation: 'read',
@@ -66,7 +66,7 @@ describe('Error Types', () => {
 		});
 
 		it('should support all operation types', async () => {
-			const { FileSystemError } = await import('./errors.js');
+			const {FileSystemError} = await import('./errors.js');
 
 			const operations: Array<'read' | 'write' | 'delete' | 'mkdir' | 'stat'> =
 				['read', 'write', 'delete', 'mkdir', 'stat'];
@@ -84,7 +84,7 @@ describe('Error Types', () => {
 
 	describe('ConfigError', () => {
 		it('should create ConfigError with required fields', async () => {
-			const { ConfigError } = await import('./errors.js');
+			const {ConfigError} = await import('./errors.js');
 
 			const error = new ConfigError({
 				configPath: '~/.config/ccmanager/config.json',
@@ -100,7 +100,7 @@ describe('Error Types', () => {
 		});
 
 		it('should support all reason types', async () => {
-			const { ConfigError } = await import('./errors.js');
+			const {ConfigError} = await import('./errors.js');
 
 			const reasons: Array<'parse' | 'validation' | 'missing' | 'migration'> = [
 				'parse',
@@ -122,7 +122,7 @@ describe('Error Types', () => {
 
 	describe('ProcessError', () => {
 		it('should create ProcessError with required fields', async () => {
-			const { ProcessError } = await import('./errors.js');
+			const {ProcessError} = await import('./errors.js');
 
 			const error = new ProcessError({
 				command: 'claude',
@@ -136,7 +136,7 @@ describe('Error Types', () => {
 		});
 
 		it('should create ProcessError with optional fields', async () => {
-			const { ProcessError } = await import('./errors.js');
+			const {ProcessError} = await import('./errors.js');
 
 			const error = new ProcessError({
 				processId: 1234,
@@ -154,7 +154,7 @@ describe('Error Types', () => {
 
 	describe('ValidationError', () => {
 		it('should create ValidationError with required fields', async () => {
-			const { ValidationError } = await import('./errors.js');
+			const {ValidationError} = await import('./errors.js');
 
 			const error = new ValidationError({
 				field: 'presetId',
@@ -170,7 +170,7 @@ describe('Error Types', () => {
 		});
 
 		it('should handle null and undefined received values', async () => {
-			const { ValidationError } = await import('./errors.js');
+			const {ValidationError} = await import('./errors.js');
 
 			const nullError = new ValidationError({
 				field: 'name',
@@ -190,18 +190,31 @@ describe('Error Types', () => {
 
 	describe('AppError Union Type', () => {
 		it('should support discriminated union via _tag', async () => {
-			const { GitError, FileSystemError, ConfigError, ProcessError, ValidationError } =
-				await import('./errors.js');
+			const {
+				GitError,
+				FileSystemError,
+				ConfigError,
+				ProcessError,
+				ValidationError,
+			} = await import('./errors.js');
 
 			const errors = [
-				new GitError({ command: 'git', exitCode: 1, stderr: 'error' }),
-				new FileSystemError({ operation: 'read', path: '/test', cause: 'error' }),
-				new ConfigError({ configPath: '/test', reason: 'parse', details: 'error' }),
-				new ProcessError({ command: 'cmd', message: 'error' }),
-				new ValidationError({ field: 'test', constraint: 'required', receivedValue: null }),
+				new GitError({command: 'git', exitCode: 1, stderr: 'error'}),
+				new FileSystemError({operation: 'read', path: '/test', cause: 'error'}),
+				new ConfigError({
+					configPath: '/test',
+					reason: 'parse',
+					details: 'error',
+				}),
+				new ProcessError({command: 'cmd', message: 'error'}),
+				new ValidationError({
+					field: 'test',
+					constraint: 'required',
+					receivedValue: null,
+				}),
 			];
 
-			const tags = errors.map((e) => e._tag);
+			const tags = errors.map(e => e._tag);
 			expect(tags).toEqual([
 				'GitError',
 				'FileSystemError',
@@ -212,7 +225,7 @@ describe('Error Types', () => {
 		});
 
 		it('should be able to narrow types using _tag', async () => {
-			const { GitError } = await import('./errors.js');
+			const {GitError} = await import('./errors.js');
 
 			// Create a GitError which is a valid AppError
 			const error: AppError = new GitError({

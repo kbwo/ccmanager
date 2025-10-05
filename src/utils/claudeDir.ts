@@ -15,7 +15,7 @@ import {ValidationError, FileSystemError} from '../types/errors.js';
  * Get the Claude directory path using Either for synchronous validation
  * Returns Either with ValidationError if HOME directory cannot be determined
  */
-export function getClaudeDir(): Either.Either<ValidationError, string> {
+export function getClaudeDir(): Either.Either<string, ValidationError> {
 	const envConfigDir = process.env['CLAUDE_CONFIG_DIR'];
 	if (envConfigDir) {
 		return Either.right(envConfigDir.trim());
@@ -49,10 +49,7 @@ export function getClaudeDir(): Either.Either<ValidationError, string> {
  * Get the Claude projects directory path using Either
  * Propagates ValidationError from getClaudeDir
  */
-export function getClaudeProjectsDir(): Either.Either<
-	ValidationError,
-	string
-> {
+export function getClaudeProjectsDir(): Either.Either<string, ValidationError> {
 	return Either.map(getClaudeDir(), dir => path.join(dir, 'projects'));
 }
 

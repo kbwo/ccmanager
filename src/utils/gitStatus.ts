@@ -42,10 +42,7 @@ export const getGitStatus = (
 	worktreePath: string,
 ): Effect.Effect<GitStatus, GitError> =>
 	Effect.gen(function* () {
-		const diffResult = yield* runGit(
-			['diff', '--shortstat'],
-			worktreePath,
-		);
+		const diffResult = yield* runGit(['diff', '--shortstat'], worktreePath);
 		const stagedResult = yield* runGit(
 			['diff', '--staged', '--shortstat'],
 			worktreePath,
@@ -213,12 +210,9 @@ function runGit(
 	);
 }
 
-function fetchParentBranch(
-	worktreePath: string,
-): Effect.Effect<string | null> {
-	return Effect.catchAll(
-		getWorktreeParentBranch(worktreePath),
-		() => Effect.succeed<string | null>(null),
+function fetchParentBranch(worktreePath: string): Effect.Effect<string | null> {
+	return Effect.catchAll(getWorktreeParentBranch(worktreePath), () =>
+		Effect.succeed<string | null>(null),
 	);
 }
 
@@ -247,15 +241,19 @@ function computeAheadBehind({
 	);
 }
 
-function parseGitStats(statLine: string): Either.Either<string, GitStats> {
+function parseGitStats(statLine: string): Either.Either<GitStats, string> {
 	const insertMatch = statLine.match(/(\d+) insertion/);
 	const deleteMatch = statLine.match(/(\d+) deletion/);
 
-	const insertions = insertMatch?.[1] ? Number.parseInt(insertMatch[1]!, 10) : 0;
+	const insertions = insertMatch?.[1]
+		? Number.parseInt(insertMatch[1]!, 10)
+		: 0;
 	const deletions = deleteMatch?.[1] ? Number.parseInt(deleteMatch[1]!, 10) : 0;
 
 	if (Number.isNaN(insertions) || Number.isNaN(deletions)) {
-		return Either.left(`Unable to parse git diff stats from "${statLine.trim()}"`);
+		return Either.left(
+			`Unable to parse git diff stats from "${statLine.trim()}"`,
+		);
 	}
 
 	return Either.right({insertions, deletions});
@@ -270,7 +268,7 @@ function decodeGitStats(statLine: string): GitStats {
 
 function parseAheadBehind(
 	stats: string,
-): Either.Either<string, {aheadCount: number; behindCount: number}> {
+): Either.Either<{aheadCount: number; behindCount: number}, string> {
 	const trimmed = stats.trim();
 	if (!trimmed) {
 		return Either.right({aheadCount: 0, behindCount: 0});
@@ -290,7 +288,10 @@ function parseAheadBehind(
 	});
 }
 
-function decodeAheadBehind(stats: string): {aheadCount: number; behindCount: number} {
+function decodeAheadBehind(stats: string): {
+	aheadCount: number;
+	behindCount: number;
+} {
 	return pipe(
 		parseAheadBehind(stats),
 		Either.getOrElse(() => ({aheadCount: 0, behindCount: 0})),
@@ -356,9 +357,7 @@ function toGitError(command: string, error: unknown): GitError {
 				? exitCodeRaw
 				: Number.parseInt(String(exitCodeRaw ?? '-1'), 10) || -1;
 		const stderr =
-			typeof error.stderr === 'string'
-				? error.stderr
-				: error.message ?? '';
+			typeof error.stderr === 'string' ? error.stderr : (error.message ?? '');
 
 		return new GitError({
 			command,

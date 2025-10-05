@@ -4,6 +4,8 @@ import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
 import {configurationManager} from './configurationManager.js';
 import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
+import {Effect} from 'effect';
+import {GitError} from '../types/errors.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -38,6 +40,13 @@ const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
 const mockedGetWorktreeHooks = vi.mocked(configurationManager.getWorktreeHooks);
 const mockedExecuteHook = vi.mocked(executeWorktreePostCreationHook);
+
+// Mock error interface for git command errors
+interface MockGitError extends Error {
+	status?: number;
+	stderr?: string;
+	stdout?: string;
+}
 
 describe('WorktreeService', () => {
 	let service: WorktreeService;
@@ -743,7 +752,7 @@ branch refs/heads/other-branch
 				},
 			});
 
-			mockedExecuteHook.mockResolvedValue(undefined);
+			mockedExecuteHook.mockResolvedValue(Effect.succeed(undefined));
 
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
@@ -758,6 +767,9 @@ branch refs/heads/other-branch
 					}
 					if (cmd.includes('git rev-parse --verify')) {
 						throw new Error('Branch not found');
+					}
+					if (cmd.startsWith('git config --worktree')) {
+						return '';
 					}
 				}
 				return '';
@@ -878,7 +890,7 @@ branch refs/heads/other-branch
 
 			// The real executeWorktreePostCreationHook doesn't throw, it catches errors internally
 			// So the mock should resolve, not reject
-			mockedExecuteHook.mockResolvedValue(undefined);
+			mockedExecuteHook.mockResolvedValue(Effect.succeed(undefined));
 
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
@@ -893,6 +905,9 @@ branch refs/heads/other-branch
 					}
 					if (cmd.includes('git rev-parse --verify')) {
 						throw new Error('Branch not found');
+					}
+					if (cmd.startsWith('git config --worktree')) {
+						return '';
 					}
 				}
 				return '';
@@ -1227,6 +1242,370 @@ branch refs/heads/other-branch
 				'git remote',
 				expect.any(Object),
 			);
+		});
+	});
+
+	describe('Effect-based getWorktrees', () => {
+		it('should return Effect with worktree array on success', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toHaveLength(2);
+			expect(result[0]).toMatchObject({
+				path: '/fake/path',
+				branch: 'main',
+				isMainWorktree: true,
+			});
+			expect(result[1]).toMatchObject({
+				path: '/fake/path/feature',
+				branch: 'feature',
+				isMainWorktree: false,
+			});
+		});
+
+		it('should return Effect that fails with GitError when git command fails', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						const error: MockGitError = new Error(
+							'fatal: not a git repository',
+						);
+						error.status = 128;
+						error.stderr = 'fatal: not a git repository';
+						throw error;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(GitError);
+				expect(result.left.command).toBe('git worktree list --porcelain');
+				expect(result.left.exitCode).toBe(128);
+				expect(result.left.stderr).toContain('not a git repository');
+			} else {
+				expect.fail('Should have returned Left with GitError');
+			}
+		});
+
+		it('should fallback to single worktree when git worktree command not supported', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						const error: MockGitError = new Error('unknown command: worktree');
+						error.status = 1;
+						error.stderr = 'unknown command: worktree';
+						throw error;
+					}
+					if (cmd === 'git rev-parse --abbrev-ref HEAD') {
+						return 'main\n';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]).toMatchObject({
+				path: '/fake/path',
+				branch: 'main',
+				isMainWorktree: true,
+			});
+		});
+	});
+
+	describe('Effect-based createWorktree', () => {
+		it('should return Effect with Worktree on success', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+				}
+				return '';
+			});
+
+			const effect = service.createWorktreeEffect(
+				'/path/to/worktree',
+				'new-feature',
+				'main',
+			);
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toMatchObject({
+				path: '/path/to/worktree',
+				branch: 'new-feature',
+				isMainWorktree: false,
+			});
+		});
+
+		it('should return Effect that fails with GitError on git command failure', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+					if (cmd.includes('git worktree add')) {
+						const error: MockGitError = new Error(
+							'fatal: invalid reference: main',
+						);
+						error.status = 128;
+						error.stderr = 'fatal: invalid reference: main';
+						throw error;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.createWorktreeEffect(
+				'/path/to/worktree',
+				'new-feature',
+				'main',
+			);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(GitError);
+				expect((result.left as GitError).exitCode).toBe(128);
+				expect((result.left as GitError).stderr).toContain('invalid reference');
+			} else {
+				expect.fail('Should have returned Left with GitError');
+			}
+		});
+	});
+
+	describe('Effect-based deleteWorktree', () => {
+		it('should return Effect with void on success', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git worktree remove')) {
+						return '';
+					}
+					if (cmd.includes('git branch -D')) {
+						return '';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.deleteWorktreeEffect('/fake/path/feature');
+			await Effect.runPromise(effect);
+
+			expect(execSync).toHaveBeenCalledWith(
+				expect.stringContaining('git worktree remove'),
+				expect.any(Object),
+			);
+		});
+
+		it('should return Effect that fails with GitError when worktree not found', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.deleteWorktreeEffect('/fake/path/nonexistent');
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(GitError);
+				expect(result.left.stderr).toContain('Worktree not found');
+			} else {
+				expect.fail('Should have returned Left with GitError');
+			}
+		});
+
+		it('should return Effect that fails with GitError when trying to delete main worktree', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.deleteWorktreeEffect('/fake/path');
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(GitError);
+				expect(result.left.stderr).toContain('Cannot delete the main worktree');
+			} else {
+				expect.fail('Should have returned Left with GitError');
+			}
+		});
+	});
+
+	describe('Effect-based mergeWorktree', () => {
+		it('should return Effect with void on successful merge', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git merge')) {
+						return 'Merge successful';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect('feature', 'main', false);
+			await Effect.runPromise(effect);
+
+			expect(execSync).toHaveBeenCalledWith(
+				'git merge --no-ff "feature"',
+				expect.any(Object),
+			);
+		});
+
+		it('should return Effect that fails with GitError when target branch not found', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect(
+				'feature',
+				'nonexistent',
+				false,
+			);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(GitError);
+				expect(result.left.stderr).toContain(
+					'Target branch worktree not found',
+				);
+			} else {
+				expect.fail('Should have returned Left with GitError');
+			}
+		});
+
+		it('should return Effect that fails with GitError on merge conflict', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git merge')) {
+						const error: MockGitError = new Error('CONFLICT: Merge conflict');
+						error.status = 1;
+						error.stderr = 'CONFLICT: Merge conflict in file.txt';
+						throw error;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect('feature', 'main', false);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(GitError);
+				expect(result.left.exitCode).toBe(1);
+				expect(result.left.stderr).toContain('Merge conflict');
+			} else {
+				expect.fail('Should have returned Left with GitError');
+			}
 		});
 	});
 });

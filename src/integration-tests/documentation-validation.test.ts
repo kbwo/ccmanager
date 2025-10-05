@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import {describe, it, expect} from 'vitest';
+import {readFileSync} from 'fs';
+import {join} from 'path';
 
 /**
  * Documentation validation tests
@@ -12,7 +12,7 @@ describe('Effect-ts Documentation Validation', () => {
 
 	try {
 		claudeMdContent = readFileSync(claudeMdPath, 'utf-8');
-	} catch (error) {
+	} catch (_error) {
 		claudeMdContent = '';
 	}
 

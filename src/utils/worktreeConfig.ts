@@ -1,5 +1,5 @@
 import {promisify} from 'util';
-import {exec, execSync, execFile} from 'child_process';
+import {execSync, execFile} from 'child_process';
 import {Effect} from 'effect';
 import {GitError} from '../types/errors.js';
 import {worktreeConfigManager} from '../services/worktreeConfigManager.js';
@@ -30,7 +30,6 @@ export function getWorktreeParentBranch(
 		return Effect.succeed(null);
 	}
 
-	const command = 'git config --worktree ccmanager.parentBranch';
 	return Effect.catchAll(
 		Effect.tryPromise({
 			try: signal =>
@@ -136,7 +135,7 @@ function toGitError(command: string, error: unknown): GitError {
 		const stderr =
 			typeof execError.stderr === 'string'
 				? execError.stderr
-				: execError.message ?? '';
+				: (execError.message ?? '');
 
 		return new GitError({
 			command,
@@ -178,11 +177,8 @@ export function setWorktreeParentBranchLegacy(
 		return;
 	}
 
-	execSync(
-		`git config --worktree ccmanager.parentBranch "${parentBranch}"`,
-		{
-			cwd: worktreePath,
-			encoding: 'utf8',
-		},
-	);
+	execSync(`git config --worktree ccmanager.parentBranch "${parentBranch}"`, {
+		cwd: worktreePath,
+		encoding: 'utf8',
+	});
 }

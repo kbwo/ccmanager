@@ -12,8 +12,9 @@ vi.mock('../utils/gitStatus.js', () => ({
 }));
 
 describe('useGitStatus', () => {
-	const mockGetGitStatus =
-		getGitStatusLegacyLimited as ReturnType<typeof vi.fn>;
+	const mockGetGitStatus = getGitStatusLegacyLimited as ReturnType<
+		typeof vi.fn
+	>;
 
 	const createWorktree = (path: string): Worktree => ({
 		path,

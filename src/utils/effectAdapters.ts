@@ -1,6 +1,6 @@
-import { Either, Effect } from 'effect';
-import type { GitOperationResult } from './gitStatus.js';
-import type { AppError } from '../types/errors.js';
+import {Either, Effect} from 'effect';
+import type {GitOperationResult} from './gitStatus.js';
+import type {AppError} from '../types/errors.js';
 
 /**
  * Convert legacy GitOperationResult to Either
@@ -38,12 +38,12 @@ export function eitherToResult<T>(
 	either: Either.Either<string | undefined, T | undefined>,
 ): GitOperationResult<T> {
 	return Either.match(either, {
-		onLeft: (error) =>
+		onLeft: error =>
 			({
 				success: false,
 				error,
 			}) as GitOperationResult<T>,
-		onRight: (data) =>
+		onRight: data =>
 			({
 				success: true,
 				data,
@@ -58,9 +58,7 @@ export function eitherToResult<T>(
  * @param effect - The Effect to convert
  * @returns Promise that resolves or rejects based on Effect result
  */
-export function effectToPromise<A, E>(
-	effect: Effect.Effect<A, E>,
-): Promise<A> {
+export function effectToPromise<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
 	return Effect.runPromise(effect);
 }
 

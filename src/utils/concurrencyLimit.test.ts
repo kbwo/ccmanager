@@ -120,9 +120,7 @@ describe('createEffectConcurrencyLimited', () => {
 
 	it('should release permits after failures', async () => {
 		const original = (shouldFail: boolean) =>
-			shouldFail
-				? Effect.fail('Task failed')
-				: Effect.succeed('success');
+			shouldFail ? Effect.fail('Task failed') : Effect.succeed('success');
 
 		const limited = createEffectConcurrencyLimited(original, 1);
 

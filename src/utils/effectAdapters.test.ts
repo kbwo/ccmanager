@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import type { GitOperationResult } from './gitStatus.js';
-import type { AppError } from '../types/errors.js';
+import {describe, it, expect} from 'vitest';
+import type {GitOperationResult} from './gitStatus.js';
+import type {AppError} from '../types/errors.js';
 
 /**
  * Tests for Effect adapter utilities
@@ -10,8 +10,8 @@ import type { AppError } from '../types/errors.js';
 describe('Effect Adapters', () => {
 	describe('resultToEither', () => {
 		it('should convert successful GitOperationResult to Either.right', async () => {
-			const { resultToEither } = await import('./effectAdapters.js');
-			const { Either } = await import('effect');
+			const {resultToEither} = await import('./effectAdapters.js');
+			const {Either} = await import('effect');
 
 			const result: GitOperationResult<string> = {
 				success: true,
@@ -27,8 +27,8 @@ describe('Effect Adapters', () => {
 		});
 
 		it('should convert failed GitOperationResult to Either.left', async () => {
-			const { resultToEither } = await import('./effectAdapters.js');
-			const { Either } = await import('effect');
+			const {resultToEither} = await import('./effectAdapters.js');
+			const {Either} = await import('effect');
 
 			const result: GitOperationResult<string> = {
 				success: false,
@@ -44,8 +44,8 @@ describe('Effect Adapters', () => {
 		});
 
 		it('should handle missing data in successful result', async () => {
-			const { resultToEither } = await import('./effectAdapters.js');
-			const { Either } = await import('effect');
+			const {resultToEither} = await import('./effectAdapters.js');
+			const {Either} = await import('effect');
 
 			const result: GitOperationResult<string> = {
 				success: true,
@@ -60,8 +60,8 @@ describe('Effect Adapters', () => {
 		});
 
 		it('should handle missing error in failed result', async () => {
-			const { resultToEither } = await import('./effectAdapters.js');
-			const { Either } = await import('effect');
+			const {resultToEither} = await import('./effectAdapters.js');
+			const {Either} = await import('effect');
 
 			const result: GitOperationResult<string> = {
 				success: false,
@@ -78,8 +78,8 @@ describe('Effect Adapters', () => {
 
 	describe('eitherToResult', () => {
 		it('should convert Either.right to successful GitOperationResult', async () => {
-			const { eitherToResult } = await import('./effectAdapters.js');
-			const { Either } = await import('effect');
+			const {eitherToResult} = await import('./effectAdapters.js');
+			const {Either} = await import('effect');
 
 			const either = Either.right('test data');
 			const result = eitherToResult(either);
@@ -90,8 +90,8 @@ describe('Effect Adapters', () => {
 		});
 
 		it('should convert Either.left to failed GitOperationResult', async () => {
-			const { eitherToResult } = await import('./effectAdapters.js');
-			const { Either } = await import('effect');
+			const {eitherToResult} = await import('./effectAdapters.js');
+			const {Either} = await import('effect');
 
 			const either = Either.left('test error');
 			const result = eitherToResult(either);
@@ -104,8 +104,8 @@ describe('Effect Adapters', () => {
 
 	describe('effectToPromise', () => {
 		it('should convert successful Effect to resolved Promise', async () => {
-			const { effectToPromise } = await import('./effectAdapters.js');
-			const { Effect } = await import('effect');
+			const {effectToPromise} = await import('./effectAdapters.js');
+			const {Effect} = await import('effect');
 
 			const effect = Effect.succeed(42);
 			const promise = effectToPromise(effect);
@@ -114,8 +114,8 @@ describe('Effect Adapters', () => {
 		});
 
 		it('should convert failed Effect to rejected Promise', async () => {
-			const { effectToPromise } = await import('./effectAdapters.js');
-			const { Effect } = await import('effect');
+			const {effectToPromise} = await import('./effectAdapters.js');
+			const {Effect} = await import('effect');
 
 			const effect = Effect.fail('test error');
 			const promise = effectToPromise(effect);
@@ -126,9 +126,11 @@ describe('Effect Adapters', () => {
 
 	describe('effectToPromiseWithErrorMapping', () => {
 		it('should map errors using provided mapper function', async () => {
-			const { effectToPromiseWithErrorMapping } = await import('./effectAdapters.js');
-			const { Effect } = await import('effect');
-			const { GitError } = await import('../types/errors.js');
+			const {effectToPromiseWithErrorMapping} = await import(
+				'./effectAdapters.js'
+			);
+			const {Effect} = await import('effect');
+			const {GitError} = await import('../types/errors.js');
 
 			const error = new GitError({
 				command: 'git status',
@@ -146,12 +148,16 @@ describe('Effect Adapters', () => {
 
 			const promise = effectToPromiseWithErrorMapping(effect, errorMapper);
 
-			await expect(promise).rejects.toThrow('Git command failed: git status (exit 128)');
+			await expect(promise).rejects.toThrow(
+				'Git command failed: git status (exit 128)',
+			);
 		});
 
 		it('should preserve success values', async () => {
-			const { effectToPromiseWithErrorMapping } = await import('./effectAdapters.js');
-			const { Effect } = await import('effect');
+			const {effectToPromiseWithErrorMapping} = await import(
+				'./effectAdapters.js'
+			);
+			const {Effect} = await import('effect');
 
 			const effect = Effect.succeed('success data');
 			const errorMapper = (e: AppError) => {
@@ -169,7 +175,9 @@ describe('Effect Adapters', () => {
 
 	describe('Round-trip conversions', () => {
 		it('should preserve data through resultToEither -> eitherToResult', async () => {
-			const { resultToEither, eitherToResult } = await import('./effectAdapters.js');
+			const {resultToEither, eitherToResult} = await import(
+				'./effectAdapters.js'
+			);
 
 			const original: GitOperationResult<number> = {
 				success: true,
@@ -182,7 +190,9 @@ describe('Effect Adapters', () => {
 		});
 
 		it('should preserve error through resultToEither -> eitherToResult', async () => {
-			const { resultToEither, eitherToResult } = await import('./effectAdapters.js');
+			const {resultToEither, eitherToResult} = await import(
+				'./effectAdapters.js'
+			);
 
 			const original: GitOperationResult<number> = {
 				success: false,
