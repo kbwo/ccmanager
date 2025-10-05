@@ -129,6 +129,342 @@ Session states are detected using a strategy pattern that supports multiple CLI 
 - Default shortcuts for common actions (back, quit, refresh, etc.)
 - Visual configuration UI accessible from main menu
 
+## Error Handling
+
+CCManager uses **Effect-ts** for type-safe, composable error handling. This approach makes errors explicit in function signatures, enables better composition, and provides powerful error recovery strategies.
+
+### Effect-ts Patterns
+
+#### When to Use Effect vs Either
+
+- **Effect**: Use for asynchronous operations or operations with side effects
+  - Git commands, file I/O, PTY spawning
+  - Operations that return `Effect<SuccessType, ErrorType, never>`
+
+- **Either**: Use for synchronous, pure operations
+  - Configuration validation, path resolution
+  - Operations that return `Either<ErrorType, SuccessType>`
+
+#### Core Effect Functions
+
+**Creating Effects:**
+
+```typescript
+// Success value
+const success = Effect.succeed(42);
+
+// Error value
+const failure = Effect.fail(new GitError({
+  command: 'git status',
+  exitCode: 128,
+  stderr: 'not a git repository'
+}));
+
+// Wrapping try-catch code
+const wrappedSync = Effect.try({
+  try: () => JSON.parse(data),
+  catch: (error) => new ConfigError({
+    configPath: path,
+    reason: 'parse',
+    details: String(error)
+  })
+});
+
+// Wrapping Promises
+const wrappedAsync = Effect.tryPromise({
+  try: () => fs.promises.readFile(path, 'utf-8'),
+  catch: (error) => new FileSystemError({
+    operation: 'read',
+    path,
+    cause: String(error)
+  })
+});
+```
+
+**Transforming Effects:**
+
+```typescript
+// Transform success values
+const mapped = Effect.map(effect, (value) => value * 2);
+
+// Chain Effect-returning operations
+const chained = Effect.flatMap(effect, (value) =>
+  Effect.succeed(value + 1)
+);
+
+// Transform errors
+const mappedError = Effect.mapError(effect, (error) =>
+  `Failed: ${error.message}`
+);
+```
+
+**Either Functions:**
+
+```typescript
+// Create Either values
+const right = Either.right(42);
+const left = Either.left('error message');
+
+// Transform Either
+const mapped = Either.map(either, (value) => value * 2);
+const chained = Either.flatMap(either, (value) => Either.right(value + 1));
+```
+
+### Error Types
+
+All errors extend `Data.TaggedError` for type-safe discrimination:
+
+- **GitError**: Git command failures (command, exitCode, stderr, stdout?)
+- **FileSystemError**: File operations (operation, path, cause)
+- **ConfigError**: Configuration issues (configPath, reason, details)
+- **ProcessError**: PTY/process failures (processId?, command, signal?, exitCode?, message)
+- **ValidationError**: Input validation (field, constraint, receivedValue)
+
+**Error Discrimination with `_tag`:**
+
+```typescript
+function handleError(error: AppError): string {
+  switch (error._tag) {
+    case 'GitError':
+      return `Git ${error.command} failed (exit ${error.exitCode}): ${error.stderr}`;
+    case 'FileSystemError':
+      return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+    case 'ConfigError':
+      return `Config error (${error.reason}): ${error.details}`;
+    case 'ProcessError':
+      return `Process error: ${error.message}`;
+    case 'ValidationError':
+      return `Validation failed for ${error.field}: ${error.constraint}`;
+  }
+}
+```
+
+### Effect Usage in Services
+
+Service methods return Effect types to make errors explicit:
+
+```typescript
+class WorktreeService {
+  getWorktrees(): Effect.Effect<Worktree[], GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['worktree', 'list', '--porcelain']);
+        return parseWorktrees(result.stdout);
+      },
+      catch: (error: any) => new GitError({
+        command: 'git worktree list',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
+  }
+
+  createWorktree(
+    branchName: string,
+    path: string
+  ): Effect.Effect<Worktree, GitError | FileSystemError, never> {
+    return Effect.flatMap(
+      this.validatePath(path),
+      (validPath) => Effect.tryPromise({
+        try: async () => {
+          await execFile('git', ['worktree', 'add', validPath, branchName]);
+          return { path: validPath, branch: branchName };
+        },
+        catch: (error: any) => new GitError({
+          command: `git worktree add ${validPath} ${branchName}`,
+          exitCode: error.code || 1,
+          stderr: error.stderr || String(error)
+        })
+      })
+    );
+  }
+}
+```
+
+### Effect Usage in Utilities
+
+Utility functions use Effect or Either based on operation type:
+
+```typescript
+// Synchronous validation with Either
+function validateConfig(data: unknown): Either.Either<ValidationError, Config> {
+  if (!isValidConfig(data)) {
+    return Either.left(new ValidationError({
+      field: 'config',
+      constraint: 'must be valid configuration object',
+      receivedValue: data
+    }));
+  }
+  return Either.right(data as Config);
+}
+
+// Asynchronous operations with Effect
+function getGitStatus(
+  worktreePath: string,
+  signal: AbortSignal
+): Effect.Effect<GitStatus, GitError, never> {
+  return Effect.tryPromise({
+    try: async () => {
+      const result = await execFile('git', ['status', '--porcelain'], {
+        cwd: worktreePath,
+        signal
+      });
+      return parseGitStatus(result.stdout);
+    },
+    catch: (error: any) => new GitError({
+      command: 'git status',
+      exitCode: error.code || 1,
+      stderr: error.stderr || String(error)
+    })
+  });
+}
+```
+
+### Effect Usage in Components
+
+React components execute Effects and handle results:
+
+```typescript
+// Pattern 1: Effect.runPromise with try-catch
+const handleCreateWorktree = async (branchName: string, path: string) => {
+  try {
+    const worktree = await Effect.runPromise(
+      worktreeService.createWorktree(branchName, path)
+    );
+    setWorktrees([...worktrees, worktree]);
+  } catch (error) {
+    if (error instanceof GitError) {
+      setError(`Git error: ${error.stderr}`);
+    } else if (error instanceof FileSystemError) {
+      setError(`File system error: ${error.cause}`);
+    } else {
+      setError('Unknown error occurred');
+    }
+  }
+};
+
+// Pattern 2: Effect.match for type-safe handling
+const handleLoadConfig = async () => {
+  const result = await Effect.runPromise(
+    Effect.match(configManager.loadConfig(), {
+      onFailure: (error) => ({ success: false as const, error }),
+      onSuccess: (config) => ({ success: true as const, config })
+    })
+  );
+
+  if (result.success) {
+    setConfig(result.config);
+  } else {
+    setError(handleError(result.error));
+  }
+};
+
+// Pattern 3: useEffect with cleanup
+useEffect(() => {
+  let cancelled = false;
+
+  Effect.runPromise(projectManager.loadRecentProjects())
+    .then(projects => {
+      if (!cancelled) setProjects(projects);
+    })
+    .catch(error => {
+      if (!cancelled) setError(String(error));
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+```
+
+### Error Recovery Strategies
+
+Effect-ts provides powerful error recovery options:
+
+```typescript
+// Catch specific error types
+const withRecovery = Effect.catchTag(effect, 'GitError', (error) => {
+  if (error.exitCode === 128) {
+    return Effect.succeed(defaultValue);
+  }
+  return Effect.fail(error);
+});
+
+// Catch all errors
+const withFallback = Effect.catchAll(effect, (error) => {
+  console.error('Operation failed:', error);
+  return Effect.succeed(fallbackValue);
+});
+
+// Provide alternative Effect
+const withAlternative = Effect.orElse(effect, () =>
+  alternativeEffect
+);
+
+// Retry with policy
+const withRetry = Effect.retry(effect, {
+  times: 3,
+  schedule: Schedule.exponential('100 millis')
+});
+```
+
+### Effect Composition
+
+Combine multiple Effects efficiently:
+
+```typescript
+// Sequential composition
+const sequential = Effect.flatMap(
+  firstEffect,
+  (first) => Effect.flatMap(
+    secondEffect,
+    (second) => Effect.succeed({ first, second })
+  )
+);
+
+// Parallel execution
+const parallel = Effect.all([
+  getGitStatus(path1),
+  getGitStatus(path2),
+  getGitStatus(path3)
+], { concurrency: 3 });
+
+// Conditional execution
+const conditional = Effect.if(
+  shouldExecute,
+  {
+    onTrue: () => effect1,
+    onFalse: () => effect2
+  }
+);
+```
+
+### Best Practices
+
+1. **Always use Effect/Either for operations that can fail**
+   - Makes errors explicit in type signatures
+   - Enables better composition and error handling
+
+2. **Use pattern matching on `_tag` for error discrimination**
+   - TypeScript narrows types automatically
+   - Ensures all error types are handled
+
+3. **Prefer Effect.match over try-catch at boundaries**
+   - More explicit about success and failure paths
+   - Better type inference
+
+4. **Use Effect.catchTag for specific error recovery**
+   - Type-safe error handling
+   - Automatic type narrowing
+
+5. **Keep Effects pure and composable**
+   - Avoid side effects in map/flatMap callbacks
+   - Use Effect.sync or Effect.tryPromise for side effects
+
+6. **Execute Effects at application boundaries**
+   - Components, event handlers, useEffect hooks
+   - Keep business logic in Effect-returning functions
+
 ## Development Guidelines
 
 ### Component Structure

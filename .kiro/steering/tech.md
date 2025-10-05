@@ -29,6 +29,9 @@
 - **@xterm/headless**: ^5.5.0 - Terminal emulator without DOM
 - **strip-ansi**: ^7.1.0 - ANSI escape code processing
 
+### Error Handling
+- **effect**: ^3.18.2 - Type-safe, composable error handling with Effect-ts
+
 ### CLI Parsing
 - **meow**: ^11.0.0 - CLI argument parsing with help text generation
 
