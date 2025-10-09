@@ -113,7 +113,7 @@
   - _Requirements: 5.4, 5.5, 5.6, 3.4, 3.8_
 
 - [ ] 4. Integrate Effect execution in React components
-- [ ] 4.1 Update Menu component for Effect-based error handling
+- [x] 4.1 Update Menu component for Effect-based error handling
   - Execute worktree listing Effect using Effect.runPromise
   - Handle GitError display using pattern matching on _tag
   - Transform error information into user-friendly messages
