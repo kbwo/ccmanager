@@ -11,6 +11,8 @@ import {promises as fs} from 'fs';
 import path from 'path';
 import {homedir} from 'os';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+import {Effect} from 'effect';
+import {FileSystemError, ConfigError} from '../types/errors.js';
 
 interface DiscoveryTask {
 	path: string;
@@ -441,6 +443,193 @@ export class ProjectManager implements IProjectManager {
 
 		this.projectCache.set(projectPath, project);
 		return project;
+	}
+
+	// Effect-based API methods
+
+	/**
+	 * Discover Git projects in the specified directory (Effect version)
+	 * @param projectsDir - Root directory to search for Git projects
+	 * @returns Effect with discovered projects or FileSystemError
+	 */
+	discoverProjectsEffect(
+		projectsDir: string,
+	): Effect.Effect<GitProject[], FileSystemError, never> {
+		return Effect.tryPromise({
+			try: async () => {
+				// Verify the directory exists
+				await fs.access(projectsDir);
+
+				// Step 1: Fast concurrent directory discovery
+				const directories = await this.discoverDirectories(projectsDir);
+
+				// Step 2: Process directories in parallel to check if they're git repos
+				const results = await this.processDirectoriesInParallel(
+					directories,
+					projectsDir,
+				);
+
+				// Step 3: Create project objects
+				const projects: GitProject[] = [];
+				const projectMap = new Map<string, GitProject>();
+
+				for (const result of results) {
+					// Handle name conflicts
+					let displayName = result.name;
+					if (projectMap.has(result.name)) {
+						displayName = result.relativePath.replace(/[\\/\\\\]/g, '/');
+					}
+
+					const project: GitProject = {
+						name: displayName,
+						path: result.path,
+						relativePath: result.relativePath,
+						isValid: true,
+						error: result.error,
+					};
+
+					projectMap.set(displayName, project);
+				}
+
+				// Convert to array and sort
+				projects.push(...projectMap.values());
+				projects.sort((a, b) => a.name.localeCompare(b.name));
+
+				// Cache results
+				this.projectCache.clear();
+				projects.forEach(p => this.projectCache.set(p.path, p));
+
+				return projects;
+			},
+			catch: error => {
+				if (error instanceof FileSystemError) {
+					return error;
+				}
+
+				const nodeError = error as NodeJS.ErrnoException;
+				const cause =
+					nodeError.code === 'ENOENT'
+						? `Projects directory does not exist: ${projectsDir}`
+						: String(error);
+
+				return new FileSystemError({
+					operation: 'read',
+					path: projectsDir,
+					cause,
+				});
+			},
+		});
+	}
+
+	/**
+	 * Load recent projects from cache (Effect version)
+	 * @returns Effect with recent projects or FileSystemError/ConfigError
+	 */
+	loadRecentProjectsEffect(): Effect.Effect<
+		RecentProject[],
+		FileSystemError | ConfigError,
+		never
+	> {
+		return Effect.try({
+			try: () => {
+				if (existsSync(this.dataPath)) {
+					const data = readFileSync(this.dataPath, 'utf-8');
+					try {
+						const parsed = JSON.parse(data);
+						return parsed || [];
+					} catch (parseError) {
+						throw new ConfigError({
+							configPath: this.dataPath,
+							reason: 'parse',
+							details: String(parseError),
+						});
+					}
+				}
+				return [];
+			},
+			catch: error => {
+				if (error instanceof ConfigError) {
+					return error;
+				}
+				return new FileSystemError({
+					operation: 'read',
+					path: this.dataPath,
+					cause: String(error),
+				});
+			},
+		});
+	}
+
+	/**
+	 * Save recent projects to cache (Effect version)
+	 * @param projects - Recent projects to save
+	 * @returns Effect with void or FileSystemError
+	 */
+	saveRecentProjectsEffect(
+		projects: RecentProject[],
+	): Effect.Effect<void, FileSystemError, never> {
+		return Effect.try({
+			try: () => {
+				writeFileSync(this.dataPath, JSON.stringify(projects, null, 2));
+			},
+			catch: error => {
+				return new FileSystemError({
+					operation: 'write',
+					path: this.dataPath,
+					cause: String(error),
+				});
+			},
+		});
+	}
+
+	/**
+	 * Refresh projects list (Effect version)
+	 * @returns Effect with void or FileSystemError
+	 */
+	refreshProjectsEffect(): Effect.Effect<void, FileSystemError, never> {
+		return Effect.flatMap(
+			Effect.try({
+				try: () => {
+					if (!this.projectsDir) {
+						throw new FileSystemError({
+							operation: 'read',
+							path: '',
+							cause: 'Projects directory not configured',
+						});
+					}
+					return this.projectsDir;
+				},
+				catch: error => {
+					if (error instanceof FileSystemError) {
+						return error;
+					}
+					return new FileSystemError({
+						operation: 'read',
+						path: '',
+						cause: String(error),
+					});
+				},
+			}),
+			projectsDir =>
+				Effect.flatMap(this.discoverProjectsEffect(projectsDir), projects =>
+					Effect.sync(() => {
+						this.projects = projects;
+
+						// Update current project if it still exists
+						if (this.currentProject) {
+							const updatedProject = this.projects.find(
+								p => p.path === this.currentProject!.path,
+							);
+							if (updatedProject) {
+								this.currentProject = updatedProject;
+							} else {
+								// Current project no longer exists
+								this.currentProject = undefined;
+							}
+						}
+					}),
+				),
+		);
 	}
 }
 

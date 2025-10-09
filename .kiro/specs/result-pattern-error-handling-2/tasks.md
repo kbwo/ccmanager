@@ -69,7 +69,7 @@
   - Handle invalid HOME directory with ValidationError
   - _Requirements: 6.4, 6.6, 2.1, 2.2_
 
-- [ ] 3. Migrate service layer to Effect types
+- [x] 3. Migrate service layer to Effect types
 - [x] 3.1 Convert WorktreeService to Effect-based operations
   - Transform worktree listing to return Effect with GitError
   - Transform worktree creation to return Effect with GitError or FileSystemError
@@ -102,7 +102,7 @@
   - Use Effect.tryPromise for Promise-based PTY operations
   - _Requirements: 5.2, 5.5, 5.6, 5.7, 3.4, 3.9_
 
-- [ ] 3.4 Convert ProjectManager to Effect-based operations
+- [x] 3.4 Convert ProjectManager to Effect-based operations
   - Transform project discovery to return Effect with FileSystemError or GitError
   - Transform recent projects loading to return Effect with FileSystemError or ConfigError
   - Transform recent projects saving to return Effect with FileSystemError
