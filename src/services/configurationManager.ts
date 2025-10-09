@@ -400,14 +400,15 @@ export class ConfigurationManager {
 					constraint: 'must be a valid configuration object',
 					receivedValue: config,
 				}),
-			);
+			) as Either.Either<ValidationError, ConfigurationData>;
 		}
 
 		// Validate shortcuts field if present
 		const configObj = config as Record<string, unknown>;
 		if (
-			configObj.shortcuts !== undefined &&
-			(typeof configObj.shortcuts !== 'object' || configObj.shortcuts === null)
+			configObj['shortcuts'] !== undefined &&
+			(typeof configObj['shortcuts'] !== 'object' ||
+				configObj['shortcuts'] === null)
 		) {
 			return Either.left(
 				new ValidationError({
@@ -415,11 +416,13 @@ export class ConfigurationManager {
 					constraint: 'shortcuts must be a valid object',
 					receivedValue: config,
 				}),
-			);
+			) as unknown as Either.Either<ValidationError, ConfigurationData>;
 		}
 
 		// Additional validation could go here
-		return Either.right(config as ConfigurationData);
+		return Either.right(
+			config as ConfigurationData,
+		) as unknown as Either.Either<ValidationError, ConfigurationData>;
 	}
 
 	/**
@@ -439,10 +442,13 @@ export class ConfigurationManager {
 					constraint: 'Preset not found',
 					receivedValue: id,
 				}),
-			);
+			) as unknown as Either.Either<ValidationError, CommandPreset>;
 		}
 
-		return Either.right(preset);
+		return Either.right(preset) as unknown as Either.Either<
+			ValidationError,
+			CommandPreset
+		>;
 	}
 
 	/**
@@ -560,10 +566,7 @@ export class ConfigurationManager {
 			};
 		}
 		if (
-			!Object.prototype.hasOwnProperty.call(
-				config.worktree,
-				'copySessionData',
-			)
+			!Object.prototype.hasOwnProperty.call(config.worktree, 'copySessionData')
 		) {
 			config.worktree.copySessionData = true;
 		}

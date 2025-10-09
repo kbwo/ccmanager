@@ -91,7 +91,7 @@
   - Maintain singleton pattern for configuration manager
   - _Requirements: 5.3, 5.6, 5.7, 3.3, 3.4, 2.1_
 
-- [ ] 3.3 Convert SessionManager to Effect-based operations
+- [x] 3.3 Convert SessionManager to Effect-based operations
   - Transform session creation with preset to return Effect with ProcessError or ConfigError
   - Transform session creation with devcontainer to return Effect with ProcessError or ConfigError
   - Transform session termination to return Effect with ProcessError

@@ -8,7 +8,6 @@ import {
 	ValidationError,
 } from '../types/errors.js';
 import type {
-	CommandConfig,
 	CommandPresetsConfig,
 	ConfigurationData,
 	CommandPreset,
@@ -71,9 +70,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 
 	describe('loadConfigEffect', () => {
 		it('should return Effect with ConfigurationData on success', async () => {
-			const result = await Effect.runPromise(
-				configManager.loadConfigEffect(),
-			);
+			const result = await Effect.runPromise(configManager.loadConfigEffect());
 
 			expect(result).toBeDefined();
 			expect(result.shortcuts).toBeDefined();
@@ -143,9 +140,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 
 			configManager = new ConfigurationManager();
 
-			const result = await Effect.runPromise(
-				configManager.loadConfigEffect(),
-			);
+			const result = await Effect.runPromise(configManager.loadConfigEffect());
 
 			expect(result.shortcuts).toEqual(legacyShortcuts);
 			expect(writeFileSync).toHaveBeenCalled();
@@ -157,6 +152,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 			const newConfig: ConfigurationData = {
 				shortcuts: {
 					returnToMenu: {ctrl: true, key: 'z'},
+					cancel: {key: 'escape'},
 				},
 			};
 
@@ -176,6 +172,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 			const newConfig: ConfigurationData = {
 				shortcuts: {
 					returnToMenu: {ctrl: true, key: 'z'},
+					cancel: {key: 'escape'},
 				},
 			};
 
@@ -199,6 +196,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 			const validConfig: ConfigurationData = {
 				shortcuts: {
 					returnToMenu: {ctrl: true, key: 'e'},
+					cancel: {key: 'escape'},
 				},
 			};
 
@@ -219,8 +217,9 @@ describe('ConfigurationManager - Effect-based operations', () => {
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {
-				expect(result.left._tag).toBe('ValidationError');
-				expect((result.left as ValidationError).field).toBe('config');
+				const error = result.left as ValidationError;
+				expect(error._tag).toBe('ValidationError');
+				expect(error.field).toBe('config');
 			}
 		});
 
@@ -229,7 +228,8 @@ describe('ConfigurationManager - Effect-based operations', () => {
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {
-				expect(result.left._tag).toBe('ValidationError');
+				const error = result.left as ValidationError;
+				expect(error._tag).toBe('ValidationError');
 			}
 		});
 	});
@@ -271,9 +271,10 @@ describe('ConfigurationManager - Effect-based operations', () => {
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {
-				expect(result.left._tag).toBe('ValidationError');
-				expect((result.left as ValidationError).field).toBe('presetId');
-				expect((result.left as ValidationError).receivedValue).toBe('999');
+				const error = result.left as unknown as ValidationError;
+				expect(error._tag).toBe('ValidationError');
+				expect(error.field).toBe('presetId');
+				expect(error.receivedValue).toBe('999');
 			}
 		});
 
@@ -289,9 +290,8 @@ describe('ConfigurationManager - Effect-based operations', () => {
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {
-				expect((result.left as ValidationError).constraint).toContain(
-					'not found',
-				);
+				const error = result.left as unknown as ValidationError;
+				expect(error.constraint).toContain('not found');
 			}
 		});
 	});
@@ -300,11 +300,10 @@ describe('ConfigurationManager - Effect-based operations', () => {
 		it('should return Effect<void> on successful update', async () => {
 			const newShortcuts = {
 				returnToMenu: {ctrl: true, key: 'z'},
+				cancel: {key: 'escape'},
 			};
 
-			await Effect.runPromise(
-				configManager.setShortcutsEffect(newShortcuts),
-			);
+			await Effect.runPromise(configManager.setShortcutsEffect(newShortcuts));
 
 			expect(writeFileSync).toHaveBeenCalled();
 		});
@@ -316,6 +315,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 
 			const newShortcuts = {
 				returnToMenu: {ctrl: true, key: 'z'},
+				cancel: {key: 'escape'},
 			};
 
 			const result = await Effect.runPromise(
