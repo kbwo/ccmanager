@@ -121,7 +121,7 @@
   - Replace try-catch blocks with Effect execution and matching
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 7.1, 7.2_
 
-- [ ] 4.2 Update worktree management forms for Effect execution
+- [x] 4.2 Update worktree management forms for Effect execution
   - Execute worktree creation Effect in NewWorktree form event handlers
   - Execute worktree deletion Effect in DeleteWorktree form event handlers
   - Execute worktree merge Effect in MergeWorktree form event handlers

@@ -1,9 +1,11 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
+import {Effect} from 'effect';
 import {WorktreeService} from '../services/worktreeService.js';
 import Confirmation, {SimpleConfirmation} from './Confirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {GitError} from '../types/errors.js';
 
 interface MergeWorktreeProps {
 	onComplete: () => void;
@@ -38,19 +40,49 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	const [useRebase, setUseRebase] = useState(false);
 	const [mergeError, setMergeError] = useState<string | null>(null);
 	const [worktreeService] = useState(() => new WorktreeService());
+	const [isLoading, setIsLoading] = useState(true);
+	const [loadError, setLoadError] = useState<string | null>(null);
 
 	useEffect(() => {
-		const loadedWorktrees = worktreeService.getWorktrees();
+		let cancelled = false;
 
-		// Create branch items for selection
-		const items = loadedWorktrees.map(wt => ({
-			label:
-				(wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached') +
-				(wt.isMainWorktree ? ' (main)' : ''),
-			value: wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached',
-		}));
-		setBranchItems(items);
-		setOriginalBranchItems(items);
+		const loadWorktrees = async () => {
+			try {
+				const loadedWorktrees = await Effect.runPromise(
+					worktreeService.getWorktreesEffect(),
+				);
+
+				if (!cancelled) {
+					// Create branch items for selection
+					const items = loadedWorktrees.map(wt => ({
+						label:
+							(wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached') +
+							(wt.isMainWorktree ? ' (main)' : ''),
+						value: wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached',
+					}));
+					setBranchItems(items);
+					setOriginalBranchItems(items);
+					setIsLoading(false);
+				}
+			} catch (err) {
+				if (!cancelled) {
+					const errorMessage =
+						err instanceof GitError
+							? `Git error: ${err.stderr}`
+							: err instanceof Error
+								? err.message
+								: String(err);
+					setLoadError(errorMessage);
+					setIsLoading(false);
+				}
+			}
+		};
+
+		loadWorktrees();
+
+		return () => {
+			cancelled = true;
+		};
 	}, [worktreeService]);
 
 	useInput((input, key) => {
@@ -87,24 +119,54 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		if (step !== 'executing-merge') return;
 
 		const performMerge = async () => {
-			const result = worktreeService.mergeWorktree(
-				sourceBranch,
-				targetBranch,
-				useRebase,
-			);
+			try {
+				await Effect.runPromise(
+					worktreeService.mergeWorktreeEffect(
+						sourceBranch,
+						targetBranch,
+						useRebase,
+					),
+				);
 
-			if (result.success) {
 				// Merge successful, ask about deleting source branch
 				setStep('delete-confirm');
-			} else {
+			} catch (err) {
 				// Merge failed, show error
-				setMergeError(result.error || 'Merge operation failed');
+				const errorMessage =
+					err instanceof GitError
+						? `${err.command} failed: ${err.stderr}`
+						: err instanceof Error
+							? err.message
+							: 'Merge operation failed';
+				setMergeError(errorMessage);
 				setStep('merge-error');
 			}
 		};
 
 		performMerge();
 	}, [step, sourceBranch, targetBranch, useRebase, worktreeService]);
+
+	if (isLoading) {
+		return (
+			<Box flexDirection="column">
+				<Text color="cyan">Loading worktrees...</Text>
+			</Box>
+		);
+	}
+
+	if (loadError) {
+		return (
+			<Box flexDirection="column">
+				<Text color="red">Error loading worktrees:</Text>
+				<Text color="red">{loadError}</Text>
+				<Box marginTop={1}>
+					<Text dimColor>
+						Press {shortcutManager.getShortcutDisplay('cancel')} to return to menu
+					</Text>
+				</Box>
+			</Box>
+		);
+	}
 
 	if (step === 'select-source') {
 		return (
@@ -285,13 +347,35 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		return (
 			<SimpleConfirmation
 				message={deleteMessage}
-				onConfirm={() => {
-					const deleteResult =
-						worktreeService.deleteWorktreeByBranch(sourceBranch);
-					if (deleteResult.success) {
+				onConfirm={async () => {
+					try {
+						// Find the worktree path for the source branch
+						const worktrees = await Effect.runPromise(
+							worktreeService.getWorktreesEffect(),
+						);
+						const sourceWorktree = worktrees.find(
+							wt =>
+								wt.branch &&
+								wt.branch.replace('refs/heads/', '') === sourceBranch,
+						);
+
+						if (sourceWorktree) {
+							await Effect.runPromise(
+								worktreeService.deleteWorktreeEffect(sourceWorktree.path, {
+									deleteBranch: true,
+								}),
+							);
+						}
+
 						onComplete();
-					} else {
-						setMergeError(deleteResult.error || 'Failed to delete worktree');
+					} catch (err) {
+						const errorMessage =
+							err instanceof GitError
+								? `Delete failed: ${err.stderr}`
+								: err instanceof Error
+									? err.message
+									: 'Failed to delete worktree';
+						setMergeError(errorMessage);
 						setStep('merge-error');
 					}
 				}}
