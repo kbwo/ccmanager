@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
+import {Effect} from 'effect';
 import SelectInput from 'ink-select-input';
 import {GitProject} from '../types/index.js';
 import {projectManager} from '../services/projectManager.js';
@@ -9,6 +10,14 @@ import {useSearchMode} from '../hooks/useSearchMode.js';
 import {RecentProject} from '../types/index.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {SessionManager} from '../services/sessionManager.js';
+import {
+	ProcessError,
+	ConfigError,
+	GitError,
+	FileSystemError,
+	ValidationError,
+	type AppError,
+} from '../types/errors.js';
 
 interface ProjectListProps {
 	projectsDir: string;
@@ -36,6 +45,22 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const limit = 10;
 
+	// Helper function to format error messages based on error type using _tag discrimination
+	const formatErrorMessage = (error: AppError): string => {
+		switch (error._tag) {
+			case 'ProcessError':
+				return `Process error: ${error.message}`;
+			case 'ConfigError':
+				return `Configuration error (${error.reason}): ${error.details}`;
+			case 'GitError':
+				return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+			case 'FileSystemError':
+				return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+			case 'ValidationError':
+				return `Validation failed for ${error.field}: ${error.constraint}`;
+		}
+	};
+
 	// Use the search mode hook
 	const displayError = error || loadError;
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -44,27 +69,51 @@ const ProjectList: React.FC<ProjectListProps> = ({
 			skipInTest: false,
 		});
 
-	const loadProjects = async () => {
+	// Helper function to load projects with Effect-based error handling
+	const loadProjectsEffect = async (checkCancellation?: () => boolean) => {
 		setLoading(true);
 		setLoadError(null);
 
-		try {
-			const discoveredProjects =
-				await projectManager.instance.discoverProjects(projectsDir);
-			setProjects(discoveredProjects);
+		// Use Effect-based project discovery
+		const projectsEffect =
+			projectManager.instance.discoverProjectsEffect(projectsDir);
 
-			// Load recent projects with no limit (pass 0)
-			const allRecentProjects = projectManager.getRecentProjects(0);
-			setRecentProjects(allRecentProjects);
-		} catch (err) {
-			setLoadError((err as Error).message);
-		} finally {
+		// Execute the Effect and handle both success and failure cases
+		const result = await Effect.runPromise(Effect.either(projectsEffect));
+
+		// Check cancellation flag before updating state (if provided)
+		if (checkCancellation && checkCancellation()) return;
+
+		if (result._tag === 'Left') {
+			// Handle error using pattern matching on _tag
+			const errorMessage = formatErrorMessage(result.left);
+			setLoadError(errorMessage);
 			setLoading(false);
+			return;
 		}
+
+		// Success case - extract projects from Right
+		const discoveredProjects = result.right;
+		setProjects(discoveredProjects);
+
+		// Load recent projects with no limit (pass 0)
+		const allRecentProjects = projectManager.getRecentProjects(0);
+		setRecentProjects(allRecentProjects);
+
+		setLoading(false);
 	};
 
+	const loadProjects = () => loadProjectsEffect();
+
 	useEffect(() => {
-		loadProjects();
+		let cancelled = false;
+
+		loadProjectsEffect(() => cancelled);
+
+		// Cleanup function to set cancellation flag
+		return () => {
+			cancelled = true;
+		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [projectsDir]);
 

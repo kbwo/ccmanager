@@ -138,7 +138,7 @@
   - Handle Effect cleanup on component unmount
   - _Requirements: 8.1, 8.2, 8.3, 8.5, 8.6_
 
-- [ ] 4.4 Update ProjectList component for Effect-based project discovery
+- [x] 4.4 Update ProjectList component for Effect-based project discovery
   - Execute project discovery Effect in component initialization
   - Handle FileSystemError gracefully with fallback messages
   - Handle GitError from project validation failures
