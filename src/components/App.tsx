@@ -1,5 +1,6 @@
 import React, {useState, useEffect, useCallback} from 'react';
 import {useApp, Box, Text} from 'ink';
+import {Effect} from 'effect';
 import Menu from './Menu.js';
 import ProjectList from './ProjectList.js';
 import Session from './Session.js';
@@ -20,6 +21,14 @@ import {
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
+import {
+	ProcessError,
+	ConfigError,
+	GitError,
+	FileSystemError,
+	ValidationError,
+	type AppError,
+} from '../types/errors.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
@@ -74,6 +83,58 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		copyClaudeDirectory: boolean;
 		ambiguousError: AmbiguousBranchError;
 	} | null>(null);
+
+	// Helper function to format error messages based on error type using _tag discrimination
+	const formatErrorMessage = (error: AppError): string => {
+		switch (error._tag) {
+			case 'ProcessError':
+				return `Process error: ${error.message}`;
+			case 'ConfigError':
+				return `Configuration error (${error.reason}): ${error.details}`;
+			case 'GitError':
+				return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+			case 'FileSystemError':
+				return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+			case 'ValidationError':
+				return `Validation failed for ${error.field}: ${error.constraint}`;
+		}
+	};
+
+	// Helper function to create session with Effect-based error handling
+	const createSessionWithEffect = async (
+		worktreePath: string,
+		presetId?: string,
+	): Promise<{
+		success: boolean;
+		session?: SessionType;
+		errorMessage?: string;
+	}> => {
+		const sessionEffect = devcontainerConfig
+			? sessionManager.createSessionWithDevcontainerEffect(
+					worktreePath,
+					devcontainerConfig,
+					presetId,
+			  )
+			: sessionManager.createSessionWithPresetEffect(worktreePath, presetId);
+
+		// Execute the Effect and handle both success and failure cases
+		const result = await Effect.runPromise(Effect.either(sessionEffect));
+
+		if (result._tag === 'Left') {
+			// Handle error using pattern matching on _tag
+			const errorMessage = formatErrorMessage(result.left);
+			return {
+				success: false,
+				errorMessage: `Failed to create session: ${errorMessage}`,
+			};
+		}
+
+		// Success case - extract session from Right
+		return {
+			success: true,
+			session: result.right,
+		};
+	};
 
 	// Helper function to clear terminal screen
 	const clearScreen = () => {
@@ -244,20 +305,15 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				return;
 			}
 
-			try {
-				// Use preset-based session creation with default preset
-				if (devcontainerConfig) {
-					session = await sessionManager.createSessionWithDevcontainer(
-						worktree.path,
-						devcontainerConfig,
-					);
-				} else {
-					session = await sessionManager.createSessionWithPreset(worktree.path);
-				}
-			} catch (error) {
-				setError(`Failed to create session: ${error}`);
+			// Use Effect-based session creation with default preset
+			const result = await createSessionWithEffect(worktree.path);
+
+			if (!result.success) {
+				setError(result.errorMessage!);
 				return;
 			}
+
+			session = result.session!;
 		}
 
 		setActiveSession(session);
@@ -267,29 +323,20 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const handlePresetSelected = async (presetId: string) => {
 		if (!selectedWorktree) return;
 
-		try {
-			// Create session with selected preset
-			let session: SessionType;
-			if (devcontainerConfig) {
-				session = await sessionManager.createSessionWithDevcontainer(
-					selectedWorktree.path,
-					devcontainerConfig,
-					presetId,
-				);
-			} else {
-				session = await sessionManager.createSessionWithPreset(
-					selectedWorktree.path,
-					presetId,
-				);
-			}
-			setActiveSession(session);
-			navigateWithClear('session');
-			setSelectedWorktree(null);
-		} catch (error) {
-			setError(`Failed to create session: ${error}`);
+		// Create session with selected preset using Effect
+		const result = await createSessionWithEffect(selectedWorktree.path, presetId);
+
+		if (!result.success) {
+			setError(result.errorMessage!);
 			setView('menu');
 			setSelectedWorktree(null);
+			return;
 		}
+
+		// Success case
+		setActiveSession(result.session!);
+		navigateWithClear('session');
+		setSelectedWorktree(null);
 	};
 
 	const handlePresetSelectorCancel = () => {
