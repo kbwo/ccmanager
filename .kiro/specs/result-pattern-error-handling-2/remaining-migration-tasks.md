@@ -61,8 +61,8 @@ During verification of the migration completion, legacy non-Effect code was disc
   - _Location: src/components/Menu.tsx:125_
   - _Related to: Requirement 8.1, 8.2, 7.1_
 
-- [ ] 4. Migrate NewWorktree component to use Effect-based branch methods
-- [ ] 4.1 Update NewWorktree.tsx to use Effect-based branch queries
+- [x] 4. Migrate NewWorktree component to use Effect-based branch methods
+- [x] 4.1 Update NewWorktree.tsx to use Effect-based branch queries
   - Replace `getAllBranches()` and `getDefaultBranch()` in useMemo on lines 60-61
   - Move Effect execution to useEffect hook instead of useMemo
   - Add loading state for branch data initialization

@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
@@ -7,6 +7,8 @@ import {configurationManager} from '../services/configurationManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import {Effect} from 'effect';
+import type {AppError} from '../types/errors.js';
 
 interface NewWorktreeProps {
 	projectPath?: string;
@@ -54,16 +56,61 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		worktreeConfig.copySessionData ?? true,
 	);
 
-	// Initialize worktree service and load branches (memoized to avoid re-initialization)
-	const {branches, defaultBranch} = useMemo(() => {
+	// Loading and error states for branch data
+	const [isLoadingBranches, setIsLoadingBranches] = useState(true);
+	const [branchLoadError, setBranchLoadError] = useState<string | null>(null);
+	const [branches, setBranches] = useState<string[]>([]);
+	const [defaultBranch, setDefaultBranch] = useState<string>('main');
+
+	// Initialize worktree service and load branches using Effect
+	useEffect(() => {
+		let cancelled = false;
 		const service = new WorktreeService();
-		const allBranches = service.getAllBranches();
-		const defaultBr = service.getDefaultBranch();
-		return {
-			branches: allBranches,
-			defaultBranch: defaultBr,
+
+		const loadBranches = async () => {
+			// Use Effect.all to load branches and defaultBranch in parallel
+			const workflow = Effect.all(
+				[service.getAllBranchesEffect(), service.getDefaultBranchEffect()],
+				{concurrency: 2},
+			);
+
+			const result = await Effect.runPromise(
+				Effect.match(workflow, {
+					onFailure: (error: AppError) => ({
+						type: 'error' as const,
+						message: formatError(error),
+					}),
+					onSuccess: ([branchList, defaultBr]: [string[], string]) => ({
+						type: 'success' as const,
+						branches: branchList,
+						defaultBranch: defaultBr,
+					}),
+				}),
+			);
+
+			if (!cancelled) {
+				if (result.type === 'error') {
+					setBranchLoadError(result.message);
+					setIsLoadingBranches(false);
+				} else {
+					setBranches(result.branches);
+					setDefaultBranch(result.defaultBranch);
+					setIsLoadingBranches(false);
+				}
+			}
 		};
-	}, []); // Empty deps array - only initialize once
+
+		loadBranches().catch(err => {
+			if (!cancelled) {
+				setBranchLoadError(`Unexpected error loading branches: ${String(err)}`);
+				setIsLoadingBranches(false);
+			}
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	// Create branch items with default branch first (memoized)
 	const allBranchItems: BranchItem[] = useMemo(
@@ -171,6 +218,67 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		worktreeConfig.autoDirectoryPattern,
 		projectPath,
 	]);
+
+	// Format errors using TaggedError discrimination
+	const formatError = (error: AppError): string => {
+		switch (error._tag) {
+			case 'GitError':
+				return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+			case 'FileSystemError':
+				return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+			case 'ConfigError':
+				return `Configuration error (${error.reason}): ${error.details}`;
+			case 'ProcessError':
+				return `Process error: ${error.message}`;
+			case 'ValidationError':
+				return `Validation failed for ${error.field}: ${error.constraint}`;
+		}
+	};
+
+	// Show loading indicator while branches load
+	if (isLoadingBranches) {
+		return (
+			<Box flexDirection="column">
+				<Box marginBottom={1}>
+					<Text bold color="green">
+						Create New Worktree
+					</Text>
+				</Box>
+				<Box>
+					<Text>Loading branches...</Text>
+				</Box>
+				<Box marginTop={1}>
+					<Text dimColor>
+						Press {shortcutManager.getShortcutDisplay('cancel')} to cancel
+					</Text>
+				</Box>
+			</Box>
+		);
+	}
+
+	// Show error message if branch loading failed
+	if (branchLoadError) {
+		return (
+			<Box flexDirection="column">
+				<Box marginBottom={1}>
+					<Text bold color="green">
+						Create New Worktree
+					</Text>
+				</Box>
+				<Box marginBottom={1}>
+					<Text color="red">Error loading branches:</Text>
+				</Box>
+				<Box marginBottom={1}>
+					<Text color="red">{branchLoadError}</Text>
+				</Box>
+				<Box marginTop={1}>
+					<Text dimColor>
+						Press {shortcutManager.getShortcutDisplay('cancel')} to go back
+					</Text>
+				</Box>
+			</Box>
+		);
+	}
 
 	return (
 		<Box flexDirection="column">
