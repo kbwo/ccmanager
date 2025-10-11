@@ -155,7 +155,7 @@
   - Use Effect.match for success and error case handling
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 4.6 Update custom hooks for Effect execution patterns
+- [x] 4.6 Update custom hooks for Effect execution patterns
   - Convert useGitStatus hook to execute Effects in useEffect
   - Handle Effect cancellation on hook cleanup
   - Transform Effect results into hook state
