@@ -686,6 +686,43 @@ export class WorktreeService {
 	/**
 	 * Effect-based getWorktrees operation
 	 * Returns Effect that may fail with GitError
+	 *
+	 * @returns {Effect.Effect<Worktree[], GitError, never>} Effect containing array of worktrees or GitError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Execute in async context
+	 * const worktrees = await Effect.runPromise(
+	 *   service.getWorktreesEffect()
+	 * );
+	 *
+	 * // Or use Effect.match for type-safe error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(service.getWorktreesEffect(), {
+	 *     onFailure: (error: GitError) => ({
+	 *       type: 'error' as const,
+	 *       message: `Git error: ${error.stderr}`
+	 *     }),
+	 *     onSuccess: (worktrees: Worktree[]) => ({
+	 *       type: 'success' as const,
+	 *       data: worktrees
+	 *     })
+	 *   })
+	 * );
+	 *
+	 * if (result.type === 'error') {
+	 *   console.error(result.message);
+	 * } else {
+	 *   console.log(`Found ${result.data.length} worktrees`);
+	 * }
+	 * ```
+	 *
+	 * @throws {GitError} When git worktree list command fails
 	 */
 	getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -792,6 +829,58 @@ export class WorktreeService {
 	/**
 	 * Effect-based createWorktree operation
 	 * May fail with GitError or FileSystemError
+	 *
+	 * @param {string} worktreePath - Path where the new worktree will be created
+	 * @param {string} branch - Name of the branch for the new worktree
+	 * @param {string} baseBranch - Base branch to create the new branch from
+	 * @param {boolean} copySessionData - Whether to copy Claude session data (default: false)
+	 * @param {boolean} copyClaudeDirectory - Whether to copy .claude directory (default: false)
+	 * @returns {Effect.Effect<Worktree, GitError | FileSystemError, never>} Effect containing created worktree or error
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 * import {GitError, FileSystemError} from './types/errors.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Create new worktree with Effect.match for error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(
+	 *     service.createWorktreeEffect(
+	 *       './feature-branch',
+	 *       'feature-xyz',
+	 *       'main',
+	 *       true, // copy session data
+	 *       false
+	 *     ),
+	 *     {
+	 *       onFailure: (error: GitError | FileSystemError) => {
+	 *         switch (error._tag) {
+	 *           case 'GitError':
+	 *             return {type: 'error' as const, msg: `Git failed: ${error.stderr}`};
+	 *           case 'FileSystemError':
+	 *             return {type: 'error' as const, msg: `FS failed: ${error.cause}`};
+	 *         }
+	 *       },
+	 *       onSuccess: (worktree: Worktree) => ({
+	 *         type: 'success' as const,
+	 *         data: worktree
+	 *       })
+	 *     }
+	 *   )
+	 * );
+	 *
+	 * if (result.type === 'error') {
+	 *   console.error(result.msg);
+	 * } else {
+	 *   console.log(`Created worktree at ${result.data.path}`);
+	 * }
+	 * ```
+	 *
+	 * @throws {GitError} When git worktree add command fails
+	 * @throws {FileSystemError} When session data copy fails
 	 */
 	createWorktreeEffect(
 		worktreePath: string,
@@ -947,6 +1036,32 @@ export class WorktreeService {
 	/**
 	 * Effect-based deleteWorktree operation
 	 * May fail with GitError
+	 *
+	 * @param {string} worktreePath - Path of the worktree to delete
+	 * @param {{deleteBranch?: boolean}} options - Options for deletion (default: deleteBranch = true)
+	 * @returns {Effect.Effect<void, GitError, never>} Effect that completes successfully or fails with GitError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Delete worktree with Effect.catchTag for specific error handling
+	 * await Effect.runPromise(
+	 *   Effect.catchTag(
+	 *     service.deleteWorktreeEffect('./feature-branch', {deleteBranch: true}),
+	 *     'GitError',
+	 *     (error) => {
+	 *       console.error(`Failed to delete worktree: ${error.stderr}`);
+	 *       return Effect.succeed(undefined); // Continue despite error
+	 *     }
+	 *   )
+	 * );
+	 * ```
+	 *
+	 * @throws {GitError} When git worktree remove command fails or worktree not found
 	 */
 	deleteWorktreeEffect(
 		worktreePath: string,
@@ -1030,6 +1145,41 @@ export class WorktreeService {
 	/**
 	 * Effect-based mergeWorktree operation
 	 * May fail with GitError
+	 *
+	 * @param {string} sourceBranch - Branch to merge from
+	 * @param {string} targetBranch - Branch to merge into
+	 * @param {boolean} useRebase - Whether to use rebase instead of merge (default: false)
+	 * @returns {Effect.Effect<void, GitError, never>} Effect that completes successfully or fails with GitError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Merge with Effect.all for parallel operations
+	 * await Effect.runPromise(
+	 *   Effect.all([
+	 *     service.mergeWorktreeEffect('feature-1', 'main', false),
+	 *     service.mergeWorktreeEffect('feature-2', 'main', false)
+	 *   ], {concurrency: 1}) // Sequential to avoid conflicts
+	 * );
+	 *
+	 * // Or use Effect.catchAll for fallback behavior
+	 * const result = await Effect.runPromise(
+	 *   Effect.catchAll(
+	 *     service.mergeWorktreeEffect('feature-xyz', 'main', true),
+	 *     (error: GitError) => {
+	 *       console.error(`Merge failed: ${error.stderr}`);
+	 *       // Return alternative Effect or rethrow
+	 *       return Effect.fail(error);
+	 *     }
+	 *   )
+	 * );
+	 * ```
+	 *
+	 * @throws {GitError} When git merge/rebase command fails or worktrees not found
 	 */
 	mergeWorktreeEffect(
 		sourceBranch: string,

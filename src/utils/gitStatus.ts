@@ -28,6 +28,38 @@ interface GitStats {
 
 const DEFAULT_GIT_STATS: GitStats = {insertions: 0, deletions: 0};
 
+/**
+ * Get comprehensive Git status for a worktree
+ *
+ * Retrieves file changes, ahead/behind counts, and parent branch information
+ * using Effect-based error handling.
+ *
+ * @param {string} worktreePath - Absolute path to the worktree directory
+ * @returns {Effect.Effect<GitStatus, GitError>} Effect containing git status or GitError
+ *
+ * @example
+ * ```typescript
+ * import {Effect} from 'effect';
+ * import {getGitStatus} from './utils/gitStatus.js';
+ *
+ * // Execute with Effect.runPromise
+ * const status = await Effect.runPromise(
+ *   getGitStatus('/path/to/worktree')
+ * );
+ * console.log(`Files added: ${status.filesAdded}, deleted: ${status.filesDeleted}`);
+ * console.log(`Ahead: ${status.aheadCount}, behind: ${status.behindCount}`);
+ *
+ * // Or use Effect.map for transformation
+ * const formatted = await Effect.runPromise(
+ *   Effect.map(
+ *     getGitStatus('/path/to/worktree'),
+ *     (status) => `+${status.filesAdded} -${status.filesDeleted}`
+ *   )
+ * );
+ * ```
+ *
+ * @throws {GitError} When git commands fail or worktree path is invalid
+ */
 export const getGitStatus = (
 	worktreePath: string,
 ): Effect.Effect<GitStatus, GitError> =>

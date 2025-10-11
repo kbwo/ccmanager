@@ -557,6 +557,322 @@ const conditional = Effect.if(
    - Components, event handlers, useEffect hooks
    - Keep business logic in Effect-returning functions
 
+### Effect-ts Documentation Links
+
+For deeper understanding of Effect-ts concepts and APIs:
+
+- **Official Effect-ts Documentation**: https://effect.website/docs/introduction
+- **Effect Type**: https://effect.website/docs/effect/effect-type
+- **Either Type**: https://effect.website/docs/either/either
+- **Error Management**: https://effect.website/docs/error-management/error-handling
+- **Tagged Errors**: https://effect.website/docs/error-management/expected-errors#tagged-errors
+- **Effect Execution**: https://effect.website/docs/guides/running-effects
+- **Error Recovery**: https://effect.website/docs/error-management/fallback
+- **Effect Composition**: https://effect.website/docs/guides/pipeline
+- **Testing with Effect**: https://effect.website/docs/guides/testing
+
+### Complete Error Flow Example
+
+Here's a complete example showing error flow from service layer through utilities to UI:
+
+```typescript
+// ============================================
+// 1. Utility Layer: Git status with Effect
+// ============================================
+import {Effect} from 'effect';
+import {GitError} from './types/errors.js';
+
+function getGitStatus(
+  worktreePath: string
+): Effect.Effect<GitStatus, GitError> {
+  return Effect.tryPromise({
+    try: async () => {
+      const result = await execFile('git', ['status', '--porcelain'], {
+        cwd: worktreePath
+      });
+      return parseGitStatus(result.stdout);
+    },
+    catch: (error: any) => new GitError({
+      command: 'git status',
+      exitCode: error.code || 1,
+      stderr: error.stderr || String(error)
+    })
+  });
+}
+
+// ============================================
+// 2. Service Layer: Worktree operations
+// ============================================
+import {Effect} from 'effect';
+import {GitError, FileSystemError} from './types/errors.js';
+
+class WorktreeService {
+  getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['worktree', 'list', '--porcelain']);
+        return parseWorktrees(result.stdout);
+      },
+      catch: (error: any) => new GitError({
+        command: 'git worktree list',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
+  }
+
+  createWorktreeEffect(
+    path: string,
+    branch: string,
+    baseBranch: string
+  ): Effect.Effect<Worktree, GitError | FileSystemError, never> {
+    // Composition: chain multiple Effects
+    return Effect.flatMap(
+      this.validatePath(path),
+      (validPath) => Effect.tryPromise({
+        try: async () => {
+          await execFile('git', ['worktree', 'add', validPath, branch]);
+          return {path: validPath, branch};
+        },
+        catch: (error: any) => new GitError({
+          command: `git worktree add ${validPath} ${branch}`,
+          exitCode: error.code || 1,
+          stderr: error.stderr || String(error)
+        })
+      })
+    );
+  }
+
+  private validatePath(
+    path: string
+  ): Effect.Effect<string, FileSystemError, never> {
+    return Effect.try({
+      try: () => {
+        if (!fs.existsSync(path)) {
+          throw new Error('Path does not exist');
+        }
+        return path;
+      },
+      catch: (error) => new FileSystemError({
+        operation: 'stat',
+        path,
+        cause: String(error)
+      })
+    });
+  }
+}
+
+// ============================================
+// 3. Component Layer: React/Ink UI with Effect execution
+// ============================================
+import React, {useState, useEffect} from 'react';
+import {Box, Text} from 'ink';
+import {Effect} from 'effect';
+import {WorktreeService} from './services/worktreeService.js';
+import {AppError, GitError, FileSystemError} from './types/errors.js';
+
+const Menu: React.FC = () => {
+  const [worktrees, setWorktrees] = useState<Worktree[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const worktreeService = new WorktreeService();
+
+  // Load worktrees on mount with Effect.match for type-safe handling
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadWorktrees = async () => {
+      const result = await Effect.runPromise(
+        Effect.match(worktreeService.getWorktreesEffect(), {
+          onFailure: (error: GitError) => ({
+            type: 'error' as const,
+            message: formatGitError(error)
+          }),
+          onSuccess: (worktrees: Worktree[]) => ({
+            type: 'success' as const,
+            data: worktrees
+          })
+        })
+      );
+
+      if (!cancelled) {
+        if (result.type === 'error') {
+          setError(result.message);
+        } else {
+          setWorktrees(result.data);
+        }
+        setIsLoading(false);
+      }
+    };
+
+    loadWorktrees().catch(err => {
+      if (!cancelled) {
+        setError(`Unexpected error: ${String(err)}`);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Create worktree with error discrimination
+  const handleCreateWorktree = async (
+    path: string,
+    branch: string,
+    baseBranch: string
+  ) => {
+    const result = await Effect.runPromise(
+      Effect.match(
+        worktreeService.createWorktreeEffect(path, branch, baseBranch),
+        {
+          onFailure: (error: GitError | FileSystemError) => ({
+            type: 'error' as const,
+            message: formatError(error)
+          }),
+          onSuccess: (worktree: Worktree) => ({
+            type: 'success' as const,
+            data: worktree
+          })
+        }
+      )
+    );
+
+    if (result.type === 'error') {
+      setError(result.message);
+    } else {
+      setWorktrees([...worktrees, result.data]);
+    }
+  };
+
+  // Format errors using TaggedError discrimination
+  const formatError = (error: AppError): string => {
+    switch (error._tag) {
+      case 'GitError':
+        return formatGitError(error);
+      case 'FileSystemError':
+        return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+      case 'ConfigError':
+        return `Config error (${error.reason}): ${error.details}`;
+      case 'ProcessError':
+        return `Process error: ${error.message}`;
+      case 'ValidationError':
+        return `Validation failed for ${error.field}: ${error.constraint}`;
+    }
+  };
+
+  const formatGitError = (error: GitError): string => {
+    return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+  };
+
+  if (isLoading) {
+    return (
+      <Box>
+        <Text>Loading worktrees...</Text>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Error: {error}</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Text>Worktrees ({worktrees.length})</Text>
+      {worktrees.map(wt => (
+        <Text key={wt.path}>{wt.branch} - {wt.path}</Text>
+      ))}
+    </Box>
+  );
+};
+
+// ============================================
+// 4. Advanced: Effect Recovery Strategies
+// ============================================
+
+// Retry with exponential backoff
+const withRetry = await Effect.runPromise(
+  Effect.retry(
+    worktreeService.getWorktreesEffect(),
+    {
+      times: 3,
+      schedule: Schedule.exponential('100 millis')
+    }
+  )
+);
+
+// Fallback to default value
+const worktreesWithFallback = await Effect.runPromise(
+  Effect.catchAll(
+    worktreeService.getWorktreesEffect(),
+    (error: GitError) => {
+      console.error('Failed to get worktrees:', error.stderr);
+      // Return fallback: single worktree for current directory
+      return Effect.succeed([{
+        path: process.cwd(),
+        branch: 'main',
+        isMainWorktree: true,
+        hasSession: false
+      }]);
+    }
+  )
+);
+
+// Recover from specific error types
+const withSpecificRecovery = await Effect.runPromise(
+  Effect.catchTag(
+    worktreeService.createWorktreeEffect('./new-feature', 'feature', 'main'),
+    'GitError',
+    (error) => {
+      if (error.exitCode === 128) {
+        // Branch already exists, try different name
+        return worktreeService.createWorktreeEffect(
+          './new-feature-2',
+          'feature-2',
+          'main'
+        );
+      }
+      // Re-throw for other git errors
+      return Effect.fail(error);
+    }
+  )
+);
+
+// Parallel execution with error collection
+const allWorktreeStatus = await Effect.runPromise(
+  Effect.all([
+    getGitStatus('/worktree1'),
+    getGitStatus('/worktree2'),
+    getGitStatus('/worktree3')
+  ], {
+    concurrency: 3,
+    mode: 'either' // Collect both successes and failures
+  })
+);
+
+// Check results - Either.isRight() for success, Either.isLeft() for error
+allWorktreeStatus.forEach((result, index) => {
+  if (Either.isRight(result)) {
+    console.log(`Worktree ${index + 1} status:`, result.right);
+  } else {
+    console.error(`Worktree ${index + 1} failed:`, result.left.stderr);
+  }
+});
+```
+
+This example demonstrates:
+1. **Utility layer**: Git operations wrapped in Effects with GitError
+2. **Service layer**: Effect composition with flatMap, multiple error types
+3. **Component layer**: Effect execution with Effect.match, error discrimination
+4. **Recovery strategies**: Retry, fallback, specific error handling, parallel execution
+
 ## Development Guidelines
 
 ### Component Structure

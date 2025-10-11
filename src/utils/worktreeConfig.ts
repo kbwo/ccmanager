@@ -21,6 +21,36 @@ export function isWorktreeConfigEnabled(gitPath?: string): boolean {
 /**
  * Get parent branch for worktree using Effect
  * Returns null if config doesn't exist or worktree config is not available
+ *
+ * @param {string} worktreePath - Path to the worktree directory
+ * @returns {Effect.Effect<string | null, never>} Effect containing parent branch name or null
+ *
+ * @example
+ * ```typescript
+ * import {Effect} from 'effect';
+ * import {getWorktreeParentBranch} from './utils/worktreeConfig.js';
+ *
+ * // This function never fails - returns null on error
+ * const parentBranch = await Effect.runPromise(
+ *   getWorktreeParentBranch('/path/to/worktree')
+ * );
+ *
+ * if (parentBranch) {
+ *   console.log(`Parent branch: ${parentBranch}`);
+ * } else {
+ *   console.log('No parent branch configured');
+ * }
+ *
+ * // Use with Effect.flatMap for chaining
+ * const status = await Effect.runPromise(
+ *   Effect.flatMap(
+ *     getWorktreeParentBranch('/path/to/worktree'),
+ *     (branch) => branch
+ *       ? Effect.succeed(`Tracking ${branch}`)
+ *       : Effect.succeed('No tracking')
+ *   )
+ * );
+ * ```
  */
 export function getWorktreeParentBranch(
 	worktreePath: string,
@@ -58,6 +88,41 @@ export function getWorktreeParentBranch(
 /**
  * Set parent branch for worktree using Effect
  * Succeeds silently if worktree config is not available
+ *
+ * @param {string} worktreePath - Path to the worktree directory
+ * @param {string} parentBranch - Name of the parent branch to track
+ * @returns {Effect.Effect<void, GitError>} Effect that succeeds or fails with GitError
+ *
+ * @example
+ * ```typescript
+ * import {Effect} from 'effect';
+ * import {setWorktreeParentBranch} from './utils/worktreeConfig.js';
+ *
+ * // Set parent branch with error handling
+ * await Effect.runPromise(
+ *   Effect.catchTag(
+ *     setWorktreeParentBranch('/path/to/worktree', 'main'),
+ *     'GitError',
+ *     (error) => {
+ *       console.error(`Failed to set parent branch: ${error.stderr}`);
+ *       return Effect.void; // Continue despite error
+ *     }
+ *   )
+ * );
+ *
+ * // Or use Effect.orElse for fallback
+ * await Effect.runPromise(
+ *   Effect.orElse(
+ *     setWorktreeParentBranch('/path/to/worktree', 'develop'),
+ *     () => {
+ *       console.log('Using fallback - no parent tracking');
+ *       return Effect.void;
+ *     }
+ *   )
+ * );
+ * ```
+ *
+ * @throws {GitError} When git config command fails
  */
 export function setWorktreeParentBranch(
 	worktreePath: string,

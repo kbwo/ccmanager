@@ -127,4 +127,154 @@ describe('Effect-ts Documentation Validation', () => {
 			expect(claudeMdContent).toMatch(/composition|compose|chain/i);
 		});
 	});
+
+	describe('Effect-ts Documentation Links', () => {
+		it('should provide link to official Effect-ts documentation', () => {
+			expect(claudeMdContent).toContain('https://effect.website');
+		});
+
+		it('should provide link to Effect Type documentation', () => {
+			expect(claudeMdContent).toContain('effect-type');
+		});
+
+		it('should provide link to Either Type documentation', () => {
+			expect(claudeMdContent).toContain('either/either');
+		});
+
+		it('should provide link to Error Management documentation', () => {
+			expect(claudeMdContent).toContain('error-management');
+		});
+
+		it('should provide link to Tagged Errors documentation', () => {
+			expect(claudeMdContent).toContain('tagged-errors');
+		});
+
+		it('should provide link to Effect Execution documentation', () => {
+			expect(claudeMdContent).toContain('running-effects');
+		});
+	});
+});
+
+describe('JSDoc Documentation on Effect-Returning Functions', () => {
+	const filesToCheck = [
+		{
+			path: join(process.cwd(), 'src/services/worktreeService.ts'),
+			functions: ['getWorktreesEffect', 'createWorktreeEffect', 'deleteWorktreeEffect', 'mergeWorktreeEffect'],
+		},
+		{
+			path: join(process.cwd(), 'src/services/configurationManager.ts'),
+			functions: ['loadConfigEffect', 'saveConfigEffect', 'setShortcutsEffect'],
+		},
+		{
+			path: join(process.cwd(), 'src/services/sessionManager.ts'),
+			functions: ['createSessionEffect', 'terminateSessionEffect'],
+		},
+		{
+			path: join(process.cwd(), 'src/services/projectManager.ts'),
+			functions: ['discoverProjectsEffect', 'loadRecentProjectsEffect', 'saveRecentProjectsEffect'],
+		},
+		{
+			path: join(process.cwd(), 'src/utils/gitStatus.ts'),
+			functions: ['getGitStatusEffect'],
+		},
+		{
+			path: join(process.cwd(), 'src/utils/worktreeConfig.ts'),
+			functions: ['getWorktreeParentBranchEffect', 'setWorktreeParentBranchEffect'],
+		},
+		{
+			path: join(process.cwd(), 'src/utils/hookExecutor.ts'),
+			functions: ['executeHookEffect'],
+		},
+		{
+			path: join(process.cwd(), 'src/utils/claudeDir.ts'),
+			functions: ['getClaudeProjectsDirEffect', 'claudeDirExistsEffect'],
+		},
+	];
+
+	filesToCheck.forEach(({path: filePath, functions}) => {
+		functions.forEach(functionName => {
+			it(`should have JSDoc with @example for ${functionName} in ${filePath.split('/').pop()}`, () => {
+				let fileContent: string;
+				try {
+					fileContent = readFileSync(filePath, 'utf-8');
+				} catch (_error) {
+					// File might not exist yet
+					expect.fail(`File not found: ${filePath}`);
+					return;
+				}
+
+				// Check if function exists
+				const functionPattern = new RegExp(`${functionName}\\s*\\(`);
+				if (!functionPattern.test(fileContent)) {
+					expect.fail(`Function ${functionName} not found in ${filePath}`);
+					return;
+				}
+
+				// Find the function and check for JSDoc before it
+				const lines = fileContent.split('\n');
+				let functionLineIndex = -1;
+
+				for (let i = 0; i < lines.length; i++) {
+					if (functionPattern.test(lines[i] || '')) {
+						functionLineIndex = i;
+						break;
+					}
+				}
+
+				expect(functionLineIndex).toBeGreaterThan(-1);
+
+				// Look backwards from function declaration for JSDoc comment
+				let jsDocFound = false;
+				let exampleFound = false;
+				let returnsFound = false;
+				let descriptionFound = false;
+
+				for (let i = functionLineIndex - 1; i >= Math.max(0, functionLineIndex - 100); i--) {
+					const line = lines[i] || '';
+
+					if (line.trim().startsWith('/**')) {
+						jsDocFound = true;
+					}
+
+					if (line.includes('@example')) {
+						exampleFound = true;
+					}
+
+					if (line.includes('@returns') || line.includes('@return')) {
+						returnsFound = true;
+					}
+
+					// Check for description (non-empty lines that aren't just * or tags)
+					if (
+						jsDocFound &&
+						line.trim().length > 2 &&
+						line.trim().startsWith('*') &&
+						!line.includes('@') &&
+						!line.trim().startsWith('/**') &&
+						!line.trim().startsWith('*/') &&
+						line.trim() !== '*'
+					) {
+						// Must have actual content after the *
+						const content = line.trim().substring(1).trim();
+						if (content.length > 0) {
+							descriptionFound = true;
+						}
+					}
+
+					// Stop if we hit the end of JSDoc or another function
+					if (line.trim() === '*/' && jsDocFound) {
+						break;
+					}
+					if (i < functionLineIndex - 1 && /^\s*(public|private|protected)?\s*\w+.*\(/.test(line)) {
+						break;
+					}
+				}
+
+				expect(jsDocFound, `${functionName} should have JSDoc comment`).toBe(true);
+				expect(descriptionFound, `${functionName} should have a description in JSDoc`).toBe(true);
+				expect(returnsFound, `${functionName} should have @returns tag documenting Effect type`).toBe(true);
+				expect(exampleFound, `${functionName} should have @example tag with usage example`).toBe(true);
+			});
+		});
+	});
 });
