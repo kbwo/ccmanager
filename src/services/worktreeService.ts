@@ -421,6 +421,235 @@ export class WorktreeService {
 	}
 
 	/**
+	 * Effect-based getDefaultBranch operation
+	 * Returns Effect that may fail with GitError
+	 *
+	 * @returns {Effect.Effect<string, GitError, never>} Effect containing default branch name or GitError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Use Effect.match for type-safe error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(service.getDefaultBranchEffect(), {
+	 *     onFailure: (error: GitError) => ({
+	 *       type: 'error' as const,
+	 *       message: `Failed to get default branch: ${error.stderr}`
+	 *     }),
+	 *     onSuccess: (branch: string) => ({
+	 *       type: 'success' as const,
+	 *       data: branch
+	 *     })
+	 *   })
+	 * );
+	 *
+	 * if (result.type === 'success') {
+	 *   console.log(`Default branch is: ${result.data}`);
+	 * }
+	 * ```
+	 *
+	 * @throws {GitError} When git symbolic-ref command fails and fallback detection also fails
+	 */
+	getDefaultBranchEffect(): Effect.Effect<string, GitError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+		return Effect.catchAll(
+			Effect.try({
+				try: () => {
+					// Try to get the default branch from origin
+					const defaultBranch = execSync(
+						"git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'",
+						{
+							cwd: self.rootPath,
+							encoding: 'utf8',
+							shell: '/bin/bash',
+						},
+					).trim();
+					if (!defaultBranch) {
+						throw new Error('No default branch from symbolic-ref');
+					}
+					return defaultBranch;
+				},
+				catch: (error: unknown) => error,
+			}),
+			(error: unknown) => {
+				// Fallback to checking for main/master branches
+				return Effect.catchAll(
+					Effect.try({
+						try: () => {
+							execSync('git rev-parse --verify main', {
+								cwd: self.rootPath,
+								encoding: 'utf8',
+							});
+							return 'main';
+						},
+						catch: (error: unknown) => error,
+					}),
+					(_mainError: unknown) => {
+						return Effect.catchAll(
+							Effect.try({
+								try: () => {
+									execSync('git rev-parse --verify master', {
+										cwd: self.rootPath,
+										encoding: 'utf8',
+									});
+									return 'master';
+								},
+								catch: (error: unknown) => error,
+							}),
+							(_masterError: unknown) => {
+								// All attempts failed, return 'main' as default
+								// This is acceptable behavior for new repositories
+								return Effect.succeed('main');
+							},
+						);
+					},
+				);
+			},
+		);
+	}
+
+	/**
+	 * Effect-based getAllBranches operation
+	 * Returns Effect that succeeds with array of branches (empty on failure for non-critical operation)
+	 *
+	 * @returns {Effect.Effect<string[], GitError, never>} Effect containing array of branch names
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Execute in async context - this operation returns empty array on failure
+	 * const branches = await Effect.runPromise(
+	 *   service.getAllBranchesEffect()
+	 * );
+	 * console.log(`Found ${branches.length} branches`);
+	 *
+	 * // Or use Effect.match for explicit error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(service.getAllBranchesEffect(), {
+	 *     onFailure: (error: GitError) => ({
+	 *       type: 'error' as const,
+	 *       message: error.stderr
+	 *     }),
+	 *     onSuccess: (branches: string[]) => ({
+	 *       type: 'success' as const,
+	 *       data: branches
+	 *     })
+	 *   })
+	 * );
+	 * ```
+	 *
+	 * @throws {GitError} When git branch command fails (but falls back to empty array)
+	 */
+	getAllBranchesEffect(): Effect.Effect<string[], GitError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+		return Effect.catchAll(
+			Effect.try({
+				try: () => {
+					const output = execSync(
+						"git branch -a --format='%(refname:short)' | grep -v HEAD | sort -u",
+						{
+							cwd: self.rootPath,
+							encoding: 'utf8',
+							shell: '/bin/bash',
+						},
+					);
+
+					const branches = output
+						.trim()
+						.split('\n')
+						.filter(branch => branch && !branch.startsWith('origin/'))
+						.map(branch => branch.trim());
+
+					// Also include remote branches without origin/ prefix
+					const remoteBranches = output
+						.trim()
+						.split('\n')
+						.filter(branch => branch.startsWith('origin/'))
+						.map(branch => branch.replace('origin/', ''));
+
+					// Merge and deduplicate
+					const allBranches = [...new Set([...branches, ...remoteBranches])];
+
+					return allBranches.filter(branch => branch);
+				},
+				catch: (error: unknown) => error,
+			}),
+			(_error: unknown) => {
+				// Return empty array on failure (non-critical operation)
+				return Effect.succeed([]);
+			},
+		);
+	}
+
+	/**
+	 * Effect-based getCurrentBranch operation
+	 * Returns Effect that may fail with GitError
+	 *
+	 * @returns {Effect.Effect<string, GitError, never>} Effect containing current branch name or GitError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Use Effect.match for type-safe error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(service.getCurrentBranchEffect(), {
+	 *     onFailure: (error: GitError) => ({
+	 *       type: 'error' as const,
+	 *       message: `Failed to get current branch: ${error.stderr}`
+	 *     }),
+	 *     onSuccess: (branch: string) => ({
+	 *       type: 'success' as const,
+	 *       data: branch
+	 *     })
+	 *   })
+	 * );
+	 *
+	 * if (result.type === 'success') {
+	 *   console.log(`Current branch: ${result.data}`);
+	 * }
+	 * ```
+	 *
+	 * @throws {GitError} When git rev-parse command fails
+	 */
+	getCurrentBranchEffect(): Effect.Effect<string, GitError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+		return Effect.catchAll(
+			Effect.try({
+				try: () => {
+					const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+						cwd: self.rootPath,
+						encoding: 'utf8',
+					}).trim();
+					if (!branch) {
+						throw new Error('No current branch returned');
+					}
+					return branch;
+				},
+				catch: (error: unknown) => error,
+			}),
+			(error: unknown) => {
+				// Return 'unknown' as fallback for compatibility
+				return Effect.succeed('unknown');
+			},
+		);
+	}
+
+	/**
 	 * Effect-based getWorktrees operation
 	 * Returns Effect that may fail with GitError
 	 *
