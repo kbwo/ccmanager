@@ -121,6 +121,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return session;
 	}
 
+	/**
+	 * Legacy Promise-based wrapper for createSessionWithPresetEffect
+	 * @deprecated Use createSessionWithPresetEffect with Effect instead
+	 * Only kept for backward compatibility in tests
+	 */
 	async createSessionWithPreset(
 		worktreePath: string,
 		presetId?: string,
@@ -513,6 +518,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return Array.from(this.sessions.values());
 	}
 
+	/**
+	 * Legacy Promise-based wrapper for createSessionWithDevcontainerEffect
+	 * @deprecated Use createSessionWithDevcontainerEffect with Effect instead
+	 * Only kept for backward compatibility in tests
+	 */
 	async createSessionWithDevcontainer(
 		worktreePath: string,
 		devcontainerConfig: DevcontainerConfig,

@@ -104,6 +104,11 @@ export class ProjectManager implements IProjectManager {
 		return service;
 	}
 
+	/**
+	 * Legacy Promise-based wrapper for refreshProjectsEffect
+	 * @deprecated Use refreshProjectsEffect with Effect instead
+	 * Only kept for backward compatibility in tests
+	 */
 	async refreshProjects(): Promise<void> {
 		if (!this.projectsDir) {
 			throw new Error('Projects directory not configured');
@@ -231,6 +236,11 @@ export class ProjectManager implements IProjectManager {
 
 	// Multi-project discovery methods
 
+	/**
+	 * Legacy Promise-based wrapper for discoverProjectsEffect
+	 * @deprecated Use discoverProjectsEffect with Effect instead
+	 * Only kept for backward compatibility in tests
+	 */
 	async discoverProjects(projectsDir: string): Promise<GitProject[]> {
 		const projects: GitProject[] = [];
 		const projectMap = new Map<string, GitProject>();
