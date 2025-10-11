@@ -59,80 +59,18 @@ export class WorktreeService {
 		}
 	}
 
-	getWorktrees(): Worktree[] {
-		try {
-			const output = execSync('git worktree list --porcelain', {
-				cwd: this.rootPath,
-				encoding: 'utf8',
-			});
 
-			const worktrees: Worktree[] = [];
-			const lines = output.trim().split('\n');
-
-			const parseWorktree = (
-				lines: string[],
-				startIndex: number,
-			): [Worktree | null, number] => {
-				const worktreeLine = lines[startIndex];
-				if (!worktreeLine?.startsWith('worktree ')) {
-					return [null, startIndex];
-				}
-
-				const worktree: Worktree = {
-					path: worktreeLine.substring(9),
-					isMainWorktree: false,
-					hasSession: false,
-				};
-
-				let i = startIndex + 1;
-				while (
-					i < lines.length &&
-					lines[i] &&
-					!lines[i]!.startsWith('worktree ')
-				) {
-					const line = lines[i];
-					if (line && line.startsWith('branch ')) {
-						const branch = line.substring(7);
-						worktree.branch = branch.startsWith('refs/heads/')
-							? branch.substring(11)
-							: branch;
-					} else if (line === 'bare') {
-						worktree.isMainWorktree = true;
-					}
-					i++;
-				}
-
-				return [worktree, i];
-			};
-
-			let index = 0;
-			while (index < lines.length) {
-				const [worktree, nextIndex] = parseWorktree(lines, index);
-				if (worktree) {
-					worktrees.push(worktree);
-				}
-				index = nextIndex > index ? nextIndex : index + 1;
-			}
-
-			// Mark the first worktree as main if none are marked
-			if (worktrees.length > 0 && !worktrees.some(w => w.isMainWorktree)) {
-				worktrees[0]!.isMainWorktree = true;
-			}
-
-			return worktrees;
-		} catch (_error) {
-			// If git worktree command fails, assume we're in a regular git repo
-			return [
-				{
-					path: this.rootPath,
-					branch: this.getCurrentBranch(),
-					isMainWorktree: true,
-					hasSession: false,
-				},
-			];
-		}
-	}
-
+	/**
+	 * LEGACY HELPER: Gets current branch synchronously
+	 *
+	 * NOTE: This method is kept as a private synchronous helper for internal use only.
+	 * It is only used as a fallback in getWorktreesEffect() when git worktree command
+	 * is not supported (line ~881). For all other use cases, prefer getCurrentBranchEffect().
+	 *
+	 * @private
+	 * @deprecated Use getCurrentBranchEffect() for new code
+	 * @returns {string} Current branch name or 'unknown' on error
+	 */
 	private getCurrentBranch(): string {
 		try {
 			const branch = execSync('git rev-parse --abbrev-ref HEAD', {
@@ -153,75 +91,15 @@ export class WorktreeService {
 		return this.gitRootPath;
 	}
 
-	getDefaultBranch(): string {
-		try {
-			// Try to get the default branch from origin
-			const defaultBranch = execSync(
-				"git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'",
-				{
-					cwd: this.rootPath,
-					encoding: 'utf8',
-					shell: '/bin/bash',
-				},
-			).trim();
-			return defaultBranch || 'main';
-		} catch {
-			// Fallback to common default branch names
-			try {
-				execSync('git rev-parse --verify main', {
-					cwd: this.rootPath,
-					encoding: 'utf8',
-				});
-				return 'main';
-			} catch {
-				try {
-					execSync('git rev-parse --verify master', {
-						cwd: this.rootPath,
-						encoding: 'utf8',
-					});
-					return 'master';
-				} catch {
-					return 'main';
-				}
-			}
-		}
-	}
 
-	getAllBranches(): string[] {
-		try {
-			const output = execSync(
-				"git branch -a --format='%(refname:short)' | grep -v HEAD | sort -u",
-				{
-					cwd: this.rootPath,
-					encoding: 'utf8',
-					shell: '/bin/bash',
-				},
-			);
-
-			const branches = output
-				.trim()
-				.split('\n')
-				.filter(branch => branch && !branch.startsWith('origin/'))
-				.map(branch => branch.trim());
-
-			// Also include remote branches without origin/ prefix
-			const remoteBranches = output
-				.trim()
-				.split('\n')
-				.filter(branch => branch.startsWith('origin/'))
-				.map(branch => branch.replace('origin/', ''));
-
-			// Merge and deduplicate
-			const allBranches = [...new Set([...branches, ...remoteBranches])];
-
-			return allBranches.filter(branch => branch);
-		} catch {
-			return [];
-		}
-	}
 
 	/**
-	 * Resolves a branch name to its proper git reference.
+	 * SYNCHRONOUS HELPER: Resolves a branch name to its proper git reference.
+	 *
+	 * This method remains synchronous as it's called within Effect.gen contexts
+	 * but doesn't need to be wrapped in Effect itself. It's used by createWorktreeEffect()
+	 * to resolve branch references before creating worktrees.
+	 *
 	 * Handles multiple remotes and throws AmbiguousBranchError when disambiguation is needed.
 	 *
 	 * Priority order:
@@ -229,6 +107,11 @@ export class WorktreeService {
 	 * 2. Single remote branch -> return remote/branch
 	 * 3. Multiple remote branches -> throw AmbiguousBranchError
 	 * 4. No branches found -> return original (let git handle error)
+	 *
+	 * @private
+	 * @param {string} branchName - Branch name to resolve
+	 * @returns {string} Resolved branch reference
+	 * @throws {AmbiguousBranchError} When branch exists in multiple remotes
 	 */
 	private resolveBranchReference(branchName: string): string {
 		try {
@@ -291,7 +174,13 @@ export class WorktreeService {
 	}
 
 	/**
-	 * Gets all git remotes for this repository.
+	 * SYNCHRONOUS HELPER: Gets all git remotes for this repository.
+	 *
+	 * This method remains synchronous as it's a simple utility used by resolveBranchReference().
+	 * No need for Effect version since it's a pure read operation with no complex error handling.
+	 *
+	 * @private
+	 * @returns {string[]} Array of remote names, empty array on error
 	 */
 	private getAllRemotes(): string[] {
 		try {
@@ -310,6 +199,18 @@ export class WorktreeService {
 		}
 	}
 
+	/**
+	 * SYNCHRONOUS HELPER: Copies Claude Code session data between worktrees.
+	 *
+	 * This method remains synchronous and is wrapped in Effect.try when called from
+	 * createWorktreeEffect() (line ~676). This provides proper error handling while
+	 * keeping the implementation simple.
+	 *
+	 * @private
+	 * @param {string} sourceWorktreePath - Source worktree path
+	 * @param {string} targetWorktreePath - Target worktree path
+	 * @throws {Error} When copy operation fails
+	 */
 	private copyClaudeSessionData(
 		sourceWorktreePath: string,
 		targetWorktreePath: string,

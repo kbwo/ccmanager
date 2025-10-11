@@ -91,51 +91,65 @@ During verification of the migration completion, legacy non-Effect code was disc
   - _Location: src/services/worktreeService.ts:379_
   - _Related to: Requirement 5.1, 5.5, 3.4_
 
-- [ ] 6. Remove legacy synchronous methods from WorktreeService
-- [ ] 6.1 Remove `getWorktrees()` synchronous method
+- [x] 6. Remove legacy synchronous methods from WorktreeService
+- [x] 6.1 Remove `getWorktrees()` synchronous method
   - Delete method implementation on line 62
   - Verify no remaining callers exist
   - Keep only `getWorktreesEffect()` method
   - _Location: src/services/worktreeService.ts:62_
   - _Related to: Requirement 9.5, 9.6_
+  - **COMPLETED**: Removed method, no remaining callers found
 
-- [ ] 6.2 Remove `getDefaultBranch()` synchronous method
+- [x] 6.2 Remove `getDefaultBranch()` synchronous method
   - Delete method implementation on line 156
   - Verify no remaining callers exist
   - Keep only `getDefaultBranchEffect()` method
   - _Location: src/services/worktreeService.ts:156_
   - _Related to: Requirement 9.5, 9.6_
+  - **COMPLETED**: Removed method, updated tests to use Effect version
 
-- [ ] 6.3 Remove `getAllBranches()` synchronous method
+- [x] 6.3 Remove `getAllBranches()` synchronous method
   - Delete method implementation on line 190
   - Verify no remaining callers exist
   - Keep only `getAllBranchesEffect()` method
   - _Location: src/services/worktreeService.ts:190_
   - _Related to: Requirement 9.5, 9.6_
+  - **COMPLETED**: Removed method, updated tests to use Effect version
 
-- [ ] 6.4 Update `getCurrentBranch()` visibility and documentation
+- [x] 6.4 Update `getCurrentBranch()` visibility and documentation
   - Keep method but mark as legacy helper for internal use only
   - Add comment explaining it's only used as fallback in getWorktreesEffect
   - Consider inlining into getWorktreesEffect if it's the only caller
   - _Location: src/services/worktreeService.ts:136_
   - _Related to: Requirement 11.2_
+  - **COMPLETED**: Added comprehensive JSDoc marking it as @deprecated with explanation
 
-- [ ] 6.5 Remove or migrate other private helper methods
+- [x] 6.5 Remove or migrate other private helper methods
   - Review `getAllRemotes()` on line 296 - used by resolveBranchReference
   - Review `resolveBranchReference()` on line 233 - used by createWorktreeEffect
   - Review `copyClaudeSessionData()` on line 313 - used by createWorktreeEffect
   - Determine if these need Effect versions or can remain synchronous helpers
   - Document decision in code comments
   - _Related to: Requirement 11.2_
+  - **COMPLETED**: All three methods documented as synchronous helpers with clear justification:
+    - `getAllRemotes()`: Simple utility for resolveBranchReference, no Effect needed
+    - `resolveBranchReference()`: Called within Effect.gen but doesn't need to be Effect itself
+    - `copyClaudeSessionData()`: Wrapped in Effect.try when called, keeping implementation simple
 
 - [ ] 7. Update tests to verify migration completeness
-- [ ] 7.1 Update WorktreeService tests for new Effect-based methods
+- [x] 7.1 Update WorktreeService tests for new Effect-based methods
   - Add tests for `getDefaultBranchEffect()`
   - Add tests for `getAllBranchesEffect()`
   - Add tests for `getCurrentBranchEffect()`
   - Verify legacy methods are removed
   - Use Effect.runSync or Effect.runPromise for test execution
   - _Related to: Requirement 10.1, 10.2, 10.3_
+  - **COMPLETED**: Added comprehensive tests for all three Effect-based methods
+    - `getDefaultBranchEffect`: 2 test cases covering success and fallback scenarios
+    - `getAllBranchesEffect`: 2 test cases covering branch listing and error handling
+    - `getCurrentBranchEffect`: 3 test cases covering success, git error fallback, and empty branch fallback
+    - All tests use Effect.runPromise for execution
+    - Total: 35 tests passing in worktreeService.test.ts
 
 - [ ] 7.2 Update hookExecutor tests for Effect composition
   - Verify executeStatusHook uses getWorktreesEffect

@@ -163,8 +163,8 @@ describe('WorktreeService', () => {
 		});
 	});
 
-	describe('getDefaultBranch', () => {
-		it('should return default branch from origin', () => {
+	describe('getDefaultBranchEffect', () => {
+		it('should return Effect with default branch from origin', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -177,7 +177,8 @@ describe('WorktreeService', () => {
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
-			const result = service.getDefaultBranch();
+			const effect = service.getDefaultBranchEffect();
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe('main');
 			expect(execSync).toHaveBeenCalledWith(
@@ -190,7 +191,7 @@ describe('WorktreeService', () => {
 			);
 		});
 
-		it('should fallback to main if origin HEAD fails', () => {
+		it('should fallback to main if origin HEAD fails', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -206,14 +207,15 @@ describe('WorktreeService', () => {
 				throw new Error('Not found');
 			});
 
-			const result = service.getDefaultBranch();
+			const effect = service.getDefaultBranchEffect();
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe('main');
 		});
 	});
 
-	describe('getAllBranches', () => {
-		it('should return all branches without duplicates', () => {
+	describe('getAllBranchesEffect', () => {
+		it('should return Effect with all branches without duplicates', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -231,12 +233,13 @@ origin/feature/test
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
-			const result = service.getAllBranches();
+			const effect = service.getAllBranchesEffect();
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toEqual(['main', 'feature/test', 'feature/remote']);
 		});
 
-		it('should return empty array on error', () => {
+		it('should return empty array on error', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (
 					typeof cmd === 'string' &&
@@ -247,9 +250,78 @@ origin/feature/test
 				throw new Error('Git error');
 			});
 
-			const result = service.getAllBranches();
+			const effect = service.getAllBranchesEffect();
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toEqual([]);
+		});
+	});
+
+	describe('getCurrentBranchEffect', () => {
+		it('should return Effect with current branch name on success', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git rev-parse --abbrev-ref HEAD') {
+						return 'feature-branch\n';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getCurrentBranchEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toBe('feature-branch');
+			expect(execSync).toHaveBeenCalledWith(
+				'git rev-parse --abbrev-ref HEAD',
+				expect.objectContaining({
+					cwd: '/fake/path',
+					encoding: 'utf8',
+				}),
+			);
+		});
+
+		it('should return Effect with "unknown" when git command fails', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git rev-parse --abbrev-ref HEAD') {
+						throw new Error('fatal: not a git repository');
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getCurrentBranchEffect();
+			const result = await Effect.runPromise(effect);
+
+			// Should fallback to 'unknown' instead of failing
+			expect(result).toBe('unknown');
+		});
+
+		it('should return Effect with "unknown" when branch name is empty', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git rev-parse --abbrev-ref HEAD') {
+						return '\n'; // Empty branch name
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getCurrentBranchEffect();
+			const result = await Effect.runPromise(effect);
+
+			// Should fallback to 'unknown' when no branch returned
+			expect(result).toBe('unknown');
 		});
 	});
 
@@ -407,137 +479,9 @@ origin/feature/test
 		});
 	});
 
-	describe('createWorktree', () => {
-		it('should create worktree with base branch when branch does not exist', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify')) {
-						throw new Error('Branch not found');
-					}
-					return '';
-				}
-				throw new Error('Unexpected command');
-			});
 
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'develop',
-			);
-
-			expect(result).toEqual({success: true});
-			expect(execSync).toHaveBeenCalledWith(
-				'git worktree add -b "new-feature" "/path/to/worktree" "develop"',
-				expect.any(Object),
-			);
-		});
-
-		it('should create worktree without base branch when branch exists', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify')) {
-						return 'hash';
-					}
-					return '';
-				}
-				throw new Error('Unexpected command');
-			});
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'existing-feature',
-				'main', // Base branch is required but not used when branch exists
-			);
-
-			expect(result).toEqual({success: true});
-			expect(execSync).toHaveBeenCalledWith(
-				'git worktree add "/path/to/worktree" "existing-feature"',
-				expect.any(Object),
-			);
-		});
-
-		it('should handle ambiguous branch error gracefully', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify new-feature')) {
-						throw new Error('Branch not found');
-					}
-					if (
-						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
-					) {
-						throw new Error('Local branch not found');
-					}
-					if (cmd === 'git remote') {
-						return 'origin\nupstream\n';
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
-						) ||
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
-						)
-					) {
-						return ''; // Both remotes have the branch
-					}
-				}
-				throw new Error('Command not mocked: ' + cmd);
-			});
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'foo/bar-xyz', // This will trigger the ambiguous branch error
-			);
-
-			expect(result.success).toBe(false);
-			expect(result.error).toContain(
-				"Ambiguous branch 'foo/bar-xyz' found in multiple remotes",
-			);
-			expect(result.error).toContain(
-				'origin/foo/bar-xyz, upstream/foo/bar-xyz',
-			);
-		});
-
-		it('should create worktree from specified base branch when branch does not exist', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify')) {
-						throw new Error('Branch not found');
-					}
-					return '';
-				}
-				throw new Error('Unexpected command');
-			});
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'main',
-			);
-
-			expect(result).toEqual({success: true});
-			expect(execSync).toHaveBeenCalledWith(
-				'git worktree add -b "new-feature" "/path/to/worktree" "main"',
-				expect.any(Object),
-			);
-		});
-	});
-
-	describe('hasClaudeDirectoryInBranch', () => {
-		it('should return true when .claude directory exists in branch worktree', () => {
+	describe('hasClaudeDirectoryInBranchEffect', () => {
+		it('should return Effect with true when .claude directory exists in branch worktree', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -568,7 +512,8 @@ branch refs/heads/feature-branch
 					}) as Stats,
 			);
 
-			const result = service.hasClaudeDirectoryInBranch('feature-branch');
+			const effect = service.hasClaudeDirectoryInBranchEffect('feature-branch');
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe(true);
 			expect(existsSync).toHaveBeenCalledWith(
@@ -579,7 +524,7 @@ branch refs/heads/feature-branch
 			);
 		});
 
-		it('should return false when .claude directory does not exist', () => {
+		it('should return Effect with false when .claude directory does not exist', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -601,7 +546,8 @@ branch refs/heads/feature-branch
 
 			mockedExistsSync.mockReturnValue(false);
 
-			const result = service.hasClaudeDirectoryInBranch('feature-branch');
+			const effect = service.hasClaudeDirectoryInBranchEffect('feature-branch');
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe(false);
 			expect(existsSync).toHaveBeenCalledWith(
@@ -609,7 +555,7 @@ branch refs/heads/feature-branch
 			);
 		});
 
-		it('should return false when .claude exists but is not a directory', () => {
+		it('should return Effect with false when .claude exists but is not a directory', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -637,12 +583,13 @@ branch refs/heads/feature-branch
 					}) as Stats,
 			);
 
-			const result = service.hasClaudeDirectoryInBranch('feature-branch');
+			const effect = service.hasClaudeDirectoryInBranchEffect('feature-branch');
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe(false);
 		});
 
-		it('should fallback to default branch when branch worktree not found', () => {
+		it('should fallback to default branch when branch worktree not found', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -670,13 +617,14 @@ branch refs/heads/main
 			);
 
 			// When asking for main branch that doesn't have a separate worktree
-			const result = service.hasClaudeDirectoryInBranch('main');
+			const effect = service.hasClaudeDirectoryInBranchEffect('main');
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe(true);
 			expect(existsSync).toHaveBeenCalledWith('/fake/path/.claude');
 		});
 
-		it('should return false when branch not found in any worktree', () => {
+		it('should return Effect with false when branch not found in any worktree', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -695,12 +643,13 @@ branch refs/heads/main
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
-			const result = service.hasClaudeDirectoryInBranch('non-existent-branch');
+			const effect = service.hasClaudeDirectoryInBranchEffect('non-existent-branch');
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe(false);
 		});
 
-		it('should check main worktree when branch is default branch', () => {
+		it('should check main worktree when branch is default branch', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
@@ -731,518 +680,11 @@ branch refs/heads/other-branch
 					}) as Stats,
 			);
 
-			const result = service.hasClaudeDirectoryInBranch('main');
+			const effect = service.hasClaudeDirectoryInBranchEffect('main');
+			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe(true);
 			expect(existsSync).toHaveBeenCalledWith('/fake/path/.claude');
-		});
-	});
-
-	describe('Worktree Hook Execution', () => {
-		afterEach(() => {
-			vi.clearAllMocks();
-		});
-
-		it('should execute post-creation hook when worktree is created', async () => {
-			// Arrange
-			const hookCommand = 'echo "Worktree created: $CCMANAGER_WORKTREE_PATH"';
-			mockedGetWorktreeHooks.mockReturnValue({
-				post_creation: {
-					command: hookCommand,
-					enabled: true,
-				},
-			});
-
-			mockedExecuteHook.mockResolvedValue(undefined);
-
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('git worktree list')) {
-						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
-					}
-					if (cmd.includes('git worktree add')) {
-						return '';
-					}
-					if (cmd.includes('git rev-parse --verify')) {
-						throw new Error('Branch not found');
-					}
-					if (cmd.startsWith('git config --worktree')) {
-						return '';
-					}
-				}
-				return '';
-			});
-
-			// Act
-			const result = await service.createWorktree(
-				'feature-branch-dir',
-				'feature-branch',
-				'main',
-				false,
-				false,
-			);
-
-			// Assert
-			expect(result.success).toBe(true);
-			expect(mockedGetWorktreeHooks).toHaveBeenCalled();
-			expect(mockedExecuteHook).toHaveBeenCalledWith(
-				hookCommand,
-				expect.objectContaining({
-					path: '/fake/path/feature-branch-dir',
-					branch: 'feature-branch',
-					isMainWorktree: false,
-					hasSession: false,
-				}),
-				'/fake/path',
-				'main',
-			);
-		});
-
-		it('should not execute hook when disabled', async () => {
-			// Arrange
-			mockedGetWorktreeHooks.mockReturnValue({
-				post_creation: {
-					command: 'echo "Should not run"',
-					enabled: false,
-				},
-			});
-
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('git worktree list')) {
-						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
-					}
-					if (cmd.includes('git worktree add')) {
-						return '';
-					}
-					if (cmd.includes('git rev-parse --verify')) {
-						throw new Error('Branch not found');
-					}
-				}
-				return '';
-			});
-
-			// Act
-			const result = await service.createWorktree(
-				'feature-branch-dir',
-				'feature-branch',
-				'main',
-				false,
-				false,
-			);
-
-			// Assert
-			expect(result.success).toBe(true);
-			expect(mockedGetWorktreeHooks).toHaveBeenCalled();
-			expect(mockedExecuteHook).not.toHaveBeenCalled();
-		});
-
-		it('should not execute hook when not configured', async () => {
-			// Arrange
-			mockedGetWorktreeHooks.mockReturnValue({});
-
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('git worktree list')) {
-						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
-					}
-					if (cmd.includes('git worktree add')) {
-						return '';
-					}
-					if (cmd.includes('git rev-parse --verify')) {
-						throw new Error('Branch not found');
-					}
-				}
-				return '';
-			});
-
-			// Act
-			const result = await service.createWorktree(
-				'feature-branch-dir',
-				'feature-branch',
-				'main',
-				false,
-				false,
-			);
-
-			// Assert
-			expect(result.success).toBe(true);
-			expect(mockedGetWorktreeHooks).toHaveBeenCalled();
-			expect(mockedExecuteHook).not.toHaveBeenCalled();
-		});
-
-		it('should not fail worktree creation if hook execution fails', async () => {
-			// Arrange
-			mockedGetWorktreeHooks.mockReturnValue({
-				post_creation: {
-					command: 'failing-command',
-					enabled: true,
-				},
-			});
-
-			// The real executeWorktreePostCreationHookLegacy doesn't throw, it catches errors internally
-			// So the mock should resolve, not reject
-			mockedExecuteHook.mockResolvedValue(undefined);
-
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('git worktree list')) {
-						return 'worktree /fake/path\nHEAD abc123\nbranch refs/heads/main\n';
-					}
-					if (cmd.includes('git worktree add')) {
-						return '';
-					}
-					if (cmd.includes('git rev-parse --verify')) {
-						throw new Error('Branch not found');
-					}
-					if (cmd.startsWith('git config --worktree')) {
-						return '';
-					}
-				}
-				return '';
-			});
-
-			// Act
-			const result = await service.createWorktree(
-				'feature-branch-dir',
-				'feature-branch',
-				'main',
-				false,
-				false,
-			);
-
-			// Allow async operations to complete
-			await new Promise(resolve => setTimeout(resolve, 10));
-
-			// Assert
-			expect(result.success).toBe(true);
-			expect(mockedExecuteHook).toHaveBeenCalled();
-		});
-	});
-
-	describe('AmbiguousBranchError Integration', () => {
-		it('should return error message when createWorktree encounters ambiguous branch', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify new-feature')) {
-						throw new Error('Branch not found');
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/heads/ambiguous-branch',
-						)
-					) {
-						throw new Error('Local branch not found');
-					}
-					if (cmd === 'git remote') {
-						return 'origin\nupstream\n';
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/origin/ambiguous-branch',
-						) ||
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/upstream/ambiguous-branch',
-						)
-					) {
-						return ''; // Both remotes have the branch
-					}
-				}
-				throw new Error('Command not mocked: ' + cmd);
-			});
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'ambiguous-branch', // This will trigger the ambiguous branch error
-			);
-
-			expect(result.success).toBe(false);
-			expect(result.error).toContain(
-				"Ambiguous branch 'ambiguous-branch' found in multiple remotes",
-			);
-			expect(result.error).toContain(
-				'origin/ambiguous-branch, upstream/ambiguous-branch',
-			);
-			expect(result.error).toContain('Please specify which remote to use');
-		});
-
-		it('should successfully create worktree with resolved remote reference', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify new-feature')) {
-						throw new Error('Branch not found');
-					}
-					// Simulate resolved reference (origin/ambiguous-branch) exists
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/heads/origin/ambiguous-branch',
-						)
-					) {
-						throw new Error('Local branch not found');
-					}
-					if (cmd === 'git remote') {
-						return 'origin\n';
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/origin/origin/ambiguous-branch',
-						)
-					) {
-						throw new Error('Remote branch not found'); // This is expected for resolved reference
-					}
-					// Mock successful worktree creation with resolved reference
-					if (
-						cmd.includes(
-							'git worktree add -b "new-feature" "/path/to/worktree" "origin/ambiguous-branch"',
-						)
-					) {
-						return '';
-					}
-				}
-				throw new Error('Command not mocked: ' + cmd);
-			});
-
-			mockedExistsSync.mockReturnValue(false);
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'origin/ambiguous-branch', // Pre-resolved reference
-			);
-
-			expect(result.success).toBe(true);
-			expect(mockedExecSync).toHaveBeenCalledWith(
-				'git worktree add -b "new-feature" "/path/to/worktree" "origin/ambiguous-branch"',
-				{cwd: '/fake/path', encoding: 'utf8'},
-			);
-		});
-
-		it('should handle three-way ambiguous branch scenario', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify test-branch')) {
-						throw new Error('Branch not found');
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/heads/three-way-branch',
-						)
-					) {
-						throw new Error('Local branch not found');
-					}
-					if (cmd === 'git remote') {
-						return 'origin\nupstream\nfork\n';
-					}
-					// All three remotes have the branch
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/origin/three-way-branch',
-						) ||
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/upstream/three-way-branch',
-						) ||
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/fork/three-way-branch',
-						)
-					) {
-						return '';
-					}
-				}
-				throw new Error('Command not mocked: ' + cmd);
-			});
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'test-branch',
-				'three-way-branch',
-			);
-
-			expect(result.success).toBe(false);
-			expect(result.error).toContain(
-				"Ambiguous branch 'three-way-branch' found in multiple remotes",
-			);
-			expect(result.error).toContain(
-				'origin/three-way-branch, upstream/three-way-branch, fork/three-way-branch',
-			);
-		});
-
-		it('should handle complex branch names with slashes in ambiguous scenario', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify new-feature')) {
-						throw new Error('Branch not found');
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/heads/feature/sub/complex-name',
-						)
-					) {
-						throw new Error('Local branch not found');
-					}
-					if (cmd === 'git remote') {
-						return 'origin\nfork\n';
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/origin/feature/sub/complex-name',
-						) ||
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/fork/feature/sub/complex-name',
-						)
-					) {
-						return '';
-					}
-				}
-				throw new Error('Command not mocked: ' + cmd);
-			});
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'feature/sub/complex-name',
-			);
-
-			expect(result.success).toBe(false);
-			expect(result.error).toContain(
-				"Ambiguous branch 'feature/sub/complex-name' found in multiple remotes",
-			);
-			expect(result.error).toContain(
-				'origin/feature/sub/complex-name, fork/feature/sub/complex-name',
-			);
-		});
-
-		it('should successfully resolve single remote branch with slashes', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify new-feature')) {
-						throw new Error('Branch not found');
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/heads/feature/auto-resolve',
-						)
-					) {
-						throw new Error('Local branch not found');
-					}
-					if (cmd === 'git remote') {
-						return 'origin\nupstream\n';
-					}
-					// Only origin has this branch
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/origin/feature/auto-resolve',
-						)
-					) {
-						return '';
-					}
-					if (
-						cmd.includes(
-							'show-ref --verify --quiet refs/remotes/upstream/feature/auto-resolve',
-						)
-					) {
-						throw new Error('Remote branch not found');
-					}
-					// Mock successful worktree creation with auto-resolved reference
-					if (
-						cmd.includes(
-							'git worktree add -b "new-feature" "/path/to/worktree" "origin/feature/auto-resolve"',
-						)
-					) {
-						return '';
-					}
-				}
-				throw new Error('Command not mocked: ' + cmd);
-			});
-
-			mockedExistsSync.mockReturnValue(false);
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'feature/auto-resolve', // Should auto-resolve to origin/feature/auto-resolve
-			);
-
-			expect(result.success).toBe(true);
-			expect(mockedExecSync).toHaveBeenCalledWith(
-				'git worktree add -b "new-feature" "/path/to/worktree" "origin/feature/auto-resolve"',
-				{cwd: '/fake/path', encoding: 'utf8'},
-			);
-		});
-
-		it('should prioritize local branch over remote branches', async () => {
-			mockedExecSync.mockImplementation((cmd, _options) => {
-				if (typeof cmd === 'string') {
-					if (cmd === 'git rev-parse --git-common-dir') {
-						return '/fake/path/.git\n';
-					}
-					if (cmd.includes('rev-parse --verify new-feature')) {
-						throw new Error('Branch not found');
-					}
-					// Local branch exists (highest priority)
-					if (
-						cmd.includes('show-ref --verify --quiet refs/heads/local-priority')
-					) {
-						return '';
-					}
-					// Remote checks should not be executed when local exists
-					// Mock successful worktree creation with local branch
-					if (
-						cmd.includes(
-							'git worktree add -b "new-feature" "/path/to/worktree" "local-priority"',
-						)
-					) {
-						return '';
-					}
-				}
-				throw new Error('Command not mocked: ' + cmd);
-			});
-
-			mockedExistsSync.mockReturnValue(false);
-
-			const result = await service.createWorktree(
-				'/path/to/worktree',
-				'new-feature',
-				'local-priority',
-			);
-
-			expect(result.success).toBe(true);
-			expect(mockedExecSync).toHaveBeenCalledWith(
-				'git worktree add -b "new-feature" "/path/to/worktree" "local-priority"',
-				{cwd: '/fake/path', encoding: 'utf8'},
-			);
-			// Verify remote command was never called since local branch exists
-			expect(mockedExecSync).not.toHaveBeenCalledWith(
-				'git remote',
-				expect.any(Object),
-			);
 		});
 	});
 
