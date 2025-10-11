@@ -21,14 +21,7 @@ import {
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
-import {
-	ProcessError,
-	ConfigError,
-	GitError,
-	FileSystemError,
-	ValidationError,
-	type AppError,
-} from '../types/errors.js';
+import {type AppError} from '../types/errors.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
@@ -114,7 +107,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 					worktreePath,
 					devcontainerConfig,
 					presetId,
-			  )
+				)
 			: sessionManager.createSessionWithPresetEffect(worktreePath, presetId);
 
 		// Execute the Effect and handle both success and failure cases
@@ -324,7 +317,10 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		if (!selectedWorktree) return;
 
 		// Create session with selected preset using Effect
-		const result = await createSessionWithEffect(selectedWorktree.path, presetId);
+		const result = await createSessionWithEffect(
+			selectedWorktree.path,
+			presetId,
+		);
 
 		if (!result.success) {
 			setError(result.errorMessage!);

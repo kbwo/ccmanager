@@ -173,7 +173,7 @@
   - Create test utilities for common Effect execution patterns
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6_
 
-- [ ] 5.2 Update component tests for Effect integration
+- [x] 5.2 Update component tests for Effect integration
   - Test component error display for each TaggedError type
   - Verify error messages include actionable context (command, path, reason)
   - Test Effect execution in event handlers and useEffect hooks

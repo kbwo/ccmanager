@@ -3,7 +3,7 @@ import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
 import {configurationManager} from './configurationManager.js';
-import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
+import {executeWorktreePostCreationHookLegacy} from '../utils/hookExecutor.js';
 import {Effect} from 'effect';
 import {GitError} from '../types/errors.js';
 
@@ -32,6 +32,7 @@ vi.mock('./configurationManager.js', () => ({
 // Mock HookExecutor
 vi.mock('../utils/hookExecutor.js', () => ({
 	executeWorktreePostCreationHook: vi.fn(),
+	executeWorktreePostCreationHookLegacy: vi.fn(),
 }));
 
 // Get the mocked function with proper typing
@@ -39,7 +40,7 @@ const mockedExecSync = vi.mocked(execSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
 const mockedGetWorktreeHooks = vi.mocked(configurationManager.getWorktreeHooks);
-const mockedExecuteHook = vi.mocked(executeWorktreePostCreationHook);
+const mockedExecuteHook = vi.mocked(executeWorktreePostCreationHookLegacy);
 
 // Mock error interface for git command errors
 interface MockGitError extends Error {
@@ -752,7 +753,7 @@ branch refs/heads/other-branch
 				},
 			});
 
-			mockedExecuteHook.mockResolvedValue(Effect.succeed(undefined));
+			mockedExecuteHook.mockResolvedValue(undefined);
 
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
@@ -888,9 +889,9 @@ branch refs/heads/other-branch
 				},
 			});
 
-			// The real executeWorktreePostCreationHook doesn't throw, it catches errors internally
+			// The real executeWorktreePostCreationHookLegacy doesn't throw, it catches errors internally
 			// So the mock should resolve, not reject
-			mockedExecuteHook.mockResolvedValue(Effect.succeed(undefined));
+			mockedExecuteHook.mockResolvedValue(undefined);
 
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {

@@ -37,17 +37,15 @@ describe('ConfigureShortcuts - Effect Integration Logic', () => {
 	describe('Configuration Loading with Effect', () => {
 		it('should handle FileSystemError when loading config fails', async () => {
 			// Mock loadConfigEffect to fail with FileSystemError
-			configurationManager.loadConfigEffect = vi
-				.fn()
-				.mockReturnValue(
-					Effect.fail(
-						new FileSystemError({
-							operation: 'read',
-							path: '/config/path',
-							cause: 'Permission denied',
-						}),
-					),
-				);
+			configurationManager.loadConfigEffect = vi.fn().mockReturnValue(
+				Effect.fail(
+					new FileSystemError({
+						operation: 'read',
+						path: '/config/path',
+						cause: 'Permission denied',
+					}),
+				),
+			);
 
 			// Simulate component's useEffect loading logic
 			const result = await Effect.runPromise(
@@ -76,17 +74,15 @@ describe('ConfigureShortcuts - Effect Integration Logic', () => {
 
 		it('should handle ConfigError when config parsing fails', async () => {
 			// Mock loadConfigEffect to fail with ConfigError
-			configurationManager.loadConfigEffect = vi
-				.fn()
-				.mockReturnValue(
-					Effect.fail(
-						new ConfigError({
-							configPath: '/config/path',
-							reason: 'parse',
-							details: 'Invalid JSON at line 5',
-						}),
-					),
-				);
+			configurationManager.loadConfigEffect = vi.fn().mockReturnValue(
+				Effect.fail(
+					new ConfigError({
+						configPath: '/config/path',
+						reason: 'parse',
+						details: 'Invalid JSON at line 5',
+					}),
+				),
+			);
 
 			// Simulate component's useEffect loading logic
 			const result = await Effect.runPromise(
@@ -147,27 +143,28 @@ describe('ConfigureShortcuts - Effect Integration Logic', () => {
 	describe('Configuration Saving with Effect', () => {
 		it('should handle FileSystemError when saving shortcuts fails', async () => {
 			// Mock setShortcutsEffect to fail with FileSystemError
-			configurationManager.setShortcutsEffect = vi
-				.fn()
-				.mockReturnValue(
-					Effect.fail(
-						new FileSystemError({
-							operation: 'write',
-							path: '/config/path',
-							cause: 'Disk full',
-						}),
-					),
-				);
+			configurationManager.setShortcutsEffect = vi.fn().mockReturnValue(
+				Effect.fail(
+					new FileSystemError({
+						operation: 'write',
+						path: '/config/path',
+						cause: 'Disk full',
+					}),
+				),
+			);
 
 			// Simulate component's save logic
 			const result = await Effect.runPromise(
-				Effect.match(configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS), {
-					onFailure: (err: FileSystemError) => ({
-						type: 'error' as const,
-						error: err,
-					}),
-					onSuccess: () => ({type: 'success' as const}),
-				}),
+				Effect.match(
+					configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS),
+					{
+						onFailure: (err: FileSystemError) => ({
+							type: 'error' as const,
+							error: err,
+						}),
+						onSuccess: () => ({type: 'success' as const}),
+					},
+				),
 			);
 
 			// Verify error was returned
@@ -187,13 +184,16 @@ describe('ConfigureShortcuts - Effect Integration Logic', () => {
 
 			// Simulate component's save logic
 			const result = await Effect.runPromise(
-				Effect.match(configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS), {
-					onFailure: (err: FileSystemError) => ({
-						type: 'error' as const,
-						error: err,
-					}),
-					onSuccess: () => ({type: 'success' as const}),
-				}),
+				Effect.match(
+					configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS),
+					{
+						onFailure: (err: FileSystemError) => ({
+							type: 'error' as const,
+							error: err,
+						}),
+						onSuccess: () => ({type: 'success' as const}),
+					},
+				),
 			);
 
 			// Verify success
@@ -286,27 +286,28 @@ describe('ConfigureShortcuts - Effect Integration Logic', () => {
 	describe('Effect.match usage patterns', () => {
 		it('should use Effect.match for type-safe error handling', async () => {
 			// Mock setShortcutsEffect to fail
-			configurationManager.setShortcutsEffect = vi
-				.fn()
-				.mockReturnValue(
-					Effect.fail(
-						new FileSystemError({
-							operation: 'write',
-							path: '/config/path',
-							cause: 'Test error',
-						}),
-					),
-				);
+			configurationManager.setShortcutsEffect = vi.fn().mockReturnValue(
+				Effect.fail(
+					new FileSystemError({
+						operation: 'write',
+						path: '/config/path',
+						cause: 'Test error',
+					}),
+				),
+			);
 
 			// Use Effect.match pattern from component
 			const result = await Effect.runPromise(
-				Effect.match(configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS), {
-					onFailure: (err: FileSystemError) => ({
-						type: 'error' as const,
-						error: err,
-					}),
-					onSuccess: () => ({type: 'success' as const}),
-				}),
+				Effect.match(
+					configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS),
+					{
+						onFailure: (err: FileSystemError) => ({
+							type: 'error' as const,
+							error: err,
+						}),
+						onSuccess: () => ({type: 'success' as const}),
+					},
+				),
 			);
 
 			// Verify error handling without crashing
@@ -322,13 +323,16 @@ describe('ConfigureShortcuts - Effect Integration Logic', () => {
 
 			// Use Effect.match pattern from component
 			const result = await Effect.runPromise(
-				Effect.match(configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS), {
-					onFailure: (err: FileSystemError) => ({
-						type: 'error' as const,
-						error: err,
-					}),
-					onSuccess: () => ({type: 'success' as const}),
-				}),
+				Effect.match(
+					configurationManager.setShortcutsEffect(DEFAULT_SHORTCUTS),
+					{
+						onFailure: (err: FileSystemError) => ({
+							type: 'error' as const,
+							error: err,
+						}),
+						onSuccess: () => ({type: 'success' as const}),
+					},
+				),
 			);
 
 			// Verify success handling
@@ -377,17 +381,15 @@ describe('ConfigureShortcuts - Effect Integration Logic', () => {
 
 		it('should handle error in composed Effect chain', async () => {
 			// Mock load to fail
-			configurationManager.loadConfigEffect = vi
-				.fn()
-				.mockReturnValue(
-					Effect.fail(
-						new FileSystemError({
-							operation: 'read',
-							path: '/config/path',
-							cause: 'File not found',
-						}),
-					),
-				);
+			configurationManager.loadConfigEffect = vi.fn().mockReturnValue(
+				Effect.fail(
+					new FileSystemError({
+						operation: 'read',
+						path: '/config/path',
+						cause: 'File not found',
+					}),
+				),
+			);
 			configurationManager.setShortcutsEffect = vi
 				.fn()
 				.mockReturnValue(Effect.succeed(undefined));

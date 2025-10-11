@@ -129,9 +129,9 @@ export function formatGitFileChanges(status: GitStatus): string {
 	const parts: string[] = [];
 
 	const colors = {
-		green: '\\x1b[32m',
-		red: '\\x1b[31m',
-		reset: '\\x1b[0m',
+		green: '\x1b[32m',
+		red: '\x1b[31m',
+		reset: '\x1b[0m',
 	};
 
 	if (status.filesAdded > 0) {
@@ -148,9 +148,9 @@ export function formatGitAheadBehind(status: GitStatus): string {
 	const parts: string[] = [];
 
 	const colors = {
-		cyan: '\\x1b[36m',
-		magenta: '\\x1b[35m',
-		reset: '\\x1b[0m',
+		cyan: '\x1b[36m',
+		magenta: '\x1b[35m',
+		reset: '\x1b[0m',
 	};
 
 	if (status.aheadCount > 0) {
@@ -183,8 +183,8 @@ export function formatParentBranch(
 	}
 
 	const colors = {
-		dim: '\\x1b[90m',
-		reset: '\\x1b[0m',
+		dim: '\x1b[90m',
+		reset: '\x1b[0m',
 	};
 
 	return `${colors.dim}(${parentBranch})${colors.reset}`;

@@ -1,14 +1,13 @@
 import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
-import React from 'react';
-import {render} from 'ink-testing-library';
-import App from './App.js';
 import {Effect} from 'effect';
 import {ProcessError, ConfigError} from '../types/errors.js';
 import type {Session} from '../types/index.js';
+import type {IPty} from 'node-pty';
+import type {Terminal} from '@xterm/headless';
 
 // Mock the dependencies
-vi.mock('../services/sessionManager.js', () => {
-	const EventEmitter = require('events');
+vi.mock('../services/sessionManager.js', async () => {
+	const {EventEmitter} = await import('events');
 	return {
 		SessionManager: class MockSessionManager extends EventEmitter {
 			getSession = vi.fn();
@@ -21,12 +20,15 @@ vi.mock('../services/sessionManager.js', () => {
 	};
 });
 
-vi.mock('../services/globalSessionOrchestrator.js', () => ({
-	globalSessionOrchestrator: {
-		getManagerForProject: vi.fn(() => new (require('../services/sessionManager.js').SessionManager)()),
-		destroyAllSessions: vi.fn(),
-	},
-}));
+vi.mock('../services/globalSessionOrchestrator.js', async () => {
+	const {SessionManager} = await import('../services/sessionManager.js');
+	return {
+		globalSessionOrchestrator: {
+			getManagerForProject: vi.fn(() => new SessionManager()),
+			destroyAllSessions: vi.fn(),
+		},
+	};
+});
 
 vi.mock('../services/worktreeService.js', () => ({
 	WorktreeService: class MockWorktreeService {
@@ -82,7 +84,7 @@ describe('App - Effect-based Session Creation Error Handling', () => {
 		// Execute the Effect and verify it fails with ProcessError
 		// Use Effect.either to extract the error without throwing
 		const result = await Effect.runPromise(
-			Effect.either(mockManager.createSessionWithPresetEffect('/test/path'))
+			Effect.either(mockManager.createSessionWithPresetEffect('/test/path')),
 		);
 
 		expect(result._tag).toBe('Left'); // Either.Left contains the error
@@ -118,14 +120,23 @@ describe('App - Effect-based Session Creation Error Handling', () => {
 		// Execute the Effect and verify it fails with ConfigError
 		// Use Effect.either to extract the error without throwing
 		const result = await Effect.runPromise(
-			Effect.either(mockManager.createSessionWithPresetEffect('/test/path', 'invalid-preset'))
+			Effect.either(
+				mockManager.createSessionWithPresetEffect(
+					'/test/path',
+					'invalid-preset',
+				),
+			),
 		);
 
 		expect(result._tag).toBe('Left'); // Either.Left contains the error
 		if (result._tag === 'Left') {
 			expect(result.left).toBeInstanceOf(ConfigError);
 			expect(result.left._tag).toBe('ConfigError');
-			expect(result.left.details).toBe('Invalid preset ID: nonexistent-preset');
+			if (result.left._tag === 'ConfigError') {
+				expect(result.left.details).toBe(
+					'Invalid preset ID: nonexistent-preset',
+				);
+			}
 		}
 	});
 
@@ -138,9 +149,10 @@ describe('App - Effect-based Session Creation Error Handling', () => {
 		});
 
 		// This should match the pattern in the component
-		const displayMessage = error._tag === 'ProcessError'
-			? `Process error: ${error.message}`
-			: 'Unknown error';
+		const displayMessage =
+			error._tag === 'ProcessError'
+				? `Process error: ${error.message}`
+				: 'Unknown error';
 
 		expect(displayMessage).toBe('Process error: Failed to spawn PTY process');
 		expect(error._tag).toBe('ProcessError');
@@ -155,11 +167,14 @@ describe('App - Effect-based Session Creation Error Handling', () => {
 		});
 
 		// This should match the pattern in the component
-		const displayMessage = error._tag === 'ConfigError'
-			? `Configuration error (${error.reason}): ${error.details}`
-			: 'Unknown error';
+		const displayMessage =
+			error._tag === 'ConfigError'
+				? `Configuration error (${error.reason}): ${error.details}`
+				: 'Unknown error';
 
-		expect(displayMessage).toBe('Configuration error (validation): Invalid preset ID: nonexistent-preset');
+		expect(displayMessage).toBe(
+			'Configuration error (validation): Invalid preset ID: nonexistent-preset',
+		);
 		expect(error._tag).toBe('ConfigError');
 	});
 
@@ -170,15 +185,20 @@ describe('App - Effect-based Session Creation Error Handling', () => {
 		const mockSession: Session = {
 			id: 'test-session-123',
 			worktreePath: '/test/path',
-			process: {} as any,
-			terminal: null,
-			command: 'claude',
-			args: [],
-			fallbackArgs: [],
-			outputHistory: [],
-			detectionStrategy: 'claude',
+			process: {} as IPty,
+			terminal: {} as Terminal,
 			state: 'idle',
+			output: [],
+			outputHistory: [],
+			lastActivity: new Date(),
 			isActive: false,
+			stateCheckInterval: undefined,
+			isPrimaryCommand: true,
+			commandConfig: undefined,
+			detectionStrategy: 'claude',
+			devcontainerConfig: undefined,
+			pendingState: undefined,
+			pendingStateStart: undefined,
 		};
 
 		mockManager.createSessionWithPresetEffect = vi.fn(() =>
@@ -187,7 +207,7 @@ describe('App - Effect-based Session Creation Error Handling', () => {
 
 		// Execute the Effect and verify it succeeds
 		const result = await Effect.runPromise(
-			mockManager.createSessionWithPresetEffect('/test/path')
+			mockManager.createSessionWithPresetEffect('/test/path'),
 		);
 
 		expect(result).toEqual(mockSession);
@@ -212,14 +232,11 @@ describe('App - Effect-based Session Creation Error Handling', () => {
 		// Use Effect.either to extract the error without throwing
 		const result = await Effect.runPromise(
 			Effect.either(
-				mockManager.createSessionWithDevcontainerEffect(
-					'/test/path',
-					{
-						upCommand: 'devcontainer up --workspace-folder .',
-						execCommand: 'devcontainer exec --workspace-folder .',
-					}
-				)
-			)
+				mockManager.createSessionWithDevcontainerEffect('/test/path', {
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				}),
+			),
 		);
 
 		expect(result._tag).toBe('Left'); // Either.Left contains the error

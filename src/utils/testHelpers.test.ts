@@ -46,14 +46,20 @@ describe('testHelpers', () => {
 		});
 
 		it('should throw when Effect fails', () => {
-			const effect = Effect.fail(new GitError({command: 'git test', exitCode: 1, stderr: 'error'}));
+			const effect = Effect.fail(
+				new GitError({command: 'git test', exitCode: 1, stderr: 'error'}),
+			);
 			expect(() => expectEffectSuccess(effect)).toThrow();
 		});
 	});
 
 	describe('expectEffectFailure', () => {
 		it('should return error when Effect fails', () => {
-			const gitError = new GitError({command: 'git test', exitCode: 1, stderr: 'error'});
+			const gitError = new GitError({
+				command: 'git test',
+				exitCode: 1,
+				stderr: 'error',
+			});
 			const effect = Effect.fail(gitError);
 			const error = expectEffectFailure(effect);
 			expect(error).toBe(gitError);
@@ -93,10 +99,14 @@ describe('testHelpers', () => {
 
 	describe('matchEffectError', () => {
 		it('should match GitError and return extracted value', () => {
-			const gitError = new GitError({command: 'git test', exitCode: 1, stderr: 'error'});
+			const gitError = new GitError({
+				command: 'git test',
+				exitCode: 1,
+				stderr: 'error',
+			});
 			const effect = Effect.fail(gitError);
 			const result = matchEffectError(effect, {
-				GitError: (err) => err.command,
+				GitError: err => err.command,
 			});
 			expect(result).toBe('git test');
 		});
@@ -109,17 +119,21 @@ describe('testHelpers', () => {
 			});
 			const effect = Effect.fail(validationError);
 			const result = matchEffectError(effect, {
-				ValidationError: (err) => err.field,
+				ValidationError: err => err.field,
 			});
 			expect(result).toBe('test');
 		});
 
 		it('should throw when error type does not match', () => {
-			const gitError = new GitError({command: 'git test', exitCode: 1, stderr: 'error'});
+			const gitError = new GitError({
+				command: 'git test',
+				exitCode: 1,
+				stderr: 'error',
+			});
 			const effect = Effect.fail(gitError);
 			expect(() =>
 				matchEffectError(effect, {
-					ValidationError: (err) => err.field,
+					ValidationError: err => err.field,
 				}),
 			).toThrow();
 		});

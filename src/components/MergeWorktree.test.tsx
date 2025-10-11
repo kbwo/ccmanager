@@ -1,6 +1,6 @@
 import React from 'react';
 import {render} from 'ink-testing-library';
-import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
+import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {Effect} from 'effect';
 import MergeWorktree from './MergeWorktree.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -71,7 +71,7 @@ describe('MergeWorktree - Effect Integration', () => {
 			() =>
 				({
 					getWorktreesEffect: mockGetWorktreesEffect,
-				}) as any,
+				}) as Partial<WorktreeService> as WorktreeService,
 		);
 
 		const onComplete = vi.fn();
@@ -124,7 +124,7 @@ describe('MergeWorktree - Effect Integration', () => {
 				({
 					getWorktreesEffect: mockGetWorktreesEffect,
 					mergeWorktreeEffect: mockMergeWorktreeEffect,
-				}) as any,
+				}) as Partial<WorktreeService> as WorktreeService,
 		);
 
 		const onComplete = vi.fn();
@@ -203,7 +203,7 @@ describe('MergeWorktree - Effect Integration', () => {
 						success: false,
 						error: 'CONFLICT: merge conflict in file.txt',
 					})),
-				}) as any,
+				}) as Partial<WorktreeService> as WorktreeService,
 		);
 
 		const onComplete = vi.fn();
@@ -229,9 +229,11 @@ describe('MergeWorktree - Effect Integration', () => {
 
 		// THEN: Error should be displayed
 		const output = lastFrame();
-		expect(output).toContain('Failed') ||
-			expect(output).toContain('error') ||
-			expect(output).toContain('conflict');
+		const hasError =
+			output?.includes('Failed') ||
+			output?.includes('error') ||
+			output?.includes('conflict');
+		expect(hasError).toBe(true);
 	});
 
 	it.skip('should execute delete using Effect-based method after successful merge', async () => {
@@ -270,7 +272,7 @@ describe('MergeWorktree - Effect Integration', () => {
 					// Keep legacy method for test compatibility
 					mergeWorktree: vi.fn(() => ({success: true})),
 					deleteWorktreeByBranch: vi.fn(() => ({success: true})),
-				}) as any,
+				}) as Partial<WorktreeService> as WorktreeService,
 		);
 
 		const onComplete = vi.fn();

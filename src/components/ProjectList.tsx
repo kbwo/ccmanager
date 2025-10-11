@@ -10,14 +10,7 @@ import {useSearchMode} from '../hooks/useSearchMode.js';
 import {RecentProject} from '../types/index.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {SessionManager} from '../services/sessionManager.js';
-import {
-	ProcessError,
-	ConfigError,
-	GitError,
-	FileSystemError,
-	ValidationError,
-	type AppError,
-} from '../types/errors.js';
+import {type AppError} from '../types/errors.js';
 
 interface ProjectListProps {
 	projectsDir: string;

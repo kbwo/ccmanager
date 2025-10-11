@@ -118,7 +118,7 @@ export function expectEffectFailure<A, E>(
  * @returns The right value
  * @throws Error if the Either is Left
  */
-export function expectEitherRight<E, A>(either: Either.Either<E, A>): A {
+export function expectEitherRight<A, E>(either: Either.Either<A, E>): A {
 	if (Either.isLeft(either)) {
 		throw new Error(
 			`Expected Either to be Right, but it was Left with: ${JSON.stringify(either.left)}`,
@@ -135,7 +135,7 @@ export function expectEitherRight<E, A>(either: Either.Either<E, A>): A {
  * @returns The left value
  * @throws Error if the Either is Right
  */
-export function expectEitherLeft<E, A>(either: Either.Either<E, A>): E {
+export function expectEitherLeft<A, E>(either: Either.Either<A, E>): E {
 	if (Either.isRight(either)) {
 		throw new Error(
 			`Expected Either to be Left, but it was Right with: ${JSON.stringify(either.right)}`,
@@ -164,17 +164,20 @@ export function expectEitherLeft<E, A>(either: Either.Either<E, A>): E {
 export function matchEffectError<R>(
 	effect: Effect.Effect<unknown, AppError, never>,
 	matchers: {
-		[K in AppError['_tag']]?: (
-			error: Extract<AppError, {_tag: K}>,
-		) => R;
+		[K in AppError['_tag']]?: (error: Extract<AppError, {_tag: K}>) => R;
 	},
 ): R {
 	const error = expectEffectFailure(effect);
-	const matcher = matchers[error._tag as AppError['_tag']];
+	const tag = error._tag as AppError['_tag'];
+	const matcher = matchers[tag];
 	if (!matcher) {
 		throw new Error(
 			`No matcher found for error tag: ${error._tag}. Available matchers: ${Object.keys(matchers).join(', ')}`,
 		);
 	}
+	// Type assertion is safe here because we've verified the tag matches
+	// We use 'as any' because TypeScript cannot express the constraint that
+	// the error type matches the matcher's expected parameter type
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	return matcher(error as any);
 }

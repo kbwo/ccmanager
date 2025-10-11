@@ -58,7 +58,9 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 						label:
 							(wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached') +
 							(wt.isMainWorktree ? ' (main)' : ''),
-						value: wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached',
+						value: wt.branch
+							? wt.branch.replace('refs/heads/', '')
+							: 'detached',
 					}));
 					setBranchItems(items);
 					setOriginalBranchItems(items);
@@ -161,7 +163,8 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 				<Text color="red">{loadError}</Text>
 				<Box marginTop={1}>
 					<Text dimColor>
-						Press {shortcutManager.getShortcutDisplay('cancel')} to return to menu
+						Press {shortcutManager.getShortcutDisplay('cancel')} to return to
+						menu
 					</Text>
 				</Box>
 			</Box>

@@ -843,7 +843,6 @@ describe('ProjectList', () => {
 
 	describe('Effect-based Project Discovery Error Handling', () => {
 		it('should handle FileSystemError from discoverProjectsEffect gracefully', async () => {
-			const {Effect} = await import('effect');
 			const {FileSystemError} = await import('../types/errors.js');
 
 			// Mock discoverProjectsEffect to return a failed Effect with FileSystemError
@@ -885,7 +884,6 @@ describe('ProjectList', () => {
 		});
 
 		it('should handle GitError from project validation failures', async () => {
-			const {Effect} = await import('effect');
 			const {GitError} = await import('../types/errors.js');
 
 			// Mock discoverProjectsEffect to return a failed Effect with GitError

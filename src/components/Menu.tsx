@@ -112,7 +112,7 @@ const Menu: React.FC<MenuProps> = ({
 					success: false as const,
 					error,
 				}),
-				onSuccess: (worktrees) => ({
+				onSuccess: worktrees => ({
 					success: true as const,
 					worktrees,
 				}),
@@ -131,9 +131,7 @@ const Menu: React.FC<MenuProps> = ({
 
 						// Update worktree session status
 						result.worktrees.forEach(wt => {
-							wt.hasSession = allSessions.some(
-								s => s.worktreePath === wt.path,
-							);
+							wt.hasSession = allSessions.some(s => s.worktreePath === wt.path);
 						});
 					} else {
 						// Handle GitError with pattern matching

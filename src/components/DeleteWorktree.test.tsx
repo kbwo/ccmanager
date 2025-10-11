@@ -1,6 +1,6 @@
 import React from 'react';
 import {render} from 'ink-testing-library';
-import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
+import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {Effect} from 'effect';
 import DeleteWorktree from './DeleteWorktree.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -71,7 +71,7 @@ describe('DeleteWorktree - Effect Integration', () => {
 			() =>
 				({
 					getWorktreesEffect: mockGetWorktreesEffect,
-				}) as any,
+				}) as Partial<WorktreeService> as WorktreeService,
 		);
 
 		const onComplete = vi.fn();
@@ -109,7 +109,7 @@ describe('DeleteWorktree - Effect Integration', () => {
 			() =>
 				({
 					getWorktreesEffect: mockGetWorktreesEffect,
-				}) as any,
+				}) as Partial<WorktreeService> as WorktreeService,
 		);
 
 		const onComplete = vi.fn();
@@ -125,9 +125,11 @@ describe('DeleteWorktree - Effect Integration', () => {
 
 		// THEN: Error should be displayed
 		const output = lastFrame();
-		expect(output).toContain('error') ||
-			expect(output).toContain('Error') ||
-			expect(output).toContain('not a git repository');
+		const hasError =
+			output?.includes('error') ||
+			output?.includes('Error') ||
+			output?.includes('not a git repository');
+		expect(hasError).toBe(true);
 	});
 
 	it('should filter out main worktree from deletable list', async () => {
@@ -154,7 +156,7 @@ describe('DeleteWorktree - Effect Integration', () => {
 			() =>
 				({
 					getWorktreesEffect: mockGetWorktreesEffect,
-				}) as any,
+				}) as Partial<WorktreeService> as WorktreeService,
 		);
 
 		const onComplete = vi.fn();
