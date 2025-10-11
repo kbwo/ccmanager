@@ -322,10 +322,97 @@ function getGitStatus(
 
 ### Effect Usage in Components
 
-React components execute Effects and handle results:
+React components execute Effects and handle results. The following patterns are demonstrated in real components like ConfigureShortcuts, Menu, and ProjectList:
 
 ```typescript
-// Pattern 1: Effect.runPromise with try-catch
+// Pattern 1: useEffect with Effect.match for loading configuration
+// Example: ConfigureShortcuts.tsx loading config on mount
+useEffect(() => {
+  let cancelled = false;
+
+  const loadConfig = async () => {
+    const result = await Effect.runPromise(
+      Effect.match(configurationManager.loadConfigEffect(), {
+        onFailure: (err: AppError) => ({
+          type: 'error' as const,
+          error: err,
+        }),
+        onSuccess: config => ({type: 'success' as const, data: config}),
+      }),
+    );
+
+    if (!cancelled) {
+      if (result.type === 'error') {
+        // Display error using TaggedError discrimination
+        const errorMsg = formatError(result.error);
+        setError(errorMsg);
+      } else if (result.data.shortcuts) {
+        setShortcuts(result.data.shortcuts);
+      }
+      setIsLoading(false);
+    }
+  };
+
+  loadConfig().catch(err => {
+    if (!cancelled) {
+      setError(`Unexpected error loading config: ${String(err)}`);
+      setIsLoading(false);
+    }
+  });
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
+// Pattern 2: Event handler with Effect.match for saving data
+// Example: ConfigureShortcuts.tsx saving shortcuts
+const handleSaveShortcuts = (shortcuts: ShortcutConfig) => {
+  const saveConfig = async () => {
+    const result = await Effect.runPromise(
+      Effect.match(configurationManager.setShortcutsEffect(shortcuts), {
+        onFailure: (err: AppError) => ({
+          type: 'error' as const,
+          error: err,
+        }),
+        onSuccess: () => ({type: 'success' as const}),
+      }),
+    );
+
+    if (result.type === 'error') {
+      // Display error using TaggedError discrimination
+      const errorMsg = formatError(result.error);
+      setError(errorMsg);
+    } else {
+      // Success - call onComplete
+      onComplete();
+    }
+  };
+
+  saveConfig().catch(err => {
+    setError(`Unexpected error saving shortcuts: ${String(err)}`);
+  });
+};
+
+// Pattern 3: Error formatting with TaggedError discrimination
+// Example: Shared formatError function used across components
+const formatError = (error: AppError): string => {
+  switch (error._tag) {
+    case 'FileSystemError':
+      return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+    case 'ConfigError':
+      return `Configuration error (${error.reason}): ${error.details}`;
+    case 'ValidationError':
+      return `Validation failed for ${error.field}: ${error.constraint}`;
+    case 'GitError':
+      return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+    case 'ProcessError':
+      return `Process error: ${error.message}`;
+  }
+};
+
+// Pattern 4: Effect.runPromise with try-catch (alternative pattern)
+// Example: NewWorktree.tsx creating worktree
 const handleCreateWorktree = async (branchName: string, path: string) => {
   try {
     const worktree = await Effect.runPromise(
@@ -343,38 +430,43 @@ const handleCreateWorktree = async (branchName: string, path: string) => {
   }
 };
 
-// Pattern 2: Effect.match for type-safe handling
-const handleLoadConfig = async () => {
-  const result = await Effect.runPromise(
-    Effect.match(configManager.loadConfig(), {
-      onFailure: (error) => ({ success: false as const, error }),
-      onSuccess: (config) => ({ success: true as const, config })
-    })
+// Pattern 5: Loading state with Effect execution
+// Example: ConfigureShortcuts.tsx with loading indicator
+const [isLoading, setIsLoading] = useState<boolean>(true);
+
+// Show loading while Effect executes
+if (isLoading) {
+  return (
+    <Box flexDirection="column">
+      <Text>Loading configuration...</Text>
+    </Box>
+  );
+}
+
+// Pattern 6: Effect composition in components
+// Example: Load config, then save modified version
+const loadAndUpdateConfig = async () => {
+  const workflow = Effect.flatMap(
+    configurationManager.loadConfigEffect(),
+    config => {
+      const updatedShortcuts = {...config.shortcuts, newKey: 'value'};
+      return configurationManager.setShortcutsEffect(updatedShortcuts);
+    },
   );
 
-  if (result.success) {
-    setConfig(result.config);
+  const result = await Effect.runPromise(
+    Effect.match(workflow, {
+      onFailure: (err: AppError) => ({type: 'error' as const, error: err}),
+      onSuccess: () => ({type: 'success' as const}),
+    }),
+  );
+
+  if (result.type === 'error') {
+    setError(formatError(result.error));
   } else {
-    setError(handleError(result.error));
+    setSuccess('Configuration updated successfully');
   }
 };
-
-// Pattern 3: useEffect with cleanup
-useEffect(() => {
-  let cancelled = false;
-
-  Effect.runPromise(projectManager.loadRecentProjects())
-    .then(projects => {
-      if (!cancelled) setProjects(projects);
-    })
-    .catch(error => {
-      if (!cancelled) setError(String(error));
-    });
-
-  return () => {
-    cancelled = true;
-  };
-}, []);
 ```
 
 ### Error Recovery Strategies
