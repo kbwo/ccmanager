@@ -344,80 +344,186 @@ export class WorktreeService {
 		}
 	}
 
-	hasClaudeDirectoryInBranch(branchName: string): boolean {
-		// Find the worktree directory for the branch
-		const worktrees = this.getWorktrees();
-		let targetWorktree = worktrees.find(
-			wt => wt.branch && wt.branch.replace('refs/heads/', '') === branchName,
-		);
+	/**
+	 * Effect-based hasClaudeDirectoryInBranch operation
+	 * Checks if a .claude directory exists in the worktree for the specified branch
+	 *
+	 * @param {string} branchName - Name of the branch to check
+	 * @returns {Effect.Effect<boolean, GitError, never>} Effect containing true if .claude directory exists, false otherwise
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Check if branch has .claude directory
+	 * const hasClaudeDir = await Effect.runPromise(
+	 *   service.hasClaudeDirectoryInBranchEffect('feature-branch')
+	 * );
+	 *
+	 * // Or use Effect.match for error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(service.hasClaudeDirectoryInBranchEffect('feature-branch'), {
+	 *     onFailure: (error: GitError) => ({
+	 *       type: 'error' as const,
+	 *       message: error.stderr
+	 *     }),
+	 *     onSuccess: (hasDir: boolean) => ({
+	 *       type: 'success' as const,
+	 *       data: hasDir
+	 *     })
+	 *   })
+	 * );
+	 * ```
+	 *
+	 * @throws {GitError} When git operations fail
+	 */
+	hasClaudeDirectoryInBranchEffect(
+		branchName: string,
+	): Effect.Effect<boolean, GitError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
 
-		// If branch worktree not found, try the default branch
-		if (!targetWorktree) {
-			const defaultBranch = this.getDefaultBranch();
-			if (branchName === defaultBranch) {
-				targetWorktree = worktrees.find(
+		return Effect.gen(function* () {
+			// Get all worktrees
+			const worktrees = yield* self.getWorktreesEffect();
+
+			// Try to find worktree for the branch
+			let targetWorktree = worktrees.find(
+				wt => wt.branch && wt.branch.replace('refs/heads/', '') === branchName,
+			);
+
+			// If branch worktree not found, try the default branch
+			if (!targetWorktree) {
+				const defaultBranch = yield* self.getDefaultBranchEffect();
+				if (branchName === defaultBranch) {
+					targetWorktree = worktrees.find(
+						wt =>
+							wt.branch &&
+							wt.branch.replace('refs/heads/', '') === defaultBranch,
+					);
+				}
+			}
+
+			// If still not found and it's the default branch, try the main worktree
+			if (!targetWorktree) {
+				const defaultBranch = yield* self.getDefaultBranchEffect();
+				if (branchName === defaultBranch) {
+					targetWorktree = worktrees.find(wt => wt.isMainWorktree);
+				}
+			}
+
+			if (!targetWorktree) {
+				return false;
+			}
+
+			// Check if .claude directory exists in the worktree
+			const claudePath = path.join(targetWorktree.path, CLAUDE_DIR);
+			return existsSync(claudePath) && statSync(claudePath).isDirectory();
+		});
+	}
+
+	/**
+	 * Effect-based copyClaudeDirectoryFromBaseBranch operation
+	 * Copies .claude directory from base branch worktree to target worktree
+	 *
+	 * @param {string} worktreePath - Path of the target worktree
+	 * @param {string} baseBranch - Name of the base branch to copy from
+	 * @returns {Effect.Effect<void, GitError | FileSystemError, never>} Effect that completes successfully or fails with error
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {WorktreeService} from './services/worktreeService.js';
+	 *
+	 * const service = new WorktreeService();
+	 *
+	 * // Copy .claude directory from main branch
+	 * await Effect.runPromise(
+	 *   service.copyClaudeDirectoryFromBaseBranchEffect(
+	 *     '/path/to/new/worktree',
+	 *     'main'
+	 *   )
+	 * );
+	 *
+	 * // With error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.catchAll(
+	 *     service.copyClaudeDirectoryFromBaseBranchEffect(worktreePath, baseBranch),
+	 *     (error) => {
+	 *       console.warn('Could not copy .claude directory:', error);
+	 *       return Effect.succeed(undefined); // Continue despite error
+	 *     }
+	 *   )
+	 * );
+	 * ```
+	 *
+	 * @throws {GitError} When base worktree cannot be found
+	 * @throws {FileSystemError} When copying the directory fails
+	 */
+	private copyClaudeDirectoryFromBaseBranchEffect(
+		worktreePath: string,
+		baseBranch: string,
+	): Effect.Effect<void, GitError | FileSystemError, never> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+
+		return Effect.gen(function* () {
+			// Find the worktree directory for the base branch
+			const worktrees = yield* self.getWorktreesEffect();
+			let baseWorktree = worktrees.find(
+				wt => wt.branch && wt.branch.replace('refs/heads/', '') === baseBranch,
+			);
+
+			// If base branch worktree not found, try the default branch
+			if (!baseWorktree) {
+				const defaultBranch = yield* self.getDefaultBranchEffect();
+				baseWorktree = worktrees.find(
 					wt =>
 						wt.branch && wt.branch.replace('refs/heads/', '') === defaultBranch,
 				);
 			}
-		}
 
-		// If still not found and it's the default branch, try the main worktree
-		if (!targetWorktree && branchName === this.getDefaultBranch()) {
-			targetWorktree = worktrees.find(wt => wt.isMainWorktree);
-		}
+			// If still not found, try the main worktree
+			if (!baseWorktree) {
+				baseWorktree = worktrees.find(wt => wt.isMainWorktree);
+			}
 
-		if (!targetWorktree) {
-			return false;
-		}
+			if (!baseWorktree) {
+				return yield* Effect.fail(
+					new GitError({
+						command: 'find base worktree',
+						exitCode: 1,
+						stderr: 'Could not find base worktree to copy settings from',
+					}),
+				);
+			}
 
-		// Check if .claude directory exists in the worktree
-		const claudePath = path.join(targetWorktree.path, CLAUDE_DIR);
-		return existsSync(claudePath) && statSync(claudePath).isDirectory();
-	}
+			// Check if .claude directory exists in base worktree
+			const sourceClaudeDir = path.join(baseWorktree.path, CLAUDE_DIR);
 
-	private copyClaudeDirectoryFromBaseBranch(
-		worktreePath: string,
-		baseBranch: string,
-	): void {
-		// Find the worktree directory for the base branch
-		const worktrees = this.getWorktrees();
-		let baseWorktree = worktrees.find(
-			wt => wt.branch && wt.branch.replace('refs/heads/', '') === baseBranch,
-		);
+			if (
+				!existsSync(sourceClaudeDir) ||
+				!statSync(sourceClaudeDir).isDirectory()
+			) {
+				// No .claude directory to copy, this is fine
+				return;
+			}
 
-		// If base branch worktree not found, try the default branch
-		if (!baseWorktree) {
-			const defaultBranch = this.getDefaultBranch();
-			baseWorktree = worktrees.find(
-				wt =>
-					wt.branch && wt.branch.replace('refs/heads/', '') === defaultBranch,
-			);
-		}
-
-		// If still not found, try the main worktree
-		if (!baseWorktree) {
-			baseWorktree = worktrees.find(wt => wt.isMainWorktree);
-		}
-
-		if (!baseWorktree) {
-			throw new Error('Could not find base worktree to copy settings from');
-		}
-
-		// Check if .claude directory exists in base worktree
-		const sourceClaudeDir = path.join(baseWorktree.path, CLAUDE_DIR);
-
-		if (
-			!existsSync(sourceClaudeDir) ||
-			!statSync(sourceClaudeDir).isDirectory()
-		) {
-			// No .claude directory to copy, this is fine
-			return;
-		}
-
-		// Copy .claude directory to new worktree
-		const targetClaudeDir = path.join(worktreePath, CLAUDE_DIR);
-		cpSync(sourceClaudeDir, targetClaudeDir, {recursive: true});
+			// Copy .claude directory to new worktree
+			const targetClaudeDir = path.join(worktreePath, CLAUDE_DIR);
+			yield* Effect.try({
+				try: () => cpSync(sourceClaudeDir, targetClaudeDir, {recursive: true}),
+				catch: (error: unknown) =>
+					new FileSystemError({
+						operation: 'write',
+						path: targetClaudeDir,
+						cause: String(error),
+					}),
+			});
+		});
 	}
 
 	/**
@@ -952,11 +1058,7 @@ export class WorktreeService {
 			// Copy .claude directory if requested
 			if (copyClaudeDirectory) {
 				yield* Effect.catchAll(
-					Effect.try({
-						try: () =>
-							self.copyClaudeDirectoryFromBaseBranch(resolvedPath, baseBranch),
-						catch: (error: unknown) => error,
-					}),
+					self.copyClaudeDirectoryFromBaseBranchEffect(resolvedPath, baseBranch),
 					(error: unknown) => {
 						console.error('Warning: Failed to copy .claude directory:', error);
 						return Effect.succeed(undefined);

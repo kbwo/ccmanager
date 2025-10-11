@@ -72,8 +72,8 @@ During verification of the migration completion, legacy non-Effect code was disc
   - _Location: src/components/NewWorktree.tsx:60-61_
   - _Related to: Requirement 8.1, 8.2, 8.4, 7.1_
 
-- [ ] 5. Migrate internal WorktreeService methods to Effect
-- [ ] 5.1 Update `hasClaudeDirectoryInBranch()` to use Effect-based methods
+- [x] 5. Migrate internal WorktreeService methods to Effect
+- [x] 5.1 Update `hasClaudeDirectoryInBranch()` to use Effect-based methods
   - Currently calls `getWorktrees()` on line 349
   - Currently calls `getDefaultBranch()` on lines 356, 366
   - Convert method signature to return `Effect.Effect<boolean, GitError, never>`
@@ -82,7 +82,7 @@ During verification of the migration completion, legacy non-Effect code was disc
   - _Location: src/services/worktreeService.ts:347_
   - _Related to: Requirement 5.1, 5.5, 3.4_
 
-- [ ] 5.2 Update `copyClaudeDirectoryFromBaseBranch()` to use Effect-based methods
+- [x] 5.2 Update `copyClaudeDirectoryFromBaseBranch()` to use Effect-based methods
   - Currently calls `getWorktrees()` on line 384
   - Currently calls `getDefaultBranch()` on line 391
   - Method is already called within Effect.try in createWorktreeEffect
