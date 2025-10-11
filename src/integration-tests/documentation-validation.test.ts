@@ -167,7 +167,7 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 		},
 		{
 			path: join(process.cwd(), 'src/services/sessionManager.ts'),
-			functions: ['createSessionEffect', 'terminateSessionEffect'],
+			functions: ['createSessionWithPresetEffect', 'terminateSessionEffect'],
 		},
 		{
 			path: join(process.cwd(), 'src/services/projectManager.ts'),
@@ -175,19 +175,19 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 		},
 		{
 			path: join(process.cwd(), 'src/utils/gitStatus.ts'),
-			functions: ['getGitStatusEffect'],
+			functions: ['getGitStatus'],
 		},
 		{
 			path: join(process.cwd(), 'src/utils/worktreeConfig.ts'),
-			functions: ['getWorktreeParentBranchEffect', 'setWorktreeParentBranchEffect'],
+			functions: ['getWorktreeParentBranch', 'setWorktreeParentBranch'],
 		},
 		{
 			path: join(process.cwd(), 'src/utils/hookExecutor.ts'),
-			functions: ['executeHookEffect'],
+			functions: ['executeHook'],
 		},
 		{
 			path: join(process.cwd(), 'src/utils/claudeDir.ts'),
-			functions: ['getClaudeProjectsDirEffect', 'claudeDirExistsEffect'],
+			functions: ['getClaudeProjectsDir', 'claudeDirExists'],
 		},
 	];
 
@@ -232,7 +232,8 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 				for (let i = functionLineIndex - 1; i >= Math.max(0, functionLineIndex - 100); i--) {
 					const line = lines[i] || '';
 
-					if (line.trim().startsWith('/**')) {
+					// Detect JSDoc block - look for closing */ or any JSDoc tags
+					if (line.trim().endsWith('*/') || line.includes('@example') || line.includes('@returns') || line.includes('@return')) {
 						jsDocFound = true;
 					}
 
@@ -246,12 +247,11 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 
 					// Check for description (non-empty lines that aren't just * or tags)
 					if (
-						jsDocFound &&
 						line.trim().length > 2 &&
 						line.trim().startsWith('*') &&
 						!line.includes('@') &&
 						!line.trim().startsWith('/**') &&
-						!line.trim().startsWith('*/') &&
+						!line.trim().endsWith('*/') &&
 						line.trim() !== '*'
 					) {
 						// Must have actual content after the *
@@ -261,8 +261,8 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 						}
 					}
 
-					// Stop if we hit the end of JSDoc or another function
-					if (line.trim() === '*/' && jsDocFound) {
+					// Stop if we hit the start of JSDoc
+					if (line.trim().startsWith('/**')) {
 						break;
 					}
 					if (i < functionLineIndex - 1 && /^\s*(public|private|protected)?\s*\w+.*\(/.test(line)) {

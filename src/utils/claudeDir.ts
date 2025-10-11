@@ -47,7 +47,24 @@ export function getClaudeDir(): Either.Either<string, ValidationError> {
 
 /**
  * Get the Claude projects directory path using Either
- * Propagates ValidationError from getClaudeDir
+ *
+ * Propagates ValidationError from getClaudeDir if HOME directory cannot be determined.
+ *
+ * @returns {Either.Either<string, ValidationError>} Either containing projects directory path or ValidationError
+ *
+ * @example
+ * ```typescript
+ * import {Either} from 'effect';
+ * import {getClaudeProjectsDir} from './utils/claudeDir.js';
+ *
+ * const projectsDirEither = getClaudeProjectsDir();
+ *
+ * if (Either.isRight(projectsDirEither)) {
+ *   console.log(`Projects directory: ${projectsDirEither.right}`);
+ * } else {
+ *   console.error(`Failed to get directory: ${projectsDirEither.left.field} ${projectsDirEither.left.constraint}`);
+ * }
+ * ```
  */
 export function getClaudeProjectsDir(): Either.Either<string, ValidationError> {
 	return Either.map(getClaudeDir(), dir => path.join(dir, 'projects'));
@@ -69,7 +86,34 @@ export function pathToClaudeProjectName(worktreePath: string): string {
 
 /**
  * Check if Claude project directory exists using Effect
- * Returns false for ENOENT, fails with FileSystemError for other errors
+ *
+ * Returns false for ENOENT (directory doesn't exist), fails with FileSystemError for other errors.
+ *
+ * @param {string} projectName - Claude project name to check
+ * @returns {Effect.Effect<boolean, FileSystemError, never>} Effect containing boolean indicating existence or FileSystemError
+ *
+ * @example
+ * ```typescript
+ * import {Effect} from 'effect';
+ * import {claudeDirExists, pathToClaudeProjectName} from './utils/claudeDir.js';
+ *
+ * const projectName = pathToClaudeProjectName('/path/to/worktree');
+ *
+ * // Check if directory exists with error handling
+ * const exists = await Effect.runPromise(
+ *   Effect.catchAll(
+ *     claudeDirExists(projectName),
+ *     (error) => {
+ *       console.error(`Failed to check directory: ${error.cause}`);
+ *       return Effect.succeed(false); // Assume doesn't exist on error
+ *     }
+ *   )
+ * );
+ *
+ * if (exists) {
+ *   console.log('Claude project directory exists');
+ * }
+ * ```
  */
 export function claudeDirExists(
 	projectName: string,

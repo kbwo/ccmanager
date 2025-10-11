@@ -377,23 +377,34 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		setView('creating-worktree');
 		setError(null);
 
-		// Create the worktree
-		const result = await worktreeService.createWorktree(
-			path,
-			branch,
-			baseBranch,
-			copySessionData,
-			copyClaudeDirectory,
+		// Create the worktree using Effect
+		const result = await Effect.runPromise(
+			Effect.either(
+				worktreeService.createWorktreeEffect(
+					path,
+					branch,
+					baseBranch,
+					copySessionData,
+					copyClaudeDirectory,
+				),
+			),
 		);
 
-		// Handle the result using the helper function
-		handleWorktreeCreationResult(result, {
-			path,
-			branch,
-			baseBranch,
-			copySessionData,
-			copyClaudeDirectory,
-		});
+		// Transform Effect result to legacy format for handleWorktreeCreationResult
+		if (result._tag === 'Left') {
+			// Handle error using pattern matching on _tag
+			const errorMessage = formatErrorMessage(result.left);
+			handleWorktreeCreationResult(
+				{success: false, error: errorMessage},
+				{path, branch, baseBranch, copySessionData, copyClaudeDirectory},
+			);
+		} else {
+			// Success case
+			handleWorktreeCreationResult(
+				{success: true},
+				{path, branch, baseBranch, copySessionData, copyClaudeDirectory},
+			);
+		}
 	};
 
 	const handleCancelNewWorktree = () => {
@@ -411,21 +422,26 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		setView('creating-worktree');
 		setError(null);
 
-		const result = await worktreeService.createWorktree(
-			creationData.path,
-			creationData.branch,
-			selectedRemoteRef, // Use the selected remote reference
-			creationData.copySessionData,
-			creationData.copyClaudeDirectory,
+		const result = await Effect.runPromise(
+			Effect.either(
+				worktreeService.createWorktreeEffect(
+					creationData.path,
+					creationData.branch,
+					selectedRemoteRef, // Use the selected remote reference
+					creationData.copySessionData,
+					creationData.copyClaudeDirectory,
+				),
+			),
 		);
 
-		if (result.success) {
+		if (result._tag === 'Left') {
+			// Handle error using pattern matching on _tag
+			const errorMessage = formatErrorMessage(result.left);
+			setError(errorMessage);
+			setView('new-worktree');
+		} else {
 			// Success - return to menu
 			handleReturnToMenu();
-		} else {
-			// Show error and return to new worktree form
-			setError(result.error || 'Failed to create worktree');
-			setView('new-worktree');
 		}
 	};
 
@@ -442,13 +458,18 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		setView('deleting-worktree');
 		setError(null);
 
-		// Delete the worktrees
+		// Delete the worktrees sequentially using Effect
 		let hasError = false;
 		for (const path of worktreePaths) {
-			const result = worktreeService.deleteWorktree(path, {deleteBranch});
-			if (!result.success) {
+			const result = await Effect.runPromise(
+				Effect.either(worktreeService.deleteWorktreeEffect(path, {deleteBranch})),
+			);
+
+			if (result._tag === 'Left') {
+				// Handle error using pattern matching on _tag
 				hasError = true;
-				setError(result.error || 'Failed to delete worktree');
+				const errorMessage = formatErrorMessage(result.left);
+				setError(errorMessage);
 				break;
 			}
 		}

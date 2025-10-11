@@ -448,9 +448,32 @@ export class ProjectManager implements IProjectManager {
 	// Effect-based API methods
 
 	/**
-	 * Discover Git projects in the specified directory (Effect version)
-	 * @param projectsDir - Root directory to search for Git projects
-	 * @returns Effect with discovered projects or FileSystemError
+	 * Discover Git projects in the specified directory using Effect
+	 *
+	 * Recursively scans the directory for Git repositories with parallel processing.
+	 * Caches results for improved performance.
+	 *
+	 * @param {string} projectsDir - Root directory to search for Git projects
+	 * @returns {Effect.Effect<GitProject[], FileSystemError, never>} Effect containing discovered projects or FileSystemError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {projectManager} from './services/projectManager.js';
+	 *
+	 * // Discover projects with error handling
+	 * const projects = await Effect.runPromise(
+	 *   Effect.catchAll(
+	 *     projectManager.instance.discoverProjectsEffect('/home/user/projects'),
+	 *     (error) => {
+	 *       console.error(`Discovery failed: ${error.cause}`);
+	 *       return Effect.succeed([]); // Return empty array on error
+	 *     }
+	 *   )
+	 * );
+	 *
+	 * console.log(`Found ${projects.length} git repositories`);
+	 * ```
 	 */
 	discoverProjectsEffect(
 		projectsDir: string,
@@ -522,8 +545,35 @@ export class ProjectManager implements IProjectManager {
 	}
 
 	/**
-	 * Load recent projects from cache (Effect version)
-	 * @returns Effect with recent projects or FileSystemError/ConfigError
+	 * Load recent projects from cache using Effect
+	 *
+	 * Reads and parses the recent projects JSON file. Returns empty array if file doesn't exist.
+	 *
+	 * @returns {Effect.Effect<RecentProject[], FileSystemError | ConfigError, never>} Effect containing recent projects or error
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {projectManager} from './services/projectManager.js';
+	 *
+	 * // Load recent projects with error handling
+	 * const recent = await Effect.runPromise(
+	 *   Effect.match(
+	 *     projectManager.instance.loadRecentProjectsEffect(),
+	 *     {
+	 *       onFailure: (error) => {
+	 *         if (error._tag === 'ConfigError') {
+	 *           console.error(`Parse error: ${error.details}`);
+	 *         } else {
+	 *           console.error(`File error: ${error.cause}`);
+	 *         }
+	 *         return [];
+	 *       },
+	 *       onSuccess: (projects) => projects
+	 *     }
+	 *   )
+	 * );
+	 * ```
 	 */
 	loadRecentProjectsEffect(): Effect.Effect<
 		RecentProject[],
@@ -561,9 +611,33 @@ export class ProjectManager implements IProjectManager {
 	}
 
 	/**
-	 * Save recent projects to cache (Effect version)
-	 * @param projects - Recent projects to save
-	 * @returns Effect with void or FileSystemError
+	 * Save recent projects to cache using Effect
+	 *
+	 * Writes the recent projects array to JSON file.
+	 *
+	 * @param {RecentProject[]} projects - Recent projects to save
+	 * @returns {Effect.Effect<void, FileSystemError, never>} Effect that succeeds or fails with FileSystemError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {projectManager} from './services/projectManager.js';
+	 *
+	 * const recentProjects = [
+	 *   { path: '/home/user/project1', name: 'project1', lastAccessed: Date.now() }
+	 * ];
+	 *
+	 * // Save with error recovery
+	 * await Effect.runPromise(
+	 *   Effect.catchAll(
+	 *     projectManager.instance.saveRecentProjectsEffect(recentProjects),
+	 *     (error) => {
+	 *       console.error(`Failed to save: ${error.cause}`);
+	 *       return Effect.void; // Continue despite error
+	 *     }
+	 *   )
+	 * );
+	 * ```
 	 */
 	saveRecentProjectsEffect(
 		projects: RecentProject[],

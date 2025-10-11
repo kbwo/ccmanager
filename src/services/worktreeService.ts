@@ -8,12 +8,13 @@ import {
 	RemoteBranchMatch,
 } from '../types/index.js';
 import {GitError, FileSystemError} from '../types/errors.js';
-import {setWorktreeParentBranchLegacy} from '../utils/worktreeConfig.js';
+import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 import {
-	getClaudeProjectsDirLegacy as getClaudeProjectsDir,
+	getClaudeProjectsDir,
+	getClaudeProjectsDirLegacy,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
-import {executeWorktreePostCreationHookLegacy as executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
+import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
 import {configurationManager} from './configurationManager.js';
 
 const CLAUDE_DIR = '.claude';
@@ -309,276 +310,12 @@ export class WorktreeService {
 		}
 	}
 
-	async createWorktree(
-		worktreePath: string,
-		branch: string,
-		baseBranch: string,
-		copySessionData = false,
-		copyClaudeDirectory: boolean = false,
-	): Promise<{success: boolean; error?: string}> {
-		try {
-			// Resolve the worktree path relative to the git repository root
-			const resolvedPath = path.isAbsolute(worktreePath)
-				? worktreePath
-				: path.join(this.gitRootPath, worktreePath);
-
-			// Check if branch exists
-			let branchExists = false;
-			try {
-				execSync(`git rev-parse --verify ${branch}`, {
-					cwd: this.rootPath,
-					encoding: 'utf8',
-				});
-				branchExists = true;
-			} catch {
-				// Branch doesn't exist
-			}
-
-			// Create the worktree
-			let command: string;
-			if (branchExists) {
-				command = `git worktree add "${resolvedPath}" "${branch}"`;
-			} else {
-				// Resolve the base branch to its proper git reference
-				try {
-					const resolvedBaseBranch = this.resolveBranchReference(baseBranch);
-					// Create new branch from specified base branch
-					command = `git worktree add -b "${branch}" "${resolvedPath}" "${resolvedBaseBranch}"`;
-				} catch (error) {
-					if (error instanceof AmbiguousBranchError) {
-						// TODO: Future enhancement - show disambiguation modal in UI
-						// The UI should present the available remote options to the user:
-						// - origin/foo/bar-xyz
-						// - upstream/foo/bar-xyz
-						// For now, return error message to be displayed to user
-						return {
-							success: false,
-							error: error.message,
-						};
-					}
-					// Re-throw any other errors
-					throw error;
-				}
-			}
-
-			execSync(command, {
-				cwd: this.gitRootPath, // Execute from git root to ensure proper resolution
-				encoding: 'utf8',
-			});
-
-			// Copy session data if requested
-			if (copySessionData) {
-				this.copyClaudeSessionData(this.rootPath, resolvedPath);
-			}
-
-			// Store the parent branch in worktree config
-			try {
-				setWorktreeParentBranchLegacy(resolvedPath, baseBranch);
-			} catch (error) {
-				console.error(
-					'Warning: Failed to set parent branch in worktree config:',
-					error,
-				);
-			}
-
-			// Copy .claude directory if requested
-			if (copyClaudeDirectory) {
-				try {
-					this.copyClaudeDirectoryFromBaseBranch(resolvedPath, baseBranch);
-				} catch (error) {
-					console.error('Warning: Failed to copy .claude directory:', error);
-				}
-			}
-
-			// Execute post-creation hook if configured
-			const worktreeHooks = configurationManager.getWorktreeHooks();
-			if (
-				worktreeHooks.post_creation?.enabled &&
-				worktreeHooks.post_creation?.command
-			) {
-				// Create a worktree object for the hook
-				const newWorktree: Worktree = {
-					path: resolvedPath,
-					branch: branch,
-					isMainWorktree: false,
-					hasSession: false,
-				};
-
-				// Execute the hook synchronously (blocking)
-				// Wait for the hook to complete before returning
-				await executeWorktreePostCreationHook(
-					worktreeHooks.post_creation.command,
-					newWorktree,
-					this.gitRootPath,
-					baseBranch,
-				);
-			}
-
-			return {success: true};
-		} catch (error) {
-			return {
-				success: false,
-				error:
-					error instanceof Error ? error.message : 'Failed to create worktree',
-			};
-		}
-	}
-
-	deleteWorktree(
-		worktreePath: string,
-		options?: {deleteBranch?: boolean},
-	): {success: boolean; error?: string} {
-		try {
-			// Get the worktree info to find the branch
-			const worktrees = this.getWorktrees();
-			const worktree = worktrees.find(wt => wt.path === worktreePath);
-
-			if (!worktree) {
-				return {
-					success: false,
-					error: 'Worktree not found',
-				};
-			}
-
-			if (worktree.isMainWorktree) {
-				return {
-					success: false,
-					error: 'Cannot delete the main worktree',
-				};
-			}
-
-			// Remove the worktree
-			execSync(`git worktree remove "${worktreePath}" --force`, {
-				cwd: this.rootPath,
-				encoding: 'utf8',
-			});
-
-			// Delete the branch if requested (default to true for backward compatibility)
-			const deleteBranch = options?.deleteBranch ?? true;
-			if (deleteBranch && worktree.branch) {
-				const branchName = worktree.branch.replace('refs/heads/', '');
-				try {
-					execSync(`git branch -D "${branchName}"`, {
-						cwd: this.rootPath,
-						encoding: 'utf8',
-					});
-				} catch {
-					// Branch might not exist or might be checked out elsewhere
-					// This is not a fatal error
-				}
-			}
-
-			return {success: true};
-		} catch (error) {
-			return {
-				success: false,
-				error:
-					error instanceof Error ? error.message : 'Failed to delete worktree',
-			};
-		}
-	}
-
-	mergeWorktree(
-		sourceBranch: string,
-		targetBranch: string,
-		useRebase: boolean = false,
-	): {success: boolean; error?: string} {
-		try {
-			// Get worktrees to find the target worktree path
-			const worktrees = this.getWorktrees();
-			const targetWorktree = worktrees.find(
-				wt =>
-					wt.branch && wt.branch.replace('refs/heads/', '') === targetBranch,
-			);
-
-			if (!targetWorktree) {
-				return {
-					success: false,
-					error: 'Target branch worktree not found',
-				};
-			}
-
-			// Perform the merge or rebase in the target worktree
-			if (useRebase) {
-				// For rebase, we need to checkout source branch and rebase it onto target
-				const sourceWorktree = worktrees.find(
-					wt =>
-						wt.branch && wt.branch.replace('refs/heads/', '') === sourceBranch,
-				);
-
-				if (!sourceWorktree) {
-					return {
-						success: false,
-						error: 'Source branch worktree not found',
-					};
-				}
-
-				// Rebase source branch onto target branch
-				execSync(`git rebase "${targetBranch}"`, {
-					cwd: sourceWorktree.path,
-					encoding: 'utf8',
-				});
-
-				// After rebase, merge the rebased source branch into target branch
-				execSync(`git merge --ff-only "${sourceBranch}"`, {
-					cwd: targetWorktree.path,
-					encoding: 'utf8',
-				});
-			} else {
-				// Regular merge
-				execSync(`git merge --no-ff "${sourceBranch}"`, {
-					cwd: targetWorktree.path,
-					encoding: 'utf8',
-				});
-			}
-
-			return {success: true};
-		} catch (error) {
-			return {
-				success: false,
-				error:
-					error instanceof Error
-						? error.message
-						: useRebase
-							? 'Failed to rebase branches'
-							: 'Failed to merge branches',
-			};
-		}
-	}
-
-	deleteWorktreeByBranch(branch: string): {success: boolean; error?: string} {
-		try {
-			// Get worktrees to find the worktree by branch
-			const worktrees = this.getWorktrees();
-			const worktree = worktrees.find(
-				wt => wt.branch && wt.branch.replace('refs/heads/', '') === branch,
-			);
-
-			if (!worktree) {
-				return {
-					success: false,
-					error: 'Worktree not found for branch',
-				};
-			}
-
-			return this.deleteWorktree(worktree.path);
-		} catch (error) {
-			return {
-				success: false,
-				error:
-					error instanceof Error
-						? error.message
-						: 'Failed to delete worktree by branch',
-			};
-		}
-	}
-
 	private copyClaudeSessionData(
 		sourceWorktreePath: string,
 		targetWorktreePath: string,
 	): void {
 		try {
-			const projectsDir = getClaudeProjectsDir();
+			const projectsDir = getClaudeProjectsDirLegacy();
 			if (!existsSync(projectsDir)) {
 				throw new Error(
 					`Claude projects directory does not exist: ${projectsDir}`,
@@ -972,10 +709,7 @@ export class WorktreeService {
 
 			// Store the parent branch in worktree config
 			yield* Effect.catchAll(
-				Effect.try({
-					try: () => setWorktreeParentBranchLegacy(resolvedPath, baseBranch),
-					catch: (error: unknown) => error,
-				}),
+				setWorktreeParentBranch(resolvedPath, baseBranch),
 				(_error: unknown) => {
 					// Log warning but don't fail
 					console.error(
@@ -1014,13 +748,11 @@ export class WorktreeService {
 					hasSession: false,
 				};
 
-				yield* Effect.promise(() =>
-					executeWorktreePostCreationHook(
-						worktreeHooks.post_creation!.command,
-						newWorktree,
-						absoluteGitRoot,
-						baseBranch,
-					),
+				yield* executeWorktreePostCreationHook(
+					worktreeHooks.post_creation.command,
+					newWorktree,
+					absoluteGitRoot,
+					baseBranch,
 				);
 			}
 

@@ -27,7 +27,7 @@
 		"build": "tsc",
 		"dev": "tsc --watch",
 		"start": "node dist/cli.js",
-		"test": "vitest run",
+		"test": "vitest --run",
 		"lint": "eslint src",
 		"lint:fix": "eslint src --fix",
 		"typecheck": "tsc --noEmit",

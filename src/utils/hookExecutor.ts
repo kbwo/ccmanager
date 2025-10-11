@@ -15,6 +15,37 @@ export interface HookEnvironment {
 
 /**
  * Execute a hook command with the provided environment variables using Effect
+ *
+ * Spawns a shell process to run the hook command with custom environment.
+ * Errors are captured but hook failures don't propagate to prevent breaking main flow.
+ *
+ * @param {string} command - Shell command to execute
+ * @param {string} cwd - Working directory for command execution
+ * @param {HookEnvironment} environment - Environment variables for the hook
+ * @returns {Effect.Effect<void, ProcessError, never>} Effect that succeeds on hook completion or fails with ProcessError
+ *
+ * @example
+ * ```typescript
+ * import {Effect} from 'effect';
+ * import {executeHook} from './utils/hookExecutor.js';
+ *
+ * const env = {
+ *   CCMANAGER_WORKTREE_PATH: '/path/to/worktree',
+ *   CCMANAGER_WORKTREE_BRANCH: 'feature-branch',
+ *   CCMANAGER_GIT_ROOT: '/path/to/repo'
+ * };
+ *
+ * // Execute hook with error recovery
+ * const result = await Effect.runPromise(
+ *   Effect.catchAll(
+ *     executeHook('npm install', '/path/to/worktree', env),
+ *     (error) => {
+ *       console.error(`Hook failed: ${error.message}`);
+ *       return Effect.succeed(undefined); // Continue despite error
+ *     }
+ *   )
+ * );
+ * ```
  */
 export function executeHook(
 	command: string,
