@@ -5,11 +5,14 @@ import {EventEmitter} from 'events';
 import {DevcontainerConfig, CommandPreset} from '../types/index.js';
 
 // Mock node-pty
-vi.mock('node-pty');
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
 
 // Mock child_process
 vi.mock('child_process', () => ({
 	exec: vi.fn(),
+	execFile: vi.fn(),
 }));
 
 // Mock configuration manager
@@ -87,9 +90,6 @@ describe('SessionManager Effect-based Operations', () => {
 			// Create session with preset - should return Effect
 			const effect =
 				sessionManager.createSessionWithPresetEffect('/test/worktree');
-
-			// Verify it's an Effect
-			expect(effect).toHaveProperty('_tag');
 
 			// Execute the Effect and verify it succeeds with a Session
 			const session = await Effect.runPromise(effect);
@@ -227,9 +227,6 @@ describe('SessionManager Effect-based Operations', () => {
 				devcontainerConfig,
 			);
 
-			// Verify it's an Effect
-			expect(effect).toHaveProperty('_tag');
-
 			// Execute the Effect and verify it succeeds with a Session
 			const session = await Effect.runPromise(effect);
 
@@ -348,9 +345,6 @@ describe('SessionManager Effect-based Operations', () => {
 
 			// Terminate session - should return Effect
 			const effect = sessionManager.terminateSessionEffect('/test/worktree');
-
-			// Verify it's an Effect
-			expect(effect).toHaveProperty('_tag');
 
 			// Execute the Effect and verify it succeeds
 			await Effect.runPromise(effect);

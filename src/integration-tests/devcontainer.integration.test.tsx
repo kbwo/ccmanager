@@ -5,8 +5,13 @@ import {spawn, IPty} from 'node-pty';
 import {exec, ExecException} from 'child_process';
 
 // Mock modules
-vi.mock('node-pty');
-vi.mock('child_process');
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
+vi.mock('child_process', () => ({
+	exec: vi.fn(),
+	execFile: vi.fn(),
+}));
 type ExecCallback = (
 	error: ExecException | null,
 	stdout: string,

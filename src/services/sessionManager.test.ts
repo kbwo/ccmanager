@@ -5,11 +5,14 @@ import {Session, DevcontainerConfig} from '../types/index.js';
 import {exec} from 'child_process';
 
 // Mock node-pty
-vi.mock('node-pty');
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
 
 // Mock child_process
 vi.mock('child_process', () => ({
 	exec: vi.fn(),
+	execFile: vi.fn(),
 }));
 
 // Mock configuration manager

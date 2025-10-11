@@ -7,7 +7,9 @@ import {
 	STATE_CHECK_INTERVAL_MS,
 } from '../constants/statePersistence.js';
 
-vi.mock('node-pty');
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
 vi.mock('./configurationManager.js', () => ({
 	configurationManager: {
 		getConfig: vi.fn().mockReturnValue({
