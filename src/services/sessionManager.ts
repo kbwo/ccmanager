@@ -122,44 +122,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	/**
-	 * Legacy Promise-based wrapper for createSessionWithPresetEffect
-	 * @deprecated Use createSessionWithPresetEffect with Effect instead
-	 * Only kept for backward compatibility in tests
-	 */
-	async createSessionWithPreset(
-		worktreePath: string,
-		presetId?: string,
-	): Promise<Session> {
-		// Check if session already exists
-		const existing = this.sessions.get(worktreePath);
-		if (existing) {
-			return existing;
-		}
-
-		// Get preset configuration
-		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
-		if (!preset) {
-			preset = configurationManager.getDefaultPreset();
-		}
-
-		const command = preset.command;
-		const args = preset.args || [];
-		const commandConfig = {
-			command: preset.command,
-			args: preset.args,
-			fallbackArgs: preset.fallbackArgs,
-		};
-
-		// Spawn the process - fallback will be handled by setupExitHandler
-		const ptyProcess = await this.spawn(command, args, worktreePath);
-
-		return this.createSessionInternal(worktreePath, ptyProcess, commandConfig, {
-			isPrimaryCommand: true,
-			detectionStrategy: preset.detectionStrategy,
-		});
-	}
-
-	/**
 	 * Create session with command preset using Effect-based error handling
 	 *
 	 * @example
@@ -516,70 +478,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	getAllSessions(): Session[] {
 		return Array.from(this.sessions.values());
-	}
-
-	/**
-	 * Legacy Promise-based wrapper for createSessionWithDevcontainerEffect
-	 * @deprecated Use createSessionWithDevcontainerEffect with Effect instead
-	 * Only kept for backward compatibility in tests
-	 */
-	async createSessionWithDevcontainer(
-		worktreePath: string,
-		devcontainerConfig: DevcontainerConfig,
-		presetId?: string,
-	): Promise<Session> {
-		// Check if session already exists
-		const existing = this.sessions.get(worktreePath);
-		if (existing) {
-			return existing;
-		}
-
-		// Execute devcontainer up command first
-		try {
-			await execAsync(devcontainerConfig.upCommand, {cwd: worktreePath});
-		} catch (error) {
-			throw new Error(
-				`Failed to start devcontainer: ${error instanceof Error ? error.message : String(error)}`,
-			);
-		}
-
-		// Get preset configuration
-		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
-		if (!preset) {
-			preset = configurationManager.getDefaultPreset();
-		}
-
-		// Parse the exec command to extract arguments
-		const execParts = devcontainerConfig.execCommand.split(/\s+/);
-		const devcontainerCmd = execParts[0] || 'devcontainer'; // Should be 'devcontainer'
-		const execArgs = execParts.slice(1); // Rest of the exec command args
-
-		// Build the full command: devcontainer exec [args] -- [preset command] [preset args]
-		const fullArgs = [
-			...execArgs,
-			'--',
-			preset.command,
-			...(preset.args || []),
-		];
-
-		// Spawn the process within devcontainer - fallback will be handled by setupExitHandler
-		const ptyProcess = await this.spawn(
-			devcontainerCmd,
-			fullArgs,
-			worktreePath,
-		);
-
-		const commandConfig = {
-			command: preset.command,
-			args: preset.args,
-			fallbackArgs: preset.fallbackArgs,
-		};
-
-		return this.createSessionInternal(worktreePath, ptyProcess, commandConfig, {
-			isPrimaryCommand: true,
-			detectionStrategy: preset.detectionStrategy,
-			devcontainerConfig,
-		});
 	}
 
 	/**

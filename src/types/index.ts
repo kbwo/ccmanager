@@ -162,7 +162,6 @@ export interface IProjectManager {
 	setMode(mode: MenuMode): void;
 	selectProject(project: GitProject): void;
 	getWorktreeService(projectPath?: string): IWorktreeService;
-	refreshProjects(): Promise<void>;
 
 	// Recent projects methods
 	getRecentProjects(limit?: number): RecentProject[];

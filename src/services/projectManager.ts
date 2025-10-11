@@ -104,33 +104,6 @@ export class ProjectManager implements IProjectManager {
 		return service;
 	}
 
-	/**
-	 * Legacy Promise-based wrapper for refreshProjectsEffect
-	 * @deprecated Use refreshProjectsEffect with Effect instead
-	 * Only kept for backward compatibility in tests
-	 */
-	async refreshProjects(): Promise<void> {
-		if (!this.projectsDir) {
-			throw new Error('Projects directory not configured');
-		}
-
-		// Discover projects
-		this.projects = await this.discoverProjects(this.projectsDir);
-
-		// Update current project if it still exists
-		if (this.currentProject) {
-			const updatedProject = this.projects.find(
-				p => p.path === this.currentProject!.path,
-			);
-			if (updatedProject) {
-				this.currentProject = updatedProject;
-			} else {
-				// Current project no longer exists
-				this.currentProject = undefined;
-			}
-		}
-	}
-
 	// Helper methods
 
 	isMultiProjectEnabled(): boolean {
@@ -235,64 +208,6 @@ export class ProjectManager implements IProjectManager {
 	}
 
 	// Multi-project discovery methods
-
-	/**
-	 * Legacy Promise-based wrapper for discoverProjectsEffect
-	 * @deprecated Use discoverProjectsEffect with Effect instead
-	 * Only kept for backward compatibility in tests
-	 */
-	async discoverProjects(projectsDir: string): Promise<GitProject[]> {
-		const projects: GitProject[] = [];
-		const projectMap = new Map<string, GitProject>();
-
-		try {
-			// Verify the directory exists
-			await fs.access(projectsDir);
-
-			// Step 1: Fast concurrent directory discovery
-			const directories = await this.discoverDirectories(projectsDir);
-
-			// Step 2: Process directories in parallel to check if they're git repos
-			const results = await this.processDirectoriesInParallel(
-				directories,
-				projectsDir,
-			);
-
-			// Step 3: Create project objects (all results are valid git repos)
-			for (const result of results) {
-				// Handle name conflicts
-				let displayName = result.name;
-				if (projectMap.has(result.name)) {
-					displayName = result.relativePath.replace(/[\\/\\\\]/g, '/');
-				}
-
-				const project: GitProject = {
-					name: displayName,
-					path: result.path,
-					relativePath: result.relativePath,
-					isValid: true,
-					error: result.error,
-				};
-
-				projectMap.set(displayName, project);
-			}
-
-			// Convert to array and sort
-			projects.push(...projectMap.values());
-			projects.sort((a, b) => a.name.localeCompare(b.name));
-
-			// Cache results
-			this.projectCache.clear();
-			projects.forEach(p => this.projectCache.set(p.path, p));
-
-			return projects;
-		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-				throw new Error(`Projects directory does not exist: ${projectsDir}`);
-			}
-			throw error;
-		}
-	}
 
 	/**
 	 * Fast directory discovery - similar to ghq's approach
