@@ -19,6 +19,63 @@ import {configurationManager} from './configurationManager.js';
 
 const CLAUDE_DIR = '.claude';
 
+/**
+ * WorktreeService - Git worktree management with Effect-based error handling
+ *
+ * All public methods return Effect types for type-safe, composable error handling.
+ * See CLAUDE.md for complete examples and patterns.
+ *
+ * ## Effect-ts Resources
+ * - Effect Type: https://effect.website/docs/effect/effect-type
+ * - Error Management: https://effect.website/docs/error-management/error-handling
+ * - Effect Execution: https://effect.website/docs/guides/running-effects
+ * - Tagged Errors: https://effect.website/docs/error-management/expected-errors#tagged-errors
+ *
+ * ## Key Concepts
+ * - All operations return `Effect.Effect<T, E, never>` where T is success type, E is error type
+ * - Execute Effects with `Effect.runPromise()` or `Effect.match()` for type-safe handling
+ * - Use error discrimination via `error._tag` property for TypeScript type narrowing
+ * - Compose Effects with `Effect.flatMap()`, `Effect.all()`, `Effect.catchTag()`, etc.
+ *
+ * @example Basic worktree query
+ * ```typescript
+ * const service = new WorktreeService();
+ * const worktrees = await Effect.runPromise(service.getWorktreesEffect());
+ * ```
+ *
+ * @example Error handling with Effect.match
+ * ```typescript
+ * const result = await Effect.runPromise(
+ *   Effect.match(service.getWorktreesEffect(), {
+ *     onFailure: (error: GitError) => ({ type: 'error', error }),
+ *     onSuccess: (worktrees) => ({ type: 'success', data: worktrees })
+ *   })
+ * );
+ * ```
+ *
+ * @example Error discrimination with _tag
+ * ```typescript
+ * try {
+ *   await Effect.runPromise(service.createWorktreeEffect(...));
+ * } catch (error) {
+ *   if (error._tag === 'GitError') {
+ *     console.error(`Git failed: ${error.stderr}`);
+ *   } else if (error._tag === 'FileSystemError') {
+ *     console.error(`FS failed: ${error.cause}`);
+ *   }
+ * }
+ * ```
+ *
+ * @example Parallel queries with Effect.all
+ * ```typescript
+ * const [branches, defaultBranch] = await Effect.runPromise(
+ *   Effect.all([
+ *     service.getAllBranchesEffect(),
+ *     service.getDefaultBranchEffect()
+ *   ], { concurrency: 2 })
+ * );
+ * ```
+ */
 export class WorktreeService {
 	private rootPath: string;
 	private gitRootPath: string;

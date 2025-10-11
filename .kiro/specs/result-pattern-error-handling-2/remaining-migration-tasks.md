@@ -191,27 +191,30 @@ During verification of the migration completion, legacy non-Effect code was disc
     - Test for Effect.match pattern usage
     - Total: 7 tests passing in NewWorktree.test.tsx
 
-- [ ] 8. Update documentation
-- [ ] 8.1 Update CLAUDE.md with final Effect patterns
+- [x] 8. Update documentation
+- [x] 8.1 Update CLAUDE.md with final Effect patterns
   - Remove any references to legacy synchronous methods
   - Add examples of Effect.all for parallel branch queries
   - Document complete Error flow with no legacy fallbacks
   - Update "Complete Error Flow Example" to remove legacy patterns
   - _Related to: Requirement 11.2, 11.5_
+  - **COMPLETED**: Updated CLAUDE.md with Effect-based method names, added parallel branch query examples, updated Active Specifications section
 
-- [ ] 8.2 Add migration completion notes to architecture documentation
+- [x] 8.2 Add migration completion notes to architecture documentation
   - Document that WorktreeService is fully Effect-based
   - Note that all try-catch blocks replaced with Effect.try
   - List any remaining synchronous helpers and justification
   - Add date of migration completion
   - _Related to: Requirement 11.2, 11.6_
+  - **COMPLETED**: Created `/workspace/docs/effect-error-handling-migration.md` with comprehensive migration summary, benefits, patterns, and completion date (October 2025)
 
-- [ ] 8.3 Update JSDoc examples for new Effect-based methods
+- [x] 8.3 Update JSDoc examples for new Effect-based methods
   - Ensure all Effect-returning methods have complete @example tags
   - Include both Effect.runPromise and Effect.match patterns
   - Show error discrimination with _tag property
   - Reference Effect-ts documentation links
   - _Related to: Requirement 11.3, 11.4, 11.5_
+  - **COMPLETED**: Added comprehensive class-level JSDoc to WorktreeService with 4 Effect-ts documentation links and multiple usage examples
 
 - [ ] 9. Final verification
 - [ ] 9.1 Run full test suite to ensure all tests pass

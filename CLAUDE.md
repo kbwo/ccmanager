@@ -241,11 +241,15 @@ function handleError(error: AppError): string {
 
 ### Effect Usage in Services
 
-Service methods return Effect types to make errors explicit:
+All service methods return Effect types to make errors explicit. **Note:** Legacy synchronous methods have been removed - all operations use Effect-based methods:
 
 ```typescript
 class WorktreeService {
-  getWorktrees(): Effect.Effect<Worktree[], GitError, never> {
+  /**
+   * Get all worktrees using Effect-based error handling.
+   * Returns Effect that must be executed with Effect.runPromise or Effect.match.
+   */
+  getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never> {
     return Effect.tryPromise({
       try: async () => {
         const result = await execFile('git', ['worktree', 'list', '--porcelain']);
@@ -259,7 +263,11 @@ class WorktreeService {
     });
   }
 
-  createWorktree(
+  /**
+   * Create a new worktree with Effect composition.
+   * Chains path validation and worktree creation into a single Effect.
+   */
+  createWorktreeEffect(
     branchName: string,
     path: string
   ): Effect.Effect<Worktree, GitError | FileSystemError, never> {
@@ -277,6 +285,45 @@ class WorktreeService {
         })
       })
     );
+  }
+
+  /**
+   * Get default branch using Effect-based error handling.
+   * Includes fallback logic for main/master detection.
+   */
+  getDefaultBranchEffect(): Effect.Effect<string, GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['symbolic-ref', 'refs/remotes/origin/HEAD']);
+        const branch = result.stdout.trim().replace('refs/remotes/origin/', '');
+        return branch || 'main';
+      },
+      catch: (error: any) => new GitError({
+        command: 'git symbolic-ref',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
+  }
+
+  /**
+   * Get all branches using Effect-based error handling.
+   * Returns empty array on failure (non-critical operation).
+   */
+  getAllBranchesEffect(): Effect.Effect<string[], GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['branch', '-a']);
+        return result.stdout.split('\n')
+          .map(b => b.trim())
+          .filter(b => b.length > 0);
+      },
+      catch: (error: any) => new GitError({
+        command: 'git branch',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
   }
 }
 ```
@@ -514,12 +561,37 @@ const sequential = Effect.flatMap(
   )
 );
 
-// Parallel execution
+// Parallel execution with git status
 const parallel = Effect.all([
   getGitStatus(path1),
   getGitStatus(path2),
   getGitStatus(path3)
 ], { concurrency: 3 });
+
+// Parallel branch queries - load all branches and default branch simultaneously
+const loadBranchData = Effect.all([
+  worktreeService.getAllBranchesEffect(),
+  worktreeService.getDefaultBranchEffect()
+], { concurrency: 2 });
+
+// Execute parallel branch queries in component
+const result = await Effect.runPromise(
+  Effect.match(loadBranchData, {
+    onFailure: (error: GitError) => ({
+      type: 'error' as const,
+      message: `Failed to load branch data: ${error.stderr}`
+    }),
+    onSuccess: ([branches, defaultBranch]) => ({
+      type: 'success' as const,
+      data: { branches, defaultBranch }
+    })
+  })
+);
+
+if (result.type === 'success') {
+  console.log(`Loaded ${result.data.branches.length} branches`);
+  console.log(`Default branch: ${result.data.defaultBranch}`);
+}
 
 // Conditional execution
 const conditional = Effect.if(
@@ -1163,7 +1235,17 @@ const recentProjects = await projectManager.getRecentProjects();
 
 ## Active Specifications
 
-- **result-pattern-error-handling-2**: Replace try-catch based error handling with Result pattern for more effective and type-safe error management
+- **result-pattern-error-handling-2**: ✅ **COMPLETED** (Migration completed: October 2025)
+  - All WorktreeService methods migrated to Effect-based error handling
+  - Legacy synchronous methods removed (`getWorktrees()`, `getDefaultBranch()`, `getAllBranches()`)
+  - All try-catch blocks replaced with `Effect.try` or `Effect.tryPromise`
+  - Components updated to use `Effect.match` and `Effect.runPromise` patterns
+  - Comprehensive tests added for all Effect-based methods
+  - Remaining synchronous helpers documented with clear justification:
+    - `getAllRemotes()`: Simple utility for `resolveBranchReference`, no Effect needed
+    - `resolveBranchReference()`: Called within Effect.gen but doesn't need to be Effect itself
+    - `copyClaudeSessionData()`: Wrapped in Effect.try when called, keeping implementation simple
+    - `getCurrentBranch()`: Marked @deprecated, only used as fallback in `getWorktreesEffect`
 
 ## Future Enhancements
 
