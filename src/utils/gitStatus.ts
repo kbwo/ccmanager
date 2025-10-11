@@ -4,10 +4,7 @@ import {Cause, Effect, Either, Exit, Option} from 'effect';
 import {pipe} from 'effect/Function';
 import {GitError} from '../types/errors.js';
 import {getWorktreeParentBranch} from './worktreeConfig.js';
-import {
-	createConcurrencyLimited,
-	createEffectConcurrencyLimited,
-} from './concurrencyLimit.js';
+import {createEffectConcurrencyLimited} from './concurrencyLimit.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,13 +14,6 @@ export interface GitStatus {
 	aheadCount: number;
 	behindCount: number;
 	parentBranch: string | null;
-}
-
-export interface GitOperationResult<T> {
-	success: boolean;
-	data?: T;
-	error?: string;
-	skipped?: boolean;
 }
 
 interface ExecResult {
@@ -76,52 +66,6 @@ export const getGitStatus = (
 
 export const getGitStatusLimited = createEffectConcurrencyLimited(
 	(worktreePath: string) => getGitStatus(worktreePath),
-	10,
-);
-
-/**
- * Temporary adapter for legacy promise-based callers
- */
-export async function getGitStatusLegacy(
-	worktreePath: string,
-	signal?: AbortSignal,
-): Promise<GitOperationResult<GitStatus>> {
-	const exit = await Effect.runPromiseExit(getGitStatus(worktreePath), {
-		signal,
-	});
-
-	if (Exit.isSuccess(exit)) {
-		return {
-			success: true,
-			data: exit.value,
-		};
-	}
-
-	if (Exit.isInterrupted(exit)) {
-		return {
-			success: false,
-			skipped: true,
-			error: 'Git status request was interrupted',
-		};
-	}
-
-	const failure = Cause.failureOption(exit.cause);
-	if (Option.isSome(failure)) {
-		const gitError = failure.value;
-		return {
-			success: false,
-			error: gitErrorToMessage(gitError),
-		};
-	}
-
-	return {
-		success: false,
-		error: Cause.pretty(exit.cause),
-	};
-}
-
-export const getGitStatusLegacyLimited = createConcurrencyLimited(
-	getGitStatusLegacy,
 	10,
 );
 

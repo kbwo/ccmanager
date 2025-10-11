@@ -6,7 +6,6 @@ import {
 	formatGitAheadBehind,
 	formatParentBranch,
 	getGitStatus,
-	getGitStatusLegacy,
 	type GitStatus,
 } from './gitStatus.js';
 import {exec} from 'child_process';
@@ -101,10 +100,6 @@ describe('GitService Integration Tests', {timeout: 10000}, () => {
 			results.forEach(result => {
 				expect(result).toEqual(firstData);
 			});
-
-			const legacyResult = await getGitStatusLegacy(tmpDir);
-			expect(legacyResult.success).toBe(true);
-			expect(legacyResult.data).toEqual(firstData);
 		} finally {
 			// Cleanup
 			fs.rmSync(tmpDir, {recursive: true, force: true});
