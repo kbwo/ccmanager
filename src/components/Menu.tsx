@@ -105,16 +105,27 @@ const Menu: React.FC<MenuProps> = ({
 	useEffect(() => {
 		let cancelled = false;
 
-		// Load worktrees using Effect-based method with Effect.match for type-safe handling
+		// Load worktrees and default branch using Effect composition
+		// Chain getWorktreesEffect and getDefaultBranchEffect using Effect.flatMap
+		const loadWorktreesAndBranch = Effect.flatMap(
+			worktreeService.getWorktreesEffect(),
+			worktrees =>
+				Effect.map(worktreeService.getDefaultBranchEffect(), defaultBranch => ({
+					worktrees,
+					defaultBranch,
+				})),
+		);
+
 		Effect.runPromise(
-			Effect.match(worktreeService.getWorktreesEffect(), {
+			Effect.match(loadWorktreesAndBranch, {
 				onFailure: (error: GitError) => ({
 					success: false as const,
 					error,
 				}),
-				onSuccess: worktrees => ({
+				onSuccess: ({worktrees, defaultBranch}) => ({
 					success: true as const,
 					worktrees,
+					defaultBranch,
 				}),
 			}),
 		)
@@ -122,7 +133,7 @@ const Menu: React.FC<MenuProps> = ({
 				if (!cancelled) {
 					if (result.success) {
 						setBaseWorktrees(result.worktrees);
-						setDefaultBranch(worktreeService.getDefaultBranch());
+						setDefaultBranch(result.defaultBranch);
 						setLoadError(null);
 
 						// Update sessions after worktrees are loaded

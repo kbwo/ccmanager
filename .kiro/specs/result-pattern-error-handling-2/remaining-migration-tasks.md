@@ -51,8 +51,8 @@ During verification of the migration completion, legacy non-Effect code was disc
   - _Location: src/utils/hookExecutor.ts:194_
   - _Related to: Requirement 6.3, 3.4_
 
-- [ ] 3. Migrate Menu component to use Effect-based branch methods
-- [ ] 3.1 Update Menu.tsx to use `getDefaultBranchEffect()`
+- [x] 3. Migrate Menu component to use Effect-based branch methods
+- [x] 3.1 Update Menu.tsx to use `getDefaultBranchEffect()`
   - Replace `worktreeService.getDefaultBranch()` call on line 125
   - Execute Effect within existing Effect.match block (after getWorktreesEffect)
   - Use Effect.flatMap to chain worktrees and defaultBranch loading
