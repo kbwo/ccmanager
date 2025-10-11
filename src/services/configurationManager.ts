@@ -326,7 +326,8 @@ export class ConfigurationManager {
 
 	/**
 	 * Load configuration from file with Effect-based error handling
-	 * Returns Effect that may fail with FileSystemError or ConfigError
+	 *
+	 * @returns Effect<ConfigurationData, FileSystemError | ConfigError, never> - Configuration data on success, errors on failure
 	 */
 	loadConfigEffect(): Effect.Effect<
 		ConfigurationData,
@@ -366,7 +367,8 @@ export class ConfigurationManager {
 
 	/**
 	 * Save configuration to file with Effect-based error handling
-	 * Returns Effect that may fail with FileSystemError
+	 *
+	 * @returns Effect<void, FileSystemError, never> - Void on success, FileSystemError on write failure
 	 */
 	saveConfigEffect(
 		config: ConfigurationData,
@@ -453,6 +455,8 @@ export class ConfigurationManager {
 
 	/**
 	 * Set shortcuts with Effect-based error handling
+	 *
+	 * @returns Effect<void, FileSystemError, never> - Void on success, FileSystemError on save failure
 	 */
 	setShortcutsEffect(
 		shortcuts: ShortcutConfig,

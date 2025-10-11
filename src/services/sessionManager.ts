@@ -156,6 +156,17 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	/**
 	 * Create session with command preset using Effect-based error handling
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(sessionManager.createSessionWithPresetEffect('/path/to/worktree'), {
+	 *     onFailure: (error) => ({ type: 'error', message: error.message }),
+	 *     onSuccess: (session) => ({ type: 'success', data: session })
+	 *   })
+	 * );
+	 * ```
+	 *
 	 * @returns Effect that may fail with ProcessError (spawn failure) or ConfigError (invalid preset)
 	 */
 	createSessionWithPresetEffect(
@@ -430,6 +441,17 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	/**
 	 * Terminate session and cleanup resources using Effect-based error handling
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(sessionManager.terminateSessionEffect('/path/to/worktree'), {
+	 *     onFailure: (error) => ({ type: 'error', message: error.message }),
+	 *     onSuccess: () => ({ type: 'success' })
+	 *   })
+	 * );
+	 * ```
+	 *
 	 * @returns Effect that may fail with ProcessError if session does not exist or cleanup fails
 	 */
 	terminateSessionEffect(

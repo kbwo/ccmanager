@@ -4,6 +4,7 @@ import {expect, describe, it, vi, beforeEach, afterEach} from 'vitest';
 import ProjectList from './ProjectList.js';
 import {projectManager} from '../services/projectManager.js';
 import {GitProject} from '../types/index.js';
+import {Effect} from 'effect';
 
 // Type for the key parameter in useInput
 type InputKey = {
@@ -53,7 +54,7 @@ vi.mock('ink-select-input', async () => {
 vi.mock('../services/projectManager.js', () => ({
 	projectManager: {
 		instance: {
-			discoverProjects: vi.fn(),
+			discoverProjectsEffect: vi.fn(),
 		},
 		getRecentProjects: vi.fn(),
 	},
@@ -81,8 +82,8 @@ describe('ProjectList - Recent Projects', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue(
-			mockProjects,
+		vi.mocked(projectManager.instance.discoverProjectsEffect).mockReturnValue(
+			Effect.succeed(mockProjects),
 		);
 		vi.mocked(projectManager.getRecentProjects).mockReturnValue([]);
 
@@ -215,8 +216,8 @@ describe('ProjectList - Recent Projects', () => {
 		);
 
 		// Mock discovered projects
-		vi.mocked(projectManager.instance.discoverProjects).mockResolvedValue(
-			manyProjects,
+		vi.mocked(projectManager.instance.discoverProjectsEffect).mockReturnValue(
+			Effect.succeed(manyProjects),
 		);
 
 		// Mock more than 5 recent projects
