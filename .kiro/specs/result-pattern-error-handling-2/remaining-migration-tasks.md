@@ -42,8 +42,8 @@ During verification of the migration completion, legacy non-Effect code was disc
   - Add JSDoc with @example showing Effect usage
   - _Related to: Requirement 5.1, 5.5_
 
-- [ ] 2. Migrate hookExecutor.ts to use Effect-based methods
-- [ ] 2.1 Update `executeStatusHook()` to use `getWorktreesEffect()`
+- [x] 2. Migrate hookExecutor.ts to use Effect-based methods
+- [x] 2.1 Update `executeStatusHook()` to use `getWorktreesEffect()`
   - Replace `worktreeService.getWorktrees()` call on line 194
   - Use Effect.gen or Effect.flatMap to compose with existing Effect
   - Maintain hook execution flow (errors should not break main flow)

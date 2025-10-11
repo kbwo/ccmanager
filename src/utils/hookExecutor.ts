@@ -189,30 +189,43 @@ export function executeStatusHook(
 		return Effect.void;
 	}
 
-	// Get branch information
 	const worktreeService = new WorktreeService();
-	const worktrees = worktreeService.getWorktrees();
-	const worktree = worktrees.find(wt => wt.path === session.worktreePath);
-	const branch = worktree?.branch || 'unknown';
 
-	// Build environment for status hook
-	const environment: HookEnvironment = {
-		CCMANAGER_WORKTREE_PATH: session.worktreePath,
-		CCMANAGER_WORKTREE_BRANCH: branch,
-		CCMANAGER_GIT_ROOT: session.worktreePath, // For status hooks, we use worktree path as cwd
-		CCMANAGER_OLD_STATE: oldState,
-		CCMANAGER_NEW_STATE: newState,
-		CCMANAGER_SESSION_ID: session.id,
-	};
+	return Effect.gen(function* () {
+		// Get branch information using Effect-based method
+		const worktrees = yield* Effect.catchAll(
+			worktreeService.getWorktreesEffect(),
+			error => {
+				// Log error but continue with empty array - hooks should not break main flow
+				console.error(
+					`Failed to get worktrees for status hook: ${error.message || String(error)}`,
+				);
+				return Effect.succeed([]);
+			},
+		);
 
-	return Effect.catchAll(
-		executeHook(hook.command, session.worktreePath, environment),
-		error => {
-			// Log error but don't throw - hooks should not break the main flow
-			console.error(`Failed to execute ${newState} hook: ${error.message}`);
-			return Effect.void;
-		},
-	);
+		const worktree = worktrees.find(wt => wt.path === session.worktreePath);
+		const branch = worktree?.branch || 'unknown';
+
+		// Build environment for status hook
+		const environment: HookEnvironment = {
+			CCMANAGER_WORKTREE_PATH: session.worktreePath,
+			CCMANAGER_WORKTREE_BRANCH: branch,
+			CCMANAGER_GIT_ROOT: session.worktreePath, // For status hooks, we use worktree path as cwd
+			CCMANAGER_OLD_STATE: oldState,
+			CCMANAGER_NEW_STATE: newState,
+			CCMANAGER_SESSION_ID: session.id,
+		};
+
+		yield* Effect.catchAll(
+			executeHook(hook.command, session.worktreePath, environment),
+			error => {
+				// Log error but don't throw - hooks should not break the main flow
+				console.error(`Failed to execute ${newState} hook: ${error.message}`);
+				return Effect.void;
+			},
+		);
+	});
 }
 
 /**

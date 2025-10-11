@@ -1,4 +1,5 @@
 import {describe, it, expect, vi} from 'vitest';
+import {Effect} from 'effect';
 import {
 	executeHookLegacy as executeHook,
 	executeWorktreePostCreationHookLegacy as executeWorktreePostCreationHook,
@@ -10,6 +11,7 @@ import {join} from 'path';
 import type {SessionState, Session} from '../types/index.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {GitError} from '../types/errors.js';
 
 // Mock the configurationManager
 vi.mock('../services/configurationManager.js', () => ({
@@ -343,14 +345,16 @@ describe('hookExecutor Integration Tests', () => {
 			vi.mocked(WorktreeService).mockImplementation(
 				() =>
 					({
-						getWorktrees: vi.fn(() => [
-							{
-								path: tmpDir,
-								branch: 'test-branch',
-								isMainWorktree: false,
-								hasSession: true,
-							},
-						]),
+						getWorktreesEffect: vi.fn(() =>
+							Effect.succeed([
+								{
+									path: tmpDir,
+									branch: 'test-branch',
+									isMainWorktree: false,
+									hasSession: true,
+								},
+							]),
+						),
 					}) as unknown as InstanceType<typeof WorktreeService>,
 			);
 
@@ -404,14 +408,16 @@ describe('hookExecutor Integration Tests', () => {
 			vi.mocked(WorktreeService).mockImplementation(
 				() =>
 					({
-						getWorktrees: vi.fn(() => [
-							{
-								path: tmpDir,
-								branch: 'test-branch',
-								isMainWorktree: false,
-								hasSession: true,
-							},
-						]),
+						getWorktreesEffect: vi.fn(() =>
+							Effect.succeed([
+								{
+									path: tmpDir,
+									branch: 'test-branch',
+									isMainWorktree: false,
+									hasSession: true,
+								},
+							]),
+						),
 					}) as unknown as InstanceType<typeof WorktreeService>,
 			);
 
@@ -464,14 +470,16 @@ describe('hookExecutor Integration Tests', () => {
 			vi.mocked(WorktreeService).mockImplementation(
 				() =>
 					({
-						getWorktrees: vi.fn(() => [
-							{
-								path: tmpDir,
-								branch: 'test-branch',
-								isMainWorktree: false,
-								hasSession: true,
-							},
-						]),
+						getWorktreesEffect: vi.fn(() =>
+							Effect.succeed([
+								{
+									path: tmpDir,
+									branch: 'test-branch',
+									isMainWorktree: false,
+									hasSession: true,
+								},
+							]),
+						),
 					}) as unknown as InstanceType<typeof WorktreeService>,
 			);
 
@@ -491,6 +499,71 @@ describe('hookExecutor Integration Tests', () => {
 
 				// Assert - file should not exist because hook was disabled
 				await expect(readFile(outputFile, 'utf-8')).rejects.toThrow();
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+
+		it('should handle getWorktreesEffect failures gracefully', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'status-hook-test-'));
+			const outputFile = join(tmpDir, 'hook-output.txt');
+
+			const mockSession = {
+				id: 'test-session-failure',
+				worktreePath: tmpDir,
+				process: {} as unknown as Session['process'],
+				terminal: {} as unknown as Session['terminal'],
+				output: [],
+				outputHistory: [],
+				state: 'idle' as SessionState,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+				lastActivity: new Date(),
+				isActive: true,
+			} satisfies Session;
+
+			// Mock WorktreeService to fail with GitError
+			vi.mocked(WorktreeService).mockImplementation(
+				() =>
+					({
+						getWorktreesEffect: vi.fn(() =>
+							Effect.fail(
+								new GitError({
+									command: 'git worktree list --porcelain',
+									exitCode: 128,
+									stderr: 'not a git repository',
+								}),
+							),
+						),
+					}) as unknown as InstanceType<typeof WorktreeService>,
+			);
+
+			// Configure mock to return a hook that should execute despite worktree query failure
+			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
+				busy: {
+					enabled: true,
+					command: `echo "Hook ran with branch: $CCMANAGER_WORKTREE_BRANCH" > "${outputFile}"`,
+				},
+				idle: {enabled: false, command: ''},
+				waiting_input: {enabled: false, command: ''},
+			});
+
+			try {
+				// Act - should not throw even when getWorktreesEffect fails
+				await expect(
+					executeStatusHook('idle', 'busy', mockSession),
+				).resolves.toBeUndefined();
+
+				// Assert - hook should have executed with 'unknown' branch
+				const content = await readFile(outputFile, 'utf-8');
+				expect(content.trim()).toBe('Hook ran with branch: unknown');
 			} finally {
 				// Cleanup
 				await rm(tmpDir, {recursive: true});
