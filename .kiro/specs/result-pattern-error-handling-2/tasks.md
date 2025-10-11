@@ -164,7 +164,7 @@
   - _Requirements: 8.1, 8.5, 8.6, 7.5_
 
 - [ ] 5. Complete migration with testing and cleanup
-- [ ] 5.1 Update test suites for Effect-based implementations
+- [x] 5.1 Update test suites for Effect-based implementations
   - Migrate utility layer tests to use Effect.runSync for success cases
   - Update service layer tests to verify Effect types are returned
   - Test error cases using Effect.runSync or Either pattern matching
