@@ -136,7 +136,7 @@ During verification of the migration completion, legacy non-Effect code was disc
     - `resolveBranchReference()`: Called within Effect.gen but doesn't need to be Effect itself
     - `copyClaudeSessionData()`: Wrapped in Effect.try when called, keeping implementation simple
 
-- [ ] 7. Update tests to verify migration completeness
+- [x] 7. Update tests to verify migration completeness
 - [x] 7.1 Update WorktreeService tests for new Effect-based methods
   - Add tests for `getDefaultBranchEffect()`
   - Add tests for `getAllBranchesEffect()`
@@ -151,25 +151,45 @@ During verification of the migration completion, legacy non-Effect code was disc
     - All tests use Effect.runPromise for execution
     - Total: 35 tests passing in worktreeService.test.ts
 
-- [ ] 7.2 Update hookExecutor tests for Effect composition
+- [x] 7.2 Update hookExecutor tests for Effect composition
   - Verify executeStatusHook uses getWorktreesEffect
   - Test error handling with GitError from worktree query
   - Verify hooks don't break main flow on worktree query failure
   - _Related to: Requirement 10.1, 10.2, 6.3_
+  - **COMPLETED**: Tests already comprehensive - verified Effect composition:
+    - Test on line 508-571: Verifies `getWorktreesEffect` failures handled gracefully
+    - Confirms hooks don't break main flow on worktree query failure
+    - Tests verify GitError from worktree query is caught and logged
+    - Hook executes with 'unknown' branch when worktree query fails
 
-- [ ] 7.3 Update Menu component tests for Effect integration
+- [x] 7.3 Update Menu component tests for Effect integration
   - Test branch loading with Effect.match pattern
   - Test error display when getDefaultBranchEffect fails
   - Verify loading state management during Effect execution
   - Test Effect composition with getWorktreesEffect
   - _Related to: Requirement 10.1, 10.2, 8.1_
+  - **COMPLETED**: Updated tests to use Effect-based methods:
+    - Updated mock to use `getDefaultBranchEffect()` instead of legacy `getDefaultBranch()`
+    - Added test for `getDefaultBranchEffect` failure and error display
+    - Added test verifying Effect composition of worktrees and defaultBranch
+    - Removed all legacy method mocks from tests
+    - Total: 8 tests passing in Menu.test.tsx
 
-- [ ] 7.4 Update NewWorktree component tests for Effect integration
+- [x] 7.4 Update NewWorktree component tests for Effect integration
   - Test branch initialization with useEffect and Effect.all
   - Test loading state display during branch queries
   - Test error handling when branch queries fail
   - Verify component behavior with empty branch list
   - _Related to: Requirement 10.1, 10.2, 8.1_
+  - **COMPLETED**: Created comprehensive test file (NewWorktree.test.tsx):
+    - Test for loading indicator during branch initialization
+    - Test for error display when `getAllBranchesEffect` fails with GitError
+    - Test for successful parallel branch loading via Effect.all
+    - Test for `getDefaultBranchEffect` failure and error display
+    - Test for empty branch list handling
+    - Test for branches displayed after successful loading
+    - Test for Effect.match pattern usage
+    - Total: 7 tests passing in NewWorktree.test.tsx
 
 - [ ] 8. Update documentation
 - [ ] 8.1 Update CLAUDE.md with final Effect patterns

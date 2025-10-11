@@ -155,7 +155,10 @@ describe('Menu component Effect-based error handling', () => {
 		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
 			Effect.succeed(mockWorktrees),
 		);
-		vi.spyOn(worktreeService, 'getDefaultBranch').mockReturnValue('main');
+		// Mock getDefaultBranchEffect to return successful Effect
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
+		);
 
 		const {lastFrame} = render(
 			<Menu
@@ -174,6 +177,97 @@ describe('Menu component Effect-based error handling', () => {
 		expect(output).toContain('main');
 		expect(output).toContain('feature-branch');
 	});
+
+	it('should handle GitError from getDefaultBranchEffect and display error message', async () => {
+		const {Effect} = await import('effect');
+		const {GitError} = await import('../types/errors.js');
+
+		const onSelectWorktree = vi.fn();
+		const onDismissError = vi.fn();
+
+		const mockWorktrees = [
+			{
+				path: '/test/main',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+		];
+
+		// Mock getWorktreesEffect to succeed
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed(mockWorktrees),
+		);
+
+		// Mock getDefaultBranchEffect to fail
+		const gitError = new GitError({
+			command: 'git symbolic-ref refs/remotes/origin/HEAD',
+			exitCode: 128,
+			stderr: 'fatal: ref refs/remotes/origin/HEAD is not a symbolic ref',
+			stdout: '',
+		});
+
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.fail(gitError),
+		);
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+				onDismissError={onDismissError}
+			/>,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Should display error with GitError information
+		expect(output).toContain('Error:');
+		expect(output).toContain('git symbolic-ref');
+		expect(output).toContain('fatal: ref refs/remotes/origin/HEAD is not a symbolic ref');
+	});
+
+	it('should use Effect composition to load worktrees and default branch together', async () => {
+		const {Effect} = await import('effect');
+
+		const onSelectWorktree = vi.fn();
+
+		const mockWorktrees = [
+			{
+				path: '/test/main',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+		];
+
+		// Track that both Effects are called
+		const getWorktreesSpy = vi
+			.spyOn(worktreeService, 'getWorktreesEffect')
+			.mockReturnValue(Effect.succeed(mockWorktrees));
+		const getDefaultBranchSpy = vi
+			.spyOn(worktreeService, 'getDefaultBranchEffect')
+			.mockReturnValue(Effect.succeed('main'));
+
+		render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+			/>,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Verify both Effect-based methods were called (Effect composition)
+		expect(getWorktreesSpy).toHaveBeenCalled();
+		expect(getDefaultBranchSpy).toHaveBeenCalled();
+	});
 });
 
 describe('Menu component rendering', () => {
@@ -184,10 +278,12 @@ describe('Menu component rendering', () => {
 		const {Effect} = await import('effect');
 		sessionManager = new SessionManager();
 		worktreeService = new WorktreeService();
-		// Mock both legacy and Effect-based methods
-		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue([]);
+		// Mock Effect-based methods
 		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
 			Effect.succeed([]),
+		);
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
 		);
 		vi.spyOn(sessionManager, 'getAllSessions').mockReturnValue([]);
 		// Mock EventEmitter methods
@@ -308,7 +404,6 @@ describe('Menu component rendering', () => {
 			{name: 'Project C', path: '/test/project-c', lastAccessed: Date.now()},
 		];
 
-		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue(mockWorktrees);
 		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
 			Effect.succeed(mockWorktrees),
 		);
@@ -373,7 +468,6 @@ describe('Menu component rendering', () => {
 			{name: 'Project B', path: '/test/project-b', lastAccessed: Date.now()},
 		];
 
-		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue(mockWorktrees);
 		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
 			Effect.succeed(mockWorktrees),
 		);
