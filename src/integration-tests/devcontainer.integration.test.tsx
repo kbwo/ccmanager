@@ -1,4 +1,5 @@
 import {describe, it, expect, vi, beforeEach} from 'vitest';
+import {Effect} from 'effect';
 import {SessionManager} from '../services/sessionManager.js';
 import {DevcontainerConfig} from '../types/index.js';
 import {spawn, IPty} from 'node-pty';
@@ -110,9 +111,11 @@ describe('Devcontainer Integration', () => {
 			},
 		);
 
-		await sessionManager.createSessionWithDevcontainer(
-			'/test/worktree',
-			devcontainerConfig,
+		await Effect.runPromise(
+			sessionManager.createSessionWithDevcontainerEffect(
+				'/test/worktree',
+				devcontainerConfig,
+			),
 		);
 
 		expect(mockExec).toHaveBeenCalledWith(
@@ -146,9 +149,11 @@ describe('Devcontainer Integration', () => {
 			},
 		);
 
-		await sessionManager.createSessionWithDevcontainer(
-			'/test/worktree',
-			devcontainerConfig,
+		await Effect.runPromise(
+			sessionManager.createSessionWithDevcontainerEffect(
+				'/test/worktree',
+				devcontainerConfig,
+			),
 		);
 
 		// Should spawn with devcontainer exec command

@@ -92,7 +92,7 @@ describe('ProjectManager', () => {
 				}),
 			};
 
-			await projectManager.refreshProjects();
+			await Effect.runPromise(projectManager.refreshProjectsEffect());
 
 			expect(projectManager.projects).toHaveLength(2);
 			expect(projectManager.projects[0]).toMatchObject({
@@ -112,9 +112,20 @@ describe('ProjectManager', () => {
 				access: vi.fn().mockRejectedValue({code: 'ENOENT'}),
 			};
 
-			await expect(projectManager.refreshProjects()).rejects.toThrow(
-				`Projects directory does not exist: ${mockProjectsDir}`,
+			const result = await Effect.runPromise(
+				Effect.either(projectManager.refreshProjectsEffect()),
 			);
+
+			expect(Either.isLeft(result)).toBe(true);
+			if (Either.isLeft(result)) {
+				const error = result.left;
+				expect(error._tag).toBe('FileSystemError');
+				if (error._tag === 'FileSystemError') {
+					expect(error.cause).toContain(
+						`Projects directory does not exist: ${mockProjectsDir}`,
+					);
+				}
+			}
 		});
 	});
 

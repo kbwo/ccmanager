@@ -341,7 +341,9 @@ describe('SessionManager Effect-based Operations', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session
-			await sessionManager.createSessionWithPreset('/test/worktree');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Terminate session - should return Effect
 			const effect = sessionManager.terminateSessionEffect('/test/worktree');
@@ -381,7 +383,9 @@ describe('SessionManager Effect-based Operations', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session
-			await sessionManager.createSessionWithPreset('/test/worktree');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Mock kill to throw error
 			mockPty.kill.mockImplementation(() => {

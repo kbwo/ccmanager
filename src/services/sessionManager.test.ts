@@ -1,4 +1,5 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
+import {Effect} from 'effect';
 import {spawn, IPty} from 'node-pty';
 import {EventEmitter} from 'events';
 import {Session, DevcontainerConfig} from '../types/index.js';
@@ -81,7 +82,7 @@ describe('SessionManager', () => {
 		sessionManager.destroy();
 	});
 
-	describe('createSessionWithPreset', () => {
+	describe('createSessionWithPresetEffect', () => {
 		it('should use default preset when no preset ID specified', async () => {
 			// Setup mock preset
 			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
@@ -95,7 +96,9 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session with preset
-			await sessionManager.createSessionWithPreset('/test/worktree');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Verify spawn was called with preset config
 			expect(spawn).toHaveBeenCalledWith('claude', ['--preset-arg'], {
@@ -121,7 +124,9 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session with specific preset
-			await sessionManager.createSessionWithPreset('/test/worktree', '2');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree', '2'),
+			);
 
 			// Verify getPresetById was called with correct ID
 			expect(configurationManager.getPresetById).toHaveBeenCalledWith('2');
@@ -149,7 +154,9 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session with non-existent preset
-			await sessionManager.createSessionWithPreset('/test/worktree', 'invalid');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree', 'invalid'),
+			);
 
 			// Verify fallback to default preset
 			expect(configurationManager.getDefaultPreset).toHaveBeenCalled();
@@ -171,9 +178,11 @@ describe('SessionManager', () => {
 				throw new Error('Command failed');
 			});
 
-			// Expect createSessionWithPreset to throw
+			// Expect createSessionWithPresetEffect to throw
 			await expect(
-				sessionManager.createSessionWithPreset('/test/worktree'),
+				Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				),
 			).rejects.toThrow('Command failed');
 
 			// Verify only one spawn attempt was made
@@ -197,10 +206,12 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session twice
-			const session1 =
-				await sessionManager.createSessionWithPreset('/test/worktree');
-			const session2 =
-				await sessionManager.createSessionWithPreset('/test/worktree');
+			const session1 = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			const session2 = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Should return the same session
 			expect(session1).toBe(session2);
@@ -223,9 +234,11 @@ describe('SessionManager', () => {
 				throw new Error('Command not found');
 			});
 
-			// Expect createSessionWithPreset to throw the original error
+			// Expect createSessionWithPresetEffect to throw the original error
 			await expect(
-				sessionManager.createSessionWithPreset('/test/worktree'),
+				Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				),
 			).rejects.toThrow('Command not found');
 		});
 
@@ -250,7 +263,9 @@ describe('SessionManager', () => {
 
 			// Create session
 			const session =
-				await sessionManager.createSessionWithPreset('/test/worktree');
+				await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Verify initial spawn
 			expect(spawn).toHaveBeenCalledTimes(1);
@@ -294,7 +309,9 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session
-			await sessionManager.createSessionWithPreset('/test/worktree');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Wait a bit to ensure no early exit
 			await new Promise(resolve => setTimeout(resolve, 600));
@@ -329,7 +346,9 @@ describe('SessionManager', () => {
 
 			// Create session
 			const session =
-				await sessionManager.createSessionWithPreset('/test/worktree');
+				await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Verify initial spawn
 			expect(spawn).toHaveBeenCalledTimes(1);
@@ -372,7 +391,9 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create session
-			await sessionManager.createSessionWithPreset('/test/worktree');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Verify spawn was called with custom command
 			expect(spawn).toHaveBeenCalledWith(
@@ -400,7 +421,9 @@ describe('SessionManager', () => {
 
 			// Expect createSessionWithPreset to throw
 			await expect(
-				sessionManager.createSessionWithPreset('/test/worktree'),
+				Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			),
 			).rejects.toThrow('spawn failed');
 		});
 	});
@@ -416,7 +439,9 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create and destroy session
-			await sessionManager.createSessionWithPreset('/test/worktree');
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 			sessionManager.destroySession('/test/worktree');
 
 			// Verify cleanup
@@ -441,7 +466,9 @@ describe('SessionManager', () => {
 
 			// Create session
 			const createdSession =
-				await sessionManager.createSessionWithPreset('/test/worktree');
+				await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
 
 			// Simulate process exit after successful creation
 			setTimeout(() => {
@@ -456,7 +483,7 @@ describe('SessionManager', () => {
 		});
 	});
 
-	describe('createSessionWithDevcontainer', () => {
+	describe('createSessionWithDevcontainerEffect', () => {
 		beforeEach(() => {
 			// Reset shouldFail flag
 			const mockExec = vi.mocked(exec) as ReturnType<typeof vi.fn> & {
@@ -502,9 +529,11 @@ describe('SessionManager', () => {
 				execCommand: 'devcontainer exec --workspace-folder .',
 			};
 
-			await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				devcontainerConfig,
+			await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					devcontainerConfig,
+				),
 			);
 
 			// Verify spawn was called correctly which proves devcontainer up succeeded
@@ -535,10 +564,12 @@ describe('SessionManager', () => {
 				execCommand: 'devcontainer exec',
 			};
 
-			await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				devcontainerConfig,
-				'2',
+			await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					devcontainerConfig,
+					'2',
+				),
 			);
 
 			// Verify correct preset was used
@@ -564,9 +595,11 @@ describe('SessionManager', () => {
 			};
 
 			await expect(
-				sessionManager.createSessionWithDevcontainer(
-					'/test/worktree',
-					devcontainerConfig,
+				Effect.runPromise(
+					sessionManager.createSessionWithDevcontainerEffect(
+						'/test/worktree',
+						devcontainerConfig,
+					),
 				),
 			).rejects.toThrow(
 				'Failed to start devcontainer: Container startup failed',
@@ -590,13 +623,17 @@ describe('SessionManager', () => {
 			};
 
 			// Create session twice
-			const session1 = await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				devcontainerConfig,
+			const session1 = await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					devcontainerConfig,
+				),
 			);
-			const session2 = await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				devcontainerConfig,
+			const session2 = await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					devcontainerConfig,
+				),
 			);
 
 			// Should return the same session
@@ -624,9 +661,11 @@ describe('SessionManager', () => {
 					'devcontainer exec --workspace-folder . --container-name mycontainer',
 			};
 
-			await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				devcontainerConfig,
+			await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					devcontainerConfig,
+				),
 			);
 
 			// Verify spawn was called with properly parsed exec command
@@ -681,10 +720,12 @@ describe('SessionManager', () => {
 				},
 			);
 
-			await sessionManager.createSessionWithDevcontainer('/test/worktree2', {
-				upCommand: 'devcontainer up --workspace-folder .',
-				execCommand: 'devcontainer exec --workspace-folder .',
-			});
+			await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect('/test/worktree2', {
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				}),
+			);
 
 			// Should spawn with devcontainer exec command
 			expect(spawn).toHaveBeenCalledWith(
@@ -716,13 +757,15 @@ describe('SessionManager', () => {
 				},
 			);
 
-			await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				{
-					upCommand: 'devcontainer up --workspace-folder .',
-					execCommand: 'devcontainer exec --workspace-folder .',
-				},
-				'custom-preset',
+			await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					{
+						upCommand: 'devcontainer up --workspace-folder .',
+						execCommand: 'devcontainer exec --workspace-folder .',
+					},
+					'custom-preset',
+				),
 			);
 
 			// Should call createSessionWithPreset internally
@@ -760,9 +803,11 @@ describe('SessionManager', () => {
 					'devcontainer exec --workspace-folder /path/to/project --user vscode',
 			};
 
-			await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				config,
+			await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					config,
+				),
 			);
 
 			expect(spawn).toHaveBeenCalledWith(
@@ -807,13 +852,15 @@ describe('SessionManager', () => {
 				args: ['-m', 'claude-3-opus'],
 			});
 
-			await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				{
-					upCommand: 'devcontainer up --workspace-folder .',
-					execCommand: 'devcontainer exec --workspace-folder .',
-				},
-				'claude-with-args',
+			await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					{
+						upCommand: 'devcontainer up --workspace-folder .',
+						execCommand: 'devcontainer exec --workspace-folder .',
+					},
+					'claude-with-args',
+				),
 			);
 
 			expect(spawn).toHaveBeenCalledWith(
@@ -870,12 +917,14 @@ describe('SessionManager', () => {
 				.mockReturnValueOnce(firstMockPty as unknown as IPty)
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
-			const session = await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				{
-					upCommand: 'devcontainer up --workspace-folder .',
-					execCommand: 'devcontainer exec --workspace-folder .',
-				},
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					{
+						upCommand: 'devcontainer up --workspace-folder .',
+						execCommand: 'devcontainer exec --workspace-folder .',
+					},
+				),
 			);
 
 			// Verify initial spawn
@@ -945,12 +994,14 @@ describe('SessionManager', () => {
 				.mockReturnValueOnce(firstMockPty as unknown as IPty)
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
-			const session = await sessionManager.createSessionWithDevcontainer(
-				'/test/worktree',
-				{
-					upCommand: 'devcontainer up --workspace-folder .',
-					execCommand: 'devcontainer exec --workspace-folder .',
-				},
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithDevcontainerEffect(
+					'/test/worktree',
+					{
+						upCommand: 'devcontainer up --workspace-folder .',
+						execCommand: 'devcontainer exec --workspace-folder .',
+					},
+				),
 			);
 
 			// Verify initial spawn
