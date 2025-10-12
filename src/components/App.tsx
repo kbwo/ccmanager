@@ -307,11 +307,15 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				return;
 			}
 
+			// Set loading state before async operation
+			setView('creating-session');
+
 			// Use Effect-based session creation with default preset
 			const result = await createSessionWithEffect(worktree.path);
 
 			if (!result.success) {
 				setError(result.errorMessage!);
+				navigateWithClear('menu');
 				return;
 			}
 
