@@ -227,4 +227,3 @@ function toGitError(command: string, error: unknown): GitError {
 		stderr: String(error),
 	});
 }
-

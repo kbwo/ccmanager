@@ -3,7 +3,6 @@ import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
 import {configurationManager} from './configurationManager.js';
-import {executeWorktreePostCreationHookLegacy} from '../utils/hookExecutor.js';
 import {Effect} from 'effect';
 import {GitError} from '../types/errors.js';
 
@@ -32,7 +31,6 @@ vi.mock('./configurationManager.js', () => ({
 // Mock HookExecutor
 vi.mock('../utils/hookExecutor.js', () => ({
 	executeWorktreePostCreationHook: vi.fn(),
-	executeWorktreePostCreationHookLegacy: vi.fn(),
 }));
 
 // Get the mocked function with proper typing
@@ -40,7 +38,6 @@ const mockedExecSync = vi.mocked(execSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
 const mockedGetWorktreeHooks = vi.mocked(configurationManager.getWorktreeHooks);
-const mockedExecuteHook = vi.mocked(executeWorktreePostCreationHookLegacy);
 
 // Mock error interface for git command errors
 interface MockGitError extends Error {
@@ -479,7 +476,6 @@ origin/feature/test
 		});
 	});
 
-
 	describe('hasClaudeDirectoryInBranchEffect', () => {
 		it('should return Effect with true when .claude directory exists in branch worktree', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
@@ -643,7 +639,9 @@ branch refs/heads/main
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
-			const effect = service.hasClaudeDirectoryInBranchEffect('non-existent-branch');
+			const effect = service.hasClaudeDirectoryInBranchEffect(
+				'non-existent-branch',
+			);
 			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe(false);

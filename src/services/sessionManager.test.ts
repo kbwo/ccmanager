@@ -155,7 +155,10 @@ describe('SessionManager', () => {
 
 			// Create session with non-existent preset
 			await Effect.runPromise(
-				sessionManager.createSessionWithPresetEffect('/test/worktree', 'invalid'),
+				sessionManager.createSessionWithPresetEffect(
+					'/test/worktree',
+					'invalid',
+				),
 			);
 
 			// Verify fallback to default preset
@@ -262,8 +265,7 @@ describe('SessionManager', () => {
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
 			// Create session
-			const session =
-				await Effect.runPromise(
+			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
 
@@ -345,8 +347,7 @@ describe('SessionManager', () => {
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
 			// Create session
-			const session =
-				await Effect.runPromise(
+			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
 
@@ -422,8 +423,8 @@ describe('SessionManager', () => {
 			// Expect createSessionWithPreset to throw
 			await expect(
 				Effect.runPromise(
-				sessionManager.createSessionWithPresetEffect('/test/worktree'),
-			),
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				),
 			).rejects.toThrow('spawn failed');
 		});
 	});
@@ -465,8 +466,7 @@ describe('SessionManager', () => {
 			});
 
 			// Create session
-			const createdSession =
-				await Effect.runPromise(
+			const createdSession = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
 
@@ -918,13 +918,10 @@ describe('SessionManager', () => {
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
 			const session = await Effect.runPromise(
-				sessionManager.createSessionWithDevcontainerEffect(
-					'/test/worktree',
-					{
-						upCommand: 'devcontainer up --workspace-folder .',
-						execCommand: 'devcontainer exec --workspace-folder .',
-					},
-				),
+				sessionManager.createSessionWithDevcontainerEffect('/test/worktree', {
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				}),
 			);
 
 			// Verify initial spawn
@@ -995,13 +992,10 @@ describe('SessionManager', () => {
 				.mockReturnValueOnce(secondMockPty as unknown as IPty);
 
 			const session = await Effect.runPromise(
-				sessionManager.createSessionWithDevcontainerEffect(
-					'/test/worktree',
-					{
-						upCommand: 'devcontainer up --workspace-folder .',
-						execCommand: 'devcontainer exec --workspace-folder .',
-					},
-				),
+				sessionManager.createSessionWithDevcontainerEffect('/test/worktree', {
+					upCommand: 'devcontainer up --workspace-folder .',
+					execCommand: 'devcontainer exec --workspace-folder .',
+				}),
 			);
 
 			// Verify initial spawn

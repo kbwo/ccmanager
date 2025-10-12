@@ -194,7 +194,11 @@ export class AmbiguousBranchError extends Error {
 }
 
 export interface IWorktreeService {
-	getWorktreesEffect(): import('effect').Effect.Effect<Worktree[], import('../types/errors.js').GitError, never>;
+	getWorktreesEffect(): import('effect').Effect.Effect<
+		Worktree[],
+		import('../types/errors.js').GitError,
+		never
+	>;
 	getGitRootPath(): string;
 	createWorktreeEffect(
 		worktreePath: string,
@@ -202,14 +206,27 @@ export interface IWorktreeService {
 		baseBranch: string,
 		copySessionData?: boolean,
 		copyClaudeDirectory?: boolean,
-	): import('effect').Effect.Effect<Worktree, import('../types/errors.js').GitError | import('../types/errors.js').FileSystemError, never>;
+	): import('effect').Effect.Effect<
+		Worktree,
+		| import('../types/errors.js').GitError
+		| import('../types/errors.js').FileSystemError,
+		never
+	>;
 	deleteWorktreeEffect(
 		worktreePath: string,
 		options?: {deleteBranch?: boolean},
-	): import('effect').Effect.Effect<void, import('../types/errors.js').GitError, never>;
+	): import('effect').Effect.Effect<
+		void,
+		import('../types/errors.js').GitError,
+		never
+	>;
 	mergeWorktreeEffect(
 		sourceBranch: string,
 		targetBranch: string,
 		useRebase?: boolean,
-	): import('effect').Effect.Effect<void, import('../types/errors.js').GitError, never>;
+	): import('effect').Effect.Effect<
+		void,
+		import('../types/errors.js').GitError,
+		never
+	>;
 }

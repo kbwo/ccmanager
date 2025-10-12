@@ -903,7 +903,7 @@ describe('ProjectList', () => {
 			});
 
 			vi.mocked(projectManager.instance.discoverProjectsEffect).mockReturnValue(
-			// @ts-expect-error - Test uses wrong error type (should be FileSystemError)
+				// @ts-expect-error - Test uses wrong error type (should be FileSystemError)
 				Effect.fail(gitError),
 			);
 

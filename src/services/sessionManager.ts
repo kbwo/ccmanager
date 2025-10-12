@@ -335,7 +335,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						session.pendingState = undefined;
 						session.pendingStateStart = undefined;
 						// Execute status hook asynchronously (non-blocking) using Effect
-						void Effect.runPromise(executeStatusHook(oldState, detectedState, session));
+						void Effect.runPromise(
+							executeStatusHook(oldState, detectedState, session),
+						);
 						this.emit('sessionStateChanged', session);
 					}
 				}

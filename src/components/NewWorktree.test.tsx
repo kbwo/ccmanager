@@ -207,7 +207,9 @@ describe('NewWorktree component Effect integration', () => {
 		vi.mocked(WorktreeService).mockImplementation(
 			() =>
 				({
-					getAllBranchesEffect: vi.fn(() => Effect.succeed(['main', 'develop'])),
+					getAllBranchesEffect: vi.fn(() =>
+						Effect.succeed(['main', 'develop']),
+					),
 					getDefaultBranchEffect: vi.fn(() => Effect.fail(gitError)),
 				}) as any,
 		);
@@ -225,7 +227,9 @@ describe('NewWorktree component Effect integration', () => {
 		const output = lastFrame();
 		expect(output).toContain('Error loading branches:');
 		expect(output).toContain('git symbolic-ref');
-		expect(output).toContain('fatal: ref refs/remotes/origin/HEAD is not a symbolic ref');
+		expect(output).toContain(
+			'fatal: ref refs/remotes/origin/HEAD is not a symbolic ref',
+		);
 	});
 
 	it('should handle empty branch list', async () => {
@@ -291,7 +295,9 @@ describe('NewWorktree component Effect integration', () => {
 			() =>
 				({
 					getAllBranchesEffect: vi.fn(() => Effect.succeed(mockBranches)),
-					getDefaultBranchEffect: vi.fn(() => Effect.succeed(mockDefaultBranch)),
+					getDefaultBranchEffect: vi.fn(() =>
+						Effect.succeed(mockDefaultBranch),
+					),
 				}) as any,
 		);
 

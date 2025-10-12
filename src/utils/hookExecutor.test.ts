@@ -41,7 +41,9 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert - should not throw
 				await expect(
-					Effect.runPromise(executeHook('echo "Test successful"', tmpDir, environment)),
+					Effect.runPromise(
+						executeHook('echo "Test successful"', tmpDir, environment),
+					),
 				).resolves.toBeUndefined();
 			} finally {
 				// Cleanup
@@ -81,11 +83,13 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert - command that writes to stderr and exits with error
 				await expect(
-					Effect.runPromise(executeHook(
-						'>&2 echo "Error details here"; exit 1',
-						tmpDir,
-						environment,
-					)),
+					Effect.runPromise(
+						executeHook(
+							'>&2 echo "Error details here"; exit 1',
+							tmpDir,
+							environment,
+						),
+					),
 				).rejects.toThrow(
 					'Hook exited with code 1\nStderr: Error details here\n',
 				);
@@ -107,11 +111,13 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Test with multiline stderr
 				try {
-					await Effect.runPromise(executeHook(
-						'>&2 echo "Line 1"; >&2 echo "Line 2"; exit 3',
-						tmpDir,
-						environment,
-					));
+					await Effect.runPromise(
+						executeHook(
+							'>&2 echo "Line 1"; >&2 echo "Line 2"; exit 3',
+							tmpDir,
+							environment,
+						),
+					);
 					expect.fail('Should have thrown');
 				} catch (error) {
 					expect(error).toBeInstanceOf(Error);
@@ -146,11 +152,13 @@ describe('hookExecutor Integration Tests', () => {
 				// Act - command that writes to stderr but exits successfully
 				// Should not throw even though there's stderr output
 				await expect(
-					Effect.runPromise(executeHook(
-						'>&2 echo "Warning message"; exit 0',
-						tmpDir,
-						environment,
-					)),
+					Effect.runPromise(
+						executeHook(
+							'>&2 echo "Warning message"; exit 0',
+							tmpDir,
+							environment,
+						),
+					),
 				).resolves.toBeUndefined();
 			} finally {
 				// Cleanup
@@ -170,7 +178,9 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act - write current directory to file
-				await Effect.runPromise(executeHook(`pwd > "${outputFile}"`, tmpDir, environment));
+				await Effect.runPromise(
+					executeHook(`pwd > "${outputFile}"`, tmpDir, environment),
+				);
 
 				// Read the output
 				const {readFile} = await import('fs/promises');
@@ -201,7 +211,9 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert - should not throw even with failing command
 				await expect(
-					Effect.runPromise(executeWorktreePostCreationHook('exit 1', worktree, tmpDir, 'main')),
+					Effect.runPromise(
+						executeWorktreePostCreationHook('exit 1', worktree, tmpDir, 'main'),
+					),
 				).resolves.toBeUndefined();
 			} finally {
 				// Cleanup
@@ -223,12 +235,14 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act - write current directory to file
-				await Effect.runPromise(executeWorktreePostCreationHook(
-					`pwd > "${outputFile}"`,
-					worktree,
-					gitRoot,
-					'main',
-				));
+				await Effect.runPromise(
+					executeWorktreePostCreationHook(
+						`pwd > "${outputFile}"`,
+						worktree,
+						gitRoot,
+						'main',
+					),
+				);
 
 				// Read the output
 				const {readFile} = await import('fs/promises');
@@ -261,12 +275,14 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act - change to git root and write its path
-				await Effect.runPromise(executeWorktreePostCreationHook(
-					`cd "$CCMANAGER_GIT_ROOT" && pwd > "${outputFile}"`,
-					worktree,
-					tmpGitRootDir,
-					'main',
-				));
+				await Effect.runPromise(
+					executeWorktreePostCreationHook(
+						`cd "$CCMANAGER_GIT_ROOT" && pwd > "${outputFile}"`,
+						worktree,
+						tmpGitRootDir,
+						'main',
+					),
+				);
 
 				// Read the output
 				const {readFile} = await import('fs/promises');
@@ -296,12 +312,14 @@ describe('hookExecutor Integration Tests', () => {
 				// Act - execute a command that spawns a background process with a delay
 				// The background process writes to a file after a delay
 				// We use a shell command that creates a background process and then exits
-				await Effect.runPromise(executeWorktreePostCreationHook(
-					`(sleep 0.1 && echo "completed" > "${outputFile}") & wait`,
-					worktree,
-					tmpDir,
-					'main',
-				));
+				await Effect.runPromise(
+					executeWorktreePostCreationHook(
+						`(sleep 0.1 && echo "completed" > "${outputFile}") & wait`,
+						worktree,
+						tmpDir,
+						'main',
+					),
+				);
 
 				// Read the output - this should exist because we waited for the background process
 				const {readFile} = await import('fs/promises');

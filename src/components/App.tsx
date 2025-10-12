@@ -462,7 +462,9 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		let hasError = false;
 		for (const path of worktreePaths) {
 			const result = await Effect.runPromise(
-				Effect.either(worktreeService.deleteWorktreeEffect(path, {deleteBranch})),
+				Effect.either(
+					worktreeService.deleteWorktreeEffect(path, {deleteBranch}),
+				),
 			);
 
 			if (result._tag === 'Left') {

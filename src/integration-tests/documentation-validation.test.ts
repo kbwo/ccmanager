@@ -159,7 +159,12 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 	const filesToCheck = [
 		{
 			path: join(process.cwd(), 'src/services/worktreeService.ts'),
-			functions: ['getWorktreesEffect', 'createWorktreeEffect', 'deleteWorktreeEffect', 'mergeWorktreeEffect'],
+			functions: [
+				'getWorktreesEffect',
+				'createWorktreeEffect',
+				'deleteWorktreeEffect',
+				'mergeWorktreeEffect',
+			],
 		},
 		{
 			path: join(process.cwd(), 'src/services/configurationManager.ts'),
@@ -171,7 +176,11 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 		},
 		{
 			path: join(process.cwd(), 'src/services/projectManager.ts'),
-			functions: ['discoverProjectsEffect', 'loadRecentProjectsEffect', 'saveRecentProjectsEffect'],
+			functions: [
+				'discoverProjectsEffect',
+				'loadRecentProjectsEffect',
+				'saveRecentProjectsEffect',
+			],
 		},
 		{
 			path: join(process.cwd(), 'src/utils/gitStatus.ts'),
@@ -229,11 +238,20 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 				let returnsFound = false;
 				let descriptionFound = false;
 
-				for (let i = functionLineIndex - 1; i >= Math.max(0, functionLineIndex - 100); i--) {
+				for (
+					let i = functionLineIndex - 1;
+					i >= Math.max(0, functionLineIndex - 100);
+					i--
+				) {
 					const line = lines[i] || '';
 
 					// Detect JSDoc block - look for closing */ or any JSDoc tags
-					if (line.trim().endsWith('*/') || line.includes('@example') || line.includes('@returns') || line.includes('@return')) {
+					if (
+						line.trim().endsWith('*/') ||
+						line.includes('@example') ||
+						line.includes('@returns') ||
+						line.includes('@return')
+					) {
 						jsDocFound = true;
 					}
 
@@ -265,15 +283,29 @@ describe('JSDoc Documentation on Effect-Returning Functions', () => {
 					if (line.trim().startsWith('/**')) {
 						break;
 					}
-					if (i < functionLineIndex - 1 && /^\s*(public|private|protected)?\s*\w+.*\(/.test(line)) {
+					if (
+						i < functionLineIndex - 1 &&
+						/^\s*(public|private|protected)?\s*\w+.*\(/.test(line)
+					) {
 						break;
 					}
 				}
 
-				expect(jsDocFound, `${functionName} should have JSDoc comment`).toBe(true);
-				expect(descriptionFound, `${functionName} should have a description in JSDoc`).toBe(true);
-				expect(returnsFound, `${functionName} should have @returns tag documenting Effect type`).toBe(true);
-				expect(exampleFound, `${functionName} should have @example tag with usage example`).toBe(true);
+				expect(jsDocFound, `${functionName} should have JSDoc comment`).toBe(
+					true,
+				);
+				expect(
+					descriptionFound,
+					`${functionName} should have a description in JSDoc`,
+				).toBe(true);
+				expect(
+					returnsFound,
+					`${functionName} should have @returns tag documenting Effect type`,
+				).toBe(true);
+				expect(
+					exampleFound,
+					`${functionName} should have @example tag with usage example`,
+				).toBe(true);
 			});
 		});
 	});

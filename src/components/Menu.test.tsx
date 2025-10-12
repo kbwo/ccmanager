@@ -228,7 +228,9 @@ describe('Menu component Effect-based error handling', () => {
 		// Should display error with GitError information
 		expect(output).toContain('Error:');
 		expect(output).toContain('git symbolic-ref');
-		expect(output).toContain('fatal: ref refs/remotes/origin/HEAD is not a symbolic ref');
+		expect(output).toContain(
+			'fatal: ref refs/remotes/origin/HEAD is not a symbolic ref',
+		);
 	});
 
 	it('should use Effect composition to load worktrees and default branch together', async () => {

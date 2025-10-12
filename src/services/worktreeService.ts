@@ -114,31 +114,6 @@ export class WorktreeService {
 			return path.resolve(this.rootPath);
 		}
 	}
-
-
-	/**
-	 * LEGACY HELPER: Gets current branch synchronously
-	 *
-	 * NOTE: This method is kept as a private synchronous helper for internal use only.
-	 * It is only used as a fallback in getWorktreesEffect() when git worktree command
-	 * is not supported (line ~881). For all other use cases, prefer getCurrentBranchEffect().
-	 *
-	 * @private
-	 * @deprecated Use getCurrentBranchEffect() for new code
-	 * @returns {string} Current branch name or 'unknown' on error
-	 */
-	private getCurrentBranch(): string {
-		try {
-			const branch = execSync('git rev-parse --abbrev-ref HEAD', {
-				cwd: this.rootPath,
-				encoding: 'utf8',
-			}).trim();
-			return branch;
-		} catch {
-			return 'unknown';
-		}
-	}
-
 	isGitRepository(): boolean {
 		return existsSync(path.join(this.rootPath, '.git'));
 	}
@@ -146,8 +121,6 @@ export class WorktreeService {
 	getGitRootPath(): string {
 		return this.gitRootPath;
 	}
-
-
 
 	/**
 	 * SYNCHRONOUS HELPER: Resolves a branch name to its proper git reference.
@@ -838,10 +811,11 @@ export class WorktreeService {
 					execError.status === 1 ||
 					execError.stderr?.includes('unknown command')
 				) {
-					return Effect.succeed([
+					// Use Effect-based getCurrentBranchEffect() instead of synchronous getCurrentBranch()
+					return Effect.map(self.getCurrentBranchEffect(), branch => [
 						{
 							path: self.rootPath,
-							branch: self.getCurrentBranch(),
+							branch,
 							isMainWorktree: true,
 							hasSession: false,
 						},
@@ -1021,7 +995,10 @@ export class WorktreeService {
 			// Copy .claude directory if requested
 			if (copyClaudeDirectory) {
 				yield* Effect.catchAll(
-					self.copyClaudeDirectoryFromBaseBranchEffect(resolvedPath, baseBranch),
+					self.copyClaudeDirectoryFromBaseBranchEffect(
+						resolvedPath,
+						baseBranch,
+					),
 					(error: unknown) => {
 						console.error('Warning: Failed to copy .claude directory:', error);
 						return Effect.succeed(undefined);
