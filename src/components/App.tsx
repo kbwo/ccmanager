@@ -693,8 +693,9 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 	if (view === 'creating-session') {
 		// Compose message based on devcontainerConfig presence
+		// Devcontainer operations take >5 seconds, so indicate extended duration
 		const message = devcontainerConfig
-			? 'Starting devcontainer and creating session...'
+			? 'Starting devcontainer (this may take a moment)...'
 			: 'Creating session...';
 
 		// Use yellow color for devcontainer operations (longer duration),
@@ -710,7 +711,10 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 	if (view === 'creating-session-preset') {
 		// Always display preset-specific message
-		const message = 'Creating session with preset...';
+		// Devcontainer operations take >5 seconds, so indicate extended duration
+		const message = devcontainerConfig
+			? 'Creating session with preset (this may take a moment)...'
+			: 'Creating session with preset...';
 
 		// Use yellow color for devcontainer, cyan for standard
 		const color = devcontainerConfig ? 'yellow' : 'cyan';
