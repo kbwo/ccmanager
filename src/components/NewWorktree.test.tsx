@@ -106,7 +106,7 @@ describe('NewWorktree component Effect integration', () => {
 							// Never resolves to simulate loading state
 						}),
 					),
-				}) as any,
+				}) as unknown as InstanceType<typeof WorktreeService>,
 		);
 
 		const onComplete = vi.fn();
@@ -140,7 +140,7 @@ describe('NewWorktree component Effect integration', () => {
 				({
 					getAllBranchesEffect: vi.fn(() => Effect.fail(gitError)),
 					getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
-				}) as any,
+				}) as unknown as InstanceType<typeof WorktreeService>,
 		);
 
 		const onComplete = vi.fn();
@@ -175,7 +175,7 @@ describe('NewWorktree component Effect integration', () => {
 				({
 					getAllBranchesEffect: getAllBranchesSpy,
 					getDefaultBranchEffect: getDefaultBranchSpy,
-				}) as any,
+				}) as unknown as InstanceType<typeof WorktreeService>,
 		);
 
 		const onComplete = vi.fn();
@@ -211,7 +211,7 @@ describe('NewWorktree component Effect integration', () => {
 						Effect.succeed(['main', 'develop']),
 					),
 					getDefaultBranchEffect: vi.fn(() => Effect.fail(gitError)),
-				}) as any,
+				}) as unknown as InstanceType<typeof WorktreeService>,
 		);
 
 		const onComplete = vi.fn();
@@ -252,7 +252,7 @@ describe('NewWorktree component Effect integration', () => {
 				({
 					getAllBranchesEffect: vi.fn(() => Effect.succeed([])),
 					getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
-				}) as any,
+				}) as unknown as InstanceType<typeof WorktreeService>,
 		);
 
 		const onComplete = vi.fn();
@@ -298,7 +298,7 @@ describe('NewWorktree component Effect integration', () => {
 					getDefaultBranchEffect: vi.fn(() =>
 						Effect.succeed(mockDefaultBranch),
 					),
-				}) as any,
+				}) as unknown as InstanceType<typeof WorktreeService>,
 		);
 
 		const onComplete = vi.fn();
@@ -341,7 +341,7 @@ describe('NewWorktree component Effect integration', () => {
 						return Effect.fail(gitError);
 					}),
 					getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
-				}) as any,
+				}) as unknown as InstanceType<typeof WorktreeService>,
 		);
 
 		const onComplete = vi.fn();

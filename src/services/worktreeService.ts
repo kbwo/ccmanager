@@ -518,7 +518,7 @@ export class WorktreeService {
 				},
 				catch: (error: unknown) => error,
 			}),
-			(error: unknown) => {
+			(_error: unknown) => {
 				// Fallback to checking for main/master branches
 				return Effect.catchAll(
 					Effect.try({
@@ -684,7 +684,7 @@ export class WorktreeService {
 				},
 				catch: (error: unknown) => error,
 			}),
-			(error: unknown) => {
+			(_error: unknown) => {
 				// Return 'unknown' as fallback for compatibility
 				return Effect.succeed('unknown');
 			},

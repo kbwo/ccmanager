@@ -1,6 +1,6 @@
 import {promisify} from 'util';
 import {execFile, type ExecException} from 'child_process';
-import {Cause, Effect, Either, Exit, Option} from 'effect';
+import {Effect, Either} from 'effect';
 import {pipe} from 'effect/Function';
 import {GitError} from '../types/errors.js';
 import {getWorktreeParentBranch} from './worktreeConfig.js';
@@ -359,15 +359,4 @@ function toGitError(command: string, error: unknown): GitError {
 		exitCode: -1,
 		stderr: String(error),
 	});
-}
-
-function gitErrorToMessage(error: GitError): string {
-	const exitCode = Number.isFinite(error.exitCode) ? error.exitCode : -1;
-	const details = [error.stderr, error.stdout]
-		.filter(part => typeof part === 'string' && part.trim().length > 0)
-		.map(part => part!.trim());
-	const detail = details[0] ?? '';
-	return detail
-		? `git command "${error.command}" failed (exit code ${exitCode}): ${detail}`
-		: `git command "${error.command}" failed (exit code ${exitCode})`;
 }

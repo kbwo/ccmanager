@@ -1,4 +1,4 @@
-import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
+import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
