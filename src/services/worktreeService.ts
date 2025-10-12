@@ -1,7 +1,7 @@
 import {execSync} from 'child_process';
 import {existsSync, statSync, cpSync} from 'fs';
 import path from 'path';
-import {Effect} from 'effect';
+import {Effect, Either} from 'effect';
 import {
 	Worktree,
 	AmbiguousBranchError,
@@ -11,7 +11,6 @@ import {GitError, FileSystemError} from '../types/errors.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 import {
 	getClaudeProjectsDir,
-	getClaudeProjectsDirLegacy,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
 import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
@@ -273,7 +272,13 @@ export class WorktreeService {
 		targetWorktreePath: string,
 	): void {
 		try {
-			const projectsDir = getClaudeProjectsDirLegacy();
+			const projectsDirEither = getClaudeProjectsDir();
+			if (Either.isLeft(projectsDirEither)) {
+				throw new Error(
+					`Could not determine Claude projects directory: ${projectsDirEither.left.field} ${projectsDirEither.left.constraint}`,
+				);
+			}
+			const projectsDir = projectsDirEither.right;
 			if (!existsSync(projectsDir)) {
 				throw new Error(
 					`Claude projects directory does not exist: ${projectsDir}`,

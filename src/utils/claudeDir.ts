@@ -154,21 +154,3 @@ export function claudeDirExists(
 		},
 	);
 }
-
-/**
- * Legacy string-returning wrapper for getClaudeDir
- * @deprecated Use getClaudeDir with Either instead
- * Throws if HOME cannot be determined
- */
-export function getClaudeDirLegacy(): string {
-	return Either.getOrThrow(getClaudeDir());
-}
-
-/**
- * Legacy string-returning wrapper for getClaudeProjectsDir
- * @deprecated Use getClaudeProjectsDir with Either instead
- * Throws if HOME cannot be determined
- */
-export function getClaudeProjectsDirLegacy(): string {
-	return Either.getOrThrow(getClaudeProjectsDir());
-}

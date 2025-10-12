@@ -228,22 +228,3 @@ function toGitError(command: string, error: unknown): GitError {
 	});
 }
 
-/**
- * Legacy synchronous wrapper for setWorktreeParentBranch
- * @deprecated Use setWorktreeParentBranch with Effect instead
- * TODO: Remove this after worktreeService.ts migration in Phase 3
- */
-export function setWorktreeParentBranchLegacy(
-	worktreePath: string,
-	parentBranch: string,
-): void {
-	// Skip if worktree config extension is not available
-	if (!worktreeConfigManager.isAvailable()) {
-		return;
-	}
-
-	execSync(`git config --worktree ccmanager.parentBranch "${parentBranch}"`, {
-		cwd: worktreePath,
-		encoding: 'utf8',
-	});
-}

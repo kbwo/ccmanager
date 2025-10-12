@@ -111,24 +111,6 @@ export function executeHook(
 }
 
 /**
- * Legacy Promise-based wrapper for executeHook
- * @deprecated Use executeHook with Effect instead
- * Converts Effect to Promise for backward compatibility
- */
-export function executeHookLegacy(
-	command: string,
-	cwd: string,
-	environment: HookEnvironment,
-): Promise<void> {
-	return Effect.runPromise(
-		Effect.mapError(
-			executeHook(command, cwd, environment),
-			error => new Error(error.message),
-		),
-	);
-}
-
-/**
  * Execute a worktree post-creation hook using Effect
  * Errors are caught and logged but do not break the main flow
  */
@@ -155,21 +137,6 @@ export function executeWorktreePostCreationHook(
 			console.error(`Failed to execute post-creation hook: ${error.message}`);
 			return Effect.void;
 		},
-	);
-}
-
-/**
- * Legacy Promise-based wrapper for executeWorktreePostCreationHook
- * @deprecated Use executeWorktreePostCreationHook with Effect instead
- */
-export function executeWorktreePostCreationHookLegacy(
-	command: string,
-	worktree: Worktree,
-	gitRoot: string,
-	baseBranch?: string,
-): Promise<void> {
-	return Effect.runPromise(
-		executeWorktreePostCreationHook(command, worktree, gitRoot, baseBranch),
 	);
 }
 
@@ -226,16 +193,4 @@ export function executeStatusHook(
 			},
 		);
 	});
-}
-
-/**
- * Legacy Promise-based wrapper for executeStatusHook
- * @deprecated Use executeStatusHook with Effect instead
- */
-export function executeStatusHookLegacy(
-	oldState: SessionState,
-	newState: SessionState,
-	session: Session,
-): Promise<void> {
-	return Effect.runPromise(executeStatusHook(oldState, newState, session));
 }
