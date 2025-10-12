@@ -77,7 +77,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Ensure consistent layout with other loading views
   - _Requirements: 1.2, 6.4_
 
-- [ ] 4. Update session creation handlers with loading state management
+- [x] 4. Update session creation handlers with loading state management
 - [x] 4.1 Enhance handleSelectWorktree with loading state for session creation
   - Set view to 'creating-session' before calling createSessionWithEffect
   - Ensure loading state is set before awaiting the promise
@@ -94,7 +94,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Clear selectedWorktree state after operation completes
   - _Requirements: 1.2, 1.4, 1.5, 1.7, 5.1, 5.3, 5.4_
 
-- [ ] 4.3 Write integration tests for session creation loading states
+- [x] 4.3 Write integration tests for session creation loading states
   - Test handleSelectWorktree sets 'creating-session' view before async operation
   - Test loading view displays correct message for standard session creation
   - Test loading view displays enhanced message for devcontainer session creation

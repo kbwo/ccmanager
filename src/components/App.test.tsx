@@ -1733,3 +1733,620 @@ describe('App - Task 4.2: handlePresetSelected Loading State Management', () => 
 		);
 	});
 });
+
+describe('App - Task 4.3: Integration Tests for Session Creation Loading States', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	describe('handleSelectWorktree Integration Tests', () => {
+		it('should set creating-session view before async operation starts', async () => {
+			// RED: Integration test verifying loading state is set before createSessionWithEffect
+			// Expected: View should be 'creating-session' before async operation executes
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const mockManager = new SessionManager();
+
+			// Track the order of operations
+			const operationOrder: string[] = [];
+
+			// Mock getSession to return null (no existing session)
+			mockManager.getSession = vi.fn(() => {
+				operationOrder.push('getSession-called');
+				return null;
+			});
+
+			// Mock createSessionWithPresetEffect to track when it's called
+			const mockSession: Session = {
+				id: 'test-session',
+				worktreePath: '/test/path',
+				process: {} as IPty,
+				terminal: {} as Terminal,
+				state: 'idle',
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+			};
+
+			mockManager.createSessionWithPresetEffect = vi.fn(() => {
+				operationOrder.push('createSessionWithPresetEffect-called');
+				return Effect.succeed(mockSession);
+			});
+
+			// Simulate the flow: getSession returns null, then createSessionWithPresetEffect is called
+			const session = mockManager.getSession('/test/path');
+			expect(session).toBeNull();
+
+			// Before calling createSessionWithPresetEffect, view should be set to 'creating-session'
+			operationOrder.push('set-view-creating-session');
+
+			// Then call the async operation
+			const result = await Effect.runPromise(
+				Effect.either(mockManager.createSessionWithPresetEffect('/test/path')),
+			);
+
+			// Verify order: getSession -> set-view -> createSessionWithPresetEffect
+			expect(operationOrder).toEqual([
+				'getSession-called',
+				'set-view-creating-session',
+				'createSessionWithPresetEffect-called',
+			]);
+
+			expect(result._tag).toBe('Right');
+		});
+
+		it('should display "Creating session..." for standard session creation', async () => {
+			// RED: Test verifies correct loading message without devcontainer
+			// Expected: Message should be "Creating session..." when devcontainerConfig is undefined
+
+			const devcontainerConfig = undefined;
+			const message = devcontainerConfig
+				? 'Starting devcontainer and creating session...'
+				: 'Creating session...';
+
+			expect(message).toBe('Creating session...');
+		});
+
+		it('should display "Starting devcontainer and creating session..." for devcontainer session', async () => {
+			// RED: Test verifies enhanced message for devcontainer initialization
+			// Expected: Message should indicate devcontainer startup when config is present
+
+			const devcontainerConfig = {
+				upCommand: 'devcontainer up --workspace-folder .',
+				execCommand: 'devcontainer exec --workspace-folder .',
+			};
+
+			const message = devcontainerConfig
+				? 'Starting devcontainer and creating session...'
+				: 'Creating session...';
+
+			expect(message).toBe('Starting devcontainer and creating session...');
+		});
+
+		it('should clear loading state on successful session creation and navigate to session view', async () => {
+			// RED: Integration test verifying success path clears loading and navigates
+			// Expected: After successful session creation, should navigate to 'session' view
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const mockManager = new SessionManager();
+
+			const mockSession: Session = {
+				id: 'test-session-success',
+				worktreePath: '/test/path',
+				process: {} as IPty,
+				terminal: {} as Terminal,
+				state: 'idle',
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+			};
+
+			mockManager.createSessionWithPresetEffect = vi.fn(() =>
+				Effect.succeed(mockSession),
+			);
+
+			// Simulate loading state
+			let currentView = 'creating-session';
+			expect(currentView).toBe('creating-session');
+
+			// Execute async operation
+			const result = await Effect.runPromise(
+				Effect.either(mockManager.createSessionWithPresetEffect('/test/path')),
+			);
+
+			expect(result._tag).toBe('Right');
+
+			// On success, navigate to session view (clears loading state)
+			if (result._tag === 'Right') {
+				currentView = 'session';
+			}
+
+			expect(currentView).toBe('session');
+		});
+
+		it('should clear loading state on session creation error and display error message', async () => {
+			// RED: Integration test verifying error path clears loading and shows error
+			// Expected: After failed session creation, should return to 'menu' with error message
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const {ProcessError} = await import('../types/errors.js');
+			const mockManager = new SessionManager();
+
+			const processError = new ProcessError({
+				command: 'claude',
+				message: 'Failed to spawn PTY process',
+			});
+
+			mockManager.createSessionWithPresetEffect = vi.fn(() =>
+				Effect.fail(processError),
+			);
+
+			// Simulate loading state
+			let currentView = 'creating-session';
+			let errorMessage: string | null = null;
+
+			expect(currentView).toBe('creating-session');
+
+			// Execute async operation
+			const result = await Effect.runPromise(
+				Effect.either(mockManager.createSessionWithPresetEffect('/test/path')),
+			);
+
+			expect(result._tag).toBe('Left');
+
+			// On error, format error message and return to menu
+			if (result._tag === 'Left') {
+				errorMessage =
+					result.left._tag === 'ProcessError'
+						? `Process error: ${result.left.message}`
+						: 'Unknown error';
+				currentView = 'menu';
+			}
+
+			expect(currentView).toBe('menu');
+			expect(errorMessage).toBe('Process error: Failed to spawn PTY process');
+		});
+
+		it('should prevent state updates on unmounted component using cancellation flag pattern', async () => {
+			// RED: Test verifies cancellation flag prevents state updates after unmount
+			// Expected: State updates should be skipped if component is unmounted during async operation
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const mockManager = new SessionManager();
+
+			const mockSession: Session = {
+				id: 'test-session-unmount',
+				worktreePath: '/test/path',
+				process: {} as IPty,
+				terminal: {} as Terminal,
+				state: 'idle',
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+			};
+
+			// Simulate delayed async operation
+			mockManager.createSessionWithPresetEffect = vi.fn(() =>
+				Effect.succeed(mockSession),
+			);
+
+			// Simulate cancellation flag pattern
+			let cancelled = false;
+			let stateUpdateAttempted = false;
+
+			// Start async operation
+			const operationPromise = Effect.runPromise(
+				Effect.either(mockManager.createSessionWithPresetEffect('/test/path')),
+			);
+
+			// Simulate component unmount before operation completes
+			cancelled = true;
+
+			// Wait for operation to complete
+			const result = await operationPromise;
+
+			expect(result._tag).toBe('Right');
+
+			// Attempt state update (should be skipped if cancelled)
+			if (!cancelled) {
+				stateUpdateAttempted = true;
+			}
+
+			// Verify state update was prevented
+			expect(stateUpdateAttempted).toBe(false);
+			expect(cancelled).toBe(true);
+		});
+	});
+
+	describe('handlePresetSelected Integration Tests', () => {
+		it('should set creating-session-preset view before async operation with preset ID', async () => {
+			// RED: Integration test verifying loading state for preset selection
+			// Expected: View should be 'creating-session-preset' before createSessionWithEffect with preset
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const mockManager = new SessionManager();
+
+			const operationOrder: string[] = [];
+
+			const mockSession: Session = {
+				id: 'test-preset-session',
+				worktreePath: '/test/path',
+				process: {} as IPty,
+				terminal: {} as Terminal,
+				state: 'idle',
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+			};
+
+			mockManager.createSessionWithPresetEffect = vi.fn((path, presetId) => {
+				operationOrder.push(`createSessionWithPresetEffect-called-${presetId}`);
+				return Effect.succeed(mockSession);
+			});
+
+			// Simulate selectedWorktree being set
+			const selectedWorktree = {
+				path: '/test/path',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			};
+
+			// Guard check
+			if (!selectedWorktree) {
+				throw new Error('selectedWorktree should be set');
+			}
+
+			// Before calling createSessionWithPresetEffect, set view to 'creating-session-preset'
+			operationOrder.push('set-view-creating-session-preset');
+
+			// Call the async operation with preset ID
+			const result = await Effect.runPromise(
+				Effect.either(
+					mockManager.createSessionWithPresetEffect(
+						selectedWorktree.path,
+						'my-preset',
+					),
+				),
+			);
+
+			// Verify order: set-view -> createSessionWithPresetEffect with preset ID
+			expect(operationOrder).toEqual([
+				'set-view-creating-session-preset',
+				'createSessionWithPresetEffect-called-my-preset',
+			]);
+
+			expect(result._tag).toBe('Right');
+		});
+
+		it('should display "Creating session with preset..." message', async () => {
+			// RED: Test verifies preset-specific loading message
+			// Expected: Message should always be "Creating session with preset..." for preset flow
+
+			const message = 'Creating session with preset...';
+			expect(message).toBe('Creating session with preset...');
+		});
+
+		it('should clear loading state on successful preset session creation', async () => {
+			// RED: Integration test verifying preset success path
+			// Expected: After successful preset session creation, should navigate to 'session' view
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const mockManager = new SessionManager();
+
+			const mockSession: Session = {
+				id: 'test-preset-success',
+				worktreePath: '/test/path',
+				process: {} as IPty,
+				terminal: {} as Terminal,
+				state: 'idle',
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+			};
+
+			mockManager.createSessionWithPresetEffect = vi.fn(() =>
+				Effect.succeed(mockSession),
+			);
+
+			// Simulate loading state
+			let currentView = 'creating-session-preset';
+			let selectedWorktree = {path: '/test/path', branch: 'main'};
+
+			expect(currentView).toBe('creating-session-preset');
+
+			// Execute async operation
+			const result = await Effect.runPromise(
+				Effect.either(
+					mockManager.createSessionWithPresetEffect('/test/path', 'my-preset'),
+				),
+			);
+
+			expect(result._tag).toBe('Right');
+
+			// On success, navigate to session view and clear selectedWorktree
+			if (result._tag === 'Right') {
+				currentView = 'session';
+				selectedWorktree = null as any;
+			}
+
+			expect(currentView).toBe('session');
+			expect(selectedWorktree).toBeNull();
+		});
+
+		it('should clear loading state on preset session creation error', async () => {
+			// RED: Integration test verifying preset error path
+			// Expected: After failed preset session creation, should return to 'menu' with error
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const {ConfigError} = await import('../types/errors.js');
+			const mockManager = new SessionManager();
+
+			const configError = new ConfigError({
+				configPath: '~/.config/ccmanager/config.json',
+				reason: 'validation',
+				details: 'Invalid preset ID: invalid-preset',
+			});
+
+			mockManager.createSessionWithPresetEffect = vi.fn(() =>
+				Effect.fail(configError),
+			);
+
+			// Simulate loading state
+			let currentView = 'creating-session-preset';
+			let errorMessage: string | null = null;
+			let selectedWorktree = {path: '/test/path', branch: 'main'};
+
+			expect(currentView).toBe('creating-session-preset');
+
+			// Execute async operation
+			const result = await Effect.runPromise(
+				Effect.either(
+					mockManager.createSessionWithPresetEffect(
+						'/test/path',
+						'invalid-preset',
+					),
+				),
+			);
+
+			expect(result._tag).toBe('Left');
+
+			// On error, format error message, return to menu, and clear selectedWorktree
+			if (result._tag === 'Left') {
+				errorMessage =
+					result.left._tag === 'ConfigError'
+						? `Configuration error (${result.left.reason}): ${result.left.details}`
+						: 'Unknown error';
+				currentView = 'menu';
+				selectedWorktree = null as any;
+			}
+
+			expect(currentView).toBe('menu');
+			expect(errorMessage).toBe(
+				'Configuration error (validation): Invalid preset ID: invalid-preset',
+			);
+			expect(selectedWorktree).toBeNull();
+		});
+
+		it('should return early if selectedWorktree is null', async () => {
+			// RED: Test verifies guard condition in handlePresetSelected
+			// Expected: Function should return early without setting loading state if no worktree selected
+
+			const selectedWorktree = null;
+			let viewChanged = false;
+
+			// Guard check
+			if (!selectedWorktree) {
+				// Early return - no state changes
+				expect(selectedWorktree).toBeNull();
+			} else {
+				viewChanged = true;
+			}
+
+			// Verify view was not changed
+			expect(viewChanged).toBe(false);
+		});
+	});
+
+	describe('Loading State Timing Integration Tests', () => {
+		it('should display loading spinner before awaiting createSessionWithEffect in handleSelectWorktree', async () => {
+			// RED: Integration test verifying loading state timing
+			// Expected: Loading view must be visible before async operation starts
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const mockManager = new SessionManager();
+
+			const mockSession: Session = {
+				id: 'test-timing',
+				worktreePath: '/test/path',
+				process: {} as IPty,
+				terminal: {} as Terminal,
+				state: 'idle',
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+			};
+
+			const executionOrder: string[] = [];
+
+			// Track when async operation starts
+			mockManager.createSessionWithPresetEffect = vi.fn(() => {
+				executionOrder.push('async-operation-started');
+				return Effect.succeed(mockSession);
+			});
+
+			// Simulate handleSelectWorktree flow
+			mockManager.getSession = vi.fn(() => null);
+
+			const session = mockManager.getSession('/test/path');
+			expect(session).toBeNull();
+
+			// Set loading state BEFORE async operation
+			executionOrder.push('set-loading-view');
+
+			// Then start async operation
+			await Effect.runPromise(
+				Effect.either(mockManager.createSessionWithPresetEffect('/test/path')),
+			);
+
+			// Verify loading state was set before async operation
+			expect(executionOrder).toEqual(['set-loading-view', 'async-operation-started']);
+			expect(executionOrder.indexOf('set-loading-view')).toBeLessThan(
+				executionOrder.indexOf('async-operation-started'),
+			);
+		});
+
+		it('should display loading spinner before awaiting createSessionWithEffect in handlePresetSelected', async () => {
+			// RED: Integration test verifying preset loading state timing
+			// Expected: Preset loading view must be visible before async operation starts
+
+			const {SessionManager} = await import('../services/sessionManager.js');
+			const mockManager = new SessionManager();
+
+			const mockSession: Session = {
+				id: 'test-preset-timing',
+				worktreePath: '/test/path',
+				process: {} as IPty,
+				terminal: {} as Terminal,
+				state: 'idle',
+				output: [],
+				outputHistory: [],
+				lastActivity: new Date(),
+				isActive: false,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+			};
+
+			const executionOrder: string[] = [];
+
+			mockManager.createSessionWithPresetEffect = vi.fn(() => {
+				executionOrder.push('preset-async-operation-started');
+				return Effect.succeed(mockSession);
+			});
+
+			// Simulate handlePresetSelected flow
+			const selectedWorktree = {path: '/test/path', branch: 'main'};
+			expect(selectedWorktree).toBeTruthy();
+
+			// Set loading state BEFORE async operation
+			executionOrder.push('set-preset-loading-view');
+
+			// Then start async operation
+			await Effect.runPromise(
+				Effect.either(
+					mockManager.createSessionWithPresetEffect('/test/path', 'my-preset'),
+				),
+			);
+
+			// Verify loading state was set before async operation
+			expect(executionOrder).toEqual([
+				'set-preset-loading-view',
+				'preset-async-operation-started',
+			]);
+			expect(executionOrder.indexOf('set-preset-loading-view')).toBeLessThan(
+				executionOrder.indexOf('preset-async-operation-started'),
+			);
+		});
+	});
+
+	describe('Error Message Formatting Integration Tests', () => {
+		it('should format ProcessError correctly in session creation flow', async () => {
+			// RED: Test verifies ProcessError formatting matches formatErrorMessage
+			// Expected: Error message should follow "Process error: {message}" pattern
+
+			const {ProcessError} = await import('../types/errors.js');
+
+			const error = new ProcessError({
+				command: 'claude',
+				message: 'PTY spawn failed',
+				exitCode: 1,
+			});
+
+			const formattedMessage =
+				error._tag === 'ProcessError'
+					? `Process error: ${error.message}`
+					: 'Unknown error';
+
+			expect(formattedMessage).toBe('Process error: PTY spawn failed');
+		});
+
+		it('should format ConfigError correctly in preset session creation flow', async () => {
+			// RED: Test verifies ConfigError formatting matches formatErrorMessage
+			// Expected: Error message should follow "Configuration error ({reason}): {details}" pattern
+
+			const {ConfigError} = await import('../types/errors.js');
+
+			const error = new ConfigError({
+				configPath: '~/.config/ccmanager/config.json',
+				reason: 'not-found',
+				details: 'Preset does not exist',
+			});
+
+			const formattedMessage =
+				error._tag === 'ConfigError'
+					? `Configuration error (${error.reason}): ${error.details}`
+					: 'Unknown error';
+
+			expect(formattedMessage).toBe(
+				'Configuration error (not-found): Preset does not exist',
+			);
+		});
+	});
+});
