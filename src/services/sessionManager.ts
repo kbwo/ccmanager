@@ -124,17 +124,20 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	/**
 	 * Create session with command preset using Effect-based error handling
 	 *
+	 * @param {string} worktreePath - Path to the worktree
+	 * @param {string} [presetId] - Optional preset ID, uses default if not provided
+	 * @returns {Effect.Effect<Session, ProcessError | ConfigError, never>} Effect that may fail with ProcessError (spawn failure) or ConfigError (invalid preset)
+	 *
 	 * @example
 	 * ```typescript
+	 * // Use Effect.match for type-safe error handling
 	 * const result = await Effect.runPromise(
-	 *   Effect.match(sessionManager.createSessionWithPresetEffect('/path/to/worktree'), {
+	 *   Effect.match(effect, {
 	 *     onFailure: (error) => ({ type: 'error', message: error.message }),
 	 *     onSuccess: (session) => ({ type: 'success', data: session })
 	 *   })
 	 * );
 	 * ```
-	 *
-	 * @returns Effect that may fail with ProcessError (spawn failure) or ConfigError (invalid preset)
 	 */
 	createSessionWithPresetEffect(
 		worktreePath: string,
@@ -411,17 +414,19 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	/**
 	 * Terminate session and cleanup resources using Effect-based error handling
 	 *
+	 * @param {string} worktreePath - Path to the worktree
+	 * @returns {Effect.Effect<void, ProcessError, never>} Effect that may fail with ProcessError if session does not exist or cleanup fails
+	 *
 	 * @example
 	 * ```typescript
+	 * // Terminate session with error handling
 	 * const result = await Effect.runPromise(
-	 *   Effect.match(sessionManager.terminateSessionEffect('/path/to/worktree'), {
+	 *   Effect.match(effect, {
 	 *     onFailure: (error) => ({ type: 'error', message: error.message }),
 	 *     onSuccess: () => ({ type: 'success' })
 	 *   })
 	 * );
 	 * ```
-	 *
-	 * @returns Effect that may fail with ProcessError if session does not exist or cleanup fails
 	 */
 	terminateSessionEffect(
 		worktreePath: string,

@@ -36,43 +36,10 @@ const CLAUDE_DIR = '.claude';
  * - Use error discrimination via `error._tag` property for TypeScript type narrowing
  * - Compose Effects with `Effect.flatMap()`, `Effect.all()`, `Effect.catchTag()`, etc.
  *
- * @example Basic worktree query
+ * @example
  * ```typescript
+ * // See individual method JSDoc for specific usage examples
  * const service = new WorktreeService();
- * const worktrees = await Effect.runPromise(service.getWorktreesEffect());
- * ```
- *
- * @example Error handling with Effect.match
- * ```typescript
- * const result = await Effect.runPromise(
- *   Effect.match(service.getWorktreesEffect(), {
- *     onFailure: (error: GitError) => ({ type: 'error', error }),
- *     onSuccess: (worktrees) => ({ type: 'success', data: worktrees })
- *   })
- * );
- * ```
- *
- * @example Error discrimination with _tag
- * ```typescript
- * try {
- *   await Effect.runPromise(service.createWorktreeEffect(...));
- * } catch (error) {
- *   if (error._tag === 'GitError') {
- *     console.error(`Git failed: ${error.stderr}`);
- *   } else if (error._tag === 'FileSystemError') {
- *     console.error(`FS failed: ${error.cause}`);
- *   }
- * }
- * ```
- *
- * @example Parallel queries with Effect.all
- * ```typescript
- * const [branches, defaultBranch] = await Effect.runPromise(
- *   Effect.all([
- *     service.getAllBranchesEffect(),
- *     service.getDefaultBranchEffect()
- *   ], { concurrency: 2 })
- * );
  * ```
  */
 export class WorktreeService {
@@ -289,19 +256,14 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Check if branch has .claude directory
 	 * const hasClaudeDir = await Effect.runPromise(
-	 *   service.hasClaudeDirectoryInBranchEffect('feature-branch')
+	 *   effect
 	 * );
 	 *
 	 * // Or use Effect.match for error handling
 	 * const result = await Effect.runPromise(
-	 *   Effect.match(service.hasClaudeDirectoryInBranchEffect('feature-branch'), {
+	 *   Effect.match(effect, {
 	 *     onFailure: (error: GitError) => ({
 	 *       type: 'error' as const,
 	 *       message: error.stderr
@@ -371,23 +333,15 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Copy .claude directory from main branch
 	 * await Effect.runPromise(
-	 *   service.copyClaudeDirectoryFromBaseBranchEffect(
-	 *     '/path/to/new/worktree',
-	 *     'main'
-	 *   )
+	 *   effect
 	 * );
 	 *
 	 * // With error handling
 	 * const result = await Effect.runPromise(
 	 *   Effect.catchAll(
-	 *     service.copyClaudeDirectoryFromBaseBranchEffect(worktreePath, baseBranch),
+	 *     effect,
 	 *     (error) => {
 	 *       console.warn('Could not copy .claude directory:', error);
 	 *       return Effect.succeed(undefined); // Continue despite error
@@ -470,14 +424,9 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Use Effect.match for type-safe error handling
 	 * const result = await Effect.runPromise(
-	 *   Effect.match(service.getDefaultBranchEffect(), {
+	 *   Effect.match(effect, {
 	 *     onFailure: (error: GitError) => ({
 	 *       type: 'error' as const,
 	 *       message: `Failed to get default branch: ${error.stderr}`
@@ -563,20 +512,15 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Execute in async context - this operation returns empty array on failure
 	 * const branches = await Effect.runPromise(
-	 *   service.getAllBranchesEffect()
+	 *   effect
 	 * );
 	 * console.log(`Found ${branches.length} branches`);
 	 *
 	 * // Or use Effect.match for explicit error handling
 	 * const result = await Effect.runPromise(
-	 *   Effect.match(service.getAllBranchesEffect(), {
+	 *   Effect.match(effect, {
 	 *     onFailure: (error: GitError) => ({
 	 *       type: 'error' as const,
 	 *       message: error.stderr
@@ -641,14 +585,9 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Use Effect.match for type-safe error handling
 	 * const result = await Effect.runPromise(
-	 *   Effect.match(service.getCurrentBranchEffect(), {
+	 *   Effect.match(effect, {
 	 *     onFailure: (error: GitError) => ({
 	 *       type: 'error' as const,
 	 *       message: `Failed to get current branch: ${error.stderr}`
@@ -699,19 +638,14 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Execute in async context
 	 * const worktrees = await Effect.runPromise(
-	 *   service.getWorktreesEffect()
+	 *   effect
 	 * );
 	 *
 	 * // Or use Effect.match for type-safe error handling
 	 * const result = await Effect.runPromise(
-	 *   Effect.match(service.getWorktreesEffect(), {
+	 *   Effect.match(effect, {
 	 *     onFailure: (error: GitError) => ({
 	 *       type: 'error' as const,
 	 *       message: `Git error: ${error.stderr}`
@@ -848,22 +782,10 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 * import {GitError, FileSystemError} from './types/errors.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Create new worktree with Effect.match for error handling
 	 * const result = await Effect.runPromise(
 	 *   Effect.match(
-	 *     service.createWorktreeEffect(
-	 *       './feature-branch',
-	 *       'feature-xyz',
-	 *       'main',
-	 *       true, // copy session data
-	 *       false
-	 *     ),
+	 *     effect,
 	 *     {
 	 *       onFailure: (error: GitError | FileSystemError) => {
 	 *         switch (error._tag) {
@@ -1046,15 +968,10 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Delete worktree with Effect.catchTag for specific error handling
 	 * await Effect.runPromise(
 	 *   Effect.catchTag(
-	 *     service.deleteWorktreeEffect('./feature-branch', {deleteBranch: true}),
+	 *     effect,
 	 *     'GitError',
 	 *     (error) => {
 	 *       console.error(`Failed to delete worktree: ${error.stderr}`);
@@ -1156,23 +1073,18 @@ export class WorktreeService {
 	 *
 	 * @example
 	 * ```typescript
-	 * import {Effect} from 'effect';
-	 * import {WorktreeService} from './services/worktreeService.js';
-	 *
-	 * const service = new WorktreeService();
-	 *
 	 * // Merge with Effect.all for parallel operations
 	 * await Effect.runPromise(
 	 *   Effect.all([
-	 *     service.mergeWorktreeEffect('feature-1', 'main', false),
-	 *     service.mergeWorktreeEffect('feature-2', 'main', false)
+	 *     effect1,
+	 *     effect2
 	 *   ], {concurrency: 1}) // Sequential to avoid conflicts
 	 * );
 	 *
 	 * // Or use Effect.catchAll for fallback behavior
 	 * const result = await Effect.runPromise(
 	 *   Effect.catchAll(
-	 *     service.mergeWorktreeEffect('feature-xyz', 'main', true),
+	 *     effect,
 	 *     (error: GitError) => {
 	 *       console.error(`Merge failed: ${error.stderr}`);
 	 *       // Return alternative Effect or rethrow

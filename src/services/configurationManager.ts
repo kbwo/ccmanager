@@ -327,7 +327,14 @@ export class ConfigurationManager {
 	/**
 	 * Load configuration from file with Effect-based error handling
 	 *
-	 * @returns Effect<ConfigurationData, FileSystemError | ConfigError, never> - Configuration data on success, errors on failure
+	 * @returns {Effect.Effect<ConfigurationData, FileSystemError | ConfigError, never>} Configuration data on success, errors on failure
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await Effect.runPromise(
+	 *   configManager.loadConfigEffect()
+	 * );
+	 * ```
 	 */
 	loadConfigEffect(): Effect.Effect<
 		ConfigurationData,
@@ -368,7 +375,14 @@ export class ConfigurationManager {
 	/**
 	 * Save configuration to file with Effect-based error handling
 	 *
-	 * @returns Effect<void, FileSystemError, never> - Void on success, FileSystemError on write failure
+	 * @returns {Effect.Effect<void, FileSystemError, never>} Void on success, FileSystemError on write failure
+	 *
+	 * @example
+	 * ```typescript
+	 * await Effect.runPromise(
+	 *   configManager.saveConfigEffect(config)
+	 * );
+	 * ```
 	 */
 	saveConfigEffect(
 		config: ConfigurationData,
@@ -456,7 +470,14 @@ export class ConfigurationManager {
 	/**
 	 * Set shortcuts with Effect-based error handling
 	 *
-	 * @returns Effect<void, FileSystemError, never> - Void on success, FileSystemError on save failure
+	 * @returns {Effect.Effect<void, FileSystemError, never>} Void on success, FileSystemError on save failure
+	 *
+	 * @example
+	 * ```typescript
+	 * await Effect.runPromise(
+	 *   configManager.setShortcutsEffect(shortcuts)
+	 * );
+	 * ```
 	 */
 	setShortcutsEffect(
 		shortcuts: ShortcutConfig,
