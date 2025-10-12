@@ -105,7 +105,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - _Requirements: 1.4, 1.5, 5.5, 9.2, 9.3, 9.4_
 
 - [ ] 5. Implement error handling with loading state cleanup
-- [ ] 5.1 Ensure Effect-based error handling properly clears loading states
+- [x] 5.1 Ensure Effect-based error handling properly clears loading states
   - Verify all Effect.runPromise calls with Effect.either handle both success and error paths
   - Ensure formatErrorMessage is called for all AppError types during loading operations
   - Verify loading state cleanup occurs in both success and error branches
