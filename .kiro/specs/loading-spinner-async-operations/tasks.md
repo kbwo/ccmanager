@@ -86,7 +86,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Use cancellation flag pattern to prevent state updates on unmounted component
   - _Requirements: 1.1, 1.4, 1.5, 1.6, 5.1, 5.3, 5.4, 5.5_
 
-- [ ] 4.2 Enhance handlePresetSelected with loading state for preset session creation
+- [x] 4.2 Enhance handlePresetSelected with loading state for preset session creation
   - Set view to 'creating-session-preset' before calling createSessionWithEffect with preset ID
   - Ensure loading state is set before awaiting the promise
   - Implement proper state cleanup in success path (navigate to session view)

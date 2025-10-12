@@ -329,6 +329,9 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const handlePresetSelected = async (presetId: string) => {
 		if (!selectedWorktree) return;
 
+		// Set loading state before async operation
+		setView('creating-session-preset');
+
 		// Create session with selected preset using Effect
 		const result = await createSessionWithEffect(
 			selectedWorktree.path,
