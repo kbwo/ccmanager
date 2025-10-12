@@ -340,18 +340,27 @@ describe('ProjectList', () => {
 			/>,
 		);
 
+		// Wait for loading to finish
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Force rerender
+		rerender(
+			<ProjectList
+				projectsDir="/projects"
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+			/>,
+		);
+
 		// Wait for projects to load
-		await vi.waitFor(() => {
-			rerender(
-				<ProjectList
-					projectsDir="/projects"
-					onSelectProject={mockOnSelectProject}
-					error={null}
-					onDismissError={mockOnDismissError}
-				/>,
-			);
-			return lastFrame()?.includes('No git repositories found') ?? false;
-		});
+		await vi.waitFor(
+			() => {
+				const frame = lastFrame();
+				return frame && !frame.includes('Loading projects...');
+			},
+			{timeout: 2000},
+		);
 
 		expect(lastFrame()).toContain('No git repositories found in /projects');
 	});
@@ -874,18 +883,27 @@ describe('ProjectList', () => {
 				/>,
 			);
 
+			// Wait for loading to finish
+			await new Promise(resolve => setTimeout(resolve, 100));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
 			// Wait for projects to attempt loading
-			await vi.waitFor(() => {
-				rerender(
-					<ProjectList
-						projectsDir="/projects"
-						onSelectProject={mockOnSelectProject}
-						error={null}
-						onDismissError={mockOnDismissError}
-					/>,
-				);
-				return !lastFrame()?.includes('Loading projects...');
-			});
+			await vi.waitFor(
+				() => {
+					const frame = lastFrame();
+					return frame && !frame.includes('Loading projects...');
+				},
+				{timeout: 2000},
+			);
 
 			// Should display error message with FileSystemError details
 			const frame = lastFrame();
@@ -983,18 +1001,27 @@ describe('ProjectList', () => {
 				/>,
 			);
 
+			// Wait for loading to finish
+			await new Promise(resolve => setTimeout(resolve, 100));
+
+			// Force rerender
+			rerender(
+				<ProjectList
+					projectsDir="/projects"
+					onSelectProject={mockOnSelectProject}
+					error={null}
+					onDismissError={mockOnDismissError}
+				/>,
+			);
+
 			// Wait for projects to load
-			await vi.waitFor(() => {
-				rerender(
-					<ProjectList
-						projectsDir="/projects"
-						onSelectProject={mockOnSelectProject}
-						error={null}
-						onDismissError={mockOnDismissError}
-					/>,
-				);
-				return lastFrame()?.includes('project1') ?? false;
-			});
+			await vi.waitFor(
+				() => {
+					const frame = lastFrame();
+					return frame && frame.includes('project1');
+				},
+				{timeout: 2000},
+			);
 
 			// Should display loaded projects
 			const frame = lastFrame();

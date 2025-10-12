@@ -22,7 +22,7 @@ describe('LoadingSpinner', () => {
 		vi.restoreAllMocks();
 	});
 
-	describe('1.1 Core LoadingSpinner component with Unicode animation', () => {
+	describe('Core LoadingSpinner component with Unicode animation', () => {
 		it('should render with default props and display message with cyan spinner', () => {
 			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
 
@@ -87,7 +87,7 @@ describe('LoadingSpinner', () => {
 		});
 	});
 
-	describe('1.2 Component variations and edge cases', () => {
+	describe('Component variations and edge cases', () => {
 		it('should accept "green" color option', () => {
 			const {lastFrame} = render(
 				<LoadingSpinner message="Success loading..." color="green" />,
@@ -152,7 +152,7 @@ describe('LoadingSpinner', () => {
 		});
 	});
 
-	describe('6.1 Terminal compatibility detection', () => {
+	describe('Terminal compatibility detection', () => {
 		it('should automatically detect Unicode support and use Unicode frames', () => {
 			// Set up environment for Unicode support
 			process.env['TERM'] = 'xterm-256color';

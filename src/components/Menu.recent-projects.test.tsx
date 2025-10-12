@@ -1,6 +1,7 @@
 import React from 'react';
 import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
 import {render} from 'ink-testing-library';
+import {Effect} from 'effect';
 import Menu from './Menu.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -44,6 +45,12 @@ vi.mock('../services/projectManager.js', () => ({
 	},
 }));
 
+vi.mock('../services/globalSessionOrchestrator.js', () => ({
+	globalSessionOrchestrator: {
+		getProjectSessions: vi.fn().mockReturnValue([]),
+	},
+}));
+
 vi.mock('../services/shortcutManager.js', () => ({
 	shortcutManager: {
 		getShortcutDisplay: vi.fn().mockReturnValue('Ctrl+C'),
@@ -75,15 +82,17 @@ describe('Menu - Recent Projects', () => {
 		} as unknown as SessionManager;
 
 		mockWorktreeService = {
-			getWorktrees: vi.fn().mockReturnValue([
-				{
-					path: '/workspace/main',
-					branch: 'main',
-					isMainWorktree: true,
-					hasSession: false,
-				},
-			]),
-			getDefaultBranch: vi.fn().mockReturnValue('main'),
+			getWorktreesEffect: vi.fn().mockReturnValue(
+				Effect.succeed([
+					{
+						path: '/workspace/main',
+						branch: 'main',
+						isMainWorktree: true,
+						hasSession: false,
+					},
+				]),
+			),
+			getDefaultBranchEffect: vi.fn().mockReturnValue(Effect.succeed('main')),
 			getGitRootPath: vi.fn().mockReturnValue('/default/project'),
 		} as unknown as WorktreeService;
 
@@ -113,11 +122,20 @@ describe('Menu - Recent Projects', () => {
 		expect(output).not.toContain('Project 1');
 	});
 
-	it('should show recent projects in multi-project mode', () => {
+	it('should show recent projects in multi-project mode', async () => {
 		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
 			{path: '/project1', name: 'Project 1', lastAccessed: 2000},
 			{path: '/project2', name: 'Project 2', lastAccessed: 1000},
 		]);
+
+		// Mock SessionManager static methods
+		vi.spyOn(SessionManager, 'getSessionCounts').mockReturnValue({
+			idle: 0,
+			busy: 0,
+			waiting_input: 0,
+			total: 0,
+		});
+		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
 
 		const {lastFrame} = render(
 			<Menu
@@ -128,6 +146,9 @@ describe('Menu - Recent Projects', () => {
 				multiProject={true}
 			/>,
 		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
 
 		const output = lastFrame();
 		expect(output).toContain('─ Recent ─');
@@ -152,13 +173,22 @@ describe('Menu - Recent Projects', () => {
 		expect(output).not.toContain('─ Recent ─');
 	});
 
-	it('should show up to 5 recent projects', () => {
+	it('should show up to 5 recent projects', async () => {
 		const manyProjects = Array.from({length: 5}, (_, i) => ({
 			path: `/project${i}`,
 			name: `Project ${i}`,
 			lastAccessed: i * 1000,
 		}));
 		vi.mocked(projectManager.getRecentProjects).mockReturnValue(manyProjects);
+
+		// Mock SessionManager static methods
+		vi.spyOn(SessionManager, 'getSessionCounts').mockReturnValue({
+			idle: 0,
+			busy: 0,
+			waiting_input: 0,
+			total: 0,
+		});
+		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
 
 		const {lastFrame} = render(
 			<Menu
@@ -169,6 +199,9 @@ describe('Menu - Recent Projects', () => {
 				multiProject={true}
 			/>,
 		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
 
 		const output = lastFrame();
 		expect(output).toContain('─ Recent ─');
