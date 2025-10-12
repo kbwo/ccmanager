@@ -1247,6 +1247,11 @@ const recentProjects = await projectManager.getRecentProjects();
     - `copyClaudeSessionData()`: Wrapped in Effect.try when called, keeping implementation simple
     - `getCurrentBranch()`: Marked @deprecated, only used as fallback in `getWorktreesEffect`
 
+- **loading-spinner-async-operations**: 🚧 **IN PROGRESS**
+  - Add loading spinner UI feedback for promise-based async operations in App.tsx
+  - Target operations: session creation, worktree creation/deletion, command execution
+  - Ensure consistent user experience during long-running operations
+
 ## Future Enhancements
 
 - Session recording and playback
