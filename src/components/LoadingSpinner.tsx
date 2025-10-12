@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text} from 'ink';
+import {supportsUnicode} from '../utils/terminalCapabilities.js';
 
 interface LoadingSpinnerProps {
 	message: string;
@@ -9,7 +10,7 @@ interface LoadingSpinnerProps {
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 	message,
-	spinnerType = 'dots',
+	spinnerType,
 	color = 'cyan',
 }) => {
 	const [frameIndex, setFrameIndex] = useState(0);
@@ -20,8 +21,18 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 	// ASCII frames for "line" spinner type (fallback for limited terminal support)
 	const asciiFrames = ['-', '\\', '|', '/'];
 
-	// Select frames based on spinner type
-	const frames = spinnerType === 'line' ? asciiFrames : unicodeFrames;
+	// Determine effective spinner type:
+	// 1. If explicit spinnerType is provided, use it
+	// 2. Otherwise, detect terminal capabilities automatically
+	const effectiveSpinnerType =
+		spinnerType !== undefined
+			? spinnerType
+			: supportsUnicode()
+				? 'dots'
+				: 'line';
+
+	// Select frames based on effective spinner type
+	const frames = effectiveSpinnerType === 'line' ? asciiFrames : unicodeFrames;
 
 	useEffect(() => {
 		// Set up animation interval - update frame every 120ms

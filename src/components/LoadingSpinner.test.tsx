@@ -4,7 +4,21 @@ import {render} from 'ink-testing-library';
 import LoadingSpinner from './LoadingSpinner.js';
 
 describe('LoadingSpinner', () => {
+	// Store original environment variables for restoration
+	const originalEnv = {...process.env};
+	const originalPlatform = process.platform;
+
 	afterEach(() => {
+		// Restore original environment
+		process.env = {...originalEnv};
+
+		// Restore platform if it was modified
+		Object.defineProperty(process, 'platform', {
+			value: originalPlatform,
+			writable: true,
+			configurable: true,
+		});
+
 		vi.restoreAllMocks();
 	});
 
@@ -135,6 +149,102 @@ describe('LoadingSpinner', () => {
 			const output = lastFrame();
 			// Default should be Unicode dots, not ASCII line
 			expect(output).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+		});
+	});
+
+	describe('6.1 Terminal compatibility detection', () => {
+		it('should automatically detect Unicode support and use Unicode frames', () => {
+			// Set up environment for Unicode support
+			process.env.TERM = 'xterm-256color';
+
+			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
+
+			const output = lastFrame();
+			// Should use Unicode frames when terminal supports it
+			expect(output).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+			expect(output).toContain('Loading...');
+		});
+
+		it('should automatically fallback to ASCII when terminal does not support Unicode', () => {
+			// Set up environment without Unicode support
+			process.env.TERM = 'dumb';
+			delete process.env.LANG;
+			delete process.env.LC_ALL;
+
+			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
+
+			const output = lastFrame();
+			// Should use ASCII frames when terminal doesn't support Unicode
+			expect(output).toMatch(/[-\\|/]/);
+			expect(output).toContain('Loading...');
+		});
+
+		it('should respect explicit spinnerType prop over automatic detection', () => {
+			// Even with Unicode support, explicit "line" should use ASCII
+			process.env.TERM = 'xterm-256color';
+
+			const {lastFrame} = render(
+				<LoadingSpinner message="Loading..." spinnerType="line" />,
+			);
+
+			const output = lastFrame();
+			// Explicit spinnerType should override detection
+			expect(output).toMatch(/[-\\|/]/);
+		});
+
+		it('should detect Unicode support on Windows with Windows Terminal', () => {
+			// Mock Windows platform
+			Object.defineProperty(process, 'platform', {
+				value: 'win32',
+				writable: true,
+				configurable: true,
+			});
+			process.env.WT_SESSION = 'some-session-id';
+
+			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
+
+			const output = lastFrame();
+			// Should use Unicode on Windows Terminal
+			expect(output).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+		});
+
+		it('should fallback to ASCII on Windows without Windows Terminal', () => {
+			// Mock Windows platform without Windows Terminal
+			Object.defineProperty(process, 'platform', {
+				value: 'win32',
+				writable: true,
+				configurable: true,
+			});
+			delete process.env.WT_SESSION;
+			delete process.env.TERM;
+			delete process.env.LANG;
+
+			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
+
+			const output = lastFrame();
+			// Should use ASCII on Windows without WT
+			expect(output).toMatch(/[-\\|/]/);
+		});
+
+		it('should detect Unicode support from LANG environment variable', () => {
+			delete process.env.TERM;
+			process.env.LANG = 'en_US.UTF-8';
+
+			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
+
+			const output = lastFrame();
+			// Should use Unicode when LANG indicates UTF-8
+			expect(output).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+		});
+
+		it('should detect Unicode support with appropriate frame rate', () => {
+			process.env.TERM = 'xterm-256color';
+
+			const setIntervalSpy = vi.spyOn(global, 'setInterval');
+			render(<LoadingSpinner message="Loading..." />);
+
+			// Verify frame rate is 120ms regardless of detection
+			expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 120);
 		});
 	});
 });
