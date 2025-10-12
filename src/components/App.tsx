@@ -34,6 +34,8 @@ type View =
 	| 'session'
 	| 'new-worktree'
 	| 'creating-worktree'
+	| 'creating-session'
+	| 'creating-session-preset'
 	| 'delete-worktree'
 	| 'deleting-worktree'
 	| 'merge-worktree'
