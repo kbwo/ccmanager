@@ -684,6 +684,37 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		);
 	}
 
+	if (view === 'creating-session') {
+		// Compose message based on devcontainerConfig presence
+		const message = devcontainerConfig
+			? 'Starting devcontainer and creating session...'
+			: 'Creating session...';
+
+		// Use yellow color for devcontainer operations (longer duration),
+		// cyan for standard session creation
+		const color = devcontainerConfig ? 'yellow' : 'cyan';
+
+		return (
+			<Box flexDirection="column">
+				<LoadingSpinner message={message} color={color} />
+			</Box>
+		);
+	}
+
+	if (view === 'creating-session-preset') {
+		// Always display preset-specific message
+		const message = 'Creating session with preset...';
+
+		// Use yellow color for devcontainer, cyan for standard
+		const color = devcontainerConfig ? 'yellow' : 'cyan';
+
+		return (
+			<Box flexDirection="column">
+				<LoadingSpinner message={message} color={color} />
+			</Box>
+		);
+	}
+
 	if (view === 'clearing') {
 		// Render nothing during the clearing phase to ensure clean transition
 		return null;
