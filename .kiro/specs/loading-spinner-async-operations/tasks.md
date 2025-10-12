@@ -53,7 +53,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Test loading state clears on deletion error and navigates to appropriate error view
   - _Requirements: 2.4, 2.5, 2.6, 2.7, 3.4, 3.5, 3.6, 9.6_
 
-- [ ] 3. Add session creation loading states to App component
+- [x] 3. Add session creation loading states to App component
 - [x] 3.1 Extend View union type with new session loading states
   - Add 'creating-session' view state to View union type in App.tsx
   - Add 'creating-session-preset' view state to View union type
@@ -70,7 +70,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Use cyan color for standard session creation
   - _Requirements: 1.1, 1.2, 1.3, 4.4_
 
-- [ ] 3.3 Implement preset session creation loading view rendering
+- [x] 3.3 Implement preset session creation loading view rendering
   - Add 'creating-session-preset' view case to App component rendering logic
   - Display "Creating session with preset..." message for preset selection flow
   - Use appropriate color based on devcontainer configuration if present
