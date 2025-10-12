@@ -10,6 +10,7 @@ import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import RemoteBranchSelector from './RemoteBranchSelector.js';
+import LoadingSpinner from './LoadingSpinner.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -76,6 +77,12 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		copyClaudeDirectory: boolean;
 		ambiguousError: AmbiguousBranchError;
 	} | null>(null);
+
+	// State for loading context - track flags for message composition
+	const [loadingContext, setLoadingContext] = useState<{
+		copySessionData?: boolean;
+		deleteBranch?: boolean;
+	}>({});
 
 	// Helper function to format error messages based on error type using _tag discrimination
 	const formatErrorMessage = (error: AppError): string => {
@@ -374,6 +381,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		copySessionData: boolean,
 		copyClaudeDirectory: boolean,
 	) => {
+		// Set loading context before showing loading view
+		setLoadingContext({copySessionData});
 		setView('creating-worktree');
 		setError(null);
 
@@ -419,6 +428,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		setPendingWorktreeCreation(null);
 
 		// Retry worktree creation with the resolved base branch
+		// Set loading context before showing loading view
+		setLoadingContext({copySessionData: creationData.copySessionData});
 		setView('creating-worktree');
 		setError(null);
 
@@ -455,6 +466,8 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		worktreePaths: string[],
 		deleteBranch: boolean,
 	) => {
+		// Set loading context before showing loading view
+		setLoadingContext({deleteBranch});
 		setView('deleting-worktree');
 		setError(null);
 
@@ -588,9 +601,14 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	}
 
 	if (view === 'creating-worktree') {
+		// Compose message based on loading context
+		const message = loadingContext.copySessionData
+			? 'Creating worktree and copying session data...'
+			: 'Creating worktree...';
+
 		return (
 			<Box flexDirection="column">
-				<Text color="green">Creating worktree...</Text>
+				<LoadingSpinner message={message} color="cyan" />
 			</Box>
 		);
 	}
@@ -612,9 +630,14 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	}
 
 	if (view === 'deleting-worktree') {
+		// Compose message based on loading context
+		const message = loadingContext.deleteBranch
+			? 'Deleting worktrees and branches...'
+			: 'Deleting worktrees...';
+
 		return (
 			<Box flexDirection="column">
-				<Text color="red">Deleting worktrees...</Text>
+				<LoadingSpinner message={message} color="cyan" />
 			</Box>
 		);
 	}

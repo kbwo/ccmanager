@@ -23,8 +23,8 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Test spinner type variations (dots vs line) render correctly
   - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 2. Enhance existing worktree creation and deletion loading views
-- [ ] 2.1 Integrate LoadingSpinner into worktree creation view
+- [x] 2. Enhance existing worktree creation and deletion loading views
+- [x] 2.1 Integrate LoadingSpinner into worktree creation view
   - Enhance 'creating-worktree' view rendering to include LoadingSpinner component
   - Implement message composition logic checking copySessionData flag
   - Display "Creating worktree and copying session data..." when session data copy is enabled
@@ -33,7 +33,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Use cyan color for normal worktree creation operations
   - _Requirements: 2.1, 2.2, 2.3, 6.1, 6.3_
 
-- [ ] 2.2 Integrate LoadingSpinner into worktree deletion view
+- [x] 2.2 Integrate LoadingSpinner into worktree deletion view
   - Enhance 'deleting-worktree' view rendering to include LoadingSpinner component
   - Implement message composition logic checking deleteBranch flag
   - Display "Deleting worktrees and branches..." when branch deletion is enabled
@@ -42,7 +42,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Ensure spinner persists throughout sequential deletion loop
   - _Requirements: 3.1, 3.2, 3.3, 6.2, 6.3_
 
-- [ ] 2.3 Write integration tests for enhanced worktree views
+- [x] 2.3 Write integration tests for enhanced worktree views
   - Test worktree creation view displays correct message without session data copy
   - Test worktree creation view displays enhanced message with session data copy enabled
   - Test worktree deletion view displays correct message without branch deletion
