@@ -18,7 +18,7 @@
  */
 export function supportsUnicode(): boolean {
 	// Check for explicitly non-Unicode terminals
-	const term = process.env.TERM;
+	const term = process.env['TERM'];
 	if (term === 'dumb') {
 		return false;
 	}
@@ -26,7 +26,7 @@ export function supportsUnicode(): boolean {
 	// Windows-specific detection
 	if (process.platform === 'win32') {
 		// Windows Terminal supports Unicode
-		if (process.env.WT_SESSION) {
+		if (process.env['WT_SESSION']) {
 			return true;
 		}
 		// Without Windows Terminal or explicit TERM, assume no Unicode
@@ -66,12 +66,12 @@ export function supportsUnicode(): boolean {
 	}
 
 	// Apple Terminal historically had issues, but with UTF-8 locale it should work
-	if (process.env.TERM_PROGRAM === 'Apple_Terminal' && !hasUtf8Locale()) {
+	if (process.env['TERM_PROGRAM'] === 'Apple_Terminal' && !hasUtf8Locale()) {
 		return false;
 	}
 
 	// CI environments often support Unicode if locale is set
-	if (process.env.CI && hasUtf8Locale()) {
+	if (process.env['CI'] && hasUtf8Locale()) {
 		return true;
 	}
 
@@ -86,6 +86,6 @@ export function supportsUnicode(): boolean {
  * @returns true if UTF-8 locale is detected
  */
 function hasUtf8Locale(): boolean {
-	const lang = process.env.LANG || process.env.LC_ALL || '';
+	const lang = process.env['LANG'] || process.env['LC_ALL'] || '';
 	return /utf-?8/i.test(lang);
 }

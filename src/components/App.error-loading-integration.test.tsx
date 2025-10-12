@@ -1,8 +1,5 @@
 import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
 import {Effect} from 'effect';
-import type {Session} from '../types/index.js';
-import type {IPty} from 'node-pty';
-import type {Terminal} from '@xterm/headless';
 
 // Mock the dependencies
 vi.mock('../services/sessionManager.js', async () => {
@@ -209,9 +206,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should clear loading state and return to form with error on GitError', async () => {
 			// RED: Test worktree creation error handling end-to-end
 			// Expected: Loading cleared, error displayed, back to new-worktree form
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -266,9 +261,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should preserve error state for display above new-worktree form', async () => {
 			// RED: Test that error persists across view transition for user context
 			// Expected: Error remains available after navigating back to form
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -316,9 +309,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should handle FileSystemError during worktree creation', async () => {
 			// RED: Test FileSystemError in worktree creation flow
 			// Expected: Clear loading, show filesystem-specific error, back to form
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {FileSystemError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -375,9 +366,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should stop deletion loop on first error and display specific error message', async () => {
 			// RED: Test sequential deletion stops on error and displays specific message
 			// Expected: Loop stops at first error, loading cleared, error displayed
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -435,9 +424,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should clear loading state and preserve error for display above delete-worktree form', async () => {
 			// RED: Test error persistence in deletion flow
 			// Expected: Error remains available after navigating back to delete form
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -481,9 +468,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should handle mixed success and error in sequential deletions', async () => {
 			// RED: Test partial success in batch deletion
 			// Expected: First deletion succeeds, second fails, loop stops
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -546,33 +531,17 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should display loading spinner again during retry after disambiguation', async () => {
 			// RED: Test that handleRemoteBranchSelected shows loading state during retry
 			// Expected: After user selects remote branch, loading spinner appears again
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const mockService = new WorktreeService();
-
-			const mockSession: Session = {
-				id: 'test-session',
-				worktreePath: '/test/path',
-				process: {} as IPty,
-				terminal: {} as Terminal,
-				state: 'idle',
-				output: [],
-				outputHistory: [],
-				lastActivity: new Date(),
-				isActive: false,
-				stateCheckInterval: undefined,
-				isPrimaryCommand: true,
-				commandConfig: undefined,
-				detectionStrategy: 'claude',
-				devcontainerConfig: undefined,
-				pendingState: undefined,
-				pendingStateStart: undefined,
-			};
 
 			// Simulate successful retry after disambiguation
 			mockService.createWorktreeEffect = vi.fn(() =>
-				Effect.succeed(mockSession),
+				Effect.succeed({
+					path: '/test/path',
+					branch: 'feature',
+					isMainWorktree: false,
+					hasSession: false,
+				}),
 			);
 
 			// Track state transitions through retry flow
@@ -617,9 +586,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should handle error during retry and navigate back to new-worktree form', async () => {
 			// RED: Test error handling during retry after disambiguation
 			// Expected: If retry fails, clear loading and show error
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -667,14 +634,19 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should clear loading state in both success and error paths during retry', async () => {
 			// RED: Test loading cleanup consistency in retry flow
 			// Expected: Loading state always cleared regardless of outcome
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
 			// Test success path
-			mockService.createWorktreeEffect = vi.fn(() => Effect.succeed(undefined));
+			mockService.createWorktreeEffect = vi.fn(() =>
+				Effect.succeed({
+					path: '/test/path',
+					branch: 'feature',
+					isMainWorktree: false,
+					hasSession: false,
+				}),
+			);
 
 			let currentView = 'creating-worktree';
 			const successResult = await Effect.runPromise(
@@ -779,9 +751,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should transition from loading view to error display in single render cycle for worktree creation', async () => {
 			// RED: Test immediate state transition for worktree errors
 			// Expected: No intermediate states between loading and error
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -839,9 +809,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 		it('should transition from loading view to error display in single render cycle for worktree deletion', async () => {
 			// RED: Test immediate state transition for deletion errors
 			// Expected: No intermediate states between loading and error
-			const {WorktreeService} = await import(
-				'../services/worktreeService.js'
-			);
+			const {WorktreeService} = await import('../services/worktreeService.js');
 			const {GitError} = await import('../types/errors.js');
 			const mockService = new WorktreeService();
 
@@ -898,9 +866,7 @@ describe('App - Error Handling Integration Tests for Loading Scenarios', () => {
 			const mockManager = new SessionManager();
 
 			mockManager.createSessionWithPresetEffect = vi.fn(() =>
-				Effect.fail(
-					new ProcessError({command: 'claude', message: 'Failed'}),
-				),
+				Effect.fail(new ProcessError({command: 'claude', message: 'Failed'})),
 			);
 
 			// Record all state changes with timestamps

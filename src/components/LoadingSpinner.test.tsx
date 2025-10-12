@@ -155,7 +155,7 @@ describe('LoadingSpinner', () => {
 	describe('6.1 Terminal compatibility detection', () => {
 		it('should automatically detect Unicode support and use Unicode frames', () => {
 			// Set up environment for Unicode support
-			process.env.TERM = 'xterm-256color';
+			process.env['TERM'] = 'xterm-256color';
 
 			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
 
@@ -167,9 +167,9 @@ describe('LoadingSpinner', () => {
 
 		it('should automatically fallback to ASCII when terminal does not support Unicode', () => {
 			// Set up environment without Unicode support
-			process.env.TERM = 'dumb';
-			delete process.env.LANG;
-			delete process.env.LC_ALL;
+			process.env['TERM'] = 'dumb';
+			delete process.env['LANG'];
+			delete process.env['LC_ALL'];
 
 			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
 
@@ -181,7 +181,7 @@ describe('LoadingSpinner', () => {
 
 		it('should respect explicit spinnerType prop over automatic detection', () => {
 			// Even with Unicode support, explicit "line" should use ASCII
-			process.env.TERM = 'xterm-256color';
+			process.env['TERM'] = 'xterm-256color';
 
 			const {lastFrame} = render(
 				<LoadingSpinner message="Loading..." spinnerType="line" />,
@@ -199,7 +199,7 @@ describe('LoadingSpinner', () => {
 				writable: true,
 				configurable: true,
 			});
-			process.env.WT_SESSION = 'some-session-id';
+			process.env['WT_SESSION'] = 'some-session-id';
 
 			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
 
@@ -215,9 +215,9 @@ describe('LoadingSpinner', () => {
 				writable: true,
 				configurable: true,
 			});
-			delete process.env.WT_SESSION;
-			delete process.env.TERM;
-			delete process.env.LANG;
+			delete process.env['WT_SESSION'];
+			delete process.env['TERM'];
+			delete process.env['LANG'];
 
 			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
 
@@ -227,8 +227,8 @@ describe('LoadingSpinner', () => {
 		});
 
 		it('should detect Unicode support from LANG environment variable', () => {
-			delete process.env.TERM;
-			process.env.LANG = 'en_US.UTF-8';
+			delete process.env['TERM'];
+			process.env['LANG'] = 'en_US.UTF-8';
 
 			const {lastFrame} = render(<LoadingSpinner message="Loading..." />);
 
@@ -238,7 +238,7 @@ describe('LoadingSpinner', () => {
 		});
 
 		it('should detect Unicode support with appropriate frame rate', () => {
-			process.env.TERM = 'xterm-256color';
+			process.env['TERM'] = 'xterm-256color';
 
 			const setIntervalSpy = vi.spyOn(global, 'setInterval');
 			render(<LoadingSpinner message="Loading..." />);
