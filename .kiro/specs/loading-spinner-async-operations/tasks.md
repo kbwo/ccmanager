@@ -113,7 +113,7 @@ This implementation plan breaks down the loading spinner feature into incrementa
   - Test ConfigError handling shows clear configuration-related error messages
   - _Requirements: 5.3, 5.4, 7.1, 7.2, 7.4_
 
-- [ ] 5.2 Handle GitError and FileSystemError during loading operations
+- [x] 5.2 Handle GitError and FileSystemError during loading operations
   - Verify GitError during worktree creation displays command, exit code, and stderr
   - Test ambiguous branch error during worktree creation clears loading and navigates to branch selector
   - Verify FileSystemError displays operation, path, and cause information
