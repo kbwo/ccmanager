@@ -209,13 +209,6 @@ describe('Menu - Recent Projects', () => {
 		expect(output).toContain('Project 4');
 	});
 
-	it('should show recent projects between worktrees and New Worktree', () => {
-		// This test validates that recent projects appear in the correct order
-		// Since all other tests pass, we can consider this behavior verified
-		// by the other test cases that check for Recent Projects rendering
-		expect(true).toBe(true);
-	});
-
 	it('should filter out current project from recent projects', async () => {
 		// Setup the initial recent projects
 		vi.mocked(projectManager.getRecentProjects).mockReturnValue([
