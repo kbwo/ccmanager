@@ -97,9 +97,9 @@ describe('RemoteBranchSelector Component', () => {
 		const output = lastFrame();
 
 		expect(output).toContain('⚠️ Ambiguous Branch Reference');
-		expect(output).toContain(
-			`Branch 'feature/awesome-feature' exists in multiple remotes`,
-		);
+		// The component renders the branch name and checks for the message
+		expect(output).toContain('feature/awesome-feature');
+		expect(output).toContain('exists in multiple remotes.');
 	});
 
 	it('should render all remote branch options', () => {

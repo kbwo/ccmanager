@@ -6,6 +6,11 @@ import {projectManager} from '../services/projectManager.js';
 import {GitProject} from '../types/index.js';
 import {Effect} from 'effect';
 
+// Mock node-pty to avoid native module loading issues
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
+
 // Type for the key parameter in useInput
 type InputKey = {
 	escape: boolean;

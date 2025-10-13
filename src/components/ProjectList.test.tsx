@@ -3,6 +3,11 @@ import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {GitProject} from '../types/index.js';
 
+// Mock node-pty to avoid native module loading issues
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
+
 // Type for the key parameter in useInput
 type InputKey = {
 	escape: boolean;
