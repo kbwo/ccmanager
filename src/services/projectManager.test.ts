@@ -1,6 +1,7 @@
 import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import {Effect, Either} from 'effect';
 
 // Mock modules before any other imports that might use them
 vi.mock('fs');
@@ -13,6 +14,7 @@ vi.mock('os', () => ({
 import {ProjectManager} from './projectManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {GitProject} from '../types/index.js';
+import {FileSystemError, ConfigError} from '../types/errors.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockFs = fs as any;
@@ -90,7 +92,7 @@ describe('ProjectManager', () => {
 				}),
 			};
 
-			await projectManager.refreshProjects();
+			await Effect.runPromise(projectManager.refreshProjectsEffect());
 
 			expect(projectManager.projects).toHaveLength(2);
 			expect(projectManager.projects[0]).toMatchObject({
@@ -110,9 +112,20 @@ describe('ProjectManager', () => {
 				access: vi.fn().mockRejectedValue({code: 'ENOENT'}),
 			};
 
-			await expect(projectManager.refreshProjects()).rejects.toThrow(
-				`Projects directory does not exist: ${mockProjectsDir}`,
+			const result = await Effect.runPromise(
+				Effect.either(projectManager.refreshProjectsEffect()),
 			);
+
+			expect(Either.isLeft(result)).toBe(true);
+			if (Either.isLeft(result)) {
+				const error = result.left;
+				expect(error._tag).toBe('FileSystemError');
+				if (error._tag === 'FileSystemError') {
+					expect(error.cause).toContain(
+						`Projects directory does not exist: ${mockProjectsDir}`,
+					);
+				}
+			}
 		});
 	});
 
@@ -418,6 +431,281 @@ describe('ProjectManager', () => {
 			const isValid =
 				await projectManager.validateGitRepository('/test/not-repo');
 			expect(isValid).toBe(false);
+		});
+	});
+
+	describe('Effect-based API', () => {
+		beforeEach(() => {
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = mockProjectsDir;
+			projectManager = new ProjectManager();
+		});
+
+		describe('discoverProjectsEffect', () => {
+			it('should return Effect with projects on success', async () => {
+				// Mock file system for project discovery
+				mockFs.promises = {
+					access: vi.fn().mockResolvedValue(undefined),
+					readdir: vi.fn().mockImplementation((dir: string) => {
+						if (dir === mockProjectsDir) {
+							return Promise.resolve([
+								{name: 'project1', isDirectory: () => true},
+								{name: 'project2', isDirectory: () => true},
+							]);
+						}
+						return Promise.resolve([]);
+					}),
+					stat: vi.fn().mockImplementation((path: string) => {
+						if (path.endsWith('.git')) {
+							return Promise.resolve({
+								isDirectory: () => true,
+								isFile: () => false,
+							});
+						}
+						throw new Error('Not found');
+					}),
+				};
+
+				const effect = projectManager.discoverProjectsEffect(mockProjectsDir);
+				const projects = await Effect.runPromise(effect);
+
+				expect(projects).toHaveLength(2);
+				expect(projects[0]).toMatchObject({
+					name: 'project1',
+					isValid: true,
+				});
+			});
+
+			it('should return Effect with FileSystemError when directory does not exist', async () => {
+				mockFs.promises = {
+					access: vi.fn().mockRejectedValue({code: 'ENOENT'}),
+				};
+
+				const effect = projectManager.discoverProjectsEffect(mockProjectsDir);
+				const result = await Effect.runPromise(Effect.either(effect));
+
+				expect(Either.isLeft(result)).toBe(true);
+				if (Either.isLeft(result)) {
+					const error = result.left;
+					expect(error._tag).toBe('FileSystemError');
+					expect(error).toBeInstanceOf(FileSystemError);
+					expect(error.operation).toBe('read');
+					expect(error.path).toBe(mockProjectsDir);
+				}
+			});
+
+			it('should use Effect.all for parallel project scanning', async () => {
+				mockFs.promises = {
+					access: vi.fn().mockResolvedValue(undefined),
+					readdir: vi.fn().mockImplementation(() => {
+						return Promise.resolve([
+							{name: 'project1', isDirectory: () => true},
+							{name: 'project2', isDirectory: () => true},
+							{name: 'project3', isDirectory: () => true},
+						]);
+					}),
+					stat: vi.fn().mockImplementation((path: string) => {
+						if (path.endsWith('.git')) {
+							return Promise.resolve({
+								isDirectory: () => true,
+								isFile: () => false,
+							});
+						}
+						throw new Error('Not found');
+					}),
+				};
+
+				const effect = projectManager.discoverProjectsEffect(mockProjectsDir);
+				const projects = await Effect.runPromise(effect);
+
+				expect(projects).toHaveLength(3);
+			});
+		});
+
+		describe('loadRecentProjectsEffect', () => {
+			it('should return Effect with recent projects on success', async () => {
+				const mockRecentProjects = [
+					{
+						path: '/path/to/project1',
+						name: 'project1',
+						lastAccessed: Date.now(),
+					},
+					{
+						path: '/path/to/project2',
+						name: 'project2',
+						lastAccessed: Date.now() - 1000,
+					},
+				];
+
+				mockFs.readFileSync.mockReturnValue(JSON.stringify(mockRecentProjects));
+				mockFs.existsSync.mockReturnValue(true);
+
+				// Re-create to load recent projects
+				projectManager = new ProjectManager();
+				const effect = projectManager.loadRecentProjectsEffect();
+				const projects = await Effect.runPromise(effect);
+
+				expect(projects).toHaveLength(2);
+				expect(projects[0]?.name).toBe('project1');
+			});
+
+			it('should return Effect with FileSystemError when file read fails', async () => {
+				mockFs.existsSync.mockReturnValue(true);
+				mockFs.readFileSync.mockImplementation(() => {
+					throw new Error('Permission denied');
+				});
+
+				projectManager = new ProjectManager();
+				const effect = projectManager.loadRecentProjectsEffect();
+				const result = await Effect.runPromise(Effect.either(effect));
+
+				expect(Either.isLeft(result)).toBe(true);
+				if (Either.isLeft(result)) {
+					const error = result.left;
+					expect(error._tag).toBe('FileSystemError');
+					expect(error).toBeInstanceOf(FileSystemError);
+					if (error._tag === 'FileSystemError') {
+						expect(error.operation).toBe('read');
+					}
+				}
+			});
+
+			it('should return Effect with ConfigError when JSON parse fails', async () => {
+				mockFs.existsSync.mockReturnValue(true);
+				mockFs.readFileSync.mockReturnValue('invalid json{');
+
+				projectManager = new ProjectManager();
+				const effect = projectManager.loadRecentProjectsEffect();
+				const result = await Effect.runPromise(Effect.either(effect));
+
+				expect(Either.isLeft(result)).toBe(true);
+				if (Either.isLeft(result)) {
+					const error = result.left;
+					expect(error._tag).toBe('ConfigError');
+					expect(error).toBeInstanceOf(ConfigError);
+					if (error._tag === 'ConfigError') {
+						expect(error.reason).toBe('parse');
+					}
+				}
+			});
+
+			it('should use Effect.catchAll for fallback to empty cache on error', async () => {
+				mockFs.existsSync.mockReturnValue(false);
+
+				projectManager = new ProjectManager();
+				const effect = projectManager.loadRecentProjectsEffect();
+				const projects = await Effect.runPromise(
+					Effect.catchAll(effect, () => Effect.succeed([])),
+				);
+
+				expect(projects).toEqual([]);
+			});
+		});
+
+		describe('saveRecentProjectsEffect', () => {
+			it('should return Effect with void on success', async () => {
+				mockFs.writeFileSync.mockImplementation(() => {});
+
+				projectManager = new ProjectManager();
+				const projects = [
+					{
+						path: '/path/to/project1',
+						name: 'project1',
+						lastAccessed: Date.now(),
+					},
+				];
+
+				const effect = projectManager.saveRecentProjectsEffect(projects);
+				await Effect.runPromise(effect);
+
+				expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+					mockRecentProjectsPath,
+					expect.any(String),
+				);
+			});
+
+			it('should return Effect with FileSystemError when write fails', async () => {
+				mockFs.writeFileSync.mockImplementation(() => {
+					throw new Error('Disk full');
+				});
+
+				projectManager = new ProjectManager();
+				const projects = [
+					{
+						path: '/path/to/project1',
+						name: 'project1',
+						lastAccessed: Date.now(),
+					},
+				];
+
+				const effect = projectManager.saveRecentProjectsEffect(projects);
+				const result = await Effect.runPromise(Effect.either(effect));
+
+				expect(Either.isLeft(result)).toBe(true);
+				if (Either.isLeft(result)) {
+					const error = result.left;
+					expect(error._tag).toBe('FileSystemError');
+					expect(error).toBeInstanceOf(FileSystemError);
+					expect(error.operation).toBe('write');
+				}
+			});
+		});
+
+		describe('refreshProjectsEffect', () => {
+			it('should return Effect with void on success', async () => {
+				mockFs.promises = {
+					access: vi.fn().mockResolvedValue(undefined),
+					readdir: vi.fn().mockImplementation(() => {
+						return Promise.resolve([
+							{name: 'project1', isDirectory: () => true},
+						]);
+					}),
+					stat: vi.fn().mockImplementation((path: string) => {
+						if (path.endsWith('.git')) {
+							return Promise.resolve({
+								isDirectory: () => true,
+								isFile: () => false,
+							});
+						}
+						throw new Error('Not found');
+					}),
+				};
+
+				const effect = projectManager.refreshProjectsEffect();
+				await Effect.runPromise(effect);
+
+				expect(projectManager.projects).toHaveLength(1);
+			});
+
+			it('should return Effect with FileSystemError when projects directory not configured', async () => {
+				// Create without multi-project root
+				delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+				projectManager = new ProjectManager();
+
+				const effect = projectManager.refreshProjectsEffect();
+				const result = await Effect.runPromise(Effect.either(effect));
+
+				expect(Either.isLeft(result)).toBe(true);
+				if (Either.isLeft(result)) {
+					const error = result.left;
+					expect(error._tag).toBe('FileSystemError');
+					expect(error).toBeInstanceOf(FileSystemError);
+				}
+			});
+
+			it('should return Effect with FileSystemError or GitError on discovery failure', async () => {
+				mockFs.promises = {
+					access: vi.fn().mockRejectedValue({code: 'ENOENT'}),
+				};
+
+				const effect = projectManager.refreshProjectsEffect();
+				const result = await Effect.runPromise(Effect.either(effect));
+
+				expect(Either.isLeft(result)).toBe(true);
+				if (Either.isLeft(result)) {
+					const error = result.left;
+					expect(['FileSystemError', 'GitError']).toContain(error._tag);
+				}
+			});
 		});
 	});
 });

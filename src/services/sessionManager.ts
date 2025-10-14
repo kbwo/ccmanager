@@ -17,6 +17,8 @@ import {
 	STATE_PERSISTENCE_DURATION_MS,
 	STATE_CHECK_INTERVAL_MS,
 } from '../constants/statePersistence.js';
+import {Effect} from 'effect';
+import {ProcessError, ConfigError} from '../types/errors.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 
@@ -119,36 +121,93 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return session;
 	}
 
-	async createSessionWithPreset(
+	/**
+	 * Create session with command preset using Effect-based error handling
+	 *
+	 * @param {string} worktreePath - Path to the worktree
+	 * @param {string} [presetId] - Optional preset ID, uses default if not provided
+	 * @returns {Effect.Effect<Session, ProcessError | ConfigError, never>} Effect that may fail with ProcessError (spawn failure) or ConfigError (invalid preset)
+	 *
+	 * @example
+	 * ```typescript
+	 * // Use Effect.match for type-safe error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(effect, {
+	 *     onFailure: (error) => ({ type: 'error', message: error.message }),
+	 *     onSuccess: (session) => ({ type: 'success', data: session })
+	 *   })
+	 * );
+	 * ```
+	 */
+	createSessionWithPresetEffect(
 		worktreePath: string,
 		presetId?: string,
-	): Promise<Session> {
-		// Check if session already exists
-		const existing = this.sessions.get(worktreePath);
-		if (existing) {
-			return existing;
-		}
+	): Effect.Effect<Session, ProcessError | ConfigError, never> {
+		return Effect.tryPromise({
+			try: async () => {
+				// Check if session already exists
+				const existing = this.sessions.get(worktreePath);
+				if (existing) {
+					return existing;
+				}
 
-		// Get preset configuration
-		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
-		if (!preset) {
-			preset = configurationManager.getDefaultPreset();
-		}
+				// Get preset configuration
+				let preset = presetId
+					? configurationManager.getPresetById(presetId)
+					: null;
+				if (!preset) {
+					preset = configurationManager.getDefaultPreset();
+				}
 
-		const command = preset.command;
-		const args = preset.args || [];
-		const commandConfig = {
-			command: preset.command,
-			args: preset.args,
-			fallbackArgs: preset.fallbackArgs,
-		};
+				// Validate preset exists
+				if (!preset) {
+					throw new ConfigError({
+						configPath: 'configuration',
+						reason: 'validation',
+						details: presetId
+							? `Preset with ID '${presetId}' not found and no default preset available`
+							: 'No default preset available',
+					});
+				}
 
-		// Spawn the process - fallback will be handled by setupExitHandler
-		const ptyProcess = await this.spawn(command, args, worktreePath);
+				const command = preset.command;
+				const args = preset.args || [];
+				const commandConfig = {
+					command: preset.command,
+					args: preset.args,
+					fallbackArgs: preset.fallbackArgs,
+				};
 
-		return this.createSessionInternal(worktreePath, ptyProcess, commandConfig, {
-			isPrimaryCommand: true,
-			detectionStrategy: preset.detectionStrategy,
+				// Spawn the process - fallback will be handled by setupExitHandler
+				const ptyProcess = await this.spawn(command, args, worktreePath);
+
+				return this.createSessionInternal(
+					worktreePath,
+					ptyProcess,
+					commandConfig,
+					{
+						isPrimaryCommand: true,
+						detectionStrategy: preset.detectionStrategy,
+					},
+				);
+			},
+			catch: (error: unknown) => {
+				// If it's already a ConfigError, return it
+				if (error instanceof ConfigError) {
+					return error;
+				}
+
+				// Otherwise, wrap in ProcessError
+				return new ProcessError({
+					command: presetId
+						? `createSessionWithPreset (preset: ${presetId})`
+						: 'createSessionWithPreset (default preset)',
+					message:
+						error instanceof Error
+							? error.message
+							: 'Failed to create session with preset',
+				});
+			},
 		});
 	}
 
@@ -278,8 +337,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						session.state = detectedState;
 						session.pendingState = undefined;
 						session.pendingStateStart = undefined;
-						// Execute status hook asynchronously (non-blocking)
-						void executeStatusHook(oldState, detectedState, session);
+						// Execute status hook asynchronously (non-blocking) using Effect
+						void Effect.runPromise(
+							executeStatusHook(oldState, detectedState, session),
+						);
 						this.emit('sessionStateChanged', session);
 					}
 				}
@@ -350,66 +411,180 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 	}
 
+	/**
+	 * Terminate session and cleanup resources using Effect-based error handling
+	 *
+	 * @param {string} worktreePath - Path to the worktree
+	 * @returns {Effect.Effect<void, ProcessError, never>} Effect that may fail with ProcessError if session does not exist or cleanup fails
+	 *
+	 * @example
+	 * ```typescript
+	 * // Terminate session with error handling
+	 * const result = await Effect.runPromise(
+	 *   Effect.match(effect, {
+	 *     onFailure: (error) => ({ type: 'error', message: error.message }),
+	 *     onSuccess: () => ({ type: 'success' })
+	 *   })
+	 * );
+	 * ```
+	 */
+	terminateSessionEffect(
+		worktreePath: string,
+	): Effect.Effect<void, ProcessError, never> {
+		return Effect.try({
+			try: () => {
+				const session = this.sessions.get(worktreePath);
+				if (!session) {
+					throw new ProcessError({
+						command: 'terminateSession',
+						message: `Session not found for worktree: ${worktreePath}`,
+					});
+				}
+
+				// Clear the state check interval
+				if (session.stateCheckInterval) {
+					clearInterval(session.stateCheckInterval);
+				}
+
+				// Try to kill the process - don't fail if process is already dead
+				try {
+					session.process.kill();
+				} catch (_error) {
+					// Process might already be dead, this is acceptable
+				}
+
+				// Clean up any pending timer
+				const timer = this.busyTimers.get(worktreePath);
+				if (timer) {
+					clearTimeout(timer);
+					this.busyTimers.delete(worktreePath);
+				}
+
+				// Remove from sessions map and cleanup
+				this.sessions.delete(worktreePath);
+				this.waitingWithBottomBorder.delete(session.id);
+				this.emit('sessionDestroyed', session);
+			},
+			catch: (error: unknown) => {
+				// If it's already a ProcessError, return it
+				if (error instanceof ProcessError) {
+					return error;
+				}
+
+				// Otherwise, wrap in ProcessError
+				return new ProcessError({
+					command: 'terminateSession',
+					message:
+						error instanceof Error
+							? error.message
+							: `Failed to terminate session for ${worktreePath}`,
+				});
+			},
+		});
+	}
+
 	getAllSessions(): Session[] {
 		return Array.from(this.sessions.values());
 	}
 
-	async createSessionWithDevcontainer(
+	/**
+	 * Create session with devcontainer integration using Effect-based error handling
+	 * @returns Effect that may fail with ProcessError (container/spawn failure) or ConfigError (invalid preset)
+	 */
+	createSessionWithDevcontainerEffect(
 		worktreePath: string,
 		devcontainerConfig: DevcontainerConfig,
 		presetId?: string,
-	): Promise<Session> {
-		// Check if session already exists
-		const existing = this.sessions.get(worktreePath);
-		if (existing) {
-			return existing;
-		}
+	): Effect.Effect<Session, ProcessError | ConfigError, never> {
+		return Effect.tryPromise({
+			try: async () => {
+				// Check if session already exists
+				const existing = this.sessions.get(worktreePath);
+				if (existing) {
+					return existing;
+				}
 
-		// Execute devcontainer up command first
-		try {
-			await execAsync(devcontainerConfig.upCommand, {cwd: worktreePath});
-		} catch (error) {
-			throw new Error(
-				`Failed to start devcontainer: ${error instanceof Error ? error.message : String(error)}`,
-			);
-		}
+				// Execute devcontainer up command first
+				try {
+					await execAsync(devcontainerConfig.upCommand, {cwd: worktreePath});
+				} catch (error) {
+					throw new ProcessError({
+						command: devcontainerConfig.upCommand,
+						message: `Failed to start devcontainer: ${error instanceof Error ? error.message : String(error)}`,
+					});
+				}
 
-		// Get preset configuration
-		let preset = presetId ? configurationManager.getPresetById(presetId) : null;
-		if (!preset) {
-			preset = configurationManager.getDefaultPreset();
-		}
+				// Get preset configuration
+				let preset = presetId
+					? configurationManager.getPresetById(presetId)
+					: null;
+				if (!preset) {
+					preset = configurationManager.getDefaultPreset();
+				}
 
-		// Parse the exec command to extract arguments
-		const execParts = devcontainerConfig.execCommand.split(/\s+/);
-		const devcontainerCmd = execParts[0] || 'devcontainer'; // Should be 'devcontainer'
-		const execArgs = execParts.slice(1); // Rest of the exec command args
+				// Validate preset exists
+				if (!preset) {
+					throw new ConfigError({
+						configPath: 'configuration',
+						reason: 'validation',
+						details: presetId
+							? `Preset with ID '${presetId}' not found and no default preset available`
+							: 'No default preset available',
+					});
+				}
 
-		// Build the full command: devcontainer exec [args] -- [preset command] [preset args]
-		const fullArgs = [
-			...execArgs,
-			'--',
-			preset.command,
-			...(preset.args || []),
-		];
+				// Parse the exec command to extract arguments
+				const execParts = devcontainerConfig.execCommand.split(/\s+/);
+				const devcontainerCmd = execParts[0] || 'devcontainer';
+				const execArgs = execParts.slice(1);
 
-		// Spawn the process within devcontainer - fallback will be handled by setupExitHandler
-		const ptyProcess = await this.spawn(
-			devcontainerCmd,
-			fullArgs,
-			worktreePath,
-		);
+				// Build the full command: devcontainer exec [args] -- [preset command] [preset args]
+				const fullArgs = [
+					...execArgs,
+					'--',
+					preset.command,
+					...(preset.args || []),
+				];
 
-		const commandConfig = {
-			command: preset.command,
-			args: preset.args,
-			fallbackArgs: preset.fallbackArgs,
-		};
+				// Spawn the process within devcontainer
+				const ptyProcess = await this.spawn(
+					devcontainerCmd,
+					fullArgs,
+					worktreePath,
+				);
 
-		return this.createSessionInternal(worktreePath, ptyProcess, commandConfig, {
-			isPrimaryCommand: true,
-			detectionStrategy: preset.detectionStrategy,
-			devcontainerConfig,
+				const commandConfig = {
+					command: preset.command,
+					args: preset.args,
+					fallbackArgs: preset.fallbackArgs,
+				};
+
+				return this.createSessionInternal(
+					worktreePath,
+					ptyProcess,
+					commandConfig,
+					{
+						isPrimaryCommand: true,
+						detectionStrategy: preset.detectionStrategy,
+						devcontainerConfig,
+					},
+				);
+			},
+			catch: (error: unknown) => {
+				// If it's already a ConfigError or ProcessError, return it
+				if (error instanceof ConfigError || error instanceof ProcessError) {
+					return error;
+				}
+
+				// Otherwise, wrap in ProcessError
+				return new ProcessError({
+					command: `createSessionWithDevcontainer (${devcontainerConfig.execCommand})`,
+					message:
+						error instanceof Error
+							? error.message
+							: 'Failed to create session with devcontainer',
+				});
+			},
 		});
 	}
 

@@ -1,5 +1,9 @@
 import {describe, it, expect} from 'vitest';
-import {createConcurrencyLimited} from './concurrencyLimit.js';
+import {Effect, Exit} from 'effect';
+import {
+	createConcurrencyLimited,
+	createEffectConcurrencyLimited,
+} from './concurrencyLimit.js';
 
 describe('createConcurrencyLimited', () => {
 	it('should limit concurrent executions', async () => {
@@ -81,6 +85,61 @@ describe('createConcurrencyLimited', () => {
 			'maxConcurrent must be at least 1',
 		);
 		expect(() => createConcurrencyLimited(fn, -1)).toThrow(
+			'maxConcurrent must be at least 1',
+		);
+	});
+});
+
+describe('createEffectConcurrencyLimited', () => {
+	it('should limit concurrent Effect executions', async () => {
+		let running = 0;
+		let maxRunning = 0;
+
+		const task = (id: number) =>
+			Effect.gen(function* () {
+				running++;
+				maxRunning = Math.max(maxRunning, running);
+				yield* Effect.sleep('10 millis');
+				running--;
+				return id;
+			});
+
+		const limited = createEffectConcurrencyLimited(task, 2);
+
+		const results = await Promise.all([
+			Effect.runPromise(limited(1)),
+			Effect.runPromise(limited(2)),
+			Effect.runPromise(limited(3)),
+			Effect.runPromise(limited(4)),
+		]);
+
+		expect(results).toEqual([1, 2, 3, 4]);
+		expect(maxRunning).toBeLessThanOrEqual(2);
+		expect(running).toBe(0);
+	});
+
+	it('should release permits after failures', async () => {
+		const original = (shouldFail: boolean) =>
+			shouldFail ? Effect.fail('Task failed') : Effect.succeed('success');
+
+		const limited = createEffectConcurrencyLimited(original, 1);
+
+		const [firstExit, secondExit] = await Promise.all([
+			Effect.runPromiseExit(limited(true)),
+			Effect.runPromiseExit(limited(false)),
+		]);
+
+		expect(Exit.isFailure(firstExit)).toBe(true);
+		expect(Exit.isSuccess(secondExit)).toBe(true);
+	});
+
+	it('should throw for invalid maxConcurrent', () => {
+		const fn = () => Effect.succeed('test');
+
+		expect(() => createEffectConcurrencyLimited(fn, 0)).toThrow(
+			'maxConcurrent must be at least 1',
+		);
+		expect(() => createEffectConcurrencyLimited(fn, -1)).toThrow(
 			'maxConcurrent must be at least 1',
 		);
 	});

@@ -5,6 +5,11 @@ import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
 
+// Mock node-pty to avoid native module issues in tests
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
+
 // Mock ink to avoid stdin issues
 vi.mock('ink', async () => {
 	const actual = await vi.importActual<typeof import('ink')>('ink');
@@ -70,14 +75,218 @@ vi.mock('../hooks/useSearchMode.js', () => ({
 	}),
 }));
 
-describe('Menu component rendering', () => {
+describe('Menu component Effect-based error handling', () => {
 	let sessionManager: SessionManager;
 	let worktreeService: WorktreeService;
 
 	beforeEach(() => {
 		sessionManager = new SessionManager();
 		worktreeService = new WorktreeService();
-		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue([]);
+		// Mock EventEmitter methods
+		vi.spyOn(sessionManager, 'on').mockImplementation(() => sessionManager);
+		vi.spyOn(sessionManager, 'off').mockImplementation(() => sessionManager);
+		vi.spyOn(sessionManager, 'getAllSessions').mockReturnValue([]);
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('should handle GitError from getWorktreesEffect and display error message', async () => {
+		const {Effect} = await import('effect');
+		const {GitError} = await import('../types/errors.js');
+
+		const onSelectWorktree = vi.fn();
+		const onDismissError = vi.fn();
+
+		// Mock getWorktreesEffect to return a failing Effect
+		const gitError = new GitError({
+			command: 'git worktree list --porcelain',
+			exitCode: 128,
+			stderr: 'fatal: not a git repository',
+			stdout: '',
+		});
+
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.fail(gitError),
+		);
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+				onDismissError={onDismissError}
+			/>,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Should display error with GitError information
+		expect(output).toContain('Error:');
+		expect(output).toContain('git worktree list --porcelain');
+		expect(output).toContain('fatal: not a git repository');
+	});
+
+	it('should successfully load worktrees using getWorktreesEffect', async () => {
+		const {Effect} = await import('effect');
+
+		const onSelectWorktree = vi.fn();
+
+		const mockWorktrees = [
+			{
+				path: '/test/main',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+			{
+				path: '/test/feature',
+				branch: 'feature-branch',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+		];
+
+		// Mock getWorktreesEffect to return successful Effect
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed(mockWorktrees),
+		);
+		// Mock getDefaultBranchEffect to return successful Effect
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
+		);
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+			/>,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Should display worktrees
+		expect(output).toContain('main');
+		expect(output).toContain('feature-branch');
+	});
+
+	it('should handle GitError from getDefaultBranchEffect and display error message', async () => {
+		const {Effect} = await import('effect');
+		const {GitError} = await import('../types/errors.js');
+
+		const onSelectWorktree = vi.fn();
+		const onDismissError = vi.fn();
+
+		const mockWorktrees = [
+			{
+				path: '/test/main',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+		];
+
+		// Mock getWorktreesEffect to succeed
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed(mockWorktrees),
+		);
+
+		// Mock getDefaultBranchEffect to fail
+		const gitError = new GitError({
+			command: 'git symbolic-ref refs/remotes/origin/HEAD',
+			exitCode: 128,
+			stderr: 'fatal: ref refs/remotes/origin/HEAD is not a symbolic ref',
+			stdout: '',
+		});
+
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.fail(gitError),
+		);
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+				onDismissError={onDismissError}
+			/>,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Should display error with GitError information
+		expect(output).toContain('Error:');
+		expect(output).toContain('git symbolic-ref');
+		expect(output).toContain(
+			'fatal: ref refs/remotes/origin/HEAD is not a symbolic ref',
+		);
+	});
+
+	it('should use Effect composition to load worktrees and default branch together', async () => {
+		const {Effect} = await import('effect');
+
+		const onSelectWorktree = vi.fn();
+
+		const mockWorktrees = [
+			{
+				path: '/test/main',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+		];
+
+		// Track that both Effects are called
+		const getWorktreesSpy = vi
+			.spyOn(worktreeService, 'getWorktreesEffect')
+			.mockReturnValue(Effect.succeed(mockWorktrees));
+		const getDefaultBranchSpy = vi
+			.spyOn(worktreeService, 'getDefaultBranchEffect')
+			.mockReturnValue(Effect.succeed('main'));
+
+		render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onSelectWorktree={onSelectWorktree}
+			/>,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Verify both Effect-based methods were called (Effect composition)
+		expect(getWorktreesSpy).toHaveBeenCalled();
+		expect(getDefaultBranchSpy).toHaveBeenCalled();
+	});
+});
+
+describe('Menu component rendering', () => {
+	let sessionManager: SessionManager;
+	let worktreeService: WorktreeService;
+
+	beforeEach(async () => {
+		const {Effect} = await import('effect');
+		sessionManager = new SessionManager();
+		worktreeService = new WorktreeService();
+		// Mock Effect-based methods
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed([]),
+		);
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
+		);
 		vi.spyOn(sessionManager, 'getAllSessions').mockReturnValue([]);
 		// Mock EventEmitter methods
 		vi.spyOn(sessionManager, 'on').mockImplementation(() => sessionManager);
@@ -164,6 +373,7 @@ describe('Menu component rendering', () => {
 	});
 
 	it('should display number shortcuts for recent projects when worktrees < 10', async () => {
+		const {Effect} = await import('effect');
 		const onSelectWorktree = vi.fn();
 		const onSelectRecentProject = vi.fn();
 
@@ -196,7 +406,9 @@ describe('Menu component rendering', () => {
 			{name: 'Project C', path: '/test/project-c', lastAccessed: Date.now()},
 		];
 
-		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue(mockWorktrees);
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed(mockWorktrees),
+		);
 		vi.spyOn(worktreeService, 'getGitRootPath').mockReturnValue(
 			'/test/current',
 		);
@@ -240,6 +452,7 @@ describe('Menu component rendering', () => {
 	});
 
 	it('should not display number shortcuts for recent projects when worktrees >= 10', async () => {
+		const {Effect} = await import('effect');
 		const onSelectWorktree = vi.fn();
 		const onSelectRecentProject = vi.fn();
 
@@ -257,7 +470,9 @@ describe('Menu component rendering', () => {
 			{name: 'Project B', path: '/test/project-b', lastAccessed: Date.now()},
 		];
 
-		vi.spyOn(worktreeService, 'getWorktrees').mockReturnValue(mockWorktrees);
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed(mockWorktrees),
+		);
 		vi.spyOn(worktreeService, 'getGitRootPath').mockReturnValue(
 			'/test/current',
 		);

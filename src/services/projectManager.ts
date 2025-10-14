@@ -11,6 +11,8 @@ import {promises as fs} from 'fs';
 import path from 'path';
 import {homedir} from 'os';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+import {Effect} from 'effect';
+import {FileSystemError, ConfigError} from '../types/errors.js';
 
 interface DiscoveryTask {
 	path: string;
@@ -100,28 +102,6 @@ export class ProjectManager implements IProjectManager {
 		const service = new WorktreeService(path);
 		this.worktreeServiceCache.set(path, service);
 		return service;
-	}
-
-	async refreshProjects(): Promise<void> {
-		if (!this.projectsDir) {
-			throw new Error('Projects directory not configured');
-		}
-
-		// Discover projects
-		this.projects = await this.discoverProjects(this.projectsDir);
-
-		// Update current project if it still exists
-		if (this.currentProject) {
-			const updatedProject = this.projects.find(
-				p => p.path === this.currentProject!.path,
-			);
-			if (updatedProject) {
-				this.currentProject = updatedProject;
-			} else {
-				// Current project no longer exists
-				this.currentProject = undefined;
-			}
-		}
 	}
 
 	// Helper methods
@@ -228,59 +208,6 @@ export class ProjectManager implements IProjectManager {
 	}
 
 	// Multi-project discovery methods
-
-	async discoverProjects(projectsDir: string): Promise<GitProject[]> {
-		const projects: GitProject[] = [];
-		const projectMap = new Map<string, GitProject>();
-
-		try {
-			// Verify the directory exists
-			await fs.access(projectsDir);
-
-			// Step 1: Fast concurrent directory discovery
-			const directories = await this.discoverDirectories(projectsDir);
-
-			// Step 2: Process directories in parallel to check if they're git repos
-			const results = await this.processDirectoriesInParallel(
-				directories,
-				projectsDir,
-			);
-
-			// Step 3: Create project objects (all results are valid git repos)
-			for (const result of results) {
-				// Handle name conflicts
-				let displayName = result.name;
-				if (projectMap.has(result.name)) {
-					displayName = result.relativePath.replace(/[\\/\\\\]/g, '/');
-				}
-
-				const project: GitProject = {
-					name: displayName,
-					path: result.path,
-					relativePath: result.relativePath,
-					isValid: true,
-					error: result.error,
-				};
-
-				projectMap.set(displayName, project);
-			}
-
-			// Convert to array and sort
-			projects.push(...projectMap.values());
-			projects.sort((a, b) => a.name.localeCompare(b.name));
-
-			// Cache results
-			this.projectCache.clear();
-			projects.forEach(p => this.projectCache.set(p.path, p));
-
-			return projects;
-		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-				throw new Error(`Projects directory does not exist: ${projectsDir}`);
-			}
-			throw error;
-		}
-	}
 
 	/**
 	 * Fast directory discovery - similar to ghq's approach
@@ -441,6 +368,267 @@ export class ProjectManager implements IProjectManager {
 
 		this.projectCache.set(projectPath, project);
 		return project;
+	}
+
+	// Effect-based API methods
+
+	/**
+	 * Discover Git projects in the specified directory using Effect
+	 *
+	 * Recursively scans the directory for Git repositories with parallel processing.
+	 * Caches results for improved performance.
+	 *
+	 * @param {string} projectsDir - Root directory to search for Git projects
+	 * @returns {Effect.Effect<GitProject[], FileSystemError, never>} Effect containing discovered projects or FileSystemError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {projectManager} from './services/projectManager.js';
+	 *
+	 * // Discover projects with error handling
+	 * const projects = await Effect.runPromise(
+	 *   Effect.catchAll(
+	 *     projectManager.instance.discoverProjectsEffect('/home/user/projects'),
+	 *     (error) => {
+	 *       console.error(`Discovery failed: ${error.cause}`);
+	 *       return Effect.succeed([]); // Return empty array on error
+	 *     }
+	 *   )
+	 * );
+	 *
+	 * console.log(`Found ${projects.length} git repositories`);
+	 * ```
+	 */
+	discoverProjectsEffect(
+		projectsDir: string,
+	): Effect.Effect<GitProject[], FileSystemError, never> {
+		return Effect.tryPromise({
+			try: async () => {
+				// Verify the directory exists
+				await fs.access(projectsDir);
+
+				// Step 1: Fast concurrent directory discovery
+				const directories = await this.discoverDirectories(projectsDir);
+
+				// Step 2: Process directories in parallel to check if they're git repos
+				const results = await this.processDirectoriesInParallel(
+					directories,
+					projectsDir,
+				);
+
+				// Step 3: Create project objects
+				const projects: GitProject[] = [];
+				const projectMap = new Map<string, GitProject>();
+
+				for (const result of results) {
+					// Handle name conflicts
+					let displayName = result.name;
+					if (projectMap.has(result.name)) {
+						displayName = result.relativePath.replace(/[\\/\\\\]/g, '/');
+					}
+
+					const project: GitProject = {
+						name: displayName,
+						path: result.path,
+						relativePath: result.relativePath,
+						isValid: true,
+						error: result.error,
+					};
+
+					projectMap.set(displayName, project);
+				}
+
+				// Convert to array and sort
+				projects.push(...projectMap.values());
+				projects.sort((a, b) => a.name.localeCompare(b.name));
+
+				// Cache results
+				this.projectCache.clear();
+				projects.forEach(p => this.projectCache.set(p.path, p));
+
+				return projects;
+			},
+			catch: error => {
+				if (error instanceof FileSystemError) {
+					return error;
+				}
+
+				const nodeError = error as NodeJS.ErrnoException;
+				const cause =
+					nodeError.code === 'ENOENT'
+						? `Projects directory does not exist: ${projectsDir}`
+						: String(error);
+
+				return new FileSystemError({
+					operation: 'read',
+					path: projectsDir,
+					cause,
+				});
+			},
+		});
+	}
+
+	/**
+	 * Load recent projects from cache using Effect
+	 *
+	 * Reads and parses the recent projects JSON file. Returns empty array if file doesn't exist.
+	 *
+	 * @returns {Effect.Effect<RecentProject[], FileSystemError | ConfigError, never>} Effect containing recent projects or error
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {projectManager} from './services/projectManager.js';
+	 *
+	 * // Load recent projects with error handling
+	 * const recent = await Effect.runPromise(
+	 *   Effect.match(
+	 *     projectManager.instance.loadRecentProjectsEffect(),
+	 *     {
+	 *       onFailure: (error) => {
+	 *         if (error._tag === 'ConfigError') {
+	 *           console.error(`Parse error: ${error.details}`);
+	 *         } else {
+	 *           console.error(`File error: ${error.cause}`);
+	 *         }
+	 *         return [];
+	 *       },
+	 *       onSuccess: (projects) => projects
+	 *     }
+	 *   )
+	 * );
+	 * ```
+	 */
+	loadRecentProjectsEffect(): Effect.Effect<
+		RecentProject[],
+		FileSystemError | ConfigError,
+		never
+	> {
+		return Effect.try({
+			try: () => {
+				if (existsSync(this.dataPath)) {
+					const data = readFileSync(this.dataPath, 'utf-8');
+					try {
+						const parsed = JSON.parse(data);
+						return parsed || [];
+					} catch (parseError) {
+						throw new ConfigError({
+							configPath: this.dataPath,
+							reason: 'parse',
+							details: String(parseError),
+						});
+					}
+				}
+				return [];
+			},
+			catch: error => {
+				if (error instanceof ConfigError) {
+					return error;
+				}
+				return new FileSystemError({
+					operation: 'read',
+					path: this.dataPath,
+					cause: String(error),
+				});
+			},
+		});
+	}
+
+	/**
+	 * Save recent projects to cache using Effect
+	 *
+	 * Writes the recent projects array to JSON file.
+	 *
+	 * @param {RecentProject[]} projects - Recent projects to save
+	 * @returns {Effect.Effect<void, FileSystemError, never>} Effect that succeeds or fails with FileSystemError
+	 *
+	 * @example
+	 * ```typescript
+	 * import {Effect} from 'effect';
+	 * import {projectManager} from './services/projectManager.js';
+	 *
+	 * const recentProjects = [
+	 *   { path: '/home/user/project1', name: 'project1', lastAccessed: Date.now() }
+	 * ];
+	 *
+	 * // Save with error recovery
+	 * await Effect.runPromise(
+	 *   Effect.catchAll(
+	 *     projectManager.instance.saveRecentProjectsEffect(recentProjects),
+	 *     (error) => {
+	 *       console.error(`Failed to save: ${error.cause}`);
+	 *       return Effect.void; // Continue despite error
+	 *     }
+	 *   )
+	 * );
+	 * ```
+	 */
+	saveRecentProjectsEffect(
+		projects: RecentProject[],
+	): Effect.Effect<void, FileSystemError, never> {
+		return Effect.try({
+			try: () => {
+				writeFileSync(this.dataPath, JSON.stringify(projects, null, 2));
+			},
+			catch: error => {
+				return new FileSystemError({
+					operation: 'write',
+					path: this.dataPath,
+					cause: String(error),
+				});
+			},
+		});
+	}
+
+	/**
+	 * Refresh projects list (Effect version)
+	 * @returns Effect with void or FileSystemError
+	 */
+	refreshProjectsEffect(): Effect.Effect<void, FileSystemError, never> {
+		return Effect.flatMap(
+			Effect.try({
+				try: () => {
+					if (!this.projectsDir) {
+						throw new FileSystemError({
+							operation: 'read',
+							path: '',
+							cause: 'Projects directory not configured',
+						});
+					}
+					return this.projectsDir;
+				},
+				catch: error => {
+					if (error instanceof FileSystemError) {
+						return error;
+					}
+					return new FileSystemError({
+						operation: 'read',
+						path: '',
+						cause: String(error),
+					});
+				},
+			}),
+			projectsDir =>
+				Effect.flatMap(this.discoverProjectsEffect(projectsDir), projects =>
+					Effect.sync(() => {
+						this.projects = projects;
+
+						// Update current project if it still exists
+						if (this.currentProject) {
+							const updatedProject = this.projects.find(
+								p => p.path === this.currentProject!.path,
+							);
+							if (updatedProject) {
+								this.currentProject = updatedProject;
+							} else {
+								// Current project no longer exists
+								this.currentProject = undefined;
+							}
+						}
+					}),
+				),
+		);
 	}
 }
 

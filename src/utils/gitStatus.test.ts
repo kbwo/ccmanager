@@ -1,4 +1,5 @@
 import {describe, it, expect, vi} from 'vitest';
+import {Effect} from 'effect';
 import {
 	formatGitStatus,
 	formatGitFileChanges,
@@ -83,20 +84,21 @@ describe('GitService Integration Tests', {timeout: 10000}, () => {
 			const controller3 = new AbortController();
 
 			const results = await Promise.all([
-				getGitStatus(tmpDir, controller1.signal),
-				getGitStatus(tmpDir, controller2.signal),
-				getGitStatus(tmpDir, controller3.signal),
+				Effect.runPromise(getGitStatus(tmpDir), {
+					signal: controller1.signal,
+				}),
+				Effect.runPromise(getGitStatus(tmpDir), {
+					signal: controller2.signal,
+				}),
+				Effect.runPromise(getGitStatus(tmpDir), {
+					signal: controller3.signal,
+				}),
 			]);
 
-			// All should succeed
-			const successCount = results.filter(r => r.success).length;
-			expect(successCount).toBe(3);
-
 			// All results should have the same data
-			const firstData = results[0]!.data;
+			const firstData = results[0];
 			results.forEach(result => {
-				expect(result.success).toBe(true);
-				expect(result.data).toEqual(firstData);
+				expect(result).toEqual(firstData);
 			});
 		} finally {
 			// Cleanup

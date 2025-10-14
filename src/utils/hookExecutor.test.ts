@@ -1,4 +1,5 @@
 import {describe, it, expect, vi} from 'vitest';
+import {Effect} from 'effect';
 import {
 	executeHook,
 	executeWorktreePostCreationHook,
@@ -10,6 +11,7 @@ import {join} from 'path';
 import type {SessionState, Session} from '../types/index.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {GitError} from '../types/errors.js';
 
 // Mock the configurationManager
 vi.mock('../services/configurationManager.js', () => ({
@@ -39,7 +41,9 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert - should not throw
 				await expect(
-					executeHook('echo "Test successful"', tmpDir, environment),
+					Effect.runPromise(
+						executeHook('echo "Test successful"', tmpDir, environment),
+					),
 				).resolves.toBeUndefined();
 			} finally {
 				// Cleanup
@@ -59,7 +63,7 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert
 				await expect(
-					executeHook('exit 1', tmpDir, environment),
+					Effect.runPromise(executeHook('exit 1', tmpDir, environment)),
 				).rejects.toThrow();
 			} finally {
 				// Cleanup
@@ -79,10 +83,12 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert - command that writes to stderr and exits with error
 				await expect(
-					executeHook(
-						'>&2 echo "Error details here"; exit 1',
-						tmpDir,
-						environment,
+					Effect.runPromise(
+						executeHook(
+							'>&2 echo "Error details here"; exit 1',
+							tmpDir,
+							environment,
+						),
 					),
 				).rejects.toThrow(
 					'Hook exited with code 1\nStderr: Error details here\n',
@@ -105,10 +111,12 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Test with multiline stderr
 				try {
-					await executeHook(
-						'>&2 echo "Line 1"; >&2 echo "Line 2"; exit 3',
-						tmpDir,
-						environment,
+					await Effect.runPromise(
+						executeHook(
+							'>&2 echo "Line 1"; >&2 echo "Line 2"; exit 3',
+							tmpDir,
+							environment,
+						),
 					);
 					expect.fail('Should have thrown');
 				} catch (error) {
@@ -119,7 +127,7 @@ describe('hookExecutor Integration Tests', () => {
 
 				// Test with empty stderr
 				try {
-					await executeHook('exit 4', tmpDir, environment);
+					await Effect.runPromise(executeHook('exit 4', tmpDir, environment));
 					expect.fail('Should have thrown');
 				} catch (error) {
 					expect(error).toBeInstanceOf(Error);
@@ -144,10 +152,12 @@ describe('hookExecutor Integration Tests', () => {
 				// Act - command that writes to stderr but exits successfully
 				// Should not throw even though there's stderr output
 				await expect(
-					executeHook(
-						'>&2 echo "Warning message"; exit 0',
-						tmpDir,
-						environment,
+					Effect.runPromise(
+						executeHook(
+							'>&2 echo "Warning message"; exit 0',
+							tmpDir,
+							environment,
+						),
 					),
 				).resolves.toBeUndefined();
 			} finally {
@@ -168,7 +178,9 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act - write current directory to file
-				await executeHook(`pwd > "${outputFile}"`, tmpDir, environment);
+				await Effect.runPromise(
+					executeHook(`pwd > "${outputFile}"`, tmpDir, environment),
+				);
 
 				// Read the output
 				const {readFile} = await import('fs/promises');
@@ -199,7 +211,9 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert - should not throw even with failing command
 				await expect(
-					executeWorktreePostCreationHook('exit 1', worktree, tmpDir, 'main'),
+					Effect.runPromise(
+						executeWorktreePostCreationHook('exit 1', worktree, tmpDir, 'main'),
+					),
 				).resolves.toBeUndefined();
 			} finally {
 				// Cleanup
@@ -221,11 +235,13 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act - write current directory to file
-				await executeWorktreePostCreationHook(
-					`pwd > "${outputFile}"`,
-					worktree,
-					gitRoot,
-					'main',
+				await Effect.runPromise(
+					executeWorktreePostCreationHook(
+						`pwd > "${outputFile}"`,
+						worktree,
+						gitRoot,
+						'main',
+					),
 				);
 
 				// Read the output
@@ -259,11 +275,13 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act - change to git root and write its path
-				await executeWorktreePostCreationHook(
-					`cd "$CCMANAGER_GIT_ROOT" && pwd > "${outputFile}"`,
-					worktree,
-					tmpGitRootDir,
-					'main',
+				await Effect.runPromise(
+					executeWorktreePostCreationHook(
+						`cd "$CCMANAGER_GIT_ROOT" && pwd > "${outputFile}"`,
+						worktree,
+						tmpGitRootDir,
+						'main',
+					),
 				);
 
 				// Read the output
@@ -294,11 +312,13 @@ describe('hookExecutor Integration Tests', () => {
 				// Act - execute a command that spawns a background process with a delay
 				// The background process writes to a file after a delay
 				// We use a shell command that creates a background process and then exits
-				await executeWorktreePostCreationHook(
-					`(sleep 0.1 && echo "completed" > "${outputFile}") & wait`,
-					worktree,
-					tmpDir,
-					'main',
+				await Effect.runPromise(
+					executeWorktreePostCreationHook(
+						`(sleep 0.1 && echo "completed" > "${outputFile}") & wait`,
+						worktree,
+						tmpDir,
+						'main',
+					),
 				);
 
 				// Read the output - this should exist because we waited for the background process
@@ -343,14 +363,16 @@ describe('hookExecutor Integration Tests', () => {
 			vi.mocked(WorktreeService).mockImplementation(
 				() =>
 					({
-						getWorktrees: vi.fn(() => [
-							{
-								path: tmpDir,
-								branch: 'test-branch',
-								isMainWorktree: false,
-								hasSession: true,
-							},
-						]),
+						getWorktreesEffect: vi.fn(() =>
+							Effect.succeed([
+								{
+									path: tmpDir,
+									branch: 'test-branch',
+									isMainWorktree: false,
+									hasSession: true,
+								},
+							]),
+						),
 					}) as unknown as InstanceType<typeof WorktreeService>,
 			);
 
@@ -366,7 +388,7 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act - execute the hook and await it
-				await executeStatusHook('idle', 'busy', mockSession);
+				await Effect.runPromise(executeStatusHook('idle', 'busy', mockSession));
 
 				// Assert - file should exist because we awaited the hook
 				const content = await readFile(outputFile, 'utf-8');
@@ -404,14 +426,16 @@ describe('hookExecutor Integration Tests', () => {
 			vi.mocked(WorktreeService).mockImplementation(
 				() =>
 					({
-						getWorktrees: vi.fn(() => [
-							{
-								path: tmpDir,
-								branch: 'test-branch',
-								isMainWorktree: false,
-								hasSession: true,
-							},
-						]),
+						getWorktreesEffect: vi.fn(() =>
+							Effect.succeed([
+								{
+									path: tmpDir,
+									branch: 'test-branch',
+									isMainWorktree: false,
+									hasSession: true,
+								},
+							]),
+						),
 					}) as unknown as InstanceType<typeof WorktreeService>,
 			);
 
@@ -428,7 +452,7 @@ describe('hookExecutor Integration Tests', () => {
 			try {
 				// Act & Assert - should not throw even when hook fails
 				await expect(
-					executeStatusHook('idle', 'busy', mockSession),
+					Effect.runPromise(executeStatusHook('idle', 'busy', mockSession)),
 				).resolves.toBeUndefined();
 			} finally {
 				// Cleanup
@@ -464,14 +488,16 @@ describe('hookExecutor Integration Tests', () => {
 			vi.mocked(WorktreeService).mockImplementation(
 				() =>
 					({
-						getWorktrees: vi.fn(() => [
-							{
-								path: tmpDir,
-								branch: 'test-branch',
-								isMainWorktree: false,
-								hasSession: true,
-							},
-						]),
+						getWorktreesEffect: vi.fn(() =>
+							Effect.succeed([
+								{
+									path: tmpDir,
+									branch: 'test-branch',
+									isMainWorktree: false,
+									hasSession: true,
+								},
+							]),
+						),
 					}) as unknown as InstanceType<typeof WorktreeService>,
 			);
 
@@ -487,10 +513,75 @@ describe('hookExecutor Integration Tests', () => {
 
 			try {
 				// Act
-				await executeStatusHook('idle', 'busy', mockSession);
+				await Effect.runPromise(executeStatusHook('idle', 'busy', mockSession));
 
 				// Assert - file should not exist because hook was disabled
 				await expect(readFile(outputFile, 'utf-8')).rejects.toThrow();
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+
+		it('should handle getWorktreesEffect failures gracefully', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'status-hook-test-'));
+			const outputFile = join(tmpDir, 'hook-output.txt');
+
+			const mockSession = {
+				id: 'test-session-failure',
+				worktreePath: tmpDir,
+				process: {} as unknown as Session['process'],
+				terminal: {} as unknown as Session['terminal'],
+				output: [],
+				outputHistory: [],
+				state: 'idle' as SessionState,
+				stateCheckInterval: undefined,
+				isPrimaryCommand: true,
+				commandConfig: undefined,
+				detectionStrategy: 'claude',
+				devcontainerConfig: undefined,
+				pendingState: undefined,
+				pendingStateStart: undefined,
+				lastActivity: new Date(),
+				isActive: true,
+			} satisfies Session;
+
+			// Mock WorktreeService to fail with GitError
+			vi.mocked(WorktreeService).mockImplementation(
+				() =>
+					({
+						getWorktreesEffect: vi.fn(() =>
+							Effect.fail(
+								new GitError({
+									command: 'git worktree list --porcelain',
+									exitCode: 128,
+									stderr: 'not a git repository',
+								}),
+							),
+						),
+					}) as unknown as InstanceType<typeof WorktreeService>,
+			);
+
+			// Configure mock to return a hook that should execute despite worktree query failure
+			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
+				busy: {
+					enabled: true,
+					command: `echo "Hook ran with branch: $CCMANAGER_WORKTREE_BRANCH" > "${outputFile}"`,
+				},
+				idle: {enabled: false, command: ''},
+				waiting_input: {enabled: false, command: ''},
+			});
+
+			try {
+				// Act - should not throw even when getWorktreesEffect fails
+				await expect(
+					Effect.runPromise(executeStatusHook('idle', 'busy', mockSession)),
+				).resolves.toBeUndefined();
+
+				// Assert - hook should have executed with 'unknown' branch
+				const content = await readFile(outputFile, 'utf-8');
+				expect(content.trim()).toBe('Hook ran with branch: unknown');
 			} finally {
 				// Cleanup
 				await rm(tmpDir, {recursive: true});

@@ -7,7 +7,9 @@ import {
 	STATE_CHECK_INTERVAL_MS,
 } from '../constants/statePersistence.js';
 
-vi.mock('node-pty');
+vi.mock('node-pty', () => ({
+	spawn: vi.fn(),
+}));
 vi.mock('./configurationManager.js', () => ({
 	configurationManager: {
 		getConfig: vi.fn().mockReturnValue({
@@ -95,7 +97,10 @@ describe('SessionManager - State Persistence', () => {
 	});
 
 	it('should not change state immediately when detected state changes', async () => {
-		const session = await sessionManager.createSessionWithPreset('/test/path');
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		// Initial state should be busy
@@ -114,7 +119,10 @@ describe('SessionManager - State Persistence', () => {
 	});
 
 	it('should change state after persistence duration is met', async () => {
-		const session = await sessionManager.createSessionWithPreset('/test/path');
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		const stateChangeHandler = vi.fn();
@@ -142,7 +150,10 @@ describe('SessionManager - State Persistence', () => {
 	});
 
 	it('should cancel pending state if detected state changes again before persistence', async () => {
-		const session = await sessionManager.createSessionWithPreset('/test/path');
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		// Initial state should be busy
@@ -167,7 +178,10 @@ describe('SessionManager - State Persistence', () => {
 	});
 
 	it('should clear pending state if detected state returns to current state', async () => {
-		const session = await sessionManager.createSessionWithPreset('/test/path');
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		// Initial state should be busy
@@ -194,7 +208,10 @@ describe('SessionManager - State Persistence', () => {
 	});
 
 	it('should not confirm state changes that do not persist long enough', async () => {
-		const session = await sessionManager.createSessionWithPreset('/test/path');
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		const stateChangeHandler = vi.fn();
@@ -229,7 +246,10 @@ describe('SessionManager - State Persistence', () => {
 	});
 
 	it('should properly clean up pending state when session is destroyed', async () => {
-		const session = await sessionManager.createSessionWithPreset('/test/path');
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		// Simulate output that would trigger idle state
@@ -249,10 +269,13 @@ describe('SessionManager - State Persistence', () => {
 	});
 
 	it('should handle multiple sessions with independent state persistence', async () => {
-		const session1 =
-			await sessionManager.createSessionWithPreset('/test/path1');
-		const session2 =
-			await sessionManager.createSessionWithPreset('/test/path2');
+		const {Effect} = await import('effect');
+		const session1 = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path1'),
+		);
+		const session2 = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path2'),
+		);
 		const eventEmitter1 = eventEmitters.get('/test/path1')!;
 		const eventEmitter2 = eventEmitters.get('/test/path2')!;
 

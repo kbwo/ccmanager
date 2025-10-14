@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
+import {Effect} from 'effect';
 import {Worktree} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import DeleteConfirmation from './DeleteConfirmation.js';
@@ -21,13 +22,41 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	);
 	const [confirmMode, setConfirmMode] = useState(false);
 	const [focusedIndex, setFocusedIndex] = useState(0);
+	const [error, setError] = useState<string | null>(null);
+	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
-		const worktreeService = new WorktreeService();
-		const allWorktrees = worktreeService.getWorktrees();
-		// Filter out main worktree - we shouldn't delete it
-		const deletableWorktrees = allWorktrees.filter(wt => !wt.isMainWorktree);
-		setWorktrees(deletableWorktrees);
+		let cancelled = false;
+
+		const loadWorktrees = async () => {
+			const worktreeService = new WorktreeService();
+
+			try {
+				const allWorktrees = await Effect.runPromise(
+					worktreeService.getWorktreesEffect(),
+				);
+
+				if (!cancelled) {
+					// Filter out main worktree - we shouldn't delete it
+					const deletableWorktrees = allWorktrees.filter(
+						wt => !wt.isMainWorktree,
+					);
+					setWorktrees(deletableWorktrees);
+					setIsLoading(false);
+				}
+			} catch (err) {
+				if (!cancelled) {
+					setError(err instanceof Error ? err.message : String(err));
+					setIsLoading(false);
+				}
+			}
+		};
+
+		loadWorktrees();
+
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	// Create menu items from worktrees
@@ -72,6 +101,26 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			onCancel();
 		}
 	});
+
+	if (isLoading) {
+		return (
+			<Box flexDirection="column">
+				<Text color="cyan">Loading worktrees...</Text>
+			</Box>
+		);
+	}
+
+	if (error) {
+		return (
+			<Box flexDirection="column">
+				<Text color="red">Error loading worktrees:</Text>
+				<Text color="red">{error}</Text>
+				<Text dimColor>
+					Press {shortcutManager.getShortcutDisplay('cancel')} to return to menu
+				</Text>
+			</Box>
+		);
+	}
 
 	if (worktrees.length === 0) {
 		return (

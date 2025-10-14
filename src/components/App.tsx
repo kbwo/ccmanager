@@ -1,5 +1,6 @@
 import React, {useState, useEffect, useCallback} from 'react';
 import {useApp, Box, Text} from 'ink';
+import {Effect} from 'effect';
 import Menu from './Menu.js';
 import ProjectList from './ProjectList.js';
 import Session from './Session.js';
@@ -9,6 +10,7 @@ import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import RemoteBranchSelector from './RemoteBranchSelector.js';
+import LoadingSpinner from './LoadingSpinner.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -20,6 +22,7 @@ import {
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
+import {type AppError} from '../types/errors.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
@@ -31,6 +34,8 @@ type View =
 	| 'session'
 	| 'new-worktree'
 	| 'creating-worktree'
+	| 'creating-session'
+	| 'creating-session-preset'
 	| 'delete-worktree'
 	| 'deleting-worktree'
 	| 'merge-worktree'
@@ -74,6 +79,64 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		copyClaudeDirectory: boolean;
 		ambiguousError: AmbiguousBranchError;
 	} | null>(null);
+
+	// State for loading context - track flags for message composition
+	const [loadingContext, setLoadingContext] = useState<{
+		copySessionData?: boolean;
+		deleteBranch?: boolean;
+	}>({});
+
+	// Helper function to format error messages based on error type using _tag discrimination
+	const formatErrorMessage = (error: AppError): string => {
+		switch (error._tag) {
+			case 'ProcessError':
+				return `Process error: ${error.message}`;
+			case 'ConfigError':
+				return `Configuration error (${error.reason}): ${error.details}`;
+			case 'GitError':
+				return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+			case 'FileSystemError':
+				return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+			case 'ValidationError':
+				return `Validation failed for ${error.field}: ${error.constraint}`;
+		}
+	};
+
+	// Helper function to create session with Effect-based error handling
+	const createSessionWithEffect = async (
+		worktreePath: string,
+		presetId?: string,
+	): Promise<{
+		success: boolean;
+		session?: SessionType;
+		errorMessage?: string;
+	}> => {
+		const sessionEffect = devcontainerConfig
+			? sessionManager.createSessionWithDevcontainerEffect(
+					worktreePath,
+					devcontainerConfig,
+					presetId,
+				)
+			: sessionManager.createSessionWithPresetEffect(worktreePath, presetId);
+
+		// Execute the Effect and handle both success and failure cases
+		const result = await Effect.runPromise(Effect.either(sessionEffect));
+
+		if (result._tag === 'Left') {
+			// Handle error using pattern matching on _tag
+			const errorMessage = formatErrorMessage(result.left);
+			return {
+				success: false,
+				errorMessage: `Failed to create session: ${errorMessage}`,
+			};
+		}
+
+		// Success case - extract session from Right
+		return {
+			success: true,
+			session: result.right,
+		};
+	};
 
 	// Helper function to clear terminal screen
 	const clearScreen = () => {
@@ -244,20 +307,19 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				return;
 			}
 
-			try {
-				// Use preset-based session creation with default preset
-				if (devcontainerConfig) {
-					session = await sessionManager.createSessionWithDevcontainer(
-						worktree.path,
-						devcontainerConfig,
-					);
-				} else {
-					session = await sessionManager.createSessionWithPreset(worktree.path);
-				}
-			} catch (error) {
-				setError(`Failed to create session: ${error}`);
+			// Set loading state before async operation
+			setView('creating-session');
+
+			// Use Effect-based session creation with default preset
+			const result = await createSessionWithEffect(worktree.path);
+
+			if (!result.success) {
+				setError(result.errorMessage!);
+				navigateWithClear('menu');
 				return;
 			}
+
+			session = result.session!;
 		}
 
 		setActiveSession(session);
@@ -267,29 +329,26 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const handlePresetSelected = async (presetId: string) => {
 		if (!selectedWorktree) return;
 
-		try {
-			// Create session with selected preset
-			let session: SessionType;
-			if (devcontainerConfig) {
-				session = await sessionManager.createSessionWithDevcontainer(
-					selectedWorktree.path,
-					devcontainerConfig,
-					presetId,
-				);
-			} else {
-				session = await sessionManager.createSessionWithPreset(
-					selectedWorktree.path,
-					presetId,
-				);
-			}
-			setActiveSession(session);
-			navigateWithClear('session');
-			setSelectedWorktree(null);
-		} catch (error) {
-			setError(`Failed to create session: ${error}`);
+		// Set loading state before async operation
+		setView('creating-session-preset');
+
+		// Create session with selected preset using Effect
+		const result = await createSessionWithEffect(
+			selectedWorktree.path,
+			presetId,
+		);
+
+		if (!result.success) {
+			setError(result.errorMessage!);
 			setView('menu');
 			setSelectedWorktree(null);
+			return;
 		}
+
+		// Success case
+		setActiveSession(result.session!);
+		navigateWithClear('session');
+		setSelectedWorktree(null);
 	};
 
 	const handlePresetSelectorCancel = () => {
@@ -331,26 +390,39 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		copySessionData: boolean,
 		copyClaudeDirectory: boolean,
 	) => {
+		// Set loading context before showing loading view
+		setLoadingContext({copySessionData});
 		setView('creating-worktree');
 		setError(null);
 
-		// Create the worktree
-		const result = await worktreeService.createWorktree(
-			path,
-			branch,
-			baseBranch,
-			copySessionData,
-			copyClaudeDirectory,
+		// Create the worktree using Effect
+		const result = await Effect.runPromise(
+			Effect.either(
+				worktreeService.createWorktreeEffect(
+					path,
+					branch,
+					baseBranch,
+					copySessionData,
+					copyClaudeDirectory,
+				),
+			),
 		);
 
-		// Handle the result using the helper function
-		handleWorktreeCreationResult(result, {
-			path,
-			branch,
-			baseBranch,
-			copySessionData,
-			copyClaudeDirectory,
-		});
+		// Transform Effect result to legacy format for handleWorktreeCreationResult
+		if (result._tag === 'Left') {
+			// Handle error using pattern matching on _tag
+			const errorMessage = formatErrorMessage(result.left);
+			handleWorktreeCreationResult(
+				{success: false, error: errorMessage},
+				{path, branch, baseBranch, copySessionData, copyClaudeDirectory},
+			);
+		} else {
+			// Success case
+			handleWorktreeCreationResult(
+				{success: true},
+				{path, branch, baseBranch, copySessionData, copyClaudeDirectory},
+			);
+		}
 	};
 
 	const handleCancelNewWorktree = () => {
@@ -365,24 +437,31 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		setPendingWorktreeCreation(null);
 
 		// Retry worktree creation with the resolved base branch
+		// Set loading context before showing loading view
+		setLoadingContext({copySessionData: creationData.copySessionData});
 		setView('creating-worktree');
 		setError(null);
 
-		const result = await worktreeService.createWorktree(
-			creationData.path,
-			creationData.branch,
-			selectedRemoteRef, // Use the selected remote reference
-			creationData.copySessionData,
-			creationData.copyClaudeDirectory,
+		const result = await Effect.runPromise(
+			Effect.either(
+				worktreeService.createWorktreeEffect(
+					creationData.path,
+					creationData.branch,
+					selectedRemoteRef, // Use the selected remote reference
+					creationData.copySessionData,
+					creationData.copyClaudeDirectory,
+				),
+			),
 		);
 
-		if (result.success) {
+		if (result._tag === 'Left') {
+			// Handle error using pattern matching on _tag
+			const errorMessage = formatErrorMessage(result.left);
+			setError(errorMessage);
+			setView('new-worktree');
+		} else {
 			// Success - return to menu
 			handleReturnToMenu();
-		} else {
-			// Show error and return to new worktree form
-			setError(result.error || 'Failed to create worktree');
-			setView('new-worktree');
 		}
 	};
 
@@ -396,16 +475,25 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		worktreePaths: string[],
 		deleteBranch: boolean,
 	) => {
+		// Set loading context before showing loading view
+		setLoadingContext({deleteBranch});
 		setView('deleting-worktree');
 		setError(null);
 
-		// Delete the worktrees
+		// Delete the worktrees sequentially using Effect
 		let hasError = false;
 		for (const path of worktreePaths) {
-			const result = worktreeService.deleteWorktree(path, {deleteBranch});
-			if (!result.success) {
+			const result = await Effect.runPromise(
+				Effect.either(
+					worktreeService.deleteWorktreeEffect(path, {deleteBranch}),
+				),
+			);
+
+			if (result._tag === 'Left') {
+				// Handle error using pattern matching on _tag
 				hasError = true;
-				setError(result.error || 'Failed to delete worktree');
+				const errorMessage = formatErrorMessage(result.left);
+				setError(errorMessage);
 				break;
 			}
 		}
@@ -522,9 +610,14 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	}
 
 	if (view === 'creating-worktree') {
+		// Compose message based on loading context
+		const message = loadingContext.copySessionData
+			? 'Creating worktree and copying session data...'
+			: 'Creating worktree...';
+
 		return (
 			<Box flexDirection="column">
-				<Text color="green">Creating worktree...</Text>
+				<LoadingSpinner message={message} color="cyan" />
 			</Box>
 		);
 	}
@@ -546,9 +639,14 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	}
 
 	if (view === 'deleting-worktree') {
+		// Compose message based on loading context
+		const message = loadingContext.deleteBranch
+			? 'Deleting worktrees and branches...'
+			: 'Deleting worktrees...';
+
 		return (
 			<Box flexDirection="column">
-				<Text color="red">Deleting worktrees...</Text>
+				<LoadingSpinner message={message} color="cyan" />
 			</Box>
 		);
 	}
@@ -590,6 +688,41 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				onSelect={handleRemoteBranchSelected}
 				onCancel={handleRemoteBranchSelectorCancel}
 			/>
+		);
+	}
+
+	if (view === 'creating-session') {
+		// Compose message based on devcontainerConfig presence
+		// Devcontainer operations take >5 seconds, so indicate extended duration
+		const message = devcontainerConfig
+			? 'Starting devcontainer (this may take a moment)...'
+			: 'Creating session...';
+
+		// Use yellow color for devcontainer operations (longer duration),
+		// cyan for standard session creation
+		const color = devcontainerConfig ? 'yellow' : 'cyan';
+
+		return (
+			<Box flexDirection="column">
+				<LoadingSpinner message={message} color={color} />
+			</Box>
+		);
+	}
+
+	if (view === 'creating-session-preset') {
+		// Always display preset-specific message
+		// Devcontainer operations take >5 seconds, so indicate extended duration
+		const message = devcontainerConfig
+			? 'Creating session with preset (this may take a moment)...'
+			: 'Creating session with preset...';
+
+		// Use yellow color for devcontainer, cyan for standard
+		const color = devcontainerConfig ? 'yellow' : 'cyan';
+
+		return (
+			<Box flexDirection="column">
+				<LoadingSpinner message={message} color={color} />
+			</Box>
 		);
 	}
 

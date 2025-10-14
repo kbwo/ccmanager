@@ -1,6 +1,7 @@
 import {homedir} from 'os';
 import {join} from 'path';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+import {Effect, Either} from 'effect';
 import {
 	ConfigurationData,
 	StatusHookConfig,
@@ -12,6 +13,11 @@ import {
 	CommandPresetsConfig,
 	DEFAULT_SHORTCUTS,
 } from '../types/index.js';
+import {
+	FileSystemError,
+	ConfigError,
+	ValidationError,
+} from '../types/errors.js';
 
 export class ConfigurationManager {
 	private configPath: string;
@@ -314,6 +320,315 @@ export class ConfigurationManager {
 		const presets = this.getCommandPresets();
 		presets.selectPresetOnStart = enabled;
 		this.setCommandPresets(presets);
+	}
+
+	// Effect-based methods for type-safe error handling
+
+	/**
+	 * Load configuration from file with Effect-based error handling
+	 *
+	 * @returns {Effect.Effect<ConfigurationData, FileSystemError | ConfigError, never>} Configuration data on success, errors on failure
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await Effect.runPromise(
+	 *   configManager.loadConfigEffect()
+	 * );
+	 * ```
+	 */
+	loadConfigEffect(): Effect.Effect<
+		ConfigurationData,
+		FileSystemError | ConfigError,
+		never
+	> {
+		return Effect.try({
+			try: () => {
+				// Try to load the new config file
+				if (existsSync(this.configPath)) {
+					const configData = readFileSync(this.configPath, 'utf-8');
+					const parsedConfig = JSON.parse(configData);
+					return this.applyDefaults(parsedConfig);
+				} else {
+					// If new config doesn't exist, check for legacy shortcuts.json
+					const migratedConfig = this.migrateLegacyShortcutsSync();
+					return this.applyDefaults(migratedConfig || {});
+				}
+			},
+			catch: (error: unknown) => {
+				// Determine error type
+				if (error instanceof SyntaxError) {
+					return new ConfigError({
+						configPath: this.configPath,
+						reason: 'parse',
+						details: String(error),
+					});
+				}
+				return new FileSystemError({
+					operation: 'read',
+					path: this.configPath,
+					cause: String(error),
+				});
+			},
+		});
+	}
+
+	/**
+	 * Save configuration to file with Effect-based error handling
+	 *
+	 * @returns {Effect.Effect<void, FileSystemError, never>} Void on success, FileSystemError on write failure
+	 *
+	 * @example
+	 * ```typescript
+	 * await Effect.runPromise(
+	 *   configManager.saveConfigEffect(config)
+	 * );
+	 * ```
+	 */
+	saveConfigEffect(
+		config: ConfigurationData,
+	): Effect.Effect<void, FileSystemError, never> {
+		return Effect.try({
+			try: () => {
+				this.config = config;
+				writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
+			},
+			catch: (error: unknown) => {
+				return new FileSystemError({
+					operation: 'write',
+					path: this.configPath,
+					cause: String(error),
+				});
+			},
+		});
+	}
+
+	/**
+	 * Validate configuration structure
+	 * Synchronous validation using Either
+	 */
+	validateConfig(
+		config: unknown,
+	): Either.Either<ValidationError, ConfigurationData> {
+		if (!config || typeof config !== 'object') {
+			return Either.left(
+				new ValidationError({
+					field: 'config',
+					constraint: 'must be a valid configuration object',
+					receivedValue: config,
+				}),
+			) as Either.Either<ValidationError, ConfigurationData>;
+		}
+
+		// Validate shortcuts field if present
+		const configObj = config as Record<string, unknown>;
+		if (
+			configObj['shortcuts'] !== undefined &&
+			(typeof configObj['shortcuts'] !== 'object' ||
+				configObj['shortcuts'] === null)
+		) {
+			return Either.left(
+				new ValidationError({
+					field: 'config',
+					constraint: 'shortcuts must be a valid object',
+					receivedValue: config,
+				}),
+			) as unknown as Either.Either<ValidationError, ConfigurationData>;
+		}
+
+		// Additional validation could go here
+		return Either.right(
+			config as ConfigurationData,
+		) as unknown as Either.Either<ValidationError, ConfigurationData>;
+	}
+
+	/**
+	 * Get preset by ID with Either-based error handling
+	 * Synchronous lookup using Either
+	 */
+	getPresetByIdEffect(
+		id: string,
+	): Either.Either<ValidationError, CommandPreset> {
+		const presets = this.getCommandPresets();
+		const preset = presets.presets.find(p => p.id === id);
+
+		if (!preset) {
+			return Either.left(
+				new ValidationError({
+					field: 'presetId',
+					constraint: 'Preset not found',
+					receivedValue: id,
+				}),
+			) as unknown as Either.Either<ValidationError, CommandPreset>;
+		}
+
+		return Either.right(preset) as unknown as Either.Either<
+			ValidationError,
+			CommandPreset
+		>;
+	}
+
+	/**
+	 * Set shortcuts with Effect-based error handling
+	 *
+	 * @returns {Effect.Effect<void, FileSystemError, never>} Void on success, FileSystemError on save failure
+	 *
+	 * @example
+	 * ```typescript
+	 * await Effect.runPromise(
+	 *   configManager.setShortcutsEffect(shortcuts)
+	 * );
+	 * ```
+	 */
+	setShortcutsEffect(
+		shortcuts: ShortcutConfig,
+	): Effect.Effect<void, FileSystemError, never> {
+		this.config.shortcuts = shortcuts;
+		return this.saveConfigEffect(this.config);
+	}
+
+	/**
+	 * Set command presets with Effect-based error handling
+	 */
+	setCommandPresetsEffect(
+		presets: CommandPresetsConfig,
+	): Effect.Effect<void, FileSystemError, never> {
+		this.config.commandPresets = presets;
+		return this.saveConfigEffect(this.config);
+	}
+
+	/**
+	 * Add or update preset with Effect-based error handling
+	 */
+	addPresetEffect(
+		preset: CommandPreset,
+	): Effect.Effect<void, FileSystemError, never> {
+		const presets = this.getCommandPresets();
+
+		// Replace if exists, otherwise add
+		const existingIndex = presets.presets.findIndex(p => p.id === preset.id);
+		if (existingIndex >= 0) {
+			presets.presets[existingIndex] = preset;
+		} else {
+			presets.presets.push(preset);
+		}
+
+		return this.setCommandPresetsEffect(presets);
+	}
+
+	/**
+	 * Delete preset with Effect-based error handling
+	 */
+	deletePresetEffect(
+		id: string,
+	): Effect.Effect<void, ValidationError | FileSystemError, never> {
+		const presets = this.getCommandPresets();
+
+		// Don't delete if it's the last preset
+		if (presets.presets.length <= 1) {
+			return Effect.fail(
+				new ValidationError({
+					field: 'presetId',
+					constraint: 'Cannot delete last preset',
+					receivedValue: id,
+				}),
+			);
+		}
+
+		// Remove the preset
+		presets.presets = presets.presets.filter(p => p.id !== id);
+
+		// Update default if needed
+		if (presets.defaultPresetId === id && presets.presets.length > 0) {
+			presets.defaultPresetId = presets.presets[0]!.id;
+		}
+
+		return this.setCommandPresetsEffect(presets);
+	}
+
+	/**
+	 * Set default preset with Effect-based error handling
+	 */
+	setDefaultPresetEffect(
+		id: string,
+	): Effect.Effect<void, ValidationError | FileSystemError, never> {
+		const presets = this.getCommandPresets();
+
+		// Only update if preset exists
+		if (!presets.presets.some(p => p.id === id)) {
+			return Effect.fail(
+				new ValidationError({
+					field: 'presetId',
+					constraint: 'Preset not found',
+					receivedValue: id,
+				}),
+			);
+		}
+
+		presets.defaultPresetId = id;
+		return this.setCommandPresetsEffect(presets);
+	}
+
+	// Helper methods
+
+	/**
+	 * Apply default values to configuration
+	 */
+	private applyDefaults(config: ConfigurationData): ConfigurationData {
+		// Ensure default values
+		if (!config.shortcuts) {
+			config.shortcuts = DEFAULT_SHORTCUTS;
+		}
+		if (!config.statusHooks) {
+			config.statusHooks = {};
+		}
+		if (!config.worktreeHooks) {
+			config.worktreeHooks = {};
+		}
+		if (!config.worktree) {
+			config.worktree = {
+				autoDirectory: false,
+				copySessionData: true,
+			};
+		}
+		if (
+			!Object.prototype.hasOwnProperty.call(config.worktree, 'copySessionData')
+		) {
+			config.worktree.copySessionData = true;
+		}
+		if (!config.command) {
+			config.command = {
+				command: 'claude',
+			};
+		}
+
+		return config;
+	}
+
+	/**
+	 * Synchronous legacy shortcuts migration helper
+	 */
+	private migrateLegacyShortcutsSync(): ConfigurationData | null {
+		if (existsSync(this.legacyShortcutsPath)) {
+			try {
+				const shortcutsData = readFileSync(this.legacyShortcutsPath, 'utf-8');
+				const shortcuts = JSON.parse(shortcutsData);
+
+				// Validate that it's a valid shortcuts config
+				if (shortcuts && typeof shortcuts === 'object') {
+					const config: ConfigurationData = {shortcuts};
+					// Save to new config format
+					this.config = config;
+					writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
+					console.log(
+						'Migrated shortcuts from legacy shortcuts.json to config.json',
+					);
+					return config;
+				}
+			} catch (error) {
+				console.error('Failed to migrate legacy shortcuts:', error);
+			}
+		}
+		return null;
 	}
 }
 

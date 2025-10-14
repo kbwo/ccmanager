@@ -2,9 +2,11 @@ import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
 import React from 'react';
 import {render, cleanup} from 'ink-testing-library';
 import {Text} from 'ink';
+import {Effect, Exit} from 'effect';
 import {useGitStatus} from './useGitStatus.js';
 import type {Worktree} from '../types/index.js';
 import {getGitStatusLimited, type GitStatus} from '../utils/gitStatus.js';
+import {GitError} from '../types/errors.js';
 
 // Mock the gitStatus module
 vi.mock('../utils/gitStatus.js', () => ({
@@ -46,11 +48,11 @@ describe('useGitStatus', () => {
 		const gitStatus2 = createGitStatus(2, 1);
 		let hookResult: Worktree[] = [];
 
-		mockGetGitStatus.mockImplementation(async path => {
+		mockGetGitStatus.mockImplementation(path => {
 			if (path === '/path1') {
-				return {success: true, data: gitStatus1};
+				return Effect.succeed(gitStatus1);
 			}
-			return {success: true, data: gitStatus2};
+			return Effect.succeed(gitStatus2);
 		});
 
 		const TestComponent = () => {
@@ -110,10 +112,13 @@ describe('useGitStatus', () => {
 	it('should continue polling after errors', async () => {
 		const worktrees = [createWorktree('/path1')];
 
-		mockGetGitStatus.mockResolvedValue({
-			success: false,
-			error: 'Git error',
+		const gitError = new GitError({
+			command: 'git status',
+			exitCode: 128,
+			stderr: 'Git error',
 		});
+
+		mockGetGitStatus.mockReturnValue(Effect.fail(gitError));
 
 		const TestComponent = () => {
 			useGitStatus(worktrees, 'main', 100);
@@ -138,24 +143,20 @@ describe('useGitStatus', () => {
 		expect(mockGetGitStatus).toHaveBeenCalledTimes(2);
 
 		// All calls should have been made despite continuous errors
-		expect(mockGetGitStatus).toHaveBeenCalledWith(
-			'/path1',
-			expect.any(AbortSignal),
-		);
+		expect(mockGetGitStatus).toHaveBeenCalledWith('/path1');
 	});
 
 	it('should handle slow git operations that exceed update interval', async () => {
 		const worktrees = [createWorktree('/path1')];
 		let fetchCount = 0;
-		let resolveFetch:
-			| ((value: {success: boolean; data?: GitStatus}) => void)
-			| null = null;
+		let resolveEffect: ((exit: Exit.Exit<GitStatus, GitError>) => void) | null =
+			null;
 
-		mockGetGitStatus.mockImplementation(async () => {
+		mockGetGitStatus.mockImplementation(() => {
 			fetchCount++;
-			// Create a promise that we can resolve manually
-			return new Promise(resolve => {
-				resolveFetch = resolve;
+			// Create an Effect that we can resolve manually
+			return Effect.async<GitStatus, GitError>(resume => {
+				resolveEffect = resume;
 			});
 		});
 
@@ -178,7 +179,7 @@ describe('useGitStatus', () => {
 		expect(mockGetGitStatus).toHaveBeenCalledTimes(1);
 
 		// Complete the first fetch
-		resolveFetch!({success: true, data: createGitStatus(1, 0)});
+		resolveEffect!(Exit.succeed(createGitStatus(1, 0)));
 
 		// Wait for the promise to resolve
 		await vi.waitFor(() => {
@@ -196,18 +197,18 @@ describe('useGitStatus', () => {
 
 	it('should properly cleanup resources when worktrees change', async () => {
 		let activeRequests = 0;
-		const abortedSignals: AbortSignal[] = [];
+		const interruptedPaths: string[] = [];
 
-		mockGetGitStatus.mockImplementation(async (path, signal) => {
+		mockGetGitStatus.mockImplementation(path => {
 			activeRequests++;
 
-			signal.addEventListener('abort', () => {
-				activeRequests--;
-				abortedSignals.push(signal);
+			// Create an Effect that never completes but handles interruption
+			return Effect.async<GitStatus, GitError>(_resume => {
+				return Effect.sync(() => {
+					activeRequests--;
+					interruptedPaths.push(path);
+				});
 			});
-
-			// Simulate ongoing request
-			return new Promise(() => {});
 		});
 
 		const TestComponent: React.FC<{worktrees: Worktree[]}> = ({worktrees}) => {
@@ -237,11 +238,13 @@ describe('useGitStatus', () => {
 
 		// Wait for cleanup and new requests
 		await vi.waitFor(() => {
-			expect(abortedSignals).toHaveLength(3);
+			expect(interruptedPaths).toHaveLength(3);
 			expect(activeRequests).toBe(2);
 		});
 
-		// Verify all old signals were aborted
-		expect(abortedSignals.every(signal => signal.aborted)).toBe(true);
+		// Verify all old paths were interrupted
+		expect(interruptedPaths).toContain('/path1');
+		expect(interruptedPaths).toContain('/path2');
+		expect(interruptedPaths).toContain('/path3');
 	});
 });

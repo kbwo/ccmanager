@@ -1,9 +1,11 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
+import {Effect} from 'effect';
 import {Worktree, Session, GitProject} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {SessionManager} from '../services/sessionManager.js';
+import {GitError} from '../types/errors.js';
 import {
 	STATUS_ICONS,
 	STATUS_LABELS,
@@ -67,6 +69,14 @@ const createSeparatorWithText = (
 	return '─'.repeat(leftDashes) + textWithSpaces + '─'.repeat(rightDashes);
 };
 
+/**
+ * Format GitError for display
+ * Extracts relevant error information using pattern matching
+ */
+const formatGitError = (error: GitError): string => {
+	return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+};
+
 const Menu: React.FC<MenuProps> = ({
 	sessionManager,
 	worktreeService,
@@ -79,6 +89,7 @@ const Menu: React.FC<MenuProps> = ({
 }) => {
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
@@ -88,14 +99,63 @@ const Menu: React.FC<MenuProps> = ({
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
 		useSearchMode(items.length, {
-			isDisabled: !!error,
+			isDisabled: !!error || !!loadError,
 		});
 
 	useEffect(() => {
-		// Load worktrees
-		const loadedWorktrees = worktreeService.getWorktrees();
-		setBaseWorktrees(loadedWorktrees);
-		setDefaultBranch(worktreeService.getDefaultBranch());
+		let cancelled = false;
+
+		// Load worktrees and default branch using Effect composition
+		// Chain getWorktreesEffect and getDefaultBranchEffect using Effect.flatMap
+		const loadWorktreesAndBranch = Effect.flatMap(
+			worktreeService.getWorktreesEffect(),
+			worktrees =>
+				Effect.map(worktreeService.getDefaultBranchEffect(), defaultBranch => ({
+					worktrees,
+					defaultBranch,
+				})),
+		);
+
+		Effect.runPromise(
+			Effect.match(loadWorktreesAndBranch, {
+				onFailure: (error: GitError) => ({
+					success: false as const,
+					error,
+				}),
+				onSuccess: ({worktrees, defaultBranch}) => ({
+					success: true as const,
+					worktrees,
+					defaultBranch,
+				}),
+			}),
+		)
+			.then(result => {
+				if (!cancelled) {
+					if (result.success) {
+						setBaseWorktrees(result.worktrees);
+						setDefaultBranch(result.defaultBranch);
+						setLoadError(null);
+
+						// Update sessions after worktrees are loaded
+						const allSessions = sessionManager.getAllSessions();
+						setSessions(allSessions);
+
+						// Update worktree session status
+						result.worktrees.forEach(wt => {
+							wt.hasSession = allSessions.some(s => s.worktreePath === wt.path);
+						});
+					} else {
+						// Handle GitError with pattern matching
+						setLoadError(formatGitError(result.error));
+					}
+				}
+			})
+			.catch((err: unknown) => {
+				// This catch should not normally be reached with Effect.match
+				if (!cancelled) {
+					setLoadError(String(err));
+				}
+			});
 
 		// Load recent projects if in multi-project mode
 		if (multiProject) {
@@ -108,26 +168,17 @@ const Menu: React.FC<MenuProps> = ({
 			setRecentProjects(filteredProjects);
 		}
 
-		// Update sessions
-		const updateSessions = () => {
+		// Listen for session changes
+		const handleSessionChange = () => {
 			const allSessions = sessionManager.getAllSessions();
 			setSessions(allSessions);
-
-			// Update worktree session status
-			loadedWorktrees.forEach(wt => {
-				wt.hasSession = allSessions.some(s => s.worktreePath === wt.path);
-			});
 		};
-
-		updateSessions();
-
-		// Listen for session changes
-		const handleSessionChange = () => updateSessions();
 		sessionManager.on('sessionCreated', handleSessionChange);
 		sessionManager.on('sessionDestroyed', handleSessionChange);
 		sessionManager.on('sessionStateChanged', handleSessionChange);
 
 		return () => {
+			cancelled = true;
 			sessionManager.off('sessionCreated', handleSessionChange);
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
@@ -287,6 +338,12 @@ const Menu: React.FC<MenuProps> = ({
 		// Dismiss error on any key press when error is shown
 		if (error && onDismissError) {
 			onDismissError();
+			return;
+		}
+
+		// Dismiss load error on any key press when load error is shown
+		if (loadError) {
+			setLoadError(null);
 			return;
 		}
 
@@ -512,11 +569,11 @@ const Menu: React.FC<MenuProps> = ({
 				/>
 			)}
 
-			{error && (
+			{(error || loadError) && (
 				<Box marginTop={1} paddingX={1} borderStyle="round" borderColor="red">
 					<Box flexDirection="column">
 						<Text color="red" bold>
-							Error: {error}
+							Error: {error || loadError}
 						</Text>
 						<Text color="gray" dimColor>
 							Press any key to dismiss

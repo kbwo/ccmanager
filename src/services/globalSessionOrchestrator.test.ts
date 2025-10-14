@@ -49,20 +49,6 @@ vi.mock('./sessionManager.js', () => {
 		emit() {
 			// Mock implementation
 		}
-
-		async createSessionWithPreset(_worktreePath: string, _presetId?: string) {
-			// Mock implementation
-			return {} as never;
-		}
-
-		async createSessionWithDevcontainer(
-			_worktreePath: string,
-			_config: unknown,
-			_presetId?: string,
-		) {
-			// Mock implementation
-			return {} as never;
-		}
 	}
 
 	return {SessionManager: MockSessionManager};

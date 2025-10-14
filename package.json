@@ -27,12 +27,11 @@
 		"build": "tsc",
 		"dev": "tsc --watch",
 		"start": "node dist/cli.js",
-		"test": "vitest",
-		"test:run": "vitest run",
+		"test": "vitest --run",
 		"lint": "eslint src",
 		"lint:fix": "eslint src --fix",
 		"typecheck": "tsc --noEmit",
-		"prepublishOnly": "npm run lint && npm run typecheck && npm run test:run && npm run build",
+		"prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build",
 		"prepare": "npm run build"
 	},
 	"files": [
@@ -40,6 +39,7 @@
 	],
 	"dependencies": {
 		"@xterm/headless": "^5.5.0",
+		"effect": "^3.18.2",
 		"ink": "^4.1.0",
 		"ink-select-input": "^5.0.0",
 		"ink-text-input": "^5.0.1",

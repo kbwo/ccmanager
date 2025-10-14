@@ -1,4 +1,6 @@
 import {spawn} from 'child_process';
+import {Effect} from 'effect';
+import {ProcessError} from '../types/errors.js';
 import {Worktree, Session, SessionState} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {configurationManager} from '../services/configurationManager.js';
@@ -12,14 +14,45 @@ export interface HookEnvironment {
 }
 
 /**
- * Execute a hook command with the provided environment variables
+ * Execute a hook command with the provided environment variables using Effect
+ *
+ * Spawns a shell process to run the hook command with custom environment.
+ * Errors are captured but hook failures don't propagate to prevent breaking main flow.
+ *
+ * @param {string} command - Shell command to execute
+ * @param {string} cwd - Working directory for command execution
+ * @param {HookEnvironment} environment - Environment variables for the hook
+ * @returns {Effect.Effect<void, ProcessError, never>} Effect that succeeds on hook completion or fails with ProcessError
+ *
+ * @example
+ * ```typescript
+ * import {Effect} from 'effect';
+ * import {executeHook} from './utils/hookExecutor.js';
+ *
+ * const env = {
+ *   CCMANAGER_WORKTREE_PATH: '/path/to/worktree',
+ *   CCMANAGER_WORKTREE_BRANCH: 'feature-branch',
+ *   CCMANAGER_GIT_ROOT: '/path/to/repo'
+ * };
+ *
+ * // Execute hook with error recovery
+ * const result = await Effect.runPromise(
+ *   Effect.catchAll(
+ *     executeHook('npm install', '/path/to/worktree', env),
+ *     (error) => {
+ *       console.error(`Hook failed: ${error.message}`);
+ *       return Effect.succeed(undefined); // Continue despite error
+ *     }
+ *   )
+ * );
+ * ```
  */
 export function executeHook(
 	command: string,
 	cwd: string,
 	environment: HookEnvironment,
-): Promise<void> {
-	return new Promise((resolve, reject) => {
+): Effect.Effect<void, ProcessError> {
+	return Effect.async<void, ProcessError>(resume => {
 		// Use spawn with shell to execute the command and wait for all child processes
 		const child = spawn(command, [], {
 			cwd,
@@ -41,38 +74,52 @@ export function executeHook(
 		// Wait for the process and all its children to exit
 		child.on('exit', (code, signal) => {
 			if (code !== 0 || signal) {
-				let errorMessage = signal
+				const errorMessage = signal
 					? `Hook terminated by signal ${signal}`
 					: `Hook exited with code ${code}`;
 
-				// Include stderr in the error message when exit code is not 0
-				if (stderr) {
-					errorMessage += `\nStderr: ${stderr}`;
-				}
-
-				reject(new Error(errorMessage));
+				resume(
+					Effect.fail(
+						new ProcessError({
+							command,
+							exitCode: code ?? undefined,
+							signal: signal ?? undefined,
+							message: stderr
+								? `${errorMessage}\nStderr: ${stderr}`
+								: errorMessage,
+						}),
+					),
+				);
 				return;
 			}
 			// When exit code is 0, ignore stderr and resolve successfully
-			resolve();
+			resume(Effect.void);
 		});
 
 		// Handle errors in spawning the process
 		child.on('error', error => {
-			reject(error);
+			resume(
+				Effect.fail(
+					new ProcessError({
+						command,
+						message: error.message,
+					}),
+				),
+			);
 		});
 	});
 }
 
 /**
- * Execute a worktree post-creation hook
+ * Execute a worktree post-creation hook using Effect
+ * Errors are caught and logged but do not break the main flow
  */
-export async function executeWorktreePostCreationHook(
+export function executeWorktreePostCreationHook(
 	command: string,
 	worktree: Worktree,
 	gitRoot: string,
 	baseBranch?: string,
-): Promise<void> {
+): Effect.Effect<void, never> {
 	const environment: HookEnvironment = {
 		CCMANAGER_WORKTREE_PATH: worktree.path,
 		CCMANAGER_WORKTREE_BRANCH: worktree.branch || 'unknown',
@@ -83,33 +130,47 @@ export async function executeWorktreePostCreationHook(
 		environment.CCMANAGER_BASE_BRANCH = baseBranch;
 	}
 
-	try {
-		await executeHook(command, worktree.path, environment);
-	} catch (error) {
-		// Log error but don't throw - hooks should not break the main flow
-		console.error(
-			`Failed to execute post-creation hook: ${
-				error instanceof Error ? error.message : String(error)
-			}`,
-		);
-	}
+	return Effect.catchAll(
+		executeHook(command, worktree.path, environment),
+		error => {
+			// Log error but don't throw - hooks should not break the main flow
+			console.error(`Failed to execute post-creation hook: ${error.message}`);
+			return Effect.void;
+		},
+	);
 }
 
 /**
- * Execute a session status change hook
+ * Execute a session status change hook using Effect
+ * Errors are caught and logged but do not break the main flow
  */
-export async function executeStatusHook(
+export function executeStatusHook(
 	oldState: SessionState,
 	newState: SessionState,
 	session: Session,
-): Promise<void> {
+): Effect.Effect<void, never> {
 	const statusHooks = configurationManager.getStatusHooks();
 	const hook = statusHooks[newState];
 
-	if (hook && hook.enabled && hook.command) {
-		// Get branch information
-		const worktreeService = new WorktreeService();
-		const worktrees = worktreeService.getWorktrees();
+	if (!hook || !hook.enabled || !hook.command) {
+		return Effect.void;
+	}
+
+	const worktreeService = new WorktreeService();
+
+	return Effect.gen(function* () {
+		// Get branch information using Effect-based method
+		const worktrees = yield* Effect.catchAll(
+			worktreeService.getWorktreesEffect(),
+			error => {
+				// Log error but continue with empty array - hooks should not break main flow
+				console.error(
+					`Failed to get worktrees for status hook: ${error.message || String(error)}`,
+				);
+				return Effect.succeed([]);
+			},
+		);
+
 		const worktree = worktrees.find(wt => wt.path === session.worktreePath);
 		const branch = worktree?.branch || 'unknown';
 
@@ -123,16 +184,13 @@ export async function executeStatusHook(
 			CCMANAGER_SESSION_ID: session.id,
 		};
 
-		// Execute the hook command in the session's worktree directory
-		try {
-			await executeHook(hook.command, session.worktreePath, environment);
-		} catch (error) {
-			// Log error but don't throw - hooks should not break the main flow
-			console.error(
-				`Failed to execute ${newState} hook: ${
-					error instanceof Error ? error.message : String(error)
-				}`,
-			);
-		}
-	}
+		yield* Effect.catchAll(
+			executeHook(hook.command, session.worktreePath, environment),
+			error => {
+				// Log error but don't throw - hooks should not break the main flow
+				console.error(`Failed to execute ${newState} hook: ${error.message}`);
+				return Effect.void;
+			},
+		);
+	});
 }

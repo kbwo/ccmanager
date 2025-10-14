@@ -129,6 +129,822 @@ Session states are detected using a strategy pattern that supports multiple CLI 
 - Default shortcuts for common actions (back, quit, refresh, etc.)
 - Visual configuration UI accessible from main menu
 
+## Error Handling
+
+CCManager uses **Effect-ts** for type-safe, composable error handling. This approach makes errors explicit in function signatures, enables better composition, and provides powerful error recovery strategies.
+
+### Effect-ts Patterns
+
+#### When to Use Effect vs Either
+
+- **Effect**: Use for asynchronous operations or operations with side effects
+  - Git commands, file I/O, PTY spawning
+  - Operations that return `Effect<SuccessType, ErrorType, never>`
+
+- **Either**: Use for synchronous, pure operations
+  - Configuration validation, path resolution
+  - Operations that return `Either<ErrorType, SuccessType>`
+
+#### Core Effect Functions
+
+**Creating Effects:**
+
+```typescript
+// Success value
+const success = Effect.succeed(42);
+
+// Error value
+const failure = Effect.fail(new GitError({
+  command: 'git status',
+  exitCode: 128,
+  stderr: 'not a git repository'
+}));
+
+// Wrapping try-catch code
+const wrappedSync = Effect.try({
+  try: () => JSON.parse(data),
+  catch: (error) => new ConfigError({
+    configPath: path,
+    reason: 'parse',
+    details: String(error)
+  })
+});
+
+// Wrapping Promises
+const wrappedAsync = Effect.tryPromise({
+  try: () => fs.promises.readFile(path, 'utf-8'),
+  catch: (error) => new FileSystemError({
+    operation: 'read',
+    path,
+    cause: String(error)
+  })
+});
+```
+
+**Transforming Effects:**
+
+```typescript
+// Transform success values
+const mapped = Effect.map(effect, (value) => value * 2);
+
+// Chain Effect-returning operations
+const chained = Effect.flatMap(effect, (value) =>
+  Effect.succeed(value + 1)
+);
+
+// Transform errors
+const mappedError = Effect.mapError(effect, (error) =>
+  `Failed: ${error.message}`
+);
+```
+
+**Either Functions:**
+
+```typescript
+// Create Either values
+const right = Either.right(42);
+const left = Either.left('error message');
+
+// Transform Either
+const mapped = Either.map(either, (value) => value * 2);
+const chained = Either.flatMap(either, (value) => Either.right(value + 1));
+```
+
+### Error Types
+
+All errors extend `Data.TaggedError` for type-safe discrimination:
+
+- **GitError**: Git command failures (command, exitCode, stderr, stdout?)
+- **FileSystemError**: File operations (operation, path, cause)
+- **ConfigError**: Configuration issues (configPath, reason, details)
+- **ProcessError**: PTY/process failures (processId?, command, signal?, exitCode?, message)
+- **ValidationError**: Input validation (field, constraint, receivedValue)
+
+**Error Discrimination with `_tag`:**
+
+```typescript
+function handleError(error: AppError): string {
+  switch (error._tag) {
+    case 'GitError':
+      return `Git ${error.command} failed (exit ${error.exitCode}): ${error.stderr}`;
+    case 'FileSystemError':
+      return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+    case 'ConfigError':
+      return `Config error (${error.reason}): ${error.details}`;
+    case 'ProcessError':
+      return `Process error: ${error.message}`;
+    case 'ValidationError':
+      return `Validation failed for ${error.field}: ${error.constraint}`;
+  }
+}
+```
+
+### Effect Usage in Services
+
+All service methods return Effect types to make errors explicit. **Note:** Legacy synchronous methods have been removed - all operations use Effect-based methods:
+
+```typescript
+class WorktreeService {
+  /**
+   * Get all worktrees using Effect-based error handling.
+   * Returns Effect that must be executed with Effect.runPromise or Effect.match.
+   */
+  getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['worktree', 'list', '--porcelain']);
+        return parseWorktrees(result.stdout);
+      },
+      catch: (error: any) => new GitError({
+        command: 'git worktree list',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
+  }
+
+  /**
+   * Create a new worktree with Effect composition.
+   * Chains path validation and worktree creation into a single Effect.
+   */
+  createWorktreeEffect(
+    branchName: string,
+    path: string
+  ): Effect.Effect<Worktree, GitError | FileSystemError, never> {
+    return Effect.flatMap(
+      this.validatePath(path),
+      (validPath) => Effect.tryPromise({
+        try: async () => {
+          await execFile('git', ['worktree', 'add', validPath, branchName]);
+          return { path: validPath, branch: branchName };
+        },
+        catch: (error: any) => new GitError({
+          command: `git worktree add ${validPath} ${branchName}`,
+          exitCode: error.code || 1,
+          stderr: error.stderr || String(error)
+        })
+      })
+    );
+  }
+
+  /**
+   * Get default branch using Effect-based error handling.
+   * Includes fallback logic for main/master detection.
+   */
+  getDefaultBranchEffect(): Effect.Effect<string, GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['symbolic-ref', 'refs/remotes/origin/HEAD']);
+        const branch = result.stdout.trim().replace('refs/remotes/origin/', '');
+        return branch || 'main';
+      },
+      catch: (error: any) => new GitError({
+        command: 'git symbolic-ref',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
+  }
+
+  /**
+   * Get all branches using Effect-based error handling.
+   * Returns empty array on failure (non-critical operation).
+   */
+  getAllBranchesEffect(): Effect.Effect<string[], GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['branch', '-a']);
+        return result.stdout.split('\n')
+          .map(b => b.trim())
+          .filter(b => b.length > 0);
+      },
+      catch: (error: any) => new GitError({
+        command: 'git branch',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
+  }
+}
+```
+
+### Effect Usage in Utilities
+
+Utility functions use Effect or Either based on operation type:
+
+```typescript
+// Synchronous validation with Either
+function validateConfig(data: unknown): Either.Either<ValidationError, Config> {
+  if (!isValidConfig(data)) {
+    return Either.left(new ValidationError({
+      field: 'config',
+      constraint: 'must be valid configuration object',
+      receivedValue: data
+    }));
+  }
+  return Either.right(data as Config);
+}
+
+// Asynchronous operations with Effect
+function getGitStatus(
+  worktreePath: string,
+  signal: AbortSignal
+): Effect.Effect<GitStatus, GitError, never> {
+  return Effect.tryPromise({
+    try: async () => {
+      const result = await execFile('git', ['status', '--porcelain'], {
+        cwd: worktreePath,
+        signal
+      });
+      return parseGitStatus(result.stdout);
+    },
+    catch: (error: any) => new GitError({
+      command: 'git status',
+      exitCode: error.code || 1,
+      stderr: error.stderr || String(error)
+    })
+  });
+}
+```
+
+### Effect Usage in Components
+
+React components execute Effects and handle results. The following patterns are demonstrated in real components like ConfigureShortcuts, Menu, and ProjectList:
+
+```typescript
+// Pattern 1: useEffect with Effect.match for loading configuration
+// Example: ConfigureShortcuts.tsx loading config on mount
+useEffect(() => {
+  let cancelled = false;
+
+  const loadConfig = async () => {
+    const result = await Effect.runPromise(
+      Effect.match(configurationManager.loadConfigEffect(), {
+        onFailure: (err: AppError) => ({
+          type: 'error' as const,
+          error: err,
+        }),
+        onSuccess: config => ({type: 'success' as const, data: config}),
+      }),
+    );
+
+    if (!cancelled) {
+      if (result.type === 'error') {
+        // Display error using TaggedError discrimination
+        const errorMsg = formatError(result.error);
+        setError(errorMsg);
+      } else if (result.data.shortcuts) {
+        setShortcuts(result.data.shortcuts);
+      }
+      setIsLoading(false);
+    }
+  };
+
+  loadConfig().catch(err => {
+    if (!cancelled) {
+      setError(`Unexpected error loading config: ${String(err)}`);
+      setIsLoading(false);
+    }
+  });
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
+// Pattern 2: Event handler with Effect.match for saving data
+// Example: ConfigureShortcuts.tsx saving shortcuts
+const handleSaveShortcuts = (shortcuts: ShortcutConfig) => {
+  const saveConfig = async () => {
+    const result = await Effect.runPromise(
+      Effect.match(configurationManager.setShortcutsEffect(shortcuts), {
+        onFailure: (err: AppError) => ({
+          type: 'error' as const,
+          error: err,
+        }),
+        onSuccess: () => ({type: 'success' as const}),
+      }),
+    );
+
+    if (result.type === 'error') {
+      // Display error using TaggedError discrimination
+      const errorMsg = formatError(result.error);
+      setError(errorMsg);
+    } else {
+      // Success - call onComplete
+      onComplete();
+    }
+  };
+
+  saveConfig().catch(err => {
+    setError(`Unexpected error saving shortcuts: ${String(err)}`);
+  });
+};
+
+// Pattern 3: Error formatting with TaggedError discrimination
+// Example: Shared formatError function used across components
+const formatError = (error: AppError): string => {
+  switch (error._tag) {
+    case 'FileSystemError':
+      return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+    case 'ConfigError':
+      return `Configuration error (${error.reason}): ${error.details}`;
+    case 'ValidationError':
+      return `Validation failed for ${error.field}: ${error.constraint}`;
+    case 'GitError':
+      return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+    case 'ProcessError':
+      return `Process error: ${error.message}`;
+  }
+};
+
+// Pattern 4: Effect.runPromise with try-catch (alternative pattern)
+// Example: NewWorktree.tsx creating worktree
+const handleCreateWorktree = async (branchName: string, path: string) => {
+  try {
+    const worktree = await Effect.runPromise(
+      worktreeService.createWorktree(branchName, path)
+    );
+    setWorktrees([...worktrees, worktree]);
+  } catch (error) {
+    if (error instanceof GitError) {
+      setError(`Git error: ${error.stderr}`);
+    } else if (error instanceof FileSystemError) {
+      setError(`File system error: ${error.cause}`);
+    } else {
+      setError('Unknown error occurred');
+    }
+  }
+};
+
+// Pattern 5: Loading state with Effect execution
+// Example: ConfigureShortcuts.tsx with loading indicator
+const [isLoading, setIsLoading] = useState<boolean>(true);
+
+// Show loading while Effect executes
+if (isLoading) {
+  return (
+    <Box flexDirection="column">
+      <Text>Loading configuration...</Text>
+    </Box>
+  );
+}
+
+// Pattern 6: Effect composition in components
+// Example: Load config, then save modified version
+const loadAndUpdateConfig = async () => {
+  const workflow = Effect.flatMap(
+    configurationManager.loadConfigEffect(),
+    config => {
+      const updatedShortcuts = {...config.shortcuts, newKey: 'value'};
+      return configurationManager.setShortcutsEffect(updatedShortcuts);
+    },
+  );
+
+  const result = await Effect.runPromise(
+    Effect.match(workflow, {
+      onFailure: (err: AppError) => ({type: 'error' as const, error: err}),
+      onSuccess: () => ({type: 'success' as const}),
+    }),
+  );
+
+  if (result.type === 'error') {
+    setError(formatError(result.error));
+  } else {
+    setSuccess('Configuration updated successfully');
+  }
+};
+```
+
+### Error Recovery Strategies
+
+Effect-ts provides powerful error recovery options:
+
+```typescript
+// Catch specific error types
+const withRecovery = Effect.catchTag(effect, 'GitError', (error) => {
+  if (error.exitCode === 128) {
+    return Effect.succeed(defaultValue);
+  }
+  return Effect.fail(error);
+});
+
+// Catch all errors
+const withFallback = Effect.catchAll(effect, (error) => {
+  console.error('Operation failed:', error);
+  return Effect.succeed(fallbackValue);
+});
+
+// Provide alternative Effect
+const withAlternative = Effect.orElse(effect, () =>
+  alternativeEffect
+);
+
+// Retry with policy
+const withRetry = Effect.retry(effect, {
+  times: 3,
+  schedule: Schedule.exponential('100 millis')
+});
+```
+
+### Effect Composition
+
+Combine multiple Effects efficiently:
+
+```typescript
+// Sequential composition
+const sequential = Effect.flatMap(
+  firstEffect,
+  (first) => Effect.flatMap(
+    secondEffect,
+    (second) => Effect.succeed({ first, second })
+  )
+);
+
+// Parallel execution with git status
+const parallel = Effect.all([
+  getGitStatus(path1),
+  getGitStatus(path2),
+  getGitStatus(path3)
+], { concurrency: 3 });
+
+// Parallel branch queries - load all branches and default branch simultaneously
+const loadBranchData = Effect.all([
+  worktreeService.getAllBranchesEffect(),
+  worktreeService.getDefaultBranchEffect()
+], { concurrency: 2 });
+
+// Execute parallel branch queries in component
+const result = await Effect.runPromise(
+  Effect.match(loadBranchData, {
+    onFailure: (error: GitError) => ({
+      type: 'error' as const,
+      message: `Failed to load branch data: ${error.stderr}`
+    }),
+    onSuccess: ([branches, defaultBranch]) => ({
+      type: 'success' as const,
+      data: { branches, defaultBranch }
+    })
+  })
+);
+
+if (result.type === 'success') {
+  console.log(`Loaded ${result.data.branches.length} branches`);
+  console.log(`Default branch: ${result.data.defaultBranch}`);
+}
+
+// Conditional execution
+const conditional = Effect.if(
+  shouldExecute,
+  {
+    onTrue: () => effect1,
+    onFalse: () => effect2
+  }
+);
+```
+
+### Best Practices
+
+1. **Always use Effect/Either for operations that can fail**
+   - Makes errors explicit in type signatures
+   - Enables better composition and error handling
+
+2. **Use pattern matching on `_tag` for error discrimination**
+   - TypeScript narrows types automatically
+   - Ensures all error types are handled
+
+3. **Prefer Effect.match over try-catch at boundaries**
+   - More explicit about success and failure paths
+   - Better type inference
+
+4. **Use Effect.catchTag for specific error recovery**
+   - Type-safe error handling
+   - Automatic type narrowing
+
+5. **Keep Effects pure and composable**
+   - Avoid side effects in map/flatMap callbacks
+   - Use Effect.sync or Effect.tryPromise for side effects
+
+6. **Execute Effects at application boundaries**
+   - Components, event handlers, useEffect hooks
+   - Keep business logic in Effect-returning functions
+
+### Effect-ts Documentation Links
+
+For deeper understanding of Effect-ts concepts and APIs:
+
+- **Official Effect-ts Documentation**: https://effect.website/docs/introduction
+- **Effect Type**: https://effect.website/docs/effect/effect-type
+- **Either Type**: https://effect.website/docs/either/either
+- **Error Management**: https://effect.website/docs/error-management/error-handling
+- **Tagged Errors**: https://effect.website/docs/error-management/expected-errors#tagged-errors
+- **Effect Execution**: https://effect.website/docs/guides/running-effects
+- **Error Recovery**: https://effect.website/docs/error-management/fallback
+- **Effect Composition**: https://effect.website/docs/guides/pipeline
+- **Testing with Effect**: https://effect.website/docs/guides/testing
+
+### Complete Error Flow Example
+
+Here's a complete example showing error flow from service layer through utilities to UI:
+
+```typescript
+// ============================================
+// 1. Utility Layer: Git status with Effect
+// ============================================
+import {Effect} from 'effect';
+import {GitError} from './types/errors.js';
+
+function getGitStatus(
+  worktreePath: string
+): Effect.Effect<GitStatus, GitError> {
+  return Effect.tryPromise({
+    try: async () => {
+      const result = await execFile('git', ['status', '--porcelain'], {
+        cwd: worktreePath
+      });
+      return parseGitStatus(result.stdout);
+    },
+    catch: (error: any) => new GitError({
+      command: 'git status',
+      exitCode: error.code || 1,
+      stderr: error.stderr || String(error)
+    })
+  });
+}
+
+// ============================================
+// 2. Service Layer: Worktree operations
+// ============================================
+import {Effect} from 'effect';
+import {GitError, FileSystemError} from './types/errors.js';
+
+class WorktreeService {
+  getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never> {
+    return Effect.tryPromise({
+      try: async () => {
+        const result = await execFile('git', ['worktree', 'list', '--porcelain']);
+        return parseWorktrees(result.stdout);
+      },
+      catch: (error: any) => new GitError({
+        command: 'git worktree list',
+        exitCode: error.code || 1,
+        stderr: error.stderr || String(error)
+      })
+    });
+  }
+
+  createWorktreeEffect(
+    path: string,
+    branch: string,
+    baseBranch: string
+  ): Effect.Effect<Worktree, GitError | FileSystemError, never> {
+    // Composition: chain multiple Effects
+    return Effect.flatMap(
+      this.validatePath(path),
+      (validPath) => Effect.tryPromise({
+        try: async () => {
+          await execFile('git', ['worktree', 'add', validPath, branch]);
+          return {path: validPath, branch};
+        },
+        catch: (error: any) => new GitError({
+          command: `git worktree add ${validPath} ${branch}`,
+          exitCode: error.code || 1,
+          stderr: error.stderr || String(error)
+        })
+      })
+    );
+  }
+
+  private validatePath(
+    path: string
+  ): Effect.Effect<string, FileSystemError, never> {
+    return Effect.try({
+      try: () => {
+        if (!fs.existsSync(path)) {
+          throw new Error('Path does not exist');
+        }
+        return path;
+      },
+      catch: (error) => new FileSystemError({
+        operation: 'stat',
+        path,
+        cause: String(error)
+      })
+    });
+  }
+}
+
+// ============================================
+// 3. Component Layer: React/Ink UI with Effect execution
+// ============================================
+import React, {useState, useEffect} from 'react';
+import {Box, Text} from 'ink';
+import {Effect} from 'effect';
+import {WorktreeService} from './services/worktreeService.js';
+import {AppError, GitError, FileSystemError} from './types/errors.js';
+
+const Menu: React.FC = () => {
+  const [worktrees, setWorktrees] = useState<Worktree[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const worktreeService = new WorktreeService();
+
+  // Load worktrees on mount with Effect.match for type-safe handling
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadWorktrees = async () => {
+      const result = await Effect.runPromise(
+        Effect.match(worktreeService.getWorktreesEffect(), {
+          onFailure: (error: GitError) => ({
+            type: 'error' as const,
+            message: formatGitError(error)
+          }),
+          onSuccess: (worktrees: Worktree[]) => ({
+            type: 'success' as const,
+            data: worktrees
+          })
+        })
+      );
+
+      if (!cancelled) {
+        if (result.type === 'error') {
+          setError(result.message);
+        } else {
+          setWorktrees(result.data);
+        }
+        setIsLoading(false);
+      }
+    };
+
+    loadWorktrees().catch(err => {
+      if (!cancelled) {
+        setError(`Unexpected error: ${String(err)}`);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Create worktree with error discrimination
+  const handleCreateWorktree = async (
+    path: string,
+    branch: string,
+    baseBranch: string
+  ) => {
+    const result = await Effect.runPromise(
+      Effect.match(
+        worktreeService.createWorktreeEffect(path, branch, baseBranch),
+        {
+          onFailure: (error: GitError | FileSystemError) => ({
+            type: 'error' as const,
+            message: formatError(error)
+          }),
+          onSuccess: (worktree: Worktree) => ({
+            type: 'success' as const,
+            data: worktree
+          })
+        }
+      )
+    );
+
+    if (result.type === 'error') {
+      setError(result.message);
+    } else {
+      setWorktrees([...worktrees, result.data]);
+    }
+  };
+
+  // Format errors using TaggedError discrimination
+  const formatError = (error: AppError): string => {
+    switch (error._tag) {
+      case 'GitError':
+        return formatGitError(error);
+      case 'FileSystemError':
+        return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
+      case 'ConfigError':
+        return `Config error (${error.reason}): ${error.details}`;
+      case 'ProcessError':
+        return `Process error: ${error.message}`;
+      case 'ValidationError':
+        return `Validation failed for ${error.field}: ${error.constraint}`;
+    }
+  };
+
+  const formatGitError = (error: GitError): string => {
+    return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
+  };
+
+  if (isLoading) {
+    return (
+      <Box>
+        <Text>Loading worktrees...</Text>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Error: {error}</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Text>Worktrees ({worktrees.length})</Text>
+      {worktrees.map(wt => (
+        <Text key={wt.path}>{wt.branch} - {wt.path}</Text>
+      ))}
+    </Box>
+  );
+};
+
+// ============================================
+// 4. Advanced: Effect Recovery Strategies
+// ============================================
+
+// Retry with exponential backoff
+const withRetry = await Effect.runPromise(
+  Effect.retry(
+    worktreeService.getWorktreesEffect(),
+    {
+      times: 3,
+      schedule: Schedule.exponential('100 millis')
+    }
+  )
+);
+
+// Fallback to default value
+const worktreesWithFallback = await Effect.runPromise(
+  Effect.catchAll(
+    worktreeService.getWorktreesEffect(),
+    (error: GitError) => {
+      console.error('Failed to get worktrees:', error.stderr);
+      // Return fallback: single worktree for current directory
+      return Effect.succeed([{
+        path: process.cwd(),
+        branch: 'main',
+        isMainWorktree: true,
+        hasSession: false
+      }]);
+    }
+  )
+);
+
+// Recover from specific error types
+const withSpecificRecovery = await Effect.runPromise(
+  Effect.catchTag(
+    worktreeService.createWorktreeEffect('./new-feature', 'feature', 'main'),
+    'GitError',
+    (error) => {
+      if (error.exitCode === 128) {
+        // Branch already exists, try different name
+        return worktreeService.createWorktreeEffect(
+          './new-feature-2',
+          'feature-2',
+          'main'
+        );
+      }
+      // Re-throw for other git errors
+      return Effect.fail(error);
+    }
+  )
+);
+
+// Parallel execution with error collection
+const allWorktreeStatus = await Effect.runPromise(
+  Effect.all([
+    getGitStatus('/worktree1'),
+    getGitStatus('/worktree2'),
+    getGitStatus('/worktree3')
+  ], {
+    concurrency: 3,
+    mode: 'either' // Collect both successes and failures
+  })
+);
+
+// Check results - Either.isRight() for success, Either.isLeft() for error
+allWorktreeStatus.forEach((result, index) => {
+  if (Either.isRight(result)) {
+    console.log(`Worktree ${index + 1} status:`, result.right);
+  } else {
+    console.error(`Worktree ${index + 1} failed:`, result.left.stderr);
+  }
+});
+```
+
+This example demonstrates:
+1. **Utility layer**: Git operations wrapped in Effects with GitError
+2. **Service layer**: Effect composition with flatMap, multiple error types
+3. **Component layer**: Effect execution with Effect.match, error discrimination
+4. **Recovery strategies**: Retry, fallback, specific error handling, parallel execution
+
 ## Development Guidelines
 
 ### Component Structure
@@ -416,6 +1232,25 @@ const recentProjects = await projectManager.getRecentProjects();
 - **Session View**: Full terminal emulation with Claude Code
 - **Forms**: Text input for creating worktrees and configuring settings
 - **Confirmation Dialogs**: Safety prompts for destructive actions
+
+## Active Specifications
+
+- **result-pattern-error-handling-2**: ✅ **COMPLETED** (Migration completed: October 2025)
+  - All WorktreeService methods migrated to Effect-based error handling
+  - Legacy synchronous methods removed (`getWorktrees()`, `getDefaultBranch()`, `getAllBranches()`)
+  - All try-catch blocks replaced with `Effect.try` or `Effect.tryPromise`
+  - Components updated to use `Effect.match` and `Effect.runPromise` patterns
+  - Comprehensive tests added for all Effect-based methods
+  - Remaining synchronous helpers documented with clear justification:
+    - `getAllRemotes()`: Simple utility for `resolveBranchReference`, no Effect needed
+    - `resolveBranchReference()`: Called within Effect.gen but doesn't need to be Effect itself
+    - `copyClaudeSessionData()`: Wrapped in Effect.try when called, keeping implementation simple
+    - `getCurrentBranch()`: Marked @deprecated, only used as fallback in `getWorktreesEffect`
+
+- **loading-spinner-async-operations**: 🚧 **IN PROGRESS**
+  - Add loading spinner UI feedback for promise-based async operations in App.tsx
+  - Target operations: session creation, worktree creation/deletion, command execution
+  - Ensure consistent user experience during long-running operations
 
 ## Future Enhancements
 

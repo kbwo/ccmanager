@@ -162,7 +162,6 @@ export interface IProjectManager {
 	setMode(mode: MenuMode): void;
 	selectProject(project: GitProject): void;
 	getWorktreeService(projectPath?: string): IWorktreeService;
-	refreshProjects(): Promise<void>;
 
 	// Recent projects methods
 	getRecentProjects(limit?: number): RecentProject[];
@@ -195,26 +194,39 @@ export class AmbiguousBranchError extends Error {
 }
 
 export interface IWorktreeService {
-	getWorktrees(): Worktree[];
+	getWorktreesEffect(): import('effect').Effect.Effect<
+		Worktree[],
+		import('../types/errors.js').GitError,
+		never
+	>;
 	getGitRootPath(): string;
-	createWorktree(
+	createWorktreeEffect(
 		worktreePath: string,
 		branch: string,
 		baseBranch: string,
 		copySessionData?: boolean,
 		copyClaudeDirectory?: boolean,
-	): Promise<{success: boolean; error?: string}>;
-	deleteWorktree(
+	): import('effect').Effect.Effect<
+		Worktree,
+		| import('../types/errors.js').GitError
+		| import('../types/errors.js').FileSystemError,
+		never
+	>;
+	deleteWorktreeEffect(
 		worktreePath: string,
 		options?: {deleteBranch?: boolean},
-	): {success: boolean; error?: string};
-	mergeWorktree(
-		worktreePath: string,
-		targetBranch?: string,
-	): {
-		success: boolean;
-		mergedBranch?: string;
-		error?: string;
-		deletedWorktree?: boolean;
-	};
+	): import('effect').Effect.Effect<
+		void,
+		import('../types/errors.js').GitError,
+		never
+	>;
+	mergeWorktreeEffect(
+		sourceBranch: string,
+		targetBranch: string,
+		useRebase?: boolean,
+	): import('effect').Effect.Effect<
+		void,
+		import('../types/errors.js').GitError,
+		never
+	>;
 }
