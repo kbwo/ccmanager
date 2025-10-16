@@ -18,6 +18,12 @@ const Session: React.FC<SessionProps> = ({
 	const {stdout} = useStdout();
 	const [isExiting, setIsExiting] = useState(false);
 
+	const stripOscColorSequences = (input: string): string => {
+		// Remove default foreground/background color OSC sequences that Codex emits
+		// These sequences leak as literal text when replaying buffered output
+		return input.replace(/\x1B\](?:10|11);[^\x07\x1B]*(?:\x07|\x1B\\)/g, '');
+	};
+
 	useEffect(() => {
 		if (!stdout) return;
 
@@ -32,7 +38,7 @@ const Session: React.FC<SessionProps> = ({
 					const buffer = restoredSession.outputHistory[i];
 					if (!buffer) continue;
 
-					const str = buffer.toString('utf8');
+					const str = stripOscColorSequences(buffer.toString('utf8'));
 
 					// Skip clear screen sequences at the beginning
 					if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
@@ -41,10 +47,12 @@ const Session: React.FC<SessionProps> = ({
 							.replace(/\x1B\[2J/g, '')
 							.replace(/\x1B\[H/g, '');
 						if (cleaned.length > 0) {
-							stdout.write(Buffer.from(cleaned, 'utf8'));
+							stdout.write(cleaned);
 						}
 					} else {
-						stdout.write(buffer);
+						if (str.length > 0) {
+							stdout.write(str);
+						}
 					}
 				}
 			}
@@ -120,11 +128,7 @@ const Session: React.FC<SessionProps> = ({
 			if (isExiting) return;
 
 			// Check for return to menu shortcut
-			const returnToMenuShortcut = shortcutManager.getShortcuts().returnToMenu;
-			const shortcutCode =
-				shortcutManager.getShortcutCode(returnToMenuShortcut);
-
-			if (shortcutCode && data === shortcutCode) {
+			if (shortcutManager.matchesRawInput('returnToMenu', data)) {
 				// Disable focus reporting mode before returning to menu
 				if (stdout) {
 					stdout.write('\x1b[?1004l');

@@ -76,6 +76,61 @@ export class ShortcutManager {
 		return configurationManager.getShortcuts();
 	}
 
+	private getRawShortcutCodes(shortcut: ShortcutKey): string[] {
+		const codes = new Set<string>();
+
+		// Direct control-code form (e.g. Ctrl+E -> \u0005)
+		const controlCode = this.getShortcutCode(shortcut);
+		if (controlCode) {
+			codes.add(controlCode);
+		}
+
+		// Escape key in raw mode
+		if (
+			shortcut.key === 'escape' &&
+			!shortcut.ctrl &&
+			!shortcut.alt &&
+			!shortcut.shift
+		) {
+			codes.add('\u001b');
+		}
+
+		// Kitty/xterm extended keyboard sequences (CSI <code>;<mod>u)
+		if (
+			shortcut.ctrl &&
+			!shortcut.alt &&
+			!shortcut.shift &&
+			shortcut.key.length === 1
+		) {
+			const lower = shortcut.key.toLowerCase();
+			const upperCode = lower.toUpperCase().charCodeAt(0);
+			const lowerCode = lower.charCodeAt(0);
+
+			// Include the CSI u format (ESC[<code>;5u) used by Kitty/WezTerm for Ctrl+letters.
+			if (upperCode >= 32 && upperCode <= 126) {
+				codes.add(`\u001b[${upperCode};5u`);
+			}
+			if (lowerCode !== upperCode && lowerCode >= 32 && lowerCode <= 126) {
+				codes.add(`\u001b[${lowerCode};5u`);
+			}
+			// Tmux/xterm with modifyOtherKeys emit ESC[27;5;<code>~ for the same shortcut.
+			if (upperCode >= 32 && upperCode <= 126) {
+				codes.add(`\u001b[27;5;${upperCode}~`);
+			}
+			if (lowerCode !== upperCode && lowerCode >= 32 && lowerCode <= 126) {
+				codes.add(`\u001b[27;5;${lowerCode}~`);
+			}
+			// Some setups (issue #82/#107 repros) send ESC[1;5<letter>; include both upper/lower.
+			const upperKey = lower.toUpperCase();
+			codes.add(`\u001b[1;5${upperKey}`);
+			if (upperKey !== lower) {
+				codes.add(`\u001b[1;5${lower}`);
+			}
+		}
+
+		return Array.from(codes);
+	}
+
 	public matchesShortcut(
 		shortcutName: keyof ShortcutConfig,
 		input: string,
@@ -135,6 +190,18 @@ export class ShortcutManager {
 		}
 
 		return null;
+	}
+
+	public matchesRawInput(
+		shortcutName: keyof ShortcutConfig,
+		input: string,
+	): boolean {
+		const shortcuts = configurationManager.getShortcuts();
+		const shortcut = shortcuts[shortcutName];
+		if (!shortcut) return false;
+
+		const codes = this.getRawShortcutCodes(shortcut);
+		return codes.some(code => input === code || input.includes(code));
 	}
 }
 
