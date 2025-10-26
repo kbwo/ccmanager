@@ -81,6 +81,11 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		// Check for "Do you want" pattern with options (e.g., "Do you want...\n...Yes")
+		if (/do you want.+\n.*yes/.test(lowerContent)) {
+			return 'waiting_input';
+		}
+
 		// Check for busy state
 		if (lowerContent.includes('esc to interrupt')) {
 			return 'busy';

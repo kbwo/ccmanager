@@ -197,6 +197,55 @@ describe('ClaudeStateDetector', () => {
 				expect(state).toBe('busy');
 			}
 		});
+
+		it('should detect waiting_input when "Do you want" with options prompt is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some previous output',
+				'Do you want to make this edit to test.txt?',
+				'❯ 1. Yes',
+				'2. Yes, allow all edits during this session (shift+tab)',
+				'3. No, and tell Claude what to do differently (esc)',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "Do you want" with options prompt is present (case insensitive)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some output',
+				'DO YOU WANT to make this edit?',
+				'❯ 1. YES',
+				'2. NO',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should prioritize "Do you want" with options over busy state', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Press ESC to interrupt',
+				'Do you want to continue?',
+				'❯ 1. Yes',
+				'2. No',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input'); // waiting_input should take precedence
+		});
 	});
 });
 
