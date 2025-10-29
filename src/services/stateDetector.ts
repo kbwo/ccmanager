@@ -81,8 +81,11 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
-		// Check for "Do you want" pattern with options (e.g., "Do you want...\n...Yes")
-		if (/do you want.+\n.*yes/.test(lowerContent)) {
+		// Check for "Do you want" or "Would you like" pattern with options
+		// Handles both simple ("Do you want...\nYes") and complex (numbered options) formats
+		if (
+			/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/.test(lowerContent)
+		) {
 			return 'waiting_input';
 		}
 

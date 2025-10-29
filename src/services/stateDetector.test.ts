@@ -246,6 +246,60 @@ describe('ClaudeStateDetector', () => {
 			// Assert
 			expect(state).toBe('waiting_input'); // waiting_input should take precedence
 		});
+
+		it('should detect waiting_input with "Would you like" and multiple numbered options', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some previous output',
+				'Would you like to proceed?',
+				'',
+				'❯ 1. Yes, and auto-accept edits',
+				'  2. Yes, and manually approve edits',
+				'  3. No, keep planning',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input with complex multi-line prompt and cursor indicator', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Processing complete.',
+				'Would you like to apply these changes?',
+				'',
+				'❯ 1. Yes, apply all changes',
+				'  2. Yes, review changes first',
+				'  3. No, discard changes',
+				'  4. Cancel operation',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when cursor indicator is present without explicit "yes" text', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Do you want to proceed?',
+				'',
+				'❯ 1. Apply all',
+				'  2. Review first',
+				'  3. Skip',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
 	});
 });
 
