@@ -11,7 +11,8 @@ export type StateDetectionStrategy =
 	| 'gemini'
 	| 'codex'
 	| 'cursor'
-	| 'github-copilot';
+	| 'github-copilot'
+	| 'cline';
 
 export interface Worktree {
 	path: string;
