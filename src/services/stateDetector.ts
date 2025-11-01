@@ -191,6 +191,7 @@ export class GitHubCopilotStateDetector extends BaseStateDetector {
 	}
 }
 
+// https://github.com/cline/cline/blob/580db36476b6b52def03c8aeda325aae1c817cde/cli/pkg/cli/task/input_handler.go
 export class ClineStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
 		const content = this.getTerminalContent(terminal);
