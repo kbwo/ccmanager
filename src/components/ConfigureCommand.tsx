@@ -29,6 +29,7 @@ const createStrategyItems = (): {
 			label: 'GitHub Copilot CLI',
 			value: 'github-copilot',
 		},
+		cline: {label: 'Cline', value: 'cline'},
 	};
 
 	return Object.values(strategies);
@@ -225,7 +226,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		if (!preset) return;
 
 		const updatedPreset = {...preset};
-		updatedPreset.detectionStrategy = item.value as 'claude' | 'gemini';
+		updatedPreset.detectionStrategy = item.value as StateDetectionStrategy;
 
 		const updatedPresets = presets.map(p =>
 			p.id === preset.id ? updatedPreset : p,
@@ -244,7 +245,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			command: newPreset.command || 'claude',
 			args: newPreset.args,
 			fallbackArgs: newPreset.fallbackArgs,
-			detectionStrategy: item.value as 'claude' | 'gemini',
+			detectionStrategy: item.value as StateDetectionStrategy,
 		};
 
 		const updatedPresets = [...presets, completePreset];
