@@ -90,6 +90,7 @@ export interface WorktreeConfig {
 	autoDirectory: boolean;
 	autoDirectoryPattern?: string; // Optional pattern for directory generation
 	copySessionData?: boolean; // Whether to copy Claude session data by default
+	sortByLastSession?: boolean; // Whether to sort worktrees by last opened session
 }
 
 export interface CommandConfig {
@@ -125,6 +126,7 @@ export interface ConfigurationData {
 	worktree?: WorktreeConfig;
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
+	worktreeLastOpened?: Record<string, number>; // Map of worktree path to last opened timestamp
 }
 
 // Multi-project support interfaces
@@ -195,7 +197,9 @@ export class AmbiguousBranchError extends Error {
 }
 
 export interface IWorktreeService {
-	getWorktreesEffect(): import('effect').Effect.Effect<
+	getWorktreesEffect(options?: {
+		sortByLastSession?: boolean;
+	}): import('effect').Effect.Effect<
 		Worktree[],
 		import('../types/errors.js').GitError,
 		never

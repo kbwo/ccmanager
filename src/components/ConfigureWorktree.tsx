@@ -28,6 +28,9 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	const [copySessionData, setCopySessionData] = useState(
 		worktreeConfig.copySessionData ?? true,
 	);
+	const [sortByLastSession, setSortByLastSession] = useState(
+		worktreeConfig.sortByLastSession ?? false,
+	);
 	const [editMode, setEditMode] = useState<EditMode>('menu');
 	const [tempPattern, setTempPattern] = useState(pattern);
 
@@ -58,6 +61,10 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			value: 'toggleCopy',
 		},
 		{
+			label: `Sort by Last Session: ${sortByLastSession ? '✅ Enabled' : '❌ Disabled'}`,
+			value: 'toggleSort',
+		},
+		{
 			label: '💾 Save Changes',
 			value: 'save',
 		},
@@ -79,12 +86,16 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			case 'toggleCopy':
 				setCopySessionData(!copySessionData);
 				break;
+			case 'toggleSort':
+				setSortByLastSession(!sortByLastSession);
+				break;
 			case 'save':
 				// Save the configuration
 				configurationManager.setWorktreeConfig({
 					autoDirectory,
 					autoDirectoryPattern: pattern,
 					copySessionData,
+					sortByLastSession,
 				});
 				onComplete();
 				break;

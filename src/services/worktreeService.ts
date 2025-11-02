@@ -666,9 +666,13 @@ export class WorktreeService {
 	 *
 	 * @throws {GitError} When git worktree list command fails
 	 */
-	getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never> {
+	getWorktreesEffect(options?: {
+		sortByLastSession?: boolean;
+	}): Effect.Effect<Worktree[], GitError, never> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
 		const self = this;
+		const sortByLastSession = options?.sortByLastSession ?? false;
+
 		return Effect.catchAll(
 			Effect.try({
 				try: () => {
@@ -728,6 +732,20 @@ export class WorktreeService {
 					// Mark the first worktree as main if none are marked
 					if (worktrees.length > 0 && !worktrees.some(w => w.isMainWorktree)) {
 						worktrees[0]!.isMainWorktree = true;
+					}
+
+					// Sort worktrees by last session if requested
+					if (sortByLastSession) {
+						worktrees.sort((a, b) => {
+							// Get last opened timestamps for both worktrees
+							const timeA =
+								configurationManager.getWorktreeLastOpenedTime(a.path) || 0;
+							const timeB =
+								configurationManager.getWorktreeLastOpenedTime(b.path) || 0;
+
+							// Sort in descending order (most recent first)
+							return timeB - timeA;
+						});
 					}
 
 					return worktrees;
