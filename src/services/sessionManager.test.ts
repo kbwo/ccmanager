@@ -23,6 +23,9 @@ vi.mock('./configurationManager.js', () => ({
 		getStatusHooks: vi.fn(() => ({})),
 		getDefaultPreset: vi.fn(),
 		getPresetById: vi.fn(),
+		setWorktreeLastOpened: vi.fn(),
+		getWorktreeLastOpenedTime: vi.fn(),
+		getWorktreeLastOpened: vi.fn(() => ({})),
 	},
 }));
 

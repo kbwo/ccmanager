@@ -116,6 +116,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		this.sessions.set(worktreePath, session);
 
+		// Record the timestamp when this worktree was opened
+		configurationManager.setWorktreeLastOpened(worktreePath, Date.now());
+
 		this.emit('sessionCreated', session);
 
 		return session;

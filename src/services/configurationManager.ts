@@ -81,6 +81,7 @@ export class ConfigurationManager {
 			this.config.worktree = {
 				autoDirectory: false,
 				copySessionData: true,
+				sortByLastSession: false,
 			};
 		}
 		if (
@@ -90,6 +91,14 @@ export class ConfigurationManager {
 			)
 		) {
 			this.config.worktree.copySessionData = true;
+		}
+		if (
+			!Object.prototype.hasOwnProperty.call(
+				this.config.worktree,
+				'sortByLastSession',
+			)
+		) {
+			this.config.worktree.sortByLastSession = false;
 		}
 		if (!this.config.command) {
 			this.config.command = {
@@ -320,6 +329,22 @@ export class ConfigurationManager {
 		const presets = this.getCommandPresets();
 		presets.selectPresetOnStart = enabled;
 		this.setCommandPresets(presets);
+	}
+
+	getWorktreeLastOpened(): Record<string, number> {
+		return this.config.worktreeLastOpened || {};
+	}
+
+	setWorktreeLastOpened(worktreePath: string, timestamp: number): void {
+		if (!this.config.worktreeLastOpened) {
+			this.config.worktreeLastOpened = {};
+		}
+		this.config.worktreeLastOpened[worktreePath] = timestamp;
+		this.saveConfig();
+	}
+
+	getWorktreeLastOpenedTime(worktreePath: string): number | undefined {
+		return this.config.worktreeLastOpened?.[worktreePath];
 	}
 
 	// Effect-based methods for type-safe error handling
@@ -588,12 +613,21 @@ export class ConfigurationManager {
 			config.worktree = {
 				autoDirectory: false,
 				copySessionData: true,
+				sortByLastSession: false,
 			};
 		}
 		if (
 			!Object.prototype.hasOwnProperty.call(config.worktree, 'copySessionData')
 		) {
 			config.worktree.copySessionData = true;
+		}
+		if (
+			!Object.prototype.hasOwnProperty.call(
+				config.worktree,
+				'sortByLastSession',
+			)
+		) {
+			config.worktree.sortByLastSession = false;
 		}
 		if (!config.command) {
 			config.command = {

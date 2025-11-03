@@ -22,6 +22,7 @@ import {RecentProject} from '../types/index.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
+import {configurationManager} from '../services/configurationManager.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -96,6 +97,9 @@ const Menu: React.FC<MenuProps> = ({
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 	const limit = 10;
 
+	// Get worktree configuration for sorting
+	const worktreeConfig = configurationManager.getWorktreeConfig();
+
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
 		useSearchMode(items.length, {
@@ -108,7 +112,9 @@ const Menu: React.FC<MenuProps> = ({
 		// Load worktrees and default branch using Effect composition
 		// Chain getWorktreesEffect and getDefaultBranchEffect using Effect.flatMap
 		const loadWorktreesAndBranch = Effect.flatMap(
-			worktreeService.getWorktreesEffect(),
+			worktreeService.getWorktreesEffect({
+				sortByLastSession: worktreeConfig.sortByLastSession,
+			}),
 			worktrees =>
 				Effect.map(worktreeService.getDefaultBranchEffect(), defaultBranch => ({
 					worktrees,
@@ -132,10 +138,6 @@ const Menu: React.FC<MenuProps> = ({
 			.then(result => {
 				if (!cancelled) {
 					if (result.success) {
-						setBaseWorktrees(result.worktrees);
-						setDefaultBranch(result.defaultBranch);
-						setLoadError(null);
-
 						// Update sessions after worktrees are loaded
 						const allSessions = sessionManager.getAllSessions();
 						setSessions(allSessions);
@@ -144,6 +146,10 @@ const Menu: React.FC<MenuProps> = ({
 						result.worktrees.forEach(wt => {
 							wt.hasSession = allSessions.some(s => s.worktreePath === wt.path);
 						});
+
+						setBaseWorktrees(result.worktrees);
+						setDefaultBranch(result.defaultBranch);
+						setLoadError(null);
 					} else {
 						// Handle GitError with pattern matching
 						setLoadError(formatGitError(result.error));
@@ -183,7 +189,12 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager, worktreeService, multiProject]);
+	}, [
+		sessionManager,
+		worktreeService,
+		multiProject,
+		worktreeConfig.sortByLastSession,
+	]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
