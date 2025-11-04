@@ -24,6 +24,7 @@ export class ConfigurationManager {
 	private legacyShortcutsPath: string;
 	private configDir: string;
 	private config: ConfigurationData = {};
+	private worktreeLastOpened: Map<string, number> = new Map();
 
 	constructor() {
 		// Determine config directory based on platform
@@ -332,19 +333,15 @@ export class ConfigurationManager {
 	}
 
 	getWorktreeLastOpened(): Record<string, number> {
-		return this.config.worktreeLastOpened || {};
+		return Object.fromEntries(this.worktreeLastOpened);
 	}
 
 	setWorktreeLastOpened(worktreePath: string, timestamp: number): void {
-		if (!this.config.worktreeLastOpened) {
-			this.config.worktreeLastOpened = {};
-		}
-		this.config.worktreeLastOpened[worktreePath] = timestamp;
-		this.saveConfig();
+		this.worktreeLastOpened.set(worktreePath, timestamp);
 	}
 
 	getWorktreeLastOpenedTime(worktreePath: string): number | undefined {
-		return this.config.worktreeLastOpened?.[worktreePath];
+		return this.worktreeLastOpened.get(worktreePath);
 	}
 
 	// Effect-based methods for type-safe error handling

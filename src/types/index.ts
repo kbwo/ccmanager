@@ -126,7 +126,6 @@ export interface ConfigurationData {
 	worktree?: WorktreeConfig;
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
-	worktreeLastOpened?: Record<string, number>; // Map of worktree path to last opened timestamp
 }
 
 // Multi-project support interfaces
