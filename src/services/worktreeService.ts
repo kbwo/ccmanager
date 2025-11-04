@@ -738,13 +738,24 @@ export class WorktreeService {
 					if (sortByLastSession) {
 						worktrees.sort((a, b) => {
 							// Get last opened timestamps for both worktrees
-							const timeA =
-								configurationManager.getWorktreeLastOpenedTime(a.path) || 0;
-							const timeB =
-								configurationManager.getWorktreeLastOpenedTime(b.path) || 0;
+							const timeA = configurationManager.getWorktreeLastOpenedTime(
+								a.path,
+							);
+							const timeB = configurationManager.getWorktreeLastOpenedTime(
+								b.path,
+							);
+
+							// If both timestamps are undefined, preserve original order
+							if (timeA === undefined && timeB === undefined) {
+								return 0;
+							}
+
+							// If only one is undefined, treat it as older (0)
+							const compareTimeA = timeA || 0;
+							const compareTimeB = timeB || 0;
 
 							// Sort in descending order (most recent first)
-							return timeB - timeA;
+							return compareTimeB - compareTimeA;
 						});
 					}
 

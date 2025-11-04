@@ -383,9 +383,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (session) {
 			session.isActive = active;
 
-			// If becoming active, emit a restore event with the output history
-			if (active && session.outputHistory.length > 0) {
-				this.emit('sessionRestore', session);
+			// If becoming active, record the timestamp when this worktree was opened
+			if (active) {
+				configurationManager.setWorktreeLastOpened(worktreePath, Date.now());
+
+				// Emit a restore event with the output history if available
+				if (session.outputHistory.length > 0) {
+					this.emit('sessionRestore', session);
+				}
 			}
 		}
 	}
