@@ -272,7 +272,7 @@ describe('prepareWorktreeItems', () => {
 				'feature/this-is-a-very-long-branch-name-that-should-be-truncated',
 		};
 		const items = prepareWorktreeItems([longBranch], []);
-		expect(items[0]?.baseLabel.length).toBeLessThanOrEqual(50); // 40 + status + default
+		expect(items[0]?.baseLabel.length).toBeLessThanOrEqual(80); // 70 + status + default
 	});
 });
 

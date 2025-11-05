@@ -10,7 +10,7 @@ import {
 } from './gitStatus.js';
 
 // Constants
-const MAX_BRANCH_NAME_LENGTH = 40; // Maximum characters for branch name display
+const MAX_BRANCH_NAME_LENGTH = 70; // Maximum characters for branch name display
 const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 
 /**
