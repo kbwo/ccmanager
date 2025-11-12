@@ -75,6 +75,18 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return currentState;
 		}
 
+		// Check for interactive selection interface patterns
+		// These patterns indicate Claude is waiting for user interaction with navigation/selection UI
+		const hasInteractivePattern =
+			lowerContent.includes('enter to select') ||
+			lowerContent.includes('tab/arrow keys to navigate') ||
+			lowerContent.includes('esc to cancel') ||
+			lowerContent.includes('ready to submit your answers?');
+
+		if (hasInteractivePattern) {
+			return 'waiting_input';
+		}
+
 		// Check for waiting prompts with box character
 		if (
 			content.includes('│ Do you want') ||

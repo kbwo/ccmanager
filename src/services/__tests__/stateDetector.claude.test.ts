@@ -276,5 +276,109 @@ describe('ClaudeStateDetector', () => {
 			// Assert
 			expect(state).toBe('waiting_input');
 		});
+
+		it('should detect waiting_input when "enter to select" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Select an option:',
+				'',
+				'❯ Option 1',
+				'  Option 2',
+				'',
+				'Enter to select',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "tab/arrow keys to navigate" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Choose your action:',
+				'',
+				'❯ Continue',
+				'  Skip',
+				'',
+				'Tab/arrow keys to navigate',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "esc to cancel" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Interactive selection:',
+				'',
+				'❯ Yes',
+				'  No',
+				'',
+				'Esc to cancel',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "ready to submit your answers?" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Review your selections:',
+				'',
+				'Choice 1: Yes',
+				'Choice 2: No',
+				'',
+				'Ready to submit your answers?',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input with mixed case interactive patterns', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Select options:',
+				'',
+				'ENTER TO SELECT',
+				'TAB/ARROW KEYS TO NAVIGATE',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should prioritize interactive patterns over busy state', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Press ESC to interrupt',
+				'',
+				'Select an option:',
+				'Enter to select',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input'); // Interactive pattern should take precedence
+		});
 	});
 });
