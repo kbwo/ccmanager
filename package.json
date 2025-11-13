@@ -45,14 +45,14 @@
 		"ink-text-input": "^5.0.1",
 		"meow": "^11.0.0",
 		"node-pty": "^1.0.0",
-		"react": "^18.2.0",
+		"react": "^19.1.1",
 		"strip-ansi": "^7.1.0"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.28.0",
 		"@sindresorhus/tsconfig": "^3.0.1",
 		"@types/node": "^20.0.0",
-		"@types/react": "^18.0.32",
+		"@types/react": "^19.1.13",
 		"@typescript-eslint/eslint-plugin": "^8.33.1",
 		"@typescript-eslint/parser": "^8.33.1",
 		"@vdemedes/prettier-config": "^2.0.1",
