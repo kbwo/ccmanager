@@ -19,12 +19,14 @@ export const MENU_ICONS = {
 } as const;
 
 export const getStatusDisplay = (
-	status: 'busy' | 'waiting_input' | 'idle',
+	status: 'busy' | 'waiting_input' | 'idle' | 'pending_auto_approval',
 ): string => {
 	switch (status) {
 		case 'busy':
 			return `${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY}`;
 		case 'waiting_input':
+			return `${STATUS_ICONS.WAITING} ${STATUS_LABELS.WAITING}`;
+		case 'pending_auto_approval':
 			return `${STATUS_ICONS.WAITING} ${STATUS_LABELS.WAITING}`;
 		case 'idle':
 			return `${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE}`;

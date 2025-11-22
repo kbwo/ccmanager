@@ -384,6 +384,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {
@@ -447,6 +448,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {
@@ -509,6 +511,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {
@@ -571,6 +574,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {

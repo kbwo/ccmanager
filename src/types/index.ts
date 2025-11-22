@@ -4,7 +4,11 @@ import {GitStatus} from '../utils/gitStatus.js';
 
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
-export type SessionState = 'idle' | 'busy' | 'waiting_input';
+export type SessionState =
+	| 'idle'
+	| 'busy'
+	| 'waiting_input'
+	| 'pending_auto_approval';
 
 export type StateDetectionStrategy =
 	| 'claude'
@@ -75,6 +79,7 @@ export interface StatusHookConfig {
 	idle?: StatusHook;
 	busy?: StatusHook;
 	waiting_input?: StatusHook;
+	pending_auto_approval?: StatusHook;
 }
 
 export interface WorktreeHook {

@@ -26,6 +26,7 @@ export interface SessionCounts {
 	idle: number;
 	busy: number;
 	waiting_input: number;
+	pending_auto_approval: number;
 	total: number;
 }
 
@@ -608,6 +609,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			idle: 0,
 			busy: 0,
 			waiting_input: 0,
+			pending_auto_approval: 0,
 			total: sessions.length,
 		};
 
@@ -621,6 +623,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					break;
 				case 'waiting_input':
 					counts.waiting_input++;
+					break;
+				case 'pending_auto_approval':
+					counts.pending_auto_approval++;
 					break;
 			}
 		});
