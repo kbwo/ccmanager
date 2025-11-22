@@ -106,6 +106,11 @@ export class ConfigurationManager {
 				command: 'claude',
 			};
 		}
+		if (!this.config.autoApproval) {
+			this.config.autoApproval = {
+				enabled: false,
+			};
+		}
 
 		// Migrate legacy command config to presets if needed
 		this.migrateLegacyCommandToPresets();
@@ -660,6 +665,13 @@ export class ConfigurationManager {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Get whether auto-approval is enabled
+	 */
+	isAutoApprovalEnabled(): boolean {
+		return this.config.autoApproval?.enabled ?? false;
 	}
 }
 

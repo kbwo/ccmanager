@@ -19,6 +19,8 @@ import {
 } from '../constants/statePersistence.js';
 import {Effect} from 'effect';
 import {ProcessError, ConfigError} from '../types/errors.js';
+import {autoApprovalVerifier} from './autoApprovalVerifier.js';
+import {logger} from '../utils/logger.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 
@@ -55,7 +57,65 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Create a detector based on the session's detection strategy
 		const strategy = session.detectionStrategy || 'claude';
 		const detector = createStateDetector(strategy);
-		return detector.detectState(session.terminal, session.state);
+		const detectedState = detector.detectState(session.terminal, session.state);
+
+		// If auto-approval is enabled and state is waiting_input, convert to pending_auto_approval
+		if (
+			detectedState === 'waiting_input' &&
+			configurationManager.isAutoApprovalEnabled() &&
+			!session.autoApprovalFailed
+		) {
+			return 'pending_auto_approval';
+		}
+
+		return detectedState;
+	}
+
+	private getTerminalContent(session: Session, maxLines: number = 30): string {
+		const buffer = session.terminal.buffer.active;
+		const lines: string[] = [];
+
+		// Start from the bottom and work our way up
+		for (let i = buffer.length - 1; i >= 0 && lines.length < maxLines; i--) {
+			const line = buffer.getLine(i);
+			if (line) {
+				const text = line.translateToString(true);
+				// Skip empty lines at the bottom
+				if (lines.length > 0 || text.trim() !== '') {
+					lines.unshift(text);
+				}
+			}
+		}
+
+		return lines.join('\n');
+	}
+
+	private handleAutoApproval(session: Session): void {
+		// Get terminal content for verification
+		const terminalContent = this.getTerminalContent(session);
+
+		// Verify if permission is needed
+		void Effect.runPromise(
+			autoApprovalVerifier.verifyNeedsPermission(terminalContent),
+		).then((needsPermission: boolean) => {
+			if (needsPermission) {
+				// Change state to waiting_input to ask for user permission
+				logger.info(
+					`[${session.id}] Auto-approval verification determined user permission needed`,
+				);
+				session.state = 'waiting_input';
+				session.autoApprovalFailed = true;
+				session.pendingState = undefined;
+				session.pendingStateStart = undefined;
+				this.emit('sessionStateChanged', session);
+			} else {
+				// Auto-approve by simulating Enter key press
+				logger.info(
+					`[${session.id}] Auto-approval granted, simulating user permission`,
+				);
+				session.process.write('\r');
+			}
+		});
 	}
 
 	constructor() {
@@ -110,6 +170,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			pendingState: undefined,
 			pendingStateStart: undefined,
+			autoApprovalFailed: false,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -341,6 +402,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						session.state = detectedState;
 						session.pendingState = undefined;
 						session.pendingStateStart = undefined;
+
+						// Handle auto-approval if state is pending_auto_approval
+						if (detectedState === 'pending_auto_approval') {
+							this.handleAutoApproval(session);
+						}
 						// Execute status hook asynchronously (non-blocking) using Effect
 						void Effect.runPromise(
 							executeStatusHook(oldState, detectedState, session),

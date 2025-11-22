@@ -26,6 +26,8 @@ vi.mock('./configurationManager.js', () => ({
 		setWorktreeLastOpened: vi.fn(),
 		getWorktreeLastOpenedTime: vi.fn(),
 		getWorktreeLastOpened: vi.fn(() => ({})),
+		isAutoApprovalEnabled: vi.fn(() => false),
+		setAutoApprovalEnabled: vi.fn(),
 	},
 }));
 

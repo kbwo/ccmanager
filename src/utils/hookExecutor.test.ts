@@ -357,6 +357,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -421,6 +422,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -484,6 +486,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -548,6 +551,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to fail with GitError

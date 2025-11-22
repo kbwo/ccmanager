@@ -44,6 +44,7 @@ export interface Session {
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	pendingState: SessionState | undefined; // State that's been detected but not yet confirmed
 	pendingStateStart: number | undefined; // Timestamp when pending state was first detected
+	autoApprovalFailed: boolean; // Whether auto-approval verification determined user permission is needed
 }
 
 export interface SessionManager {
@@ -131,6 +132,9 @@ export interface ConfigurationData {
 	worktree?: WorktreeConfig;
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
+	autoApproval?: {
+		enabled: boolean; // Whether auto-approval is enabled
+	};
 }
 
 // Multi-project support interfaces
