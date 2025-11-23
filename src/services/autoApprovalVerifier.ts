@@ -1,7 +1,7 @@
 import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {logger} from '../utils/logger.js';
-import {execSync} from 'child_process';
+import {execFile, type ExecFileOptionsWithStringEncoding} from 'child_process';
 
 /**
  * Response from Claude Haiku for auto-approval verification
@@ -28,8 +28,8 @@ export class AutoApprovalVerifier {
 	verifyNeedsPermission(
 		terminalOutput: string,
 	): Effect.Effect<boolean, ProcessError, never> {
-		return Effect.try({
-			try: () => {
+		return Effect.tryPromise({
+			try: async () => {
 				const prompt = `You are a CLI assistant analyzer. Examine the following terminal output and determine if there's a problem that requires user permission before proceeding.
 
 Terminal Output:
@@ -56,17 +56,61 @@ Be conservative: when in doubt, return true to ask for user permission.`;
 				});
 
 				try {
-					const result = execSync(
-						`claude --model ${this.model} -p --output-format json --json-schema '${jsonSchema.replace(/'/g, "'\\''")}'`,
-						{
-							input: prompt,
-							encoding: 'utf8',
-							maxBuffer: 10 * 1024 * 1024,
-						},
-					);
+					const execOptions: ExecFileOptionsWithStringEncoding = {
+						encoding: 'utf8',
+						maxBuffer: 10 * 1024 * 1024,
+					};
+
+					const stdout = await new Promise<string>((resolve, reject) => {
+						const child = execFile(
+							'claude',
+							[
+								'--model',
+								this.model,
+								'-p',
+								'--output-format',
+								'json',
+								'--json-schema',
+								jsonSchema,
+							],
+							execOptions,
+							error => {
+								if (error) {
+									reject(error);
+								}
+							},
+						);
+
+						let output = '';
+
+						child.stdout?.setEncoding('utf8');
+						child.stdout?.on('data', chunk => {
+							output += chunk;
+						});
+
+						child.stderr?.on('data', chunk => {
+							logger.debug('Auto-approval stderr chunk', chunk.toString());
+						});
+
+						child.on('error', err => reject(err));
+						child.on('close', code => {
+							if (code && code !== 0) {
+								reject(new Error(`claude exited with code ${code}`));
+								return;
+							}
+							resolve(output);
+						});
+
+						if (child.stdin) {
+							child.stdin.write(prompt);
+							child.stdin.end();
+						} else {
+							reject(new Error('claude stdin unavailable'));
+						}
+					});
 
 					// Parse the JSON response directly
-					const response = JSON.parse(result) as AutoApprovalResponse;
+					const response = JSON.parse(stdout) as AutoApprovalResponse;
 					return response.needsPermission;
 				} catch (error) {
 					logger.error('Auto-approval verification failed', error);
