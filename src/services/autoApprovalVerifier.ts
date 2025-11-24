@@ -1,7 +1,13 @@
 import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {logger} from '../utils/logger.js';
-import {execFile, type ExecFileOptionsWithStringEncoding} from 'child_process';
+import {
+	execFile,
+	type ChildProcess,
+	type ExecFileOptionsWithStringEncoding,
+} from 'child_process';
+
+const AUTO_APPROVAL_TIMEOUT_MS = 15_000;
 
 /**
  * Response from Claude Haiku for auto-approval verification
@@ -30,7 +36,7 @@ export class AutoApprovalVerifier {
 	): Effect.Effect<boolean, ProcessError, never> {
 		return Effect.tryPromise({
 			try: async () => {
-				const prompt = `You are a safety gate preventing risky auto-approvals of CLI actions. Examine the terminal output below and decide if the agent must pause for user permission.
+					const prompt = `You are a safety gate preventing risky auto-approvals of CLI actions. Examine the terminal output below and decide if the agent must pause for user permission.
 
 Terminal Output:
 ${terminalOutput}
@@ -47,7 +53,9 @@ Return false (auto-approve) when:
 - The output clearly shows explicit user intent/confirmation to run the action (e.g., user typed the command or answered yes/confirm), even if it is not read-only or could be destructive.
 - The output shows strictly read-only, low-risk operations (e.g., lint/test passing, help text, formatting dry runs, simple logs) with no pending commands that could change the system or touch sensitive data.
 
-When unsure, return true.`;
+When unsure, return true.
+
+Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not add any explanations or extra fields.`;
 
 				const jsonSchema = JSON.stringify({
 					type: 'object',
@@ -67,8 +75,33 @@ When unsure, return true.`;
 						maxBuffer: 10 * 1024 * 1024,
 					};
 
-					const stdout = await new Promise<string>((resolve, reject) => {
-						const child = execFile(
+					const responseText = await new Promise<string>((resolve, reject) => {
+						let settled = false;
+						let child: ChildProcess | undefined;
+
+						const settle = (action: () => void) => {
+							if (settled) {
+								return;
+							}
+							settled = true;
+							action();
+						};
+
+						const timeoutId = setTimeout(() => {
+							settle(() => {
+								logger.warn(
+									'Auto-approval verification timed out, terminating helper Claude process',
+								);
+								if (child?.pid) {
+									child.kill('SIGKILL');
+								}
+								reject(
+									new Error('Auto-approval verification timed out after 15s'),
+								);
+							});
+						}, AUTO_APPROVAL_TIMEOUT_MS);
+
+						child = execFile(
 							'claude',
 							[
 								'--model',
@@ -80,43 +113,52 @@ When unsure, return true.`;
 								jsonSchema,
 							],
 							execOptions,
-							error => {
-								if (error) {
-									reject(error);
-								}
+							(error, stdout) => {
+								settle(() => {
+									clearTimeout(timeoutId);
+									if (error) {
+										reject(error);
+										return;
+									}
+									// execFile buffers stdout/stderr for us
+									resolve(stdout);
+								});
 							},
 						);
-
-						let output = '';
-
-						child.stdout?.setEncoding('utf8');
-						child.stdout?.on('data', chunk => {
-							output += chunk;
-						});
 
 						child.stderr?.on('data', chunk => {
 							logger.debug('Auto-approval stderr chunk', chunk.toString());
 						});
 
-						child.on('error', err => reject(err));
-						child.on('close', code => {
-							if (code && code !== 0) {
-								reject(new Error(`claude exited with code ${code}`));
-								return;
-							}
-							resolve(output);
+						child.on('error', err => {
+							settle(() => {
+								clearTimeout(timeoutId);
+								reject(err);
+							});
 						});
 
 						if (child.stdin) {
 							child.stdin.write(prompt);
 							child.stdin.end();
 						} else {
-							reject(new Error('claude stdin unavailable'));
+							settle(() => {
+								clearTimeout(timeoutId);
+								reject(new Error('claude stdin unavailable'));
+							});
 						}
+
+						child.on('close', code => {
+							if (code && code !== 0) {
+								settle(() => {
+									clearTimeout(timeoutId);
+									reject(new Error(`claude exited with code ${code}`));
+								});
+							}
+						});
 					});
 
 					// Parse the JSON response directly
-					const response = JSON.parse(stdout) as AutoApprovalResponse;
+					const response = JSON.parse(responseText) as AutoApprovalResponse;
 					return response.needsPermission;
 				} catch (error) {
 					logger.error('Auto-approval verification failed', error);
