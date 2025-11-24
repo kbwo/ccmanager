@@ -47,6 +47,29 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
+	it('should detect waiting_input state for multiline do you want prompt with yes', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Would you like to run the following command?',
+			'',
+			'Reason: Need to write to .git/worktrees metadata to stage changes for the requested commi',
+			'',
+			'$ git add test.ts',
+			'',
+			'› 1. Yes, proceed (y)',
+			"  2. Yes, and don't ask again for this command (a)",
+			'  3. No, and tell Codex what to do differently (esc)',
+			'',
+			'Press enter to confirm or esc to cancel',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
 	it('should detect busy state for Esc to interrupt pattern', () => {
 		// Arrange
 		terminal = createMockTerminal([

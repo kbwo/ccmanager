@@ -152,6 +152,14 @@ export class CodexStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		if (
+			/(do you want|would you like)[\s\S]*?\n+[\s\S]*?\byes\b/.test(
+				lowerContent,
+			)
+		) {
+			return 'waiting_input';
+		}
+
 		// Check for busy state
 		if (/esc.*interrupt/i.test(lowerContent)) {
 			return 'busy';
