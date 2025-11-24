@@ -38,11 +38,18 @@ const Session: React.FC<SessionProps> = ({
 			stdout.write('\x1b[2K'); // Clear the line
 
 			if (content) {
+				const bg = '\x1b[48;5;214m'; // High-contrast orange for dark terminals
+				const fg = '\x1b[30m'; // Black text
+				const bold = '\x1b[1m';
+				const reset = '\x1b[0m';
+				const maxContentWidth = Math.max(cols - 4, 0);
+				const prefixed = `[AUTO-APPROVAL] ${content}`;
 				const trimmed =
-					content.length > cols ? content.slice(0, cols) : content;
-				const padded =
-					trimmed.length < cols ? trimmed.padEnd(cols, ' ') : trimmed;
-				stdout.write(padded);
+					prefixed.length > maxContentWidth
+						? prefixed.slice(0, maxContentWidth)
+						: prefixed;
+				const boxedContent = ` ${trimmed}`.padEnd(cols, ' ');
+				stdout.write(`${bg}${fg}${bold}${boxedContent}${reset}`);
 			}
 
 			stdout.write('\x1b8'); // Restore cursor position
