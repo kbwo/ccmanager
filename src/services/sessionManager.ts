@@ -23,6 +23,7 @@ import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
+const TERMINAL_CONTENT_MAX_LINES = 300;
 
 export interface SessionCounts {
 	idle: number;
@@ -71,12 +72,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return detectedState;
 	}
 
-	private getTerminalContent(session: Session, maxLines: number = 30): string {
+	private getTerminalContent(session: Session): string {
 		const buffer = session.terminal.buffer.active;
 		const lines: string[] = [];
 
 		// Start from the bottom and work our way up
-		for (let i = buffer.length - 1; i >= 0 && lines.length < maxLines; i--) {
+		for (
+			let i = buffer.length - 1;
+			i >= 0 && lines.length < TERMINAL_CONTENT_MAX_LINES;
+			i--
+		) {
 			const line = buffer.getLine(i);
 			if (line) {
 				const text = line.translateToString(true);
