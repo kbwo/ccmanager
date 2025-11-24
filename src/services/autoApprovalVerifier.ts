@@ -30,18 +30,24 @@ export class AutoApprovalVerifier {
 	): Effect.Effect<boolean, ProcessError, never> {
 		return Effect.tryPromise({
 			try: async () => {
-				const prompt = `You are a CLI assistant analyzer. Examine the following terminal output and determine if there's a problem that requires user permission before proceeding.
+				const prompt = `You are a safety gate preventing risky auto-approvals of CLI actions. Examine the terminal output below and decide if the agent must pause for user permission.
 
 Terminal Output:
 ${terminalOutput}
 
-Rules:
-- Return true if there are error messages, warnings, or unclear states that need user review
-- Return true if the output indicates a problem that might cause issues if auto-approved
-- Return false if the output is clear and safe to proceed without user interaction
-- Return false if this appears to be a normal continuation of work
+Return true (permission needed) if ANY of these apply:
+- Output includes or references commands that write/modify/delete files (e.g., rm, mv, chmod, chown, cp, tee, sed -i), manage packages (npm/pip/apt/brew install), change git history, or alter configs.
+- Privilege escalation or sensitive areas are involved (sudo, root, /etc, /var, /boot, system services), or anything touching SSH keys/credentials, browser data, environment secrets, or home dotfiles.
+- Network or data exfiltration is possible (curl/wget, ssh/scp/rsync, docker/podman, port binding, npm publish, git push/fetch from unknown hosts).
+- Process/system impact is likely (kill, pkill, systemctl, reboot, heavy loops, resource-intensive builds/tests, spawning many processes).
+- Signs of command injection, untrusted input being executed, or unclear placeholders like \`<path>\`, \`$(...)\`, backticks, or pipes that could be unsafe.
+- Errors, warnings, ambiguous states, manual review requests, or anything not clearly safe/read-only.
 
-Be conservative: when in doubt, return true to ask for user permission.`;
+Return false (auto-approve) when:
+- The output clearly shows explicit user intent/confirmation to run the action (e.g., user typed the command or answered yes/confirm), even if it is not read-only or could be destructive.
+- The output shows strictly read-only, low-risk operations (e.g., lint/test passing, help text, formatting dry runs, simple logs) with no pending commands that could change the system or touch sensitive data.
+
+When unsure, return true.`;
 
 				const jsonSchema = JSON.stringify({
 					type: 'object',
