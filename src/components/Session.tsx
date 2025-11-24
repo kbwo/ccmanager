@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {useStdout} from 'ink';
 import {Session as SessionType} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
@@ -17,6 +17,61 @@ const Session: React.FC<SessionProps> = ({
 }) => {
 	const {stdout} = useStdout();
 	const [isExiting, setIsExiting] = useState(false);
+	const [statusMessage, setStatusMessage] = useState<string | null>(() =>
+		session.state === 'pending_auto_approval'
+			? 'Auto-approval pending... verifying permissions'
+			: null,
+	);
+	const statusMessageRef = useRef(statusMessage);
+
+	const renderStatusLine = useCallback(
+		(message?: string | null) => {
+			if (!stdout) return;
+
+			const rows = stdout.rows ?? process.stdout.rows ?? 24;
+			const cols = stdout.columns ?? process.stdout.columns ?? 80;
+			const content =
+				message !== undefined ? message : statusMessageRef.current;
+
+			stdout.write('\x1b7'); // Save cursor position
+			stdout.write(`\x1b[${rows};1H`); // Move to bottom row
+			stdout.write('\x1b[2K'); // Clear the line
+
+			if (content) {
+				const trimmed =
+					content.length > cols ? content.slice(0, cols) : content;
+				const padded =
+					trimmed.length < cols ? trimmed.padEnd(cols, ' ') : trimmed;
+				stdout.write(padded);
+			}
+
+			stdout.write('\x1b8'); // Restore cursor position
+		},
+		[stdout],
+	);
+
+	useEffect(() => {
+		statusMessageRef.current = statusMessage;
+		renderStatusLine(statusMessage);
+	}, [statusMessage, renderStatusLine]);
+
+	useEffect(() => {
+		const handleSessionStateChange = (updatedSession: SessionType) => {
+			if (updatedSession.id !== session.id) return;
+
+			if (updatedSession.state === 'pending_auto_approval') {
+				setStatusMessage('Auto-approval pending... verifying permissions');
+			} else {
+				setStatusMessage(null);
+			}
+		};
+
+		sessionManager.on('sessionStateChanged', handleSessionStateChange);
+
+		return () => {
+			sessionManager.off('sessionStateChanged', handleSessionStateChange);
+		};
+	}, [session.id, sessionManager]);
 
 	const stripOscColorSequences = (input: string): string => {
 		// Remove default foreground/background color OSC sequences that Codex emits
@@ -55,6 +110,10 @@ const Session: React.FC<SessionProps> = ({
 						}
 					}
 				}
+
+				if (statusMessageRef.current) {
+					renderStatusLine();
+				}
 			}
 		};
 
@@ -86,12 +145,17 @@ const Session: React.FC<SessionProps> = ({
 			// Only handle data for our session
 			if (activeSession.id === session.id && !isExiting) {
 				stdout.write(data);
+
+				if (statusMessageRef.current) {
+					renderStatusLine();
+				}
 			}
 		};
 
 		const handleSessionExit = (exitedSession: SessionType) => {
 			if (exitedSession.id === session.id) {
 				setIsExiting(true);
+				setStatusMessage(null);
 				// Don't call onReturnToMenu here - App component handles it
 			}
 		};
@@ -107,6 +171,10 @@ const Session: React.FC<SessionProps> = ({
 			// Also resize the virtual terminal
 			if (session.terminal) {
 				session.terminal.resize(cols, rows);
+			}
+
+			if (statusMessageRef.current) {
+				renderStatusLine();
 			}
 		};
 
@@ -174,8 +242,17 @@ const Session: React.FC<SessionProps> = ({
 			sessionManager.off('sessionData', handleSessionData);
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);
+
+			renderStatusLine(null);
 		};
-	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
+	}, [
+		session,
+		sessionManager,
+		stdout,
+		onReturnToMenu,
+		isExiting,
+		renderStatusLine,
+	]);
 
 	// Return null to render nothing (PTY output goes directly to stdout)
 	return null;
