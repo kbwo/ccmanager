@@ -128,6 +128,15 @@ export class GeminiStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		// Check for multiline confirmation prompts ending with "yes"
+		if (
+			/(allow execution|do you want to|apply this change)[\s\S]*?\n+[\s\S]*?\byes\b/.test(
+				lowerContent,
+			)
+		) {
+			return 'waiting_input';
+		}
+
 		// Check for busy state
 		if (lowerContent.includes('esc to cancel')) {
 			return 'busy';

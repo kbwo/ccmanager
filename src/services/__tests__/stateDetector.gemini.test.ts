@@ -57,6 +57,21 @@ describe('GeminiStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
+		it('should detect waiting_input for multiline confirmation ending with "yes"', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Apply this change to the workspace?',
+				'The operation will modify several files.',
+				'   yes',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
 		it('should detect busy when "esc to cancel" is present', () => {
 			// Arrange
 			terminal = createMockTerminal([
