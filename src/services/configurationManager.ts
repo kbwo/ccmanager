@@ -194,6 +194,25 @@ export class ConfigurationManager {
 		this.saveConfig();
 	}
 
+	getAutoApprovalConfig(): NonNullable<ConfigurationData['autoApproval']> {
+		return (
+			this.config.autoApproval || {
+				enabled: false,
+			}
+		);
+	}
+
+	setAutoApprovalConfig(
+		autoApproval: NonNullable<ConfigurationData['autoApproval']>,
+	): void {
+		this.config.autoApproval = autoApproval;
+		this.saveConfig();
+	}
+
+	setAutoApprovalEnabled(enabled: boolean): void {
+		this.setAutoApprovalConfig({enabled});
+	}
+
 	getCommandConfig(): CommandConfig {
 		// For backward compatibility, return the default preset as CommandConfig
 		const defaultPreset = this.getDefaultPreset();
@@ -634,6 +653,11 @@ export class ConfigurationManager {
 		if (!config.command) {
 			config.command = {
 				command: 'claude',
+			};
+		}
+		if (!config.autoApproval) {
+			config.autoApproval = {
+				enabled: false,
 			};
 		}
 
