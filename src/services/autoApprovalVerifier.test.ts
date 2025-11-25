@@ -63,7 +63,7 @@ describe('AutoApprovalVerifier', () => {
 
 		expect(execFileMock).toHaveBeenCalledWith(
 			'claude',
-			expect.arrayContaining(['--model', 'haiku']),
+			expect.arrayContaining(['--model', 'opus']),
 			expect.objectContaining({encoding: 'utf8'}),
 			expect.any(Function),
 		);

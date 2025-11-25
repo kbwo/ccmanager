@@ -7,7 +7,7 @@ import {
 	type ExecFileOptionsWithStringEncoding,
 } from 'child_process';
 
-const AUTO_APPROVAL_TIMEOUT_MS = 15_000;
+const AUTO_APPROVAL_TIMEOUT_MS = 30_000;
 
 /**
  * Response from Claude Haiku for auto-approval verification
@@ -22,7 +22,7 @@ export interface AutoApprovalResponse {
  * user permission is required before proceeding
  */
 export class AutoApprovalVerifier {
-	private readonly model = 'haiku';
+	private readonly model = 'opus';
 
 	/**
 	 * Verify if the current terminal output requires user permission
@@ -96,7 +96,7 @@ Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not a
 									child.kill('SIGKILL');
 								}
 								reject(
-									new Error('Auto-approval verification timed out after 15s'),
+									new Error('Auto-approval verification timed out after 30s'),
 								);
 							});
 						}, AUTO_APPROVAL_TIMEOUT_MS);
