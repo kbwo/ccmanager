@@ -408,6 +408,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						session.pendingState = undefined;
 						session.pendingStateStart = undefined;
 
+						// If we previously blocked auto-approval and have moved out of a user prompt,
+						// allow future auto-approval attempts.
+						if (
+							session.autoApprovalFailed &&
+							detectedState !== 'waiting_input' &&
+							detectedState !== 'pending_auto_approval'
+						) {
+							session.autoApprovalFailed = false;
+						}
+
 						// Handle auto-approval if state is pending_auto_approval
 						if (detectedState === 'pending_auto_approval') {
 							this.handleAutoApproval(session);
