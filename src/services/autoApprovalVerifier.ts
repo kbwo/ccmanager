@@ -22,7 +22,7 @@ export interface AutoApprovalResponse {
  * user permission is required before proceeding
  */
 export class AutoApprovalVerifier {
-	private readonly model = 'opus';
+	private readonly model = 'haiku';
 
 	/**
 	 * Verify if the current terminal output requires user permission
@@ -96,7 +96,7 @@ Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not a
 									child.kill('SIGKILL');
 								}
 								reject(
-									new Error('Auto-approval verification timed out after 30s'),
+									new Error('Auto-approval verification timed out after 15s'),
 								);
 							});
 						}, AUTO_APPROVAL_TIMEOUT_MS);
