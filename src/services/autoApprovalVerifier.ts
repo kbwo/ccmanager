@@ -36,7 +36,7 @@ export class AutoApprovalVerifier {
 	): Effect.Effect<boolean, ProcessError, never> {
 		return Effect.tryPromise({
 			try: async () => {
-					const prompt = `You are a safety gate preventing risky auto-approvals of CLI actions. Examine the terminal output below and decide if the agent must pause for user permission.
+				const prompt = `You are a safety gate preventing risky auto-approvals of CLI actions. Examine the terminal output below and decide if the agent must pause for user permission.
 
 Terminal Output:
 ${terminalOutput}

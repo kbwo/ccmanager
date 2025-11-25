@@ -57,8 +57,7 @@ describe('AutoApprovalVerifier', () => {
 
 		expect(needsPermission).toBe(false);
 		expect(ticked).toBe(true);
-		const child = execFileMock.mock.results[0]
-			?.value as ChildProcess & {
+		const child = execFileMock.mock.results[0]?.value as ChildProcess & {
 			stdin: {write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>};
 		};
 
