@@ -1,5 +1,5 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {useStdout} from 'ink';
+import React, {useEffect, useMemo, useState} from 'react';
+import {Box, Text, useStdout} from 'ink';
 import {Session as SessionType} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
@@ -22,45 +22,22 @@ const Session: React.FC<SessionProps> = ({
 			? 'Auto-approval pending... verifying permissions'
 			: null,
 	);
-	const statusMessageRef = useRef(statusMessage);
-
-	const renderStatusLine = useCallback(
-		(message?: string | null) => {
-			if (!stdout) return;
-
-			const rows = stdout.rows ?? process.stdout.rows ?? 24;
-			const cols = stdout.columns ?? process.stdout.columns ?? 80;
-			const content =
-				message !== undefined ? message : statusMessageRef.current;
-
-			stdout.write('\x1b7'); // Save cursor position
-			stdout.write(`\x1b[${rows};1H`); // Move to bottom row
-			stdout.write('\x1b[2K'); // Clear the line
-
-			if (content) {
-				const bg = '\x1b[48;5;214m'; // High-contrast orange for dark terminals
-				const fg = '\x1b[30m'; // Black text
-				const bold = '\x1b[1m';
-				const reset = '\x1b[0m';
-				const maxContentWidth = Math.max(cols - 4, 0);
-				const prefixed = `[AUTO-APPROVAL] ${content}`;
-				const trimmed =
-					prefixed.length > maxContentWidth
-						? prefixed.slice(0, maxContentWidth)
-						: prefixed;
-				const boxedContent = ` ${trimmed}`.padEnd(cols, ' ');
-				stdout.write(`${bg}${fg}${bold}${boxedContent}${reset}`);
-			}
-
-			stdout.write('\x1b8'); // Restore cursor position
-		},
-		[stdout],
+	const [columns, setColumns] = useState(
+		() => stdout?.columns ?? process.stdout.columns ?? 80,
 	);
 
-	useEffect(() => {
-		statusMessageRef.current = statusMessage;
-		renderStatusLine(statusMessage);
-	}, [statusMessage, renderStatusLine]);
+	const statusLineText = useMemo(() => {
+		if (!statusMessage) return null;
+
+		const maxContentWidth = Math.max(columns - 4, 0);
+		const prefixed = `[AUTO-APPROVAL] ${statusMessage}`;
+		const trimmed =
+			prefixed.length > maxContentWidth
+				? prefixed.slice(0, maxContentWidth)
+				: prefixed;
+
+		return ` ${trimmed}`.padEnd(columns, ' ');
+	}, [columns, statusMessage]);
 
 	useEffect(() => {
 		const handleSessionStateChange = (updatedSession: SessionType) => {
@@ -117,10 +94,6 @@ const Session: React.FC<SessionProps> = ({
 						}
 					}
 				}
-
-				if (statusMessageRef.current) {
-					renderStatusLine();
-				}
 			}
 		};
 
@@ -152,10 +125,6 @@ const Session: React.FC<SessionProps> = ({
 			// Only handle data for our session
 			if (activeSession.id === session.id && !isExiting) {
 				stdout.write(data);
-
-				if (statusMessageRef.current) {
-					renderStatusLine();
-				}
 			}
 		};
 
@@ -174,14 +143,11 @@ const Session: React.FC<SessionProps> = ({
 		const handleResize = () => {
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
+			setColumns(cols);
 			session.process.resize(cols, rows);
 			// Also resize the virtual terminal
 			if (session.terminal) {
 				session.terminal.resize(cols, rows);
-			}
-
-			if (statusMessageRef.current) {
-				renderStatusLine();
 			}
 		};
 
@@ -249,20 +215,16 @@ const Session: React.FC<SessionProps> = ({
 			sessionManager.off('sessionData', handleSessionData);
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);
-
-			renderStatusLine(null);
 		};
-	}, [
-		session,
-		sessionManager,
-		stdout,
-		onReturnToMenu,
-		isExiting,
-		renderStatusLine,
-	]);
+	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
 
-	// Return null to render nothing (PTY output goes directly to stdout)
-	return null;
+	return statusLineText ? (
+		<Box width="100%">
+			<Text backgroundColor="#fcbf49" color="black" bold>
+				{statusLineText}
+			</Text>
+		</Box>
+	) : null;
 };
 
 export default Session;
