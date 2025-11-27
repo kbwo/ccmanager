@@ -96,31 +96,104 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	private handleAutoApproval(session: Session): void {
+		// Cancel any existing verification before starting a new one
+		this.cancelAutoApprovalVerification(
+			session,
+			'Restarting verification for pending auto-approval state',
+		);
+
+		const abortController = new AbortController();
+		session.autoApprovalAbortController = abortController;
+
 		// Get terminal content for verification
 		const terminalContent = this.getTerminalContent(session);
 
 		// Verify if permission is needed
 		void Effect.runPromise(
-			autoApprovalVerifier.verifyNeedsPermission(terminalContent),
-		).then((needsPermission: boolean) => {
-			if (needsPermission) {
-				// Change state to waiting_input to ask for user permission
-				logger.info(
-					`[${session.id}] Auto-approval verification determined user permission needed`,
+			autoApprovalVerifier.verifyNeedsPermission(terminalContent, {
+				signal: abortController.signal,
+			}),
+		)
+			.then((needsPermission: boolean) => {
+				if (abortController.signal.aborted) {
+					logger.debug(
+						`[${session.id}] Auto-approval verification aborted before completion`,
+					);
+					return;
+				}
+
+				// If state already moved away, skip handling
+				if (session.state !== 'pending_auto_approval') {
+					logger.debug(
+						`[${session.id}] Skipping auto-approval handling; current state is ${session.state}`,
+					);
+					return;
+				}
+
+				if (needsPermission) {
+					// Change state to waiting_input to ask for user permission
+					logger.info(
+						`[${session.id}] Auto-approval verification determined user permission needed`,
+					);
+					session.state = 'waiting_input';
+					session.autoApprovalFailed = true;
+					session.pendingState = undefined;
+					session.pendingStateStart = undefined;
+					this.emit('sessionStateChanged', session);
+				} else {
+					// Auto-approve by simulating Enter key press
+					logger.info(
+						`[${session.id}] Auto-approval granted, simulating user permission`,
+					);
+					session.process.write('\r');
+				}
+			})
+			.catch((error: unknown) => {
+				if (abortController.signal.aborted) {
+					logger.debug(
+						`[${session.id}] Auto-approval verification aborted (${(error as Error)?.message ?? 'aborted'})`,
+					);
+					return;
+				}
+
+				// On failure, fall back to requiring explicit permission
+				logger.error(
+					`[${session.id}] Auto-approval verification failed, requiring user permission`,
+					error,
 				);
-				session.state = 'waiting_input';
-				session.autoApprovalFailed = true;
-				session.pendingState = undefined;
-				session.pendingStateStart = undefined;
-				this.emit('sessionStateChanged', session);
-			} else {
-				// Auto-approve by simulating Enter key press
-				logger.info(
-					`[${session.id}] Auto-approval granted, simulating user permission`,
-				);
-				session.process.write('\r');
-			}
-		});
+
+				if (session.state === 'pending_auto_approval') {
+					session.state = 'waiting_input';
+					session.autoApprovalFailed = true;
+					session.pendingState = undefined;
+					session.pendingStateStart = undefined;
+					this.emit('sessionStateChanged', session);
+				}
+			})
+			.finally(() => {
+				if (session.autoApprovalAbortController === abortController) {
+					session.autoApprovalAbortController = undefined;
+				}
+			});
+	}
+
+	private cancelAutoApprovalVerification(
+		session: Session,
+		reason: string,
+	): void {
+		const controller = session.autoApprovalAbortController;
+		if (!controller) {
+			return;
+		}
+
+		if (!controller.signal.aborted) {
+			controller.abort();
+		}
+
+		session.autoApprovalAbortController = undefined;
+		logger.info(
+			`[${session.id}] Cancelled auto-approval verification: ${reason}`,
+		);
 	}
 
 	constructor() {
@@ -176,6 +249,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			pendingState: undefined,
 			pendingStateStart: undefined,
 			autoApprovalFailed: false,
+			autoApprovalAbortController: undefined,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -408,6 +482,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						session.pendingState = undefined;
 						session.pendingStateStart = undefined;
 
+						if (
+							session.autoApprovalAbortController &&
+							detectedState !== 'pending_auto_approval'
+						) {
+							this.cancelAutoApprovalVerification(
+								session,
+								`state changed to ${detectedState}`,
+							);
+						}
+
 						// If we previously blocked auto-approval and have moved out of a user prompt,
 						// allow future auto-approval attempts.
 						if (
@@ -441,6 +525,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	private cleanupSession(session: Session): void {
+		if (session.autoApprovalAbortController) {
+			this.cancelAutoApprovalVerification(session, 'Session cleanup');
+		}
+
 		// Clear the state check interval
 		if (session.stateCheckInterval) {
 			clearInterval(session.stateCheckInterval);
@@ -480,6 +568,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	destroySession(worktreePath: string): void {
 		const session = this.sessions.get(worktreePath);
 		if (session) {
+			if (session.autoApprovalAbortController) {
+				this.cancelAutoApprovalVerification(session, 'Session destroyed');
+			}
+
 			// Clear the state check interval
 			if (session.stateCheckInterval) {
 				clearInterval(session.stateCheckInterval);

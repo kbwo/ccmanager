@@ -45,6 +45,7 @@ export interface Session {
 	pendingState: SessionState | undefined; // State that's been detected but not yet confirmed
 	pendingStateStart: number | undefined; // Timestamp when pending state was first detected
 	autoApprovalFailed: boolean; // Whether auto-approval verification determined user permission is needed
+	autoApprovalAbortController?: AbortController; // Abort controller to cancel in-flight auto-approval verification
 }
 
 export interface SessionManager {

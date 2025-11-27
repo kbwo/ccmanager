@@ -9,6 +9,12 @@ import {
 
 const AUTO_APPROVAL_TIMEOUT_MS = 60_000;
 
+const createAbortError = (): Error => {
+	const error = new Error('Auto-approval verification aborted');
+	error.name = 'AbortError';
+	return error;
+};
+
 /**
  * Response from Claude Haiku for auto-approval verification
  */
@@ -33,6 +39,7 @@ export class AutoApprovalVerifier {
 	 */
 	verifyNeedsPermission(
 		terminalOutput: string,
+		options?: {signal?: AbortSignal},
 	): Effect.Effect<boolean, ProcessError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -70,24 +77,48 @@ Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not a
 				});
 
 				try {
+					const signal = options?.signal;
+
+					if (signal?.aborted) {
+						throw createAbortError();
+					}
+
 					const execOptions: ExecFileOptionsWithStringEncoding = {
 						encoding: 'utf8',
 						maxBuffer: 10 * 1024 * 1024,
+						signal,
 					};
 
 					const responseText = await new Promise<string>((resolve, reject) => {
 						let settled = false;
 						let child: ChildProcess | undefined;
+						let timeoutId: NodeJS.Timeout;
+
+						const removeAbortListener = () => {
+							if (!signal) return;
+							signal.removeEventListener('abort', abortListener);
+						};
 
 						const settle = (action: () => void) => {
 							if (settled) {
 								return;
 							}
 							settled = true;
+							removeAbortListener();
 							action();
 						};
 
-						const timeoutId = setTimeout(() => {
+						const abortListener = () => {
+							settle(() => {
+								clearTimeout(timeoutId);
+								if (child?.pid) {
+									child.kill('SIGKILL');
+								}
+								reject(createAbortError());
+							});
+						};
+
+						timeoutId = setTimeout(() => {
 							settle(() => {
 								logger.warn(
 									'Auto-approval verification timed out, terminating helper Claude process',
@@ -100,6 +131,14 @@ Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not a
 								);
 							});
 						}, AUTO_APPROVAL_TIMEOUT_MS);
+
+						if (signal) {
+							if (signal.aborted) {
+								abortListener();
+								return;
+							}
+							signal.addEventListener('abort', abortListener, {once: true});
+						}
 
 						child = execFile(
 							'claude',
@@ -161,12 +200,21 @@ Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not a
 					const response = JSON.parse(responseText) as AutoApprovalResponse;
 					return response.needsPermission;
 				} catch (error) {
+					if ((error as Error)?.name === 'AbortError') {
+						throw error;
+					}
 					logger.error('Auto-approval verification failed', error);
 					// Default to requiring permission on error
 					return true;
 				}
 			},
 			catch: (error: unknown) => {
+				if ((error as Error)?.name === 'AbortError') {
+					return new ProcessError({
+						command: 'autoApprovalVerifier.verifyNeedsPermission',
+						message: 'Auto-approval verification aborted',
+					});
+				}
 				logger.error('Auto-approval verification error', error);
 				return new ProcessError({
 					command: 'autoApprovalVerifier.verifyNeedsPermission',
