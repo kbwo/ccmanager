@@ -27,6 +27,29 @@ const Session: React.FC<SessionProps> = ({
 	useEffect(() => {
 		if (!stdout) return;
 
+		const resetTerminalInputModes = () => {
+			// Reset terminal modes that interactive tools like Codex enable (kitty keyboard
+			// protocol / modifyOtherKeys / focus tracking) so they don't leak into other
+			// sessions after we detach.
+			stdout.write('\x1b[>0u'); // Disable kitty keyboard protocol (CSI u sequences)
+			stdout.write('\x1b[>4m'); // Disable xterm modifyOtherKeys extensions
+			stdout.write('\x1b[?1004l'); // Disable focus reporting
+			stdout.write('\x1b[?2004l'); // Disable bracketed paste (can interfere with shortcuts)
+		};
+
+		const sanitizeReplayBuffer = (input: string): string => {
+			// Remove terminal mode toggles emitted by Codex so replay doesn't re-enable them
+			// on our own TTY when restoring the session view.
+			return stripOscColorSequences(input)
+				.replace(/\x1B\[>4;?\d*m/g, '') // modifyOtherKeys set/reset
+				.replace(/\x1B\[>[0-9;]*u/g, '') // kitty keyboard protocol enables
+				.replace(/\x1B\[\?1004[hl]/g, '') // focus tracking
+				.replace(/\x1B\[\?2004[hl]/g, ''); // bracketed paste
+		};
+
+		// Reset modes immediately on entry in case a previous session left them on
+		resetTerminalInputModes();
+
 		// Clear screen when entering session
 		stdout.write('\x1B[2J\x1B[H');
 
@@ -38,7 +61,7 @@ const Session: React.FC<SessionProps> = ({
 					const buffer = restoredSession.outputHistory[i];
 					if (!buffer) continue;
 
-					const str = stripOscColorSequences(buffer.toString('utf8'));
+					const str = sanitizeReplayBuffer(buffer.toString('utf8'));
 
 					// Skip clear screen sequences at the beginning
 					if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
@@ -129,9 +152,9 @@ const Session: React.FC<SessionProps> = ({
 
 			// Check for return to menu shortcut
 			if (shortcutManager.matchesRawInput('returnToMenu', data)) {
-				// Disable focus reporting mode before returning to menu
+				// Disable any extended input modes that might have been enabled by the PTY
 				if (stdout) {
-					stdout.write('\x1b[?1004l');
+					resetTerminalInputModes();
 				}
 				// Restore stdin state before returning to menu
 				stdin.removeListener('data', handleStdinData);
@@ -153,7 +176,7 @@ const Session: React.FC<SessionProps> = ({
 
 			// Disable focus reporting mode that might have been enabled by the PTY
 			if (stdout) {
-				stdout.write('\x1b[?1004l');
+				resetTerminalInputModes();
 			}
 
 			// Restore stdin to its original state
