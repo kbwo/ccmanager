@@ -20,6 +20,7 @@ const STATUS_LABELS: Record<SessionState, string> = {
 	idle: 'Idle',
 	busy: 'Busy',
 	waiting_input: 'Waiting for Input',
+	pending_auto_approval: 'Pending Auto Approval',
 };
 
 const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
@@ -50,7 +51,14 @@ const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
 		const items: MenuItem[] = [];
 
 		// Add status hook items
-		(['idle', 'busy', 'waiting_input'] as SessionState[]).forEach(status => {
+		(
+			[
+				'idle',
+				'busy',
+				'waiting_input',
+				'pending_auto_approval',
+			] as SessionState[]
+		).forEach(status => {
 			const hook = statusHooks[status];
 			const enabled = hook?.enabled ? '✓' : '✗';
 			const command = hook?.command || '(not set)';

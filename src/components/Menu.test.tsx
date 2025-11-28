@@ -422,6 +422,7 @@ describe('Menu component rendering', () => {
 			idle: 0,
 			busy: 0,
 			waiting_input: 0,
+			pending_auto_approval: 0,
 			total: 0,
 		});
 		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
@@ -486,6 +487,7 @@ describe('Menu component rendering', () => {
 			idle: 0,
 			busy: 0,
 			waiting_input: 0,
+			pending_auto_approval: 0,
 			total: 0,
 		});
 		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');

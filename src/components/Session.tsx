@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {useStdout} from 'ink';
+import React, {useEffect, useMemo, useState} from 'react';
+import {Box, Text, useStdout} from 'ink';
 import {Session as SessionType} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
@@ -17,6 +17,45 @@ const Session: React.FC<SessionProps> = ({
 }) => {
 	const {stdout} = useStdout();
 	const [isExiting, setIsExiting] = useState(false);
+	const [statusMessage, setStatusMessage] = useState<string | null>(() =>
+		session.state === 'pending_auto_approval'
+			? 'Auto-approval pending... verifying permissions'
+			: null,
+	);
+	const [columns, setColumns] = useState(
+		() => stdout?.columns ?? process.stdout.columns ?? 80,
+	);
+
+	const statusLineText = useMemo(() => {
+		if (!statusMessage) return null;
+
+		const maxContentWidth = Math.max(columns - 4, 0);
+		const prefixed = `[AUTO-APPROVAL] ${statusMessage}`;
+		const trimmed =
+			prefixed.length > maxContentWidth
+				? prefixed.slice(0, maxContentWidth)
+				: prefixed;
+
+		return ` ${trimmed}`.padEnd(columns, ' ');
+	}, [columns, statusMessage]);
+
+	useEffect(() => {
+		const handleSessionStateChange = (updatedSession: SessionType) => {
+			if (updatedSession.id !== session.id) return;
+
+			if (updatedSession.state === 'pending_auto_approval') {
+				setStatusMessage('Auto-approval pending... verifying permissions');
+			} else {
+				setStatusMessage(null);
+			}
+		};
+
+		sessionManager.on('sessionStateChanged', handleSessionStateChange);
+
+		return () => {
+			sessionManager.off('sessionStateChanged', handleSessionStateChange);
+		};
+	}, [session.id, sessionManager]);
 
 	const stripOscColorSequences = (input: string): string => {
 		// Remove default foreground/background color OSC sequences that Codex emits
@@ -115,6 +154,7 @@ const Session: React.FC<SessionProps> = ({
 		const handleSessionExit = (exitedSession: SessionType) => {
 			if (exitedSession.id === session.id) {
 				setIsExiting(true);
+				setStatusMessage(null);
 				// Don't call onReturnToMenu here - App component handles it
 			}
 		};
@@ -126,6 +166,7 @@ const Session: React.FC<SessionProps> = ({
 		const handleResize = () => {
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
+			setColumns(cols);
 			session.process.resize(cols, rows);
 			// Also resize the virtual terminal
 			if (session.terminal) {
@@ -200,8 +241,13 @@ const Session: React.FC<SessionProps> = ({
 		};
 	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
 
-	// Return null to render nothing (PTY output goes directly to stdout)
-	return null;
+	return statusLineText ? (
+		<Box width="100%">
+			<Text backgroundColor="#fcbf49" color="black" bold>
+				{statusLineText}
+			</Text>
+		</Box>
+	) : null;
 };
 
 export default Session;

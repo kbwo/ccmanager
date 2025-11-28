@@ -246,6 +246,7 @@ describe('prepareWorktreeItems', () => {
 		devcontainerConfig: undefined,
 		pendingState: undefined,
 		pendingStateStart: undefined,
+		autoApprovalFailed: false,
 	};
 
 	it('should prepare basic worktree without git status', () => {

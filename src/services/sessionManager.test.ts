@@ -26,6 +26,8 @@ vi.mock('./configurationManager.js', () => ({
 		setWorktreeLastOpened: vi.fn(),
 		getWorktreeLastOpenedTime: vi.fn(),
 		getWorktreeLastOpened: vi.fn(() => ({})),
+		isAutoApprovalEnabled: vi.fn(() => false),
+		setAutoApprovalEnabled: vi.fn(),
 	},
 }));
 
@@ -1080,6 +1082,7 @@ describe('SessionManager', () => {
 					idle: 1,
 					busy: 2,
 					waiting_input: 1,
+					pending_auto_approval: 0,
 					total: 4,
 				};
 
@@ -1093,6 +1096,7 @@ describe('SessionManager', () => {
 					idle: 2,
 					busy: 0,
 					waiting_input: 1,
+					pending_auto_approval: 0,
 					total: 3,
 				};
 
@@ -1106,6 +1110,7 @@ describe('SessionManager', () => {
 					idle: 0,
 					busy: 3,
 					waiting_input: 0,
+					pending_auto_approval: 0,
 					total: 3,
 				};
 
@@ -1119,6 +1124,7 @@ describe('SessionManager', () => {
 					idle: 0,
 					busy: 0,
 					waiting_input: 0,
+					pending_auto_approval: 0,
 					total: 0,
 				};
 

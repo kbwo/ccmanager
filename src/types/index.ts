@@ -4,7 +4,11 @@ import {GitStatus} from '../utils/gitStatus.js';
 
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
-export type SessionState = 'idle' | 'busy' | 'waiting_input';
+export type SessionState =
+	| 'idle'
+	| 'busy'
+	| 'waiting_input'
+	| 'pending_auto_approval';
 
 export type StateDetectionStrategy =
 	| 'claude'
@@ -40,6 +44,8 @@ export interface Session {
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	pendingState: SessionState | undefined; // State that's been detected but not yet confirmed
 	pendingStateStart: number | undefined; // Timestamp when pending state was first detected
+	autoApprovalFailed: boolean; // Whether auto-approval verification determined user permission is needed
+	autoApprovalAbortController?: AbortController; // Abort controller to cancel in-flight auto-approval verification
 }
 
 export interface SessionManager {
@@ -75,6 +81,7 @@ export interface StatusHookConfig {
 	idle?: StatusHook;
 	busy?: StatusHook;
 	waiting_input?: StatusHook;
+	pending_auto_approval?: StatusHook;
 }
 
 export interface WorktreeHook {
@@ -126,6 +133,9 @@ export interface ConfigurationData {
 	worktree?: WorktreeConfig;
 	command?: CommandConfig;
 	commandPresets?: CommandPresetsConfig; // New field for command presets
+	autoApproval?: {
+		enabled: boolean; // Whether auto-approval is enabled
+	};
 }
 
 // Multi-project support interfaces

@@ -357,6 +357,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -384,6 +385,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {
@@ -420,6 +422,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -447,6 +450,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {
@@ -482,6 +486,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -509,6 +514,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {
@@ -545,6 +551,7 @@ describe('hookExecutor Integration Tests', () => {
 				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
+				autoApprovalFailed: false,
 			} satisfies Session;
 
 			// Mock WorktreeService to fail with GitError
@@ -571,6 +578,7 @@ describe('hookExecutor Integration Tests', () => {
 				},
 				idle: {enabled: false, command: ''},
 				waiting_input: {enabled: false, command: ''},
+				pending_auto_approval: {enabled: false, command: ''},
 			});
 
 			try {

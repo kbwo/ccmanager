@@ -1,3 +1,5 @@
+import {SessionState} from '../types/index.js';
+
 export const STATUS_ICONS = {
 	BUSY: '●',
 	WAITING: '◐',
@@ -7,6 +9,7 @@ export const STATUS_ICONS = {
 export const STATUS_LABELS = {
 	BUSY: 'Busy',
 	WAITING: 'Waiting',
+	PENDING_AUTO_APPROVAL: 'Pending Auto Approval',
 	IDLE: 'Idle',
 } as const;
 
@@ -18,14 +21,14 @@ export const MENU_ICONS = {
 	EXIT: '⏻',
 } as const;
 
-export const getStatusDisplay = (
-	status: 'busy' | 'waiting_input' | 'idle',
-): string => {
+export const getStatusDisplay = (status: SessionState): string => {
 	switch (status) {
 		case 'busy':
 			return `${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY}`;
 		case 'waiting_input':
 			return `${STATUS_ICONS.WAITING} ${STATUS_LABELS.WAITING}`;
+		case 'pending_auto_approval':
+			return `${STATUS_ICONS.WAITING} ${STATUS_LABELS.PENDING_AUTO_APPROVAL}`;
 		case 'idle':
 			return `${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE}`;
 	}

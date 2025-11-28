@@ -6,6 +6,7 @@ import ConfigureStatusHooks from './ConfigureStatusHooks.js';
 import ConfigureWorktreeHooks from './ConfigureWorktreeHooks.js';
 import ConfigureWorktree from './ConfigureWorktree.js';
 import ConfigureCommand from './ConfigureCommand.js';
+import ConfigureOther from './ConfigureOther.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface ConfigurationProps {
@@ -18,7 +19,8 @@ type ConfigView =
 	| 'statusHooks'
 	| 'worktreeHooks'
 	| 'worktree'
-	| 'presets';
+	| 'presets'
+	| 'other';
 
 interface MenuItem {
 	label: string;
@@ -50,6 +52,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			value: 'presets',
 		},
 		{
+			label: 'O 🧪  Other & Experimental',
+			value: 'other',
+		},
+		{
 			label: 'B ← Back to Main Menu',
 			value: 'back',
 		},
@@ -68,6 +74,8 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 			setView('worktree');
 		} else if (item.value === 'presets') {
 			setView('presets');
+		} else if (item.value === 'other') {
+			setView('other');
 		}
 	};
 
@@ -96,6 +104,9 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 				break;
 			case 'c':
 				setView('presets');
+				break;
+			case 'o':
+				setView('other');
 				break;
 			case 'b':
 				onComplete();
@@ -126,6 +137,10 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 
 	if (view === 'presets') {
 		return <ConfigureCommand onComplete={handleSubMenuComplete} />;
+	}
+
+	if (view === 'other') {
+		return <ConfigureOther onComplete={handleSubMenuComplete} />;
 	}
 
 	return (

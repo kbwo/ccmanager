@@ -16,7 +16,7 @@ import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.j
 import {WorktreeService} from '../services/worktreeService.js';
 import {
 	Worktree,
-	Session as SessionType,
+	Session as ISession,
 	DevcontainerConfig,
 	GitProject,
 	AmbiguousBranchError,
@@ -60,7 +60,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const [worktreeService, setWorktreeService] = useState(
 		() => new WorktreeService(),
 	);
-	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
+	const [activeSession, setActiveSession] = useState<ISession | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
@@ -108,7 +108,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 		presetId?: string,
 	): Promise<{
 		success: boolean;
-		session?: SessionType;
+		session?: ISession;
 		errorMessage?: string;
 	}> => {
 		const sessionEffect = devcontainerConfig
@@ -160,7 +160,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
-		const handleSessionExit = (session: SessionType) => {
+		const handleSessionExit = (session: ISession) => {
 			// If the exited session is the active one, return to menu
 			setActiveSession(current => {
 				if (current && session.id === current.id) {
