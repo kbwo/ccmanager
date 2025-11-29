@@ -48,6 +48,10 @@ export interface Session {
 	autoApprovalAbortController?: AbortController; // Abort controller to cancel in-flight auto-approval verification
 }
 
+export interface AutoApprovalResponse {
+	needsPermission: boolean;
+}
+
 export interface SessionManager {
 	sessions: Map<string, Session>;
 	getSession(worktreePath: string): Session | undefined;
@@ -135,6 +139,7 @@ export interface ConfigurationData {
 	commandPresets?: CommandPresetsConfig; // New field for command presets
 	autoApproval?: {
 		enabled: boolean; // Whether auto-approval is enabled
+		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse
 	};
 }
 

@@ -3,6 +3,7 @@ import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import TextInputWrapper from './TextInputWrapper.js';
 
 interface ConfigureOtherProps {
 	onComplete: () => void;
@@ -17,6 +18,9 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	const autoApprovalConfig = configurationManager.getAutoApprovalConfig();
 	const [autoApprovalEnabled, setAutoApprovalEnabled] = useState(
 		autoApprovalConfig.enabled,
+	);
+	const [customCommand, setCustomCommand] = useState(
+		autoApprovalConfig.customCommand ?? '',
 	);
 
 	useInput((input, key) => {
@@ -48,6 +52,7 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 			case 'save':
 				configurationManager.setAutoApprovalConfig({
 					enabled: autoApprovalEnabled,
+					customCommand: customCommand.trim() || undefined,
 				});
 				onComplete();
 				break;
@@ -71,6 +76,18 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 				<Text dimColor>
 					Toggle experimental capabilities and other miscellaneous options.
 				</Text>
+			</Box>
+
+			<Box flexDirection="column" marginBottom={1}>
+				<Text>
+					Custom auto-approval command (outputs {'{needsPermission:boolean}'}):
+				</Text>
+				<TextInputWrapper
+					value={customCommand}
+					onChange={setCustomCommand}
+					placeholder={`e.g. jq -n '{"needsPermission":true}'`}
+				/>
+				<Text dimColor>Env provided: $DEFAULT_PROMPT, $TERMINAL_OUTPUT</Text>
 			</Box>
 
 			<SelectInput items={menuItems} onSelect={handleSelect} isFocused />

@@ -1,10 +1,14 @@
 import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
+import {AutoApprovalResponse} from '../types/index.js';
+import {configurationManager} from './configurationManager.js';
 import {logger} from '../utils/logger.js';
 import {
 	execFile,
+	spawn,
 	type ChildProcess,
 	type ExecFileOptionsWithStringEncoding,
+	type SpawnOptions,
 } from 'child_process';
 
 const AUTO_APPROVAL_TIMEOUT_MS = 60_000;
@@ -16,19 +20,107 @@ const createAbortError = (): Error => {
 };
 
 /**
- * Response from Claude Haiku for auto-approval verification
- */
-export interface AutoApprovalResponse {
-	needsPermission: boolean;
-}
-
-/**
  * Service to verify if auto-approval should be granted for pending states
  * Uses Claude Haiku model to analyze terminal output and determine if
  * user permission is required before proceeding
  */
 export class AutoApprovalVerifier {
 	private readonly model = 'haiku';
+
+	private async runCustomCommand(
+		command: string,
+		prompt: string,
+		terminalOutput: string,
+		signal?: AbortSignal,
+	): Promise<string> {
+		return new Promise<string>((resolve, reject) => {
+			let settled = false;
+			let timeoutId: NodeJS.Timeout;
+
+			const settle = (action: () => void) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timeoutId);
+				if (signal) {
+					signal.removeEventListener('abort', abortListener);
+				}
+				action();
+			};
+
+			const abortListener = () => {
+				settle(() => {
+					child.kill('SIGKILL');
+					reject(createAbortError());
+				});
+			};
+
+			const spawnOptions: SpawnOptions = {
+				shell: true,
+				env: {
+					...process.env,
+					DEFAULT_PROMPT: prompt,
+					TERMINAL_OUTPUT: terminalOutput,
+				},
+				stdio: ['ignore', 'pipe', 'pipe'],
+				signal,
+			};
+
+			const child = spawn(command, [], spawnOptions);
+
+			let stdout = '';
+			let stderr = '';
+
+			timeoutId = setTimeout(() => {
+				logger.warn(
+					'Auto-approval custom command timed out, terminating process',
+				);
+				settle(() => {
+					child.kill('SIGKILL');
+					reject(
+						new Error(
+							'Auto-approval verification custom command timed out after 60s',
+						),
+					);
+				});
+			}, AUTO_APPROVAL_TIMEOUT_MS);
+
+			if (signal) {
+				if (signal.aborted) {
+					abortListener();
+					return;
+				}
+				signal.addEventListener('abort', abortListener, {once: true});
+			}
+
+			child.stdout?.on('data', chunk => {
+				stdout += chunk.toString();
+			});
+
+			child.stderr?.on('data', chunk => {
+				const data = chunk.toString();
+				stderr += data;
+				logger.debug('Auto-approval custom command stderr', data);
+			});
+
+			child.on('error', error => {
+				settle(() => reject(error));
+			});
+
+			child.on('exit', (code, signalExit) => {
+				settle(() => {
+					if (code === 0) {
+						resolve(stdout);
+						return;
+					}
+					const message =
+						signalExit !== null
+							? `Custom command terminated by signal ${signalExit}`
+							: `Custom command exited with code ${code}`;
+					reject(new Error(stderr ? `${message}\nStderr: ${stderr}` : message));
+				});
+			});
+		});
+	}
 
 	/**
 	 * Verify if the current terminal output requires user permission
@@ -43,6 +135,9 @@ export class AutoApprovalVerifier {
 	): Effect.Effect<boolean, ProcessError, never> {
 		return Effect.tryPromise({
 			try: async () => {
+				const autoApprovalConfig = configurationManager.getAutoApprovalConfig();
+				const customCommand = autoApprovalConfig.customCommand?.trim();
+
 				const prompt = `You are a safety gate preventing risky auto-approvals of CLI actions. Examine the terminal output below and decide if the agent must pause for user permission.
 
 Terminal Output:
@@ -89,112 +184,121 @@ Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not a
 						signal,
 					};
 
-					const responseText = await new Promise<string>((resolve, reject) => {
-						let settled = false;
-						let child: ChildProcess | undefined;
-						let timeoutId: NodeJS.Timeout;
+					const responseText = customCommand
+						? await this.runCustomCommand(
+								customCommand,
+								prompt,
+								terminalOutput,
+								signal,
+							)
+						: await new Promise<string>((resolve, reject) => {
+								let settled = false;
+								let child: ChildProcess | undefined;
+								let timeoutId: NodeJS.Timeout;
 
-						const removeAbortListener = () => {
-							if (!signal) return;
-							signal.removeEventListener('abort', abortListener);
-						};
+								const removeAbortListener = () => {
+									if (!signal) return;
+									signal.removeEventListener('abort', abortListener);
+								};
 
-						const settle = (action: () => void) => {
-							if (settled) {
-								return;
-							}
-							settled = true;
-							removeAbortListener();
-							action();
-						};
-
-						const abortListener = () => {
-							settle(() => {
-								clearTimeout(timeoutId);
-								if (child?.pid) {
-									child.kill('SIGKILL');
-								}
-								reject(createAbortError());
-							});
-						};
-
-						timeoutId = setTimeout(() => {
-							settle(() => {
-								logger.warn(
-									'Auto-approval verification timed out, terminating helper Claude process',
-								);
-								if (child?.pid) {
-									child.kill('SIGKILL');
-								}
-								reject(
-									new Error('Auto-approval verification timed out after 60s'),
-								);
-							});
-						}, AUTO_APPROVAL_TIMEOUT_MS);
-
-						if (signal) {
-							if (signal.aborted) {
-								abortListener();
-								return;
-							}
-							signal.addEventListener('abort', abortListener, {once: true});
-						}
-
-						child = execFile(
-							'claude',
-							[
-								'--model',
-								this.model,
-								'-p',
-								'--output-format',
-								'json',
-								'--json-schema',
-								jsonSchema,
-							],
-							execOptions,
-							(error, stdout) => {
-								settle(() => {
-									clearTimeout(timeoutId);
-									if (error) {
-										reject(error);
+								const settle = (action: () => void) => {
+									if (settled) {
 										return;
 									}
-									// execFile buffers stdout/stderr for us
-									resolve(stdout);
+									settled = true;
+									removeAbortListener();
+									action();
+								};
+
+								const abortListener = () => {
+									settle(() => {
+										clearTimeout(timeoutId);
+										if (child?.pid) {
+											child.kill('SIGKILL');
+										}
+										reject(createAbortError());
+									});
+								};
+
+								timeoutId = setTimeout(() => {
+									settle(() => {
+										logger.warn(
+											'Auto-approval verification timed out, terminating helper Claude process',
+										);
+										if (child?.pid) {
+											child.kill('SIGKILL');
+										}
+										reject(
+											new Error(
+												'Auto-approval verification timed out after 60s',
+											),
+										);
+									});
+								}, AUTO_APPROVAL_TIMEOUT_MS);
+
+								if (signal) {
+									if (signal.aborted) {
+										abortListener();
+										return;
+									}
+									signal.addEventListener('abort', abortListener, {once: true});
+								}
+
+								child = execFile(
+									'claude',
+									[
+										'--model',
+										this.model,
+										'-p',
+										'--output-format',
+										'json',
+										'--json-schema',
+										jsonSchema,
+									],
+									execOptions,
+									(error, stdout) => {
+										settle(() => {
+											clearTimeout(timeoutId);
+											if (error) {
+												reject(error);
+												return;
+											}
+											// execFile buffers stdout/stderr for us
+											resolve(stdout);
+										});
+									},
+								);
+
+								child.stderr?.on('data', chunk => {
+									logger.debug('Auto-approval stderr chunk', chunk.toString());
 								});
-							},
-						);
 
-						child.stderr?.on('data', chunk => {
-							logger.debug('Auto-approval stderr chunk', chunk.toString());
-						});
-
-						child.on('error', err => {
-							settle(() => {
-								clearTimeout(timeoutId);
-								reject(err);
-							});
-						});
-
-						if (child.stdin) {
-							child.stdin.write(prompt);
-							child.stdin.end();
-						} else {
-							settle(() => {
-								clearTimeout(timeoutId);
-								reject(new Error('claude stdin unavailable'));
-							});
-						}
-
-						child.on('close', code => {
-							if (code && code !== 0) {
-								settle(() => {
-									clearTimeout(timeoutId);
-									reject(new Error(`claude exited with code ${code}`));
+								child.on('error', err => {
+									settle(() => {
+										clearTimeout(timeoutId);
+										reject(err);
+									});
 								});
-							}
-						});
-					});
+
+								if (child.stdin) {
+									child.stdin.write(prompt);
+									child.stdin.end();
+								} else {
+									settle(() => {
+										clearTimeout(timeoutId);
+										reject(new Error('claude stdin unavailable'));
+									});
+								}
+
+								child.on('close', code => {
+									if (code && code !== 0) {
+										settle(() => {
+											clearTimeout(timeoutId);
+											reject(new Error(`claude exited with code ${code}`));
+										});
+									}
+								});
+							});
 
 					// Parse the JSON response directly
 					const response = JSON.parse(responseText) as AutoApprovalResponse;

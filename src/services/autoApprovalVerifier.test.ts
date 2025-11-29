@@ -10,6 +10,12 @@ vi.mock('child_process', () => ({
 	execFile: (...args: unknown[]) => execFileMock(...args),
 }));
 
+vi.mock('./configurationManager.js', () => ({
+	configurationManager: {
+		getAutoApprovalConfig: vi.fn().mockReturnValue({enabled: false}),
+	},
+}));
+
 describe('AutoApprovalVerifier', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
@@ -63,7 +69,7 @@ describe('AutoApprovalVerifier', () => {
 
 		expect(execFileMock).toHaveBeenCalledWith(
 			'claude',
-			expect.arrayContaining(['--model', 'opus']),
+			expect.arrayContaining(['--model', 'haiku']),
 			expect.objectContaining({encoding: 'utf8'}),
 			expect.any(Function),
 		);

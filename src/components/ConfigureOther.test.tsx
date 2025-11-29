@@ -44,6 +44,14 @@ vi.mock('../services/shortcutManager.js', () => ({
 	},
 }));
 
+vi.mock('./TextInputWrapper.js', async () => {
+	const React = await vi.importActual<typeof import('react')>('react');
+	return {
+		default: ({value}: {value: string}) =>
+			React.createElement('input', {value, 'data-testid': 'text-input'}),
+	};
+});
+
 const mockedConfigurationManager = configurationManager as unknown as {
 	getAutoApprovalConfig: ReturnType<typeof vi.fn>;
 	setAutoApprovalConfig: ReturnType<typeof vi.fn>;
@@ -63,6 +71,7 @@ describe('ConfigureOther', () => {
 
 		expect(lastFrame()).toContain('Other & Experimental Settings');
 		expect(lastFrame()).toContain('Auto Approval (experimental): ✅ Enabled');
+		expect(lastFrame()).toContain('Custom auto-approval command');
 		expect(lastFrame()).toContain('Save Changes');
 	});
 });
