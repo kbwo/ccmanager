@@ -36,12 +36,12 @@ Return true (permission needed) if ANY of these apply:
 - Errors, warnings, ambiguous states, manual review requests, or anything not clearly safe/read-only.
 
 Return false (auto-approve) when:
-- The output clearly shows explicit user intent/confirmation to run the action (e.g., user typed the command or answered yes/confirm), even if it is not read-only or could be destructive.
+- The output clearly shows explicit user intent/confirmation to run the exact action (e.g., user typed the command AND confirmed, or explicitly said “I want to delete <path>; please do it now”). Explicit intent should normally override the risk list unless there are signs of coercion/compromise, the target path is unclear, or the action differs from what was confirmed.
 - The output shows strictly read-only, low-risk operations (e.g., lint/test passing, help text, formatting dry runs, simple logs) with no pending commands that could change the system or touch sensitive data.
 
 When unsure, return true.
 
-Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not add any explanations or extra fields.`;
+Respond with ONLY valid JSON matching: {"needsPermission": true|false, "reason"?: string}. When needsPermission is true, include a brief reason (<=140 chars) explaining why permission is needed. Do not add any other fields or text.`;
 
 const buildPrompt = (terminalOutput: string): string =>
 	PROMPT_TEMPLATE.replace(PLACEHOLDER.terminal, terminalOutput);
@@ -267,8 +267,8 @@ export class AutoApprovalVerifier {
 	verifyNeedsPermission(
 		terminalOutput: string,
 		options?: {signal?: AbortSignal},
-	): Effect.Effect<boolean, ProcessError, never> {
-		return Effect.tryPromise({
+	): Effect.Effect<AutoApprovalResponse, ProcessError, never> {
+		const attemptVerification = Effect.tryPromise({
 			try: async () => {
 				const autoApprovalConfig = configurationManager.getAutoApprovalConfig();
 				const customCommand = autoApprovalConfig.customCommand?.trim();
@@ -282,54 +282,56 @@ export class AutoApprovalVerifier {
 							description:
 								'Whether user permission is needed before auto-approval',
 						},
+						reason: {
+							type: 'string',
+							description:
+								'Optional reason describing why user permission is needed',
+						},
 					},
 					required: ['needsPermission'],
 				});
 
-				try {
-					const signal = options?.signal;
+				const signal = options?.signal;
 
-					if (signal?.aborted) {
-						throw createAbortError();
-					}
-
-					const responseText = customCommand
-						? await this.runCustomCommand(
-								customCommand,
-								prompt,
-								terminalOutput,
-								signal,
-							)
-						: await this.runClaudePrompt(prompt, jsonSchema, signal);
-
-					// Parse the JSON response directly
-					const response = JSON.parse(responseText) as AutoApprovalResponse;
-					return response.needsPermission;
-				} catch (error) {
-					if ((error as Error)?.name === 'AbortError') {
-						throw error;
-					}
-					logger.error('Auto-approval verification failed', error);
-					// Default to requiring permission on error
-					return true;
+				if (signal?.aborted) {
+					throw createAbortError();
 				}
+
+				const responseText = customCommand
+					? await this.runCustomCommand(
+							customCommand,
+							prompt,
+							terminalOutput,
+							signal,
+						)
+					: await this.runClaudePrompt(prompt, jsonSchema, signal);
+
+				return JSON.parse(responseText) as AutoApprovalResponse;
 			},
-			catch: (error: unknown) => {
-				if ((error as Error)?.name === 'AbortError') {
-					return new ProcessError({
+			catch: (error: unknown) => error as Error,
+		});
+
+		return Effect.catchAll(attemptVerification, (error: Error) => {
+			if (error.name === 'AbortError') {
+				return Effect.fail(
+					new ProcessError({
 						command: 'autoApprovalVerifier.verifyNeedsPermission',
 						message: 'Auto-approval verification aborted',
-					});
-				}
-				logger.error('Auto-approval verification error', error);
-				return new ProcessError({
-					command: 'autoApprovalVerifier.verifyNeedsPermission',
-					message:
-						error instanceof Error
-							? error.message
-							: 'Failed to verify auto-approval',
-				});
-			},
+					}),
+				);
+			}
+
+			const isParseError = error instanceof SyntaxError;
+			const reason = isParseError
+				? 'Failed to parse auto-approval helper response'
+				: 'Auto-approval helper command failed';
+
+			logger.error(reason, error);
+
+			return Effect.succeed({
+				needsPermission: true,
+				reason: `${reason}: ${error.message ?? 'unknown error'}`,
+			});
 		});
 	}
 }

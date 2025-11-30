@@ -8,7 +8,9 @@ import {
 import {Effect} from 'effect';
 
 const detectStateMock = vi.fn();
-const verifyNeedsPermissionMock = vi.fn(() => Effect.succeed(false));
+const verifyNeedsPermissionMock = vi.fn(() =>
+	Effect.succeed({needsPermission: false}),
+);
 
 vi.mock('node-pty', () => ({
 	spawn: vi.fn(),

@@ -16,6 +16,17 @@ const ConfigureCustomCommand: React.FC<ConfigureCustomCommandProps> = ({
 	onSubmit,
 	onCancel,
 }) => {
+	const shouldIgnoreNextChange = React.useRef(false);
+
+	const handleChange = (newValue: string) => {
+		if (shouldIgnoreNextChange.current) {
+			shouldIgnoreNextChange.current = false;
+			return;
+		}
+
+		onChange(newValue);
+	};
+
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
@@ -24,6 +35,8 @@ const ConfigureCustomCommand: React.FC<ConfigureCustomCommandProps> = ({
 
 		// Ctrl+K clears the current input
 		if (key.ctrl && input.toLowerCase() === 'k') {
+			// Ignore the TextInput change event that will fire for the same key
+			shouldIgnoreNextChange.current = true;
 			onChange('');
 		}
 	});
@@ -45,7 +58,7 @@ const ConfigureCustomCommand: React.FC<ConfigureCustomCommandProps> = ({
 			<Box marginBottom={1}>
 				<TextInputWrapper
 					value={value}
-					onChange={onChange}
+					onChange={handleChange}
 					onSubmit={() => onSubmit(value)}
 					placeholder={`e.g. jq -n '{"needsPermission":true}'`}
 					focus

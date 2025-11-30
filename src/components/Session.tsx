@@ -24,9 +24,11 @@ const Session: React.FC<SessionProps> = ({
 	): {message: string | null; variant: StatusVariant} => {
 		// Always prioritize showing the manual approval notice when verification failed
 		if (currentSession.autoApprovalFailed) {
+			const reason = currentSession.autoApprovalReason
+				? ` Reason: ${currentSession.autoApprovalReason}.`
+				: '';
 			return {
-				message:
-					'Auto-approval failed. Manual approval required—respond to the prompt.',
+				message: `Auto-approval failed.${reason} Manual approval required—respond to the prompt.`,
 				variant: 'error',
 			};
 		}
@@ -67,7 +69,7 @@ const Session: React.FC<SessionProps> = ({
 			statusVariant === 'error'
 				? '[AUTO-APPROVAL REQUIRED]'
 				: '[AUTO-APPROVAL]';
-		const prefixed = `${prefix} ${statusMessage.toUpperCase()}`;
+		const prefixed = `${prefix} ${statusMessage}`;
 		const trimmed =
 			prefixed.length > maxContentWidth
 				? prefixed.slice(0, maxContentWidth)

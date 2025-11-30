@@ -104,6 +104,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		const abortController = new AbortController();
 		session.autoApprovalAbortController = abortController;
+		session.autoApprovalReason = undefined;
 
 		// Get terminal content for verification
 		const terminalContent = this.getTerminalContent(session);
@@ -114,7 +115,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				signal: abortController.signal,
 			}),
 		)
-			.then((needsPermission: boolean) => {
+			.then(autoApprovalResult => {
 				if (abortController.signal.aborted) {
 					logger.debug(
 						`[${session.id}] Auto-approval verification aborted before completion`,
@@ -130,13 +131,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					return;
 				}
 
-				if (needsPermission) {
+				if (autoApprovalResult.needsPermission) {
 					// Change state to waiting_input to ask for user permission
 					logger.info(
 						`[${session.id}] Auto-approval verification determined user permission needed`,
 					);
 					session.state = 'waiting_input';
 					session.autoApprovalFailed = true;
+					session.autoApprovalReason = autoApprovalResult.reason;
 					session.pendingState = undefined;
 					session.pendingStateStart = undefined;
 					this.emit('sessionStateChanged', session);
@@ -145,6 +147,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					logger.info(
 						`[${session.id}] Auto-approval granted, simulating user permission`,
 					);
+					session.autoApprovalReason = undefined;
 					session.process.write('\r');
 				}
 			})
@@ -165,6 +168,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				if (session.state === 'pending_auto_approval') {
 					session.state = 'waiting_input';
 					session.autoApprovalFailed = true;
+					session.autoApprovalReason =
+						(error as Error | undefined)?.message ??
+						'Auto-approval verification failed';
 					session.pendingState = undefined;
 					session.pendingStateStart = undefined;
 					this.emit('sessionStateChanged', session);
@@ -249,6 +255,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			pendingState: undefined,
 			pendingStateStart: undefined,
 			autoApprovalFailed: false,
+			autoApprovalReason: undefined,
 			autoApprovalAbortController: undefined,
 		};
 
@@ -500,6 +507,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 							detectedState !== 'pending_auto_approval'
 						) {
 							session.autoApprovalFailed = false;
+							session.autoApprovalReason = undefined;
 						}
 
 						// Handle auto-approval if state is pending_auto_approval
@@ -565,7 +573,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 	}
 
-	cancelAutoApproval(worktreePath: string, reason = 'User input received'): void {
+	cancelAutoApproval(
+		worktreePath: string,
+		reason = 'User input received',
+	): void {
 		const session = this.sessions.get(worktreePath);
 		if (!session) {
 			return;
@@ -580,6 +591,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		this.cancelAutoApprovalVerification(session, reason);
 		session.autoApprovalFailed = true;
+		session.autoApprovalReason = reason;
 		session.pendingState = undefined;
 		session.pendingStateStart = undefined;
 

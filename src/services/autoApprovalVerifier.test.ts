@@ -59,9 +59,9 @@ describe('AutoApprovalVerifier', () => {
 		);
 
 		await vi.runAllTimersAsync();
-		const needsPermission = await needsPermissionPromise;
+		const result = await needsPermissionPromise;
 
-		expect(needsPermission).toBe(false);
+		expect(result.needsPermission).toBe(false);
 		expect(ticked).toBe(true);
 		const child = execFileMock.mock.results[0]?.value as ChildProcess & {
 			stdin: {write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn>};
@@ -101,7 +101,8 @@ describe('AutoApprovalVerifier', () => {
 		);
 
 		await vi.runAllTimersAsync();
-		expect(await resultPromise).toBe(true);
+		const result = await resultPromise;
+		expect(result.needsPermission).toBe(true);
 	});
 
 	it('defaults to requiring permission on malformed JSON', async () => {
@@ -128,7 +129,9 @@ describe('AutoApprovalVerifier', () => {
 		);
 
 		await vi.runAllTimersAsync();
-		expect(await resultPromise).toBe(true);
+		const result = await resultPromise;
+		expect(result.needsPermission).toBe(true);
+		expect(result.reason).toBeDefined();
 	});
 
 	it('defaults to requiring permission when execution errors', async () => {
@@ -155,7 +158,9 @@ describe('AutoApprovalVerifier', () => {
 		);
 
 		await vi.runAllTimersAsync();
-		expect(await resultPromise).toBe(true);
+		const result = await resultPromise;
+		expect(result.needsPermission).toBe(true);
+		expect(result.reason).toBeDefined();
 	});
 
 	it('passes JSON schema flag and prompt content to claude helper', async () => {

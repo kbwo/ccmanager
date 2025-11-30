@@ -45,11 +45,13 @@ export interface Session {
 	pendingState: SessionState | undefined; // State that's been detected but not yet confirmed
 	pendingStateStart: number | undefined; // Timestamp when pending state was first detected
 	autoApprovalFailed: boolean; // Whether auto-approval verification determined user permission is needed
+	autoApprovalReason?: string; // Optional reason provided when auto-approval failed
 	autoApprovalAbortController?: AbortController; // Abort controller to cancel in-flight auto-approval verification
 }
 
 export interface AutoApprovalResponse {
 	needsPermission: boolean;
+	reason?: string;
 }
 
 export interface SessionManager {
