@@ -19,7 +19,7 @@ const Session: React.FC<SessionProps> = ({
 	const [isExiting, setIsExiting] = useState(false);
 	const [statusMessage, setStatusMessage] = useState<string | null>(() =>
 		session.state === 'pending_auto_approval'
-			? 'Auto-approval pending... verifying permissions'
+			? 'Auto-approval pending... verifying permissions (press any key to cancel)'
 			: null,
 	);
 	const [columns, setColumns] = useState(
@@ -44,7 +44,9 @@ const Session: React.FC<SessionProps> = ({
 			if (updatedSession.id !== session.id) return;
 
 			if (updatedSession.state === 'pending_auto_approval') {
-				setStatusMessage('Auto-approval pending... verifying permissions');
+				setStatusMessage(
+					'Auto-approval pending... verifying permissions (press any key to cancel)',
+				);
 			} else {
 				setStatusMessage(null);
 			}
@@ -180,6 +182,13 @@ const Session: React.FC<SessionProps> = ({
 				stdin.pause();
 				onReturnToMenu();
 				return;
+			}
+
+			if (session.state === 'pending_auto_approval') {
+				sessionManager.cancelAutoApproval(
+					session.worktreePath,
+					'User input received during auto-approval',
+				);
 			}
 
 			// Pass all other input directly to the PTY

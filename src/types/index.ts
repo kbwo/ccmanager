@@ -57,6 +57,7 @@ export interface SessionManager {
 	getSession(worktreePath: string): Session | undefined;
 	destroySession(worktreePath: string): void;
 	getAllSessions(): Session[];
+	cancelAutoApproval(worktreePath: string, reason?: string): void;
 }
 
 export interface ShortcutKey {

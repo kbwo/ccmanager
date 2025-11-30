@@ -565,6 +565,30 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 	}
 
+	cancelAutoApproval(worktreePath: string, reason = 'User input received'): void {
+		const session = this.sessions.get(worktreePath);
+		if (!session) {
+			return;
+		}
+
+		if (
+			session.state !== 'pending_auto_approval' &&
+			!session.autoApprovalAbortController
+		) {
+			return;
+		}
+
+		this.cancelAutoApprovalVerification(session, reason);
+		session.autoApprovalFailed = true;
+		session.pendingState = undefined;
+		session.pendingStateStart = undefined;
+
+		if (session.state === 'pending_auto_approval') {
+			session.state = 'waiting_input';
+			this.emit('sessionStateChanged', session);
+		}
+	}
+
 	destroySession(worktreePath: string): void {
 		const session = this.sessions.get(worktreePath);
 		if (session) {

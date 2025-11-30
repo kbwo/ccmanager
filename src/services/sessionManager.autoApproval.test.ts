@@ -179,4 +179,33 @@ describe('SessionManager - Auto Approval Recovery', () => {
 		await Promise.resolve(); // allow handleAutoApproval promise to resolve
 		expect(verifyNeedsPermissionMock).toHaveBeenCalled();
 	});
+
+	it('cancels auto approval when user input is detected', async () => {
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
+
+		const abortController = new AbortController();
+		session.state = 'pending_auto_approval';
+		session.autoApprovalAbortController = abortController;
+		session.pendingState = 'pending_auto_approval';
+		session.pendingStateStart = Date.now();
+
+		const handler = vi.fn();
+		sessionManager.on('sessionStateChanged', handler);
+
+		sessionManager.cancelAutoApproval(
+			session.worktreePath,
+			'User pressed a key',
+		);
+
+		expect(abortController.signal.aborted).toBe(true);
+		expect(session.autoApprovalAbortController).toBeUndefined();
+		expect(session.autoApprovalFailed).toBe(true);
+		expect(session.state).toBe('waiting_input');
+		expect(session.pendingState).toBeUndefined();
+		expect(handler).toHaveBeenCalledWith(session);
+
+		sessionManager.off('sessionStateChanged', handler);
+	});
 });
