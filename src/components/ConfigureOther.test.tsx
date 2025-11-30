@@ -52,6 +52,27 @@ vi.mock('./TextInputWrapper.js', async () => {
 	};
 });
 
+vi.mock('./ConfigureCustomCommand.js', async () => {
+	const React = await vi.importActual<typeof import('react')>('react');
+	return {
+		default: () =>
+			React.createElement('div', {'data-testid': 'custom-command-editor'}),
+	};
+});
+
+vi.mock('./CustomCommandSummary.js', async () => {
+	const React = await vi.importActual<typeof import('react')>('react');
+	const {Text} = await vi.importActual<typeof import('ink')>('ink');
+	return {
+		default: ({command}: {command: string}) =>
+			React.createElement(
+				Text,
+				null,
+				`Custom auto-approval command: ${command || 'Empty'}`,
+			),
+	};
+});
+
 const mockedConfigurationManager = configurationManager as unknown as {
 	getAutoApprovalConfig: ReturnType<typeof vi.fn>;
 	setAutoApprovalConfig: ReturnType<typeof vi.fn>;
@@ -65,13 +86,28 @@ describe('ConfigureOther', () => {
 	it('renders experimental settings with auto-approval status', () => {
 		mockedConfigurationManager.getAutoApprovalConfig.mockReturnValue({
 			enabled: true,
+			customCommand: '',
 		});
 
 		const {lastFrame} = render(<ConfigureOther onComplete={vi.fn()} />);
 
 		expect(lastFrame()).toContain('Other & Experimental Settings');
 		expect(lastFrame()).toContain('Auto Approval (experimental): ✅ Enabled');
-		expect(lastFrame()).toContain('Custom auto-approval command');
+		expect(lastFrame()).toContain('Custom auto-approval command: Empty');
+		expect(lastFrame()).toContain('Edit Custom Command');
 		expect(lastFrame()).toContain('Save Changes');
+	});
+
+	it('shows current custom command summary', () => {
+		mockedConfigurationManager.getAutoApprovalConfig.mockReturnValue({
+			enabled: false,
+			customCommand: 'jq -n \'{"needsPermission":true}\'',
+		});
+
+		const {lastFrame} = render(<ConfigureOther onComplete={vi.fn()} />);
+
+		expect(lastFrame()).toContain('Custom auto-approval command:');
+		expect(lastFrame()).toContain('jq -n');
+		expect(lastFrame()).toContain('Edit Custom Command');
 	});
 });

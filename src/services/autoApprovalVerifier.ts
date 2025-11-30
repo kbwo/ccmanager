@@ -157,7 +157,7 @@ Return false (auto-approve) when:
 
 When unsure, return true.
 
-Respond with ONLY valid JSON matching: {"needsPermission": true|false}. Do not add any explanations or extra fields.`;
+Respond with ONLY valid JSON matching: {\\"needsPermission\\": true|false}. Do not add any explanations or extra fields.`;
 
 				const jsonSchema = JSON.stringify({
 					type: 'object',

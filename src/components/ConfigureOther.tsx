@@ -3,7 +3,8 @@ import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
-import TextInputWrapper from './TextInputWrapper.js';
+import ConfigureCustomCommand from './ConfigureCustomCommand.js';
+import CustomCommandSummary from './CustomCommandSummary.js';
 
 interface ConfigureOtherProps {
 	onComplete: () => void;
@@ -14,17 +15,26 @@ interface MenuItem {
 	value: string;
 }
 
+type OtherView = 'main' | 'customCommand';
+
 const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	const autoApprovalConfig = configurationManager.getAutoApprovalConfig();
+	const [view, setView] = useState<OtherView>('main');
 	const [autoApprovalEnabled, setAutoApprovalEnabled] = useState(
 		autoApprovalConfig.enabled,
 	);
 	const [customCommand, setCustomCommand] = useState(
 		autoApprovalConfig.customCommand ?? '',
 	);
+	const [customCommandDraft, setCustomCommandDraft] = useState(customCommand);
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
+			if (view === 'customCommand') {
+				setCustomCommandDraft(customCommand);
+				setView('main');
+				return;
+			}
 			onComplete();
 		}
 	});
@@ -33,6 +43,10 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 		{
 			label: `Auto Approval (experimental): ${autoApprovalEnabled ? '✅ Enabled' : '❌ Disabled'}`,
 			value: 'toggleAutoApproval',
+		},
+		{
+			label: '✏️  Edit Custom Command',
+			value: 'customCommand',
 		},
 		{
 			label: '💾 Save Changes',
@@ -49,6 +63,10 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 			case 'toggleAutoApproval':
 				setAutoApprovalEnabled(!autoApprovalEnabled);
 				break;
+			case 'customCommand':
+				setCustomCommandDraft(customCommand);
+				setView('customCommand');
+				break;
 			case 'save':
 				configurationManager.setAutoApprovalConfig({
 					enabled: autoApprovalEnabled,
@@ -64,6 +82,23 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 		}
 	};
 
+	if (view === 'customCommand') {
+		return (
+			<ConfigureCustomCommand
+				value={customCommandDraft}
+				onChange={setCustomCommandDraft}
+				onCancel={() => {
+					setCustomCommandDraft(customCommand);
+					setView('main');
+				}}
+				onSubmit={value => {
+					setCustomCommand(value);
+					setView('main');
+				}}
+			/>
+		);
+	}
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
@@ -78,17 +113,7 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 				</Text>
 			</Box>
 
-			<Box flexDirection="column" marginBottom={1}>
-				<Text>
-					Custom auto-approval command (outputs {'{needsPermission:boolean}'}):
-				</Text>
-				<TextInputWrapper
-					value={customCommand}
-					onChange={setCustomCommand}
-					placeholder={`e.g. jq -n '{"needsPermission":true}'`}
-				/>
-				<Text dimColor>Env provided: $DEFAULT_PROMPT, $TERMINAL_OUTPUT</Text>
-			</Box>
+			<CustomCommandSummary command={customCommand} />
 
 			<SelectInput items={menuItems} onSelect={handleSelect} isFocused />
 
