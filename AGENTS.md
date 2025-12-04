@@ -19,6 +19,7 @@
 - Components and Effect-style services use PascalCase filenames; hooks start with `use`.  
 - Keep TUI prompts and commands in `constants/` and `services/` rather than inline JSX.  
 - Prefer dependency-free helpers in `utils/` so the CLI stays fast to load.
+- use logger class instead of console. e.g. `logger.info("This is info level log");`
 
 ## Testing Guidelines
 - Write Vitest unit tests alongside new files (`*.test.ts` or `*.test.tsx`); mirror the folder containing the behavior.  

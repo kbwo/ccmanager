@@ -106,6 +106,15 @@ export class ConfigurationManager {
 				command: 'claude',
 			};
 		}
+		if (!this.config.autoApproval) {
+			this.config.autoApproval = {
+				enabled: false,
+			};
+		} else if (
+			!Object.prototype.hasOwnProperty.call(this.config.autoApproval, 'enabled')
+		) {
+			this.config.autoApproval.enabled = false;
+		}
 
 		// Migrate legacy command config to presets if needed
 		this.migrateLegacyCommandToPresets();
@@ -187,6 +196,26 @@ export class ConfigurationManager {
 	setWorktreeConfig(worktreeConfig: WorktreeConfig): void {
 		this.config.worktree = worktreeConfig;
 		this.saveConfig();
+	}
+
+	getAutoApprovalConfig(): NonNullable<ConfigurationData['autoApproval']> {
+		return (
+			this.config.autoApproval || {
+				enabled: false,
+			}
+		);
+	}
+
+	setAutoApprovalConfig(
+		autoApproval: NonNullable<ConfigurationData['autoApproval']>,
+	): void {
+		this.config.autoApproval = autoApproval;
+		this.saveConfig();
+	}
+
+	setAutoApprovalEnabled(enabled: boolean): void {
+		const currentConfig = this.getAutoApprovalConfig();
+		this.setAutoApprovalConfig({...currentConfig, enabled});
 	}
 
 	getCommandConfig(): CommandConfig {
@@ -631,6 +660,15 @@ export class ConfigurationManager {
 				command: 'claude',
 			};
 		}
+		if (!config.autoApproval) {
+			config.autoApproval = {
+				enabled: false,
+			};
+		} else if (
+			!Object.prototype.hasOwnProperty.call(config.autoApproval, 'enabled')
+		) {
+			config.autoApproval.enabled = false;
+		}
 
 		return config;
 	}
@@ -660,6 +698,13 @@ export class ConfigurationManager {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Get whether auto-approval is enabled
+	 */
+	isAutoApprovalEnabled(): boolean {
+		return this.config.autoApproval?.enabled ?? false;
 	}
 }
 

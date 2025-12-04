@@ -1,14 +1,16 @@
-import React, {useEffect, useState} from 'react';
-import {useStdout} from 'ink';
-import {Session as SessionType} from '../types/index.js';
+import React, {useEffect, useMemo, useState} from 'react';
+import {Box, Text, useStdout} from 'ink';
+import {Session as ISession} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface SessionProps {
-	session: SessionType;
+	session: ISession;
 	sessionManager: SessionManager;
 	onReturnToMenu: () => void;
 }
+
+type StatusVariant = 'error' | 'pending' | null;
 
 const Session: React.FC<SessionProps> = ({
 	session,
@@ -17,6 +19,84 @@ const Session: React.FC<SessionProps> = ({
 }) => {
 	const {stdout} = useStdout();
 	const [isExiting, setIsExiting] = useState(false);
+	const deriveStatus = (
+		currentSession: ISession,
+	): {message: string | null; variant: StatusVariant} => {
+		// Always prioritize showing the manual approval notice when verification failed
+		if (currentSession.autoApprovalFailed) {
+			const reason = currentSession.autoApprovalReason
+				? ` Reason: ${currentSession.autoApprovalReason}.`
+				: '';
+			return {
+				message: `Auto-approval failed.${reason} Manual approval required—respond to the prompt.`,
+				variant: 'error',
+			};
+		}
+
+		if (currentSession.state === 'pending_auto_approval') {
+			return {
+				message:
+					'Auto-approval pending... verifying permissions (press any key to cancel)',
+				variant: 'pending',
+			};
+		}
+
+		return {message: null, variant: null};
+	};
+
+	const initialStatus = deriveStatus(session);
+	const [statusMessage, setStatusMessage] = useState<string | null>(
+		initialStatus.message,
+	);
+	const [statusVariant, setStatusVariant] = useState<StatusVariant>(
+		initialStatus.variant,
+	);
+	const [columns, setColumns] = useState(
+		() => stdout?.columns ?? process.stdout.columns ?? 80,
+	);
+
+	const {statusLineText, backgroundColor, textColor} = useMemo(() => {
+		if (!statusMessage || !statusVariant) {
+			return {
+				statusLineText: null,
+				backgroundColor: undefined,
+				textColor: undefined,
+			};
+		}
+
+		const maxContentWidth = Math.max(columns - 4, 0);
+		const prefix =
+			statusVariant === 'error'
+				? '[AUTO-APPROVAL REQUIRED]'
+				: '[AUTO-APPROVAL]';
+		const prefixed = `${prefix} ${statusMessage}`;
+		const trimmed =
+			prefixed.length > maxContentWidth
+				? prefixed.slice(0, maxContentWidth)
+				: prefixed;
+
+		return {
+			statusLineText: ` ${trimmed}`.padEnd(columns, ' '),
+			backgroundColor: statusVariant === 'error' ? '#d90429' : '#ffd166',
+			textColor: statusVariant === 'error' ? 'white' : '#1c1c1c',
+		};
+	}, [columns, statusMessage, statusVariant]);
+
+	useEffect(() => {
+		const handleSessionStateChange = (updatedSession: ISession) => {
+			if (updatedSession.id !== session.id) return;
+
+			const {message, variant} = deriveStatus(updatedSession);
+			setStatusMessage(message);
+			setStatusVariant(variant);
+		};
+
+		sessionManager.on('sessionStateChanged', handleSessionStateChange);
+
+		return () => {
+			sessionManager.off('sessionStateChanged', handleSessionStateChange);
+		};
+	}, [session.id, sessionManager]);
 
 	const stripOscColorSequences = (input: string): string => {
 		// Remove default foreground/background color OSC sequences that Codex emits
@@ -54,7 +134,7 @@ const Session: React.FC<SessionProps> = ({
 		stdout.write('\x1B[2J\x1B[H');
 
 		// Handle session restoration
-		const handleSessionRestore = (restoredSession: SessionType) => {
+		const handleSessionRestore = (restoredSession: ISession) => {
 			if (restoredSession.id === session.id) {
 				// Replay all buffered output, but skip the initial clear if present
 				for (let i = 0; i < restoredSession.outputHistory.length; i++) {
@@ -105,16 +185,17 @@ const Session: React.FC<SessionProps> = ({
 		}
 
 		// Listen for session data events
-		const handleSessionData = (activeSession: SessionType, data: string) => {
+		const handleSessionData = (activeSession: ISession, data: string) => {
 			// Only handle data for our session
 			if (activeSession.id === session.id && !isExiting) {
 				stdout.write(data);
 			}
 		};
 
-		const handleSessionExit = (exitedSession: SessionType) => {
+		const handleSessionExit = (exitedSession: ISession) => {
 			if (exitedSession.id === session.id) {
 				setIsExiting(true);
+				setStatusMessage(null);
 				// Don't call onReturnToMenu here - App component handles it
 			}
 		};
@@ -126,6 +207,7 @@ const Session: React.FC<SessionProps> = ({
 		const handleResize = () => {
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
+			setColumns(cols);
 			session.process.resize(cols, rows);
 			// Also resize the virtual terminal
 			if (session.terminal) {
@@ -164,6 +246,13 @@ const Session: React.FC<SessionProps> = ({
 				return;
 			}
 
+			if (session.state === 'pending_auto_approval') {
+				sessionManager.cancelAutoApproval(
+					session.worktreePath,
+					'User input received during auto-approval',
+				);
+			}
+
 			// Pass all other input directly to the PTY
 			session.process.write(data);
 		};
@@ -200,8 +289,13 @@ const Session: React.FC<SessionProps> = ({
 		};
 	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
 
-	// Return null to render nothing (PTY output goes directly to stdout)
-	return null;
+	return statusLineText ? (
+		<Box width="100%">
+			<Text backgroundColor={backgroundColor} color={textColor} bold>
+				{statusLineText}
+			</Text>
+		</Box>
+	) : null;
 };
 
 export default Session;
