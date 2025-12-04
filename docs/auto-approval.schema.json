@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "needsPermission": {
+      "type": "boolean",
+      "description": "Whether auto-approval requires explicit user permission"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional short reason describing why manual approval is required (e.g., no explicit user confirmation, ambiguous output, or potential risk)"
+    }
+  },
+  "required": ["needsPermission"],
+  "additionalProperties": false
+}
