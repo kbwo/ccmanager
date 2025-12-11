@@ -11,7 +11,13 @@ import {
 	type SpawnOptions,
 } from 'child_process';
 
-const AUTO_APPROVAL_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_SECONDS = 30;
+
+const getTimeoutMs = (): number => {
+	const config = configurationManager.getAutoApprovalConfig();
+	const timeoutSeconds = config.timeout ?? DEFAULT_TIMEOUT_SECONDS;
+	return timeoutSeconds * 1000;
+};
 
 const createAbortError = (): Error => {
 	const error = new Error('Auto-approval verification aborted');
@@ -96,6 +102,7 @@ export class AutoApprovalVerifier {
 				signal.removeEventListener('abort', abortListener);
 			};
 
+			const timeoutMs = getTimeoutMs();
 			const timeoutId = setTimeout(() => {
 				settle(() => {
 					logger.warn(
@@ -104,9 +111,13 @@ export class AutoApprovalVerifier {
 					if (child?.pid) {
 						child.kill('SIGKILL');
 					}
-					reject(new Error('Auto-approval verification timed out after 60s'));
+					reject(
+						new Error(
+							`Auto-approval verification timed out after ${timeoutMs / 1000}s`,
+						),
+					);
 				});
-			}, AUTO_APPROVAL_TIMEOUT_MS);
+			}, timeoutMs);
 
 			if (signal) {
 				if (signal.aborted) {
@@ -205,6 +216,7 @@ export class AutoApprovalVerifier {
 			let stdout = '';
 			let stderr = '';
 
+			const timeoutMs = getTimeoutMs();
 			timeoutId = setTimeout(() => {
 				logger.warn(
 					'Auto-approval custom command timed out, terminating process',
@@ -213,11 +225,11 @@ export class AutoApprovalVerifier {
 					child.kill('SIGKILL');
 					reject(
 						new Error(
-							'Auto-approval verification custom command timed out after 60s',
+							`Auto-approval verification custom command timed out after ${timeoutMs / 1000}s`,
 						),
 					);
 				});
-			}, AUTO_APPROVAL_TIMEOUT_MS);
+			}, timeoutMs);
 
 			if (signal) {
 				if (signal.aborted) {
