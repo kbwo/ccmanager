@@ -109,11 +109,25 @@ export class ConfigurationManager {
 		if (!this.config.autoApproval) {
 			this.config.autoApproval = {
 				enabled: false,
+				timeout: 30,
 			};
-		} else if (
-			!Object.prototype.hasOwnProperty.call(this.config.autoApproval, 'enabled')
-		) {
-			this.config.autoApproval.enabled = false;
+		} else {
+			if (
+				!Object.prototype.hasOwnProperty.call(
+					this.config.autoApproval,
+					'enabled',
+				)
+			) {
+				this.config.autoApproval.enabled = false;
+			}
+			if (
+				!Object.prototype.hasOwnProperty.call(
+					this.config.autoApproval,
+					'timeout',
+				)
+			) {
+				this.config.autoApproval.timeout = 30;
+			}
 		}
 
 		// Migrate legacy command config to presets if needed
@@ -199,11 +213,14 @@ export class ConfigurationManager {
 	}
 
 	getAutoApprovalConfig(): NonNullable<ConfigurationData['autoApproval']> {
-		return (
-			this.config.autoApproval || {
-				enabled: false,
-			}
-		);
+		const config = this.config.autoApproval || {
+			enabled: false,
+		};
+		// Default timeout to 30 seconds if not set
+		return {
+			...config,
+			timeout: config.timeout ?? 30,
+		};
 	}
 
 	setAutoApprovalConfig(
@@ -216,6 +233,11 @@ export class ConfigurationManager {
 	setAutoApprovalEnabled(enabled: boolean): void {
 		const currentConfig = this.getAutoApprovalConfig();
 		this.setAutoApprovalConfig({...currentConfig, enabled});
+	}
+
+	setAutoApprovalTimeout(timeout: number): void {
+		const currentConfig = this.getAutoApprovalConfig();
+		this.setAutoApprovalConfig({...currentConfig, timeout});
 	}
 
 	getCommandConfig(): CommandConfig {
@@ -663,11 +685,19 @@ export class ConfigurationManager {
 		if (!config.autoApproval) {
 			config.autoApproval = {
 				enabled: false,
+				timeout: 30,
 			};
-		} else if (
-			!Object.prototype.hasOwnProperty.call(config.autoApproval, 'enabled')
-		) {
-			config.autoApproval.enabled = false;
+		} else {
+			if (
+				!Object.prototype.hasOwnProperty.call(config.autoApproval, 'enabled')
+			) {
+				config.autoApproval.enabled = false;
+			}
+			if (
+				!Object.prototype.hasOwnProperty.call(config.autoApproval, 'timeout')
+			) {
+				config.autoApproval.timeout = 30;
+			}
 		}
 
 		return config;

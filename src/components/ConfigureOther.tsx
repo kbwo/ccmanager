@@ -4,6 +4,7 @@ import SelectInput from 'ink-select-input';
 import {configurationManager} from '../services/configurationManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import ConfigureCustomCommand from './ConfigureCustomCommand.js';
+import ConfigureTimeout from './ConfigureTimeout.js';
 import CustomCommandSummary from './CustomCommandSummary.js';
 
 interface ConfigureOtherProps {
@@ -15,7 +16,7 @@ interface MenuItem {
 	value: string;
 }
 
-type OtherView = 'main' | 'customCommand';
+type OtherView = 'main' | 'customCommand' | 'timeout';
 
 const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	const autoApprovalConfig = configurationManager.getAutoApprovalConfig();
@@ -27,11 +28,18 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 		autoApprovalConfig.customCommand ?? '',
 	);
 	const [customCommandDraft, setCustomCommandDraft] = useState(customCommand);
+	const [timeout, setTimeout] = useState(autoApprovalConfig.timeout ?? 30);
+	const [timeoutDraft, setTimeoutDraft] = useState(timeout);
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			if (view === 'customCommand') {
 				setCustomCommandDraft(customCommand);
+				setView('main');
+				return;
+			}
+			if (view === 'timeout') {
+				setTimeoutDraft(timeout);
 				setView('main');
 				return;
 			}
@@ -47,6 +55,10 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 		{
 			label: '✏️  Edit Custom Command',
 			value: 'customCommand',
+		},
+		{
+			label: `⏱️  Set Timeout (${timeout}s)`,
+			value: 'timeout',
 		},
 		{
 			label: '💾 Save Changes',
@@ -67,10 +79,15 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 				setCustomCommandDraft(customCommand);
 				setView('customCommand');
 				break;
+			case 'timeout':
+				setTimeoutDraft(timeout);
+				setView('timeout');
+				break;
 			case 'save':
 				configurationManager.setAutoApprovalConfig({
 					enabled: autoApprovalEnabled,
 					customCommand: customCommand.trim() || undefined,
+					timeout,
 				});
 				onComplete();
 				break;
@@ -93,6 +110,23 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 				}}
 				onSubmit={value => {
 					setCustomCommand(value);
+					setView('main');
+				}}
+			/>
+		);
+	}
+
+	if (view === 'timeout') {
+		return (
+			<ConfigureTimeout
+				value={timeoutDraft}
+				onChange={setTimeoutDraft}
+				onCancel={() => {
+					setTimeoutDraft(timeout);
+					setView('main');
+				}}
+				onSubmit={value => {
+					setTimeout(value);
 					setView('main');
 				}}
 			/>
