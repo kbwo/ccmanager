@@ -24,8 +24,9 @@
 		"node": ">=22"
 	},
 	"scripts": {
-		"build": "tsc",
-		"dev": "tsc --watch",
+		"build": "node esbuild.config.mjs",
+		"build:tsc": "tsc",
+		"dev": "node esbuild.config.mjs --watch",
 		"start": "node dist/cli.js",
 		"test": "vitest --run",
 		"lint": "eslint src",
@@ -57,6 +58,7 @@
 		"@typescript-eslint/parser": "^8.33.1",
 		"@vdemedes/prettier-config": "^2.0.1",
 		"chalk": "^5.2.0",
+		"esbuild": "0.27.1",
 		"eslint": "^9.28.0",
 		"eslint-config-prettier": "^10.1.5",
 		"eslint-plugin-prettier": "^5.4.1",
