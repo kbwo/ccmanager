@@ -172,7 +172,7 @@ describe('SessionManager - State Persistence', () => {
 		expect(session.pendingState).toBe('idle');
 
 		// Simulate output that would trigger waiting_input state
-		eventEmitter.emit('data', '│ Do you want to continue?');
+		eventEmitter.emit('data', 'Do you want to continue?\n❯ 1. Yes');
 
 		// Advance time to trigger another check
 		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS);
@@ -237,7 +237,10 @@ describe('SessionManager - State Persistence', () => {
 
 		// Now change to a different state before idle persists
 		// Clear terminal first and add waiting prompt
-		eventEmitter.emit('data', '\x1b[2J\x1b[H│ Do you want to continue?\n');
+		eventEmitter.emit(
+			'data',
+			'\x1b[2J\x1b[HDo you want to continue?\n❯ 1. Yes',
+		);
 
 		// Advance time to detect new state but still less than persistence duration from first change
 		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS); // Another 100ms, total 200ms exactly at threshold
@@ -293,7 +296,7 @@ describe('SessionManager - State Persistence', () => {
 		eventEmitter1.emit('data', 'Idle output for session 1');
 
 		// Session 2 goes to waiting_input
-		eventEmitter2.emit('data', '│ Do you want to continue?');
+		eventEmitter2.emit('data', 'Do you want to continue?\n❯ 1. Yes');
 
 		// Advance time to check but not confirm
 		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS * 2);
