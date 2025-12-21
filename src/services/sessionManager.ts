@@ -510,10 +510,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 							session.autoApprovalReason = undefined;
 						}
 
-						// Handle auto-approval if state is pending_auto_approval
-						if (detectedState === 'pending_auto_approval') {
-							this.handleAutoApproval(session);
-						}
 						// Execute status hook asynchronously (non-blocking) using Effect
 						void Effect.runPromise(
 							executeStatusHook(oldState, detectedState, session),
@@ -525,6 +521,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				// Detected state matches current state, clear any pending state
 				session.pendingState = undefined;
 				session.pendingStateStart = undefined;
+			}
+
+			// Handle auto-approval if state is pending_auto_approval and no verification is in progress.
+			// This ensures auto-approval is retried when the state remains pending_auto_approval
+			// but the previous verification completed (success, failure, timeout, or abort).
+			if (
+				session.state === 'pending_auto_approval' &&
+				!session.autoApprovalAbortController
+			) {
+				this.handleAutoApproval(session);
 			}
 		}, STATE_CHECK_INTERVAL_MS);
 
