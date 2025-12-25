@@ -1,6 +1,7 @@
 import {IPty} from 'node-pty';
 import type pkg from '@xterm/headless';
 import {GitStatus} from '../utils/gitStatus.js';
+import {Mutex, SessionStateData} from '../utils/mutex.js';
 
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
@@ -31,7 +32,6 @@ export interface Session {
 	id: string;
 	worktreePath: string;
 	process: IPty;
-	state: SessionState;
 	output: string[]; // Recent output for state detection
 	outputHistory: Buffer[]; // Full output history as buffers
 	lastActivity: Date;
@@ -42,11 +42,12 @@ export interface Session {
 	commandConfig: CommandConfig | undefined; // Store command config for fallback
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
-	pendingState: SessionState | undefined; // State that's been detected but not yet confirmed
-	pendingStateStart: number | undefined; // Timestamp when pending state was first detected
-	autoApprovalFailed: boolean; // Whether auto-approval verification determined user permission is needed
-	autoApprovalReason?: string; // Optional reason provided when auto-approval failed
-	autoApprovalAbortController?: AbortController; // Abort controller to cancel in-flight auto-approval verification
+	/**
+	 * Mutex-protected session state data.
+	 * Access via stateMutex.runExclusive() or stateMutex.update() to ensure thread-safe operations.
+	 * Contains: state, pendingState, pendingStateStart, autoApprovalFailed, autoApprovalReason, autoApprovalAbortController
+	 */
+	stateMutex: Mutex<SessionStateData>;
 }
 
 export interface AutoApprovalResponse {

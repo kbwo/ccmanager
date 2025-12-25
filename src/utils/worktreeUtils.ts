@@ -117,7 +117,9 @@ export function prepareWorktreeItems(
 ): WorktreeItem[] {
 	return worktrees.map(wt => {
 		const session = sessions.find(s => s.worktreePath === wt.path);
-		const status = session ? ` [${getStatusDisplay(session.state)}]` : '';
+		const status = session
+			? ` [${getStatusDisplay(session.stateMutex.getSnapshot().state)}]`
+			: '';
 		const fullBranchName = wt.branch
 			? wt.branch.replace('refs/heads/', '')
 			: 'detached';

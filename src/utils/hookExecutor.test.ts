@@ -8,10 +8,11 @@ import {
 import {mkdtemp, rm, readFile, realpath} from 'fs/promises';
 import {tmpdir} from 'os';
 import {join} from 'path';
-import type {SessionState, Session} from '../types/index.js';
+import type {Session} from '../types/index.js';
 import {configurationManager} from '../services/configurationManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {GitError} from '../types/errors.js';
+import {Mutex, createInitialSessionStateData} from './mutex.js';
 
 // Mock the configurationManager
 vi.mock('../services/configurationManager.js', () => ({
@@ -340,25 +341,22 @@ describe('hookExecutor Integration Tests', () => {
 			const tmpDir = await mkdtemp(join(tmpdir(), 'status-hook-test-'));
 			const outputFile = join(tmpDir, 'status-hook-output.txt');
 
-			const mockSession = {
+			const mockSession: Session = {
 				id: 'test-session-123',
 				worktreePath: tmpDir, // Use tmpDir as the worktree path
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
 				output: [],
 				outputHistory: [],
-				state: 'idle' as SessionState,
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
 				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
-				pendingState: undefined,
-				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
-				autoApprovalFailed: false,
-			} satisfies Session;
+				stateMutex: new Mutex(createInitialSessionStateData()),
+			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
 			vi.mocked(WorktreeService).mockImplementation(
@@ -405,25 +403,22 @@ describe('hookExecutor Integration Tests', () => {
 			// Arrange
 			const tmpDir = await mkdtemp(join(tmpdir(), 'status-hook-test-'));
 
-			const mockSession = {
+			const mockSession: Session = {
 				id: 'test-session-456',
 				worktreePath: tmpDir, // Use tmpDir as the worktree path
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
 				output: [],
 				outputHistory: [],
-				state: 'idle' as SessionState,
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
 				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
-				pendingState: undefined,
-				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
-				autoApprovalFailed: false,
-			} satisfies Session;
+				stateMutex: new Mutex(createInitialSessionStateData()),
+			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
 			vi.mocked(WorktreeService).mockImplementation(
@@ -469,25 +464,22 @@ describe('hookExecutor Integration Tests', () => {
 			const tmpDir = await mkdtemp(join(tmpdir(), 'status-hook-test-'));
 			const outputFile = join(tmpDir, 'should-not-exist.txt');
 
-			const mockSession = {
+			const mockSession: Session = {
 				id: 'test-session-789',
 				worktreePath: tmpDir, // Use tmpDir as the worktree path
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
 				output: [],
 				outputHistory: [],
-				state: 'idle' as SessionState,
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
 				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
-				pendingState: undefined,
-				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
-				autoApprovalFailed: false,
-			} satisfies Session;
+				stateMutex: new Mutex(createInitialSessionStateData()),
+			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
 			vi.mocked(WorktreeService).mockImplementation(
@@ -534,25 +526,22 @@ describe('hookExecutor Integration Tests', () => {
 			const tmpDir = await mkdtemp(join(tmpdir(), 'status-hook-test-'));
 			const outputFile = join(tmpDir, 'hook-output.txt');
 
-			const mockSession = {
+			const mockSession: Session = {
 				id: 'test-session-failure',
 				worktreePath: tmpDir,
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
 				output: [],
 				outputHistory: [],
-				state: 'idle' as SessionState,
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
 				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
-				pendingState: undefined,
-				pendingStateStart: undefined,
 				lastActivity: new Date(),
 				isActive: true,
-				autoApprovalFailed: false,
-			} satisfies Session;
+				stateMutex: new Mutex(createInitialSessionStateData()),
+			};
 
 			// Mock WorktreeService to fail with GitError
 			vi.mocked(WorktreeService).mockImplementation(

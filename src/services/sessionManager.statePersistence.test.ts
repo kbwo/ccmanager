@@ -109,18 +109,18 @@ describe('SessionManager - State Persistence', () => {
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		// Initial state should be busy
-		expect(session.state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS * 2);
+		// Advance time less than persistence duration (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
 
 		// State should still be busy, but pending state should be set
-		expect(session.state).toBe('busy');
-		expect(session.pendingState).toBe('idle');
-		expect(session.pendingStateStart).toBeDefined();
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
+		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 	});
 
 	it('should change state after persistence duration is met', async () => {
@@ -134,23 +134,23 @@ describe('SessionManager - State Persistence', () => {
 		sessionManager.on('sessionStateChanged', stateChangeHandler);
 
 		// Initial state should be busy
-		expect(session.state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS * 2);
-		expect(session.state).toBe('busy');
+		// Advance time less than persistence duration (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 		expect(stateChangeHandler).not.toHaveBeenCalled();
 
 		// Advance time to exceed persistence duration
-		vi.advanceTimersByTime(STATE_PERSISTENCE_DURATION_MS);
+		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS);
 
 		// State should now be changed
-		expect(session.state).toBe('idle');
-		expect(session.pendingState).toBeUndefined();
-		expect(session.pendingStateStart).toBeUndefined();
+		expect(session.stateMutex.getSnapshot().state).toBe('idle');
+		expect(session.stateMutex.getSnapshot().pendingState).toBeUndefined();
+		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeUndefined();
 		expect(stateChangeHandler).toHaveBeenCalledWith(session);
 	});
 
@@ -162,24 +162,24 @@ describe('SessionManager - State Persistence', () => {
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		// Initial state should be busy
-		expect(session.state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS * 2);
-		expect(session.pendingState).toBe('idle');
+		// Advance time less than persistence duration (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
 
 		// Simulate output that would trigger waiting_input state
 		eventEmitter.emit('data', 'Do you want to continue?\n❯ 1. Yes');
 
-		// Advance time to trigger another check
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS);
+		// Advance time to trigger another check (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
 
 		// Pending state should now be waiting_input, not idle
-		expect(session.state).toBe('busy'); // Still original state
-		expect(session.pendingState).toBe('waiting_input');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy'); // Still original state
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('waiting_input');
 	});
 
 	it('should clear pending state if detected state returns to current state', async () => {
@@ -190,26 +190,26 @@ describe('SessionManager - State Persistence', () => {
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
 		// Initial state should be busy
-		expect(session.state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS * 2);
-		expect(session.pendingState).toBe('idle');
-		expect(session.pendingStateStart).toBeDefined();
+		// Advance time less than persistence duration (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
+		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 
 		// Simulate output that would trigger busy state again (back to original)
 		eventEmitter.emit('data', 'ESC to interrupt');
 
-		// Advance time to trigger another check
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS);
+		// Advance time to trigger another check (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
 
 		// Pending state should be cleared
-		expect(session.state).toBe('busy');
-		expect(session.pendingState).toBeUndefined();
-		expect(session.pendingStateStart).toBeUndefined();
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().pendingState).toBeUndefined();
+		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeUndefined();
 	});
 
 	it('should not confirm state changes that do not persist long enough', async () => {
@@ -223,17 +223,17 @@ describe('SessionManager - State Persistence', () => {
 		sessionManager.on('sessionStateChanged', stateChangeHandler);
 
 		// Initial state should be busy
-		expect(session.state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
 		// Try to change to idle
 		eventEmitter.emit('data', 'Some idle output\n');
 
-		// Wait for detection but not full persistence (less than 200ms)
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS); // 100ms
+		// Wait for detection but not full persistence (less than 200ms) (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS); // 100ms
 
 		// Should have pending state but not confirmed
-		expect(session.state).toBe('busy');
-		expect(session.pendingState).toBe('idle');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
 
 		// Now change to a different state before idle persists
 		// Clear terminal first and add waiting prompt
@@ -242,12 +242,12 @@ describe('SessionManager - State Persistence', () => {
 			'\x1b[2J\x1b[HDo you want to continue?\n❯ 1. Yes',
 		);
 
-		// Advance time to detect new state but still less than persistence duration from first change
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS); // Another 100ms, total 200ms exactly at threshold
+		// Advance time to detect new state but still less than persistence duration from first change (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS); // Another 100ms, total 200ms exactly at threshold
 
 		// Pending state should have changed to waiting_input
-		expect(session.state).toBe('busy'); // Still original state
-		expect(session.pendingState).toBe('waiting_input');
+		expect(session.stateMutex.getSnapshot().state).toBe('busy'); // Still original state
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('waiting_input');
 
 		// Since states kept changing before persisting, no state change should have been confirmed
 		expect(stateChangeHandler).not.toHaveBeenCalled();
@@ -263,10 +263,10 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS * 2);
-		expect(session.pendingState).toBe('idle');
-		expect(session.pendingStateStart).toBeDefined();
+		// Advance time less than persistence duration (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
+		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 
 		// Destroy the session
 		sessionManager.destroySession('/test/path');
@@ -288,8 +288,8 @@ describe('SessionManager - State Persistence', () => {
 		const eventEmitter2 = eventEmitters.get('/test/path2')!;
 
 		// Both should start as busy
-		expect(session1.state).toBe('busy');
-		expect(session2.state).toBe('busy');
+		expect(session1.stateMutex.getSnapshot().state).toBe('busy');
+		expect(session2.stateMutex.getSnapshot().state).toBe('busy');
 
 		// Simulate different outputs for each session
 		// Session 1 goes to idle
@@ -298,22 +298,24 @@ describe('SessionManager - State Persistence', () => {
 		// Session 2 goes to waiting_input
 		eventEmitter2.emit('data', 'Do you want to continue?\n❯ 1. Yes');
 
-		// Advance time to check but not confirm
-		vi.advanceTimersByTime(STATE_CHECK_INTERVAL_MS * 2);
+		// Advance time to check but not confirm (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
 
 		// Both should have pending states but not changed yet
-		expect(session1.state).toBe('busy');
-		expect(session1.pendingState).toBe('idle');
-		expect(session2.state).toBe('busy');
-		expect(session2.pendingState).toBe('waiting_input');
+		expect(session1.stateMutex.getSnapshot().state).toBe('busy');
+		expect(session1.stateMutex.getSnapshot().pendingState).toBe('idle');
+		expect(session2.stateMutex.getSnapshot().state).toBe('busy');
+		expect(session2.stateMutex.getSnapshot().pendingState).toBe(
+			'waiting_input',
+		);
 
-		// Advance time to confirm both
-		vi.advanceTimersByTime(STATE_PERSISTENCE_DURATION_MS);
+		// Advance time to confirm both (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS);
 
 		// Both should now be in their new states
-		expect(session1.state).toBe('idle');
-		expect(session1.pendingState).toBeUndefined();
-		expect(session2.state).toBe('waiting_input');
-		expect(session2.pendingState).toBeUndefined();
+		expect(session1.stateMutex.getSnapshot().state).toBe('idle');
+		expect(session1.stateMutex.getSnapshot().pendingState).toBeUndefined();
+		expect(session2.stateMutex.getSnapshot().state).toBe('waiting_input');
+		expect(session2.stateMutex.getSnapshot().pendingState).toBeUndefined();
 	});
 });
