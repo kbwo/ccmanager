@@ -210,4 +210,39 @@ describe('SessionManager - Auto Approval Recovery', () => {
 
 		sessionManager.off('sessionStateChanged', handler);
 	});
+
+	it('forces state to busy after auto-approval to prevent endless loop', async () => {
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
+
+		const mockPty = mockPtyInstances.get('/test/path');
+		expect(mockPty).toBeDefined();
+
+		const handler = vi.fn();
+		sessionManager.on('sessionStateChanged', handler);
+
+		// Advance to pending_auto_approval state
+		vi.advanceTimersByTime(
+			STATE_CHECK_INTERVAL_MS * 3 + STATE_PERSISTENCE_DURATION_MS,
+		);
+		expect(session.state).toBe('pending_auto_approval');
+
+		// Wait for handleAutoApproval promise chain to fully resolve
+		await vi.waitFor(() => {
+			expect(session.state).toBe('busy');
+		});
+		expect(session.pendingState).toBeUndefined();
+		expect(session.pendingStateStart).toBeUndefined();
+
+		// Verify Enter key was sent to approve
+		expect(mockPty!.write).toHaveBeenCalledWith('\r');
+
+		// Verify sessionStateChanged was emitted
+		expect(handler).toHaveBeenCalledWith(
+			expect.objectContaining({state: 'busy'}),
+		);
+
+		sessionManager.off('sessionStateChanged', handler);
+	});
 });

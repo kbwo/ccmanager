@@ -149,6 +149,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					);
 					session.autoApprovalReason = undefined;
 					session.process.write('\r');
+					// Force state to busy to prevent endless auto-approval
+					// when the state detection still sees pending_auto_approval
+					session.state = 'busy';
+					session.pendingState = undefined;
+					session.pendingStateStart = undefined;
+					this.emit('sessionStateChanged', session);
 				}
 			})
 			.catch((error: unknown) => {
