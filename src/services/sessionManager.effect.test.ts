@@ -99,7 +99,7 @@ describe('SessionManager Effect-based Operations', () => {
 
 			expect(session).toBeDefined();
 			expect(session.worktreePath).toBe('/test/worktree');
-			expect(session.state).toBe('busy');
+			expect(session.stateMutex.getSnapshot().state).toBe('busy');
 		});
 
 		it('should return Effect that fails with ConfigError when preset not found', async () => {

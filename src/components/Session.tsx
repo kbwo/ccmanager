@@ -22,10 +22,11 @@ const Session: React.FC<SessionProps> = ({
 	const deriveStatus = (
 		currentSession: ISession,
 	): {message: string | null; variant: StatusVariant} => {
+		const stateData = currentSession.stateMutex.getSnapshot();
 		// Always prioritize showing the manual approval notice when verification failed
-		if (currentSession.autoApprovalFailed) {
-			const reason = currentSession.autoApprovalReason
-				? ` Reason: ${currentSession.autoApprovalReason}.`
+		if (stateData.autoApprovalFailed) {
+			const reason = stateData.autoApprovalReason
+				? ` Reason: ${stateData.autoApprovalReason}.`
 				: '';
 			return {
 				message: `Auto-approval failed.${reason} Manual approval required—respond to the prompt.`,
@@ -33,7 +34,7 @@ const Session: React.FC<SessionProps> = ({
 			};
 		}
 
-		if (currentSession.state === 'pending_auto_approval') {
+		if (stateData.state === 'pending_auto_approval') {
 			return {
 				message:
 					'Auto-approval pending... verifying permissions (press any key to cancel)',
@@ -246,7 +247,7 @@ const Session: React.FC<SessionProps> = ({
 				return;
 			}
 
-			if (session.state === 'pending_auto_approval') {
+			if (session.stateMutex.getSnapshot().state === 'pending_auto_approval') {
 				sessionManager.cancelAutoApproval(
 					session.worktreePath,
 					'User input received during auto-approval',

@@ -1034,13 +1034,24 @@ describe('SessionManager', () => {
 
 	describe('static methods', () => {
 		describe('getSessionCounts', () => {
+			// Helper to create mock session with stateMutex
+			const createMockSession = (
+				id: string,
+				state: 'idle' | 'busy' | 'waiting_input' | 'pending_auto_approval',
+			): Partial<Session> => ({
+				id,
+				stateMutex: {
+					getSnapshot: () => ({state}),
+				} as Session['stateMutex'],
+			});
+
 			it('should count sessions by state', () => {
-				const sessions: Partial<Session>[] = [
-					{id: '1', state: 'idle'},
-					{id: '2', state: 'busy'},
-					{id: '3', state: 'busy'},
-					{id: '4', state: 'waiting_input'},
-					{id: '5', state: 'idle'},
+				const sessions = [
+					createMockSession('1', 'idle'),
+					createMockSession('2', 'busy'),
+					createMockSession('3', 'busy'),
+					createMockSession('4', 'waiting_input'),
+					createMockSession('5', 'idle'),
 				];
 
 				const counts = SessionManager.getSessionCounts(sessions as Session[]);
@@ -1061,10 +1072,10 @@ describe('SessionManager', () => {
 			});
 
 			it('should handle sessions with single state', () => {
-				const sessions: Partial<Session>[] = [
-					{id: '1', state: 'busy'},
-					{id: '2', state: 'busy'},
-					{id: '3', state: 'busy'},
+				const sessions = [
+					createMockSession('1', 'busy'),
+					createMockSession('2', 'busy'),
+					createMockSession('3', 'busy'),
 				];
 
 				const counts = SessionManager.getSessionCounts(sessions as Session[]);

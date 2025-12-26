@@ -9,6 +9,7 @@ import {
 } from './worktreeUtils.js';
 import {Worktree, Session} from '../types/index.js';
 import {execSync} from 'child_process';
+import {Mutex, createInitialSessionStateData} from './mutex.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -232,7 +233,6 @@ describe('prepareWorktreeItems', () => {
 	const mockSession: Session = {
 		id: 'test-session',
 		worktreePath: '/path/to/worktree',
-		state: 'idle',
 		process: {} as Session['process'],
 		output: [],
 		outputHistory: [],
@@ -244,9 +244,10 @@ describe('prepareWorktreeItems', () => {
 		commandConfig: undefined,
 		detectionStrategy: 'claude',
 		devcontainerConfig: undefined,
-		pendingState: undefined,
-		pendingStateStart: undefined,
-		autoApprovalFailed: false,
+		stateMutex: new Mutex({
+			...createInitialSessionStateData(),
+			state: 'idle',
+		}),
 	};
 
 	it('should prepare basic worktree without git status', () => {
