@@ -1,12 +1,12 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {Effect} from 'effect';
-import {spawn, IPty} from 'node-pty';
+import {spawn, type IPty} from '@skitee3000/bun-pty';
 import {EventEmitter} from 'events';
 import {Session, DevcontainerConfig} from '../types/index.js';
 import {exec} from 'child_process';
 
-// Mock node-pty
-vi.mock('node-pty', () => ({
+// Mock bun-pty
+vi.mock('@skitee3000/bun-pty', () => ({
 	spawn: vi.fn(),
 }));
 

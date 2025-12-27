@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach, afterEach, vi, Mock} from 'vitest';
 import {EventEmitter} from 'events';
-import {spawn, IPty} from 'node-pty';
+import {spawn, type IPty} from '@skitee3000/bun-pty';
 import {
 	STATE_CHECK_INTERVAL_MS,
 	STATE_PERSISTENCE_DURATION_MS,
@@ -21,7 +21,7 @@ const verifyNeedsPermissionMock = vi.fn(() =>
 	),
 );
 
-vi.mock('node-pty', () => ({
+vi.mock('@skitee3000/bun-pty', () => ({
 	spawn: vi.fn(),
 }));
 

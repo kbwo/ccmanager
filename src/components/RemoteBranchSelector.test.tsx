@@ -72,12 +72,12 @@ describe('RemoteBranchSelector Component', () => {
 		},
 	];
 
-	let onSelect: ReturnType<typeof vi.fn>;
-	let onCancel: ReturnType<typeof vi.fn>;
+	let onSelect: ReturnType<typeof vi.fn<(selectedRemoteRef: string) => void>>;
+	let onCancel: ReturnType<typeof vi.fn<() => void>>;
 
 	beforeEach(() => {
-		onSelect = vi.fn();
-		onCancel = vi.fn();
+		onSelect = vi.fn<(selectedRemoteRef: string) => void>();
+		onCancel = vi.fn<() => void>();
 	});
 
 	afterEach(() => {

@@ -1,4 +1,4 @@
-import {spawn, IPty} from 'node-pty';
+import {spawn, type IPty} from '@skitee3000/bun-pty';
 import {
 	Session,
 	SessionManager as ISessionManager,

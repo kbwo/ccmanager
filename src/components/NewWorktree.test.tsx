@@ -3,8 +3,8 @@ import {render} from 'ink-testing-library';
 import NewWorktree from './NewWorktree.js';
 import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
 
-// Mock node-pty to avoid native module issues in tests
-vi.mock('node-pty', () => ({
+// Mock bun-pty to avoid native module issues in tests
+vi.mock('@skitee3000/bun-pty', () => ({
 	spawn: vi.fn(),
 }));
 
@@ -235,9 +235,8 @@ describe('NewWorktree component Effect integration', () => {
 	it('should handle empty branch list', async () => {
 		const {Effect} = await import('effect');
 		const {WorktreeService} = await import('../services/worktreeService.js');
-		const {configurationManager} = await import(
-			'../services/configurationManager.js'
-		);
+		const {configurationManager} =
+			await import('../services/configurationManager.js');
 
 		// Mock autoDirectory to true so component starts at base-branch step
 		vi.spyOn(configurationManager, 'getWorktreeConfig').mockReturnValue({
@@ -276,9 +275,8 @@ describe('NewWorktree component Effect integration', () => {
 	it('should display branches after successful loading', async () => {
 		const {Effect} = await import('effect');
 		const {WorktreeService} = await import('../services/worktreeService.js');
-		const {configurationManager} = await import(
-			'../services/configurationManager.js'
-		);
+		const {configurationManager} =
+			await import('../services/configurationManager.js');
 
 		// Mock autoDirectory to true so component starts at base-branch step
 		vi.spyOn(configurationManager, 'getWorktreeConfig').mockReturnValue({

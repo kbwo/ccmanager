@@ -6,8 +6,8 @@ import {projectManager} from '../services/projectManager.js';
 import {GitProject} from '../types/index.js';
 import {Effect} from 'effect';
 
-// Mock node-pty to avoid native module loading issues
-vi.mock('node-pty', () => ({
+// Mock bun-pty to avoid native module loading issues
+vi.mock('@skitee3000/bun-pty', () => ({
 	spawn: vi.fn(),
 }));
 

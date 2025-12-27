@@ -5,8 +5,8 @@ import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
 
-// Mock node-pty to avoid native module issues in tests
-vi.mock('node-pty', () => ({
+// Mock bun-pty to avoid native module issues in tests
+vi.mock('@skitee3000/bun-pty', () => ({
 	spawn: vi.fn(),
 }));
 
