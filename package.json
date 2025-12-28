@@ -31,7 +31,6 @@
 		"lint": "bun run eslint src",
 		"lint:fix": "bun run eslint src --fix",
 		"typecheck": "bun run tsc --noEmit",
-		"postinstall": "node bin/postinstall.js",
 		"prepublishOnly": "bun run lint && bun run typecheck && bun run test && bun run build",
 		"prepare": "bun run build",
 		"publish:packages": "bun run scripts/publish-packages.ts",
