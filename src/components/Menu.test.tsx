@@ -7,7 +7,9 @@ import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
 
 // Mock bun-pty to avoid native module issues in tests
 vi.mock('@skitee3000/bun-pty', () => ({
-	spawn: vi.fn(),
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock ink to avoid stdin issues

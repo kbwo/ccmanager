@@ -5,7 +5,9 @@ import {GitProject} from '../types/index.js';
 
 // Mock bun-pty to avoid native module loading issues
 vi.mock('@skitee3000/bun-pty', () => ({
-	spawn: vi.fn(),
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Type for the key parameter in useInput

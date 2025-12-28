@@ -7,7 +7,13 @@ import {WorktreeService} from '../services/worktreeService.js';
 import {Worktree} from '../types/index.js';
 import {GitError} from '../types/errors.js';
 
-vi.mock('../services/worktreeService.js');
+vi.mock('../services/worktreeService.js', () => ({
+	WorktreeService: vi.fn(function () {
+		return {
+			getWorktreesEffect: vi.fn(),
+		};
+	}),
+}));
 vi.mock('../services/shortcutManager.js', () => ({
 	shortcutManager: {
 		matchesShortcut: vi.fn(),
@@ -67,12 +73,11 @@ describe('DeleteWorktree - Effect Integration', () => {
 		const mockEffect = Effect.succeed(mockWorktrees);
 		const mockGetWorktreesEffect = vi.fn(() => mockEffect);
 
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getWorktreesEffect: mockGetWorktreesEffect,
-				}) as Partial<WorktreeService> as WorktreeService,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: mockGetWorktreesEffect,
+			} as Partial<WorktreeService> as WorktreeService;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -105,12 +110,11 @@ describe('DeleteWorktree - Effect Integration', () => {
 		const mockEffect = Effect.fail(mockError);
 		const mockGetWorktreesEffect = vi.fn(() => mockEffect);
 
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getWorktreesEffect: mockGetWorktreesEffect,
-				}) as Partial<WorktreeService> as WorktreeService,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: mockGetWorktreesEffect,
+			} as Partial<WorktreeService> as WorktreeService;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -152,12 +156,11 @@ describe('DeleteWorktree - Effect Integration', () => {
 		const mockEffect = Effect.succeed(mockWorktrees);
 		const mockGetWorktreesEffect = vi.fn(() => mockEffect);
 
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getWorktreesEffect: mockGetWorktreesEffect,
-				}) as Partial<WorktreeService> as WorktreeService,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: mockGetWorktreesEffect,
+			} as Partial<WorktreeService> as WorktreeService;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();

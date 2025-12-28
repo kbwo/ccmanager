@@ -8,7 +8,9 @@ import {
 } from '../constants/statePersistence.js';
 
 vi.mock('@skitee3000/bun-pty', () => ({
-	spawn: vi.fn(),
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 vi.mock('./configurationManager.js', () => ({
 	configurationManager: {

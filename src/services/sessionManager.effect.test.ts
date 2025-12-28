@@ -6,7 +6,9 @@ import {DevcontainerConfig, CommandPreset} from '../types/index.js';
 
 // Mock bun-pty
 vi.mock('@skitee3000/bun-pty', () => ({
-	spawn: vi.fn(),
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock child_process
@@ -29,15 +31,17 @@ vi.mock('./configurationManager.js', () => ({
 // Mock Terminal
 vi.mock('@xterm/headless', () => ({
 	default: {
-		Terminal: vi.fn().mockImplementation(() => ({
-			buffer: {
-				active: {
-					length: 0,
-					getLine: vi.fn(),
+		Terminal: vi.fn().mockImplementation(function () {
+			return {
+				buffer: {
+					active: {
+						length: 0,
+						getLine: vi.fn(),
+					},
 				},
-			},
-			write: vi.fn(),
-		})),
+				write: vi.fn(),
+			};
+		}),
 	},
 }));
 

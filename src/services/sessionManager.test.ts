@@ -7,13 +7,19 @@ import {exec} from 'child_process';
 
 // Mock bun-pty
 vi.mock('@skitee3000/bun-pty', () => ({
-	spawn: vi.fn(),
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock child_process
 vi.mock('child_process', () => ({
-	exec: vi.fn(),
-	execFile: vi.fn(),
+	exec: vi.fn(function () {
+		return null;
+	}),
+	execFile: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock configuration manager
@@ -34,21 +40,29 @@ vi.mock('./configurationManager.js', () => ({
 // Mock Terminal
 vi.mock('@xterm/headless', () => ({
 	default: {
-		Terminal: vi.fn().mockImplementation(() => ({
-			buffer: {
-				active: {
-					length: 0,
-					getLine: vi.fn(),
+		Terminal: vi.fn(function () {
+			return {
+				buffer: {
+					active: {
+						length: 0,
+						getLine: vi.fn(function () {
+							return null;
+						}),
+					},
 				},
-			},
-			write: vi.fn(),
-		})),
+				write: vi.fn(function () {
+					return undefined;
+				}),
+			};
+		}),
 	},
 }));
 
 // Mock worktreeService
 vi.mock('./worktreeService.js', () => ({
-	WorktreeService: vi.fn(),
+	WorktreeService: vi.fn(function () {
+		return {};
+	}),
 }));
 
 // Create a mock IPty class
