@@ -62,7 +62,7 @@
 		"eslint-plugin-prettier": "^5.4.1",
 		"eslint-plugin-react": "^7.32.2",
 		"eslint-plugin-react-hooks": "^5.2.0",
-		"ink-testing-library": "^3.0.0",
+		"ink-testing-library": "4.0.0",
 		"prettier": "^3.0.0",
 		"typescript": "^5.0.3",
 		"vitest": "^4.0.16"
@@ -72,12 +72,13 @@
 		"@skitee3000/bun-pty": "^0.3.3",
 		"@xterm/headless": "^5.5.0",
 		"effect": "^3.18.2",
-		"ink": "^6.6.0",
+		"ink": "5.2.1",
 		"ink-select-input": "^5.0.0",
 		"ink-text-input": "^5.0.1",
 		"meow": "^11.0.0",
-		"react": "^18.2.0",
+		"react": "18.2.0",
 		"react-devtools-core": "^6.1.1",
+		"react-dom": "18.2.0",
 		"strip-ansi": "^7.1.0"
 	}
 }
