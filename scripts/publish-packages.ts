@@ -38,7 +38,7 @@ async function publishPlatformPackage(platform: string, dryRun: boolean) {
 		return false;
 	}
 
-	console.log(`Publishing @kodaikabasawa/ccmanager-bun-test-${platform}...`);
+	console.log(`Publishing ccmanager-bun-test-${platform}...`);
 
 	try {
 		if (dryRun) {
@@ -55,7 +55,7 @@ async function publishPlatformPackage(platform: string, dryRun: boolean) {
 }
 
 async function publishMainPackage(dryRun: boolean) {
-	console.log(`\nPublishing main package @kodaikabasawa/ccmanager-bun-test...`);
+	console.log(`\nPublishing main package ccmanager-bun-test...`);
 
 	try {
 		if (dryRun) {

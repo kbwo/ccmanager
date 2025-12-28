@@ -1,5 +1,5 @@
 {
-	"name": "@kodaikabasawa/ccmanager-bun-test-linux-arm64",
+	"name": "ccmanager-bun-test-linux-arm64",
 	"version": "3.1.5",
 	"description": "ccmanager binary for Linux ARM64",
 	"license": "MIT",

@@ -9,7 +9,7 @@ import { createRequire } from "node:module";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
-const PACKAGE_NAME = "@kodaikabasawa/ccmanager-bun-test";
+const PACKAGE_NAME = "ccmanager-bun-test";
 const BINARY_NAME = "ccmanager";
 
 const PLATFORM_PACKAGES = {
