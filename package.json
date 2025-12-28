@@ -69,6 +69,15 @@
 	},
 	"prettier": "@vdemedes/prettier-config",
 	"dependencies": {
-		"ink": "^6.6.0"
+		"@skitee3000/bun-pty": "^0.3.3",
+		"@xterm/headless": "^5.5.0",
+		"effect": "^3.18.2",
+		"ink": "^6.6.0",
+		"ink-select-input": "^5.0.0",
+		"ink-text-input": "^5.0.1",
+		"meow": "^11.0.0",
+		"react": "^18.2.0",
+		"react-devtools-core": "^6.1.1",
+		"strip-ansi": "^7.1.0"
 	}
 }
