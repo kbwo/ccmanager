@@ -1,5 +1,5 @@
 {
-	"name": "ccmanager",
+	"name": "@kodaikabasawa/ccmanager-bun-test",
 	"version": "3.1.5",
 	"description": "TUI application for managing multiple Claude Code sessions across Git worktrees",
 	"license": "MIT",
@@ -17,33 +17,36 @@
 		"cli"
 	],
 	"bin": {
-		"ccmanager": "dist/cli.js"
+		"ccmanager": "bin/cli.js"
 	},
 	"type": "module",
 	"scripts": {
 		"build": "bun run tsc",
+		"build:binary": "bun run scripts/build-binaries.ts",
+		"build:binary:native": "bun run scripts/build-binaries.ts --target=native",
+		"build:binary:all": "bun run scripts/build-binaries.ts --target=all",
 		"dev": "bun run tsc --watch",
 		"start": "bun dist/cli.js",
 		"test": "vitest --run",
 		"lint": "bun run eslint src",
 		"lint:fix": "bun run eslint src --fix",
 		"typecheck": "bun run tsc --noEmit",
+		"postinstall": "node bin/postinstall.js",
 		"prepublishOnly": "bun run lint && bun run typecheck && bun run test && bun run build",
-		"prepare": "bun run build"
+		"prepare": "bun run build",
+		"publish:packages": "bun run scripts/publish-packages.ts",
+		"publish:packages:dry": "bun run scripts/publish-packages.ts --dry-run"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"bin"
 	],
-	"dependencies": {
-		"@skitee3000/bun-pty": "^0.3.3",
-		"@xterm/headless": "^5.5.0",
-		"effect": "^3.18.2",
-		"ink": "^4.4.1",
-		"ink-select-input": "^5.0.0",
-		"ink-text-input": "^5.0.1",
-		"meow": "^11.0.0",
-		"react": "^18.2.0",
-		"strip-ansi": "^7.1.0"
+	"optionalDependencies": {
+		"@kodaikabasawa/ccmanager-bun-test-darwin-arm64": "3.1.5",
+		"@kodaikabasawa/ccmanager-bun-test-darwin-x64": "3.1.5",
+		"@kodaikabasawa/ccmanager-bun-test-linux-arm64": "3.1.5",
+		"@kodaikabasawa/ccmanager-bun-test-linux-x64": "3.1.5",
+		"@kodaikabasawa/ccmanager-bun-test-win32-x64": "3.1.5"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.28.0",
@@ -64,5 +67,8 @@
 		"typescript": "^5.0.3",
 		"vitest": "^4.0.16"
 	},
-	"prettier": "@vdemedes/prettier-config"
+	"prettier": "@vdemedes/prettier-config",
+	"dependencies": {
+		"ink": "^6.6.0"
+	}
 }

@@ -1,0 +1,15 @@
+{
+	"name": "@kodaikabasawa/ccmanager-bun-test-linux-x64",
+	"version": "3.1.5",
+	"description": "ccmanager binary for Linux x64",
+	"license": "MIT",
+	"author": "Kodai Kabasawa",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/kbwo/ccmanager.git"
+	},
+	"os": ["linux"],
+	"cpu": ["x64"],
+	"files": ["bin/ccmanager"],
+	"preferUnplugged": true
+}

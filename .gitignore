@@ -2,3 +2,9 @@ node_modules
 dist
 *.log
 .idea/
+
+# Built binaries for platform packages
+npm/*/bin/ccmanager
+npm/*/bin/ccmanager.exe
+bin/ccmanager
+bin/ccmanager.exe

@@ -24,6 +24,8 @@ type InputKey = {
 	backspace: boolean;
 	delete: boolean;
 	meta: boolean;
+	home: boolean;
+	end: boolean;
 };
 
 // Import the actual component code but skip the useInput hook
@@ -427,6 +429,8 @@ describe('ProjectList', () => {
 					backspace: false,
 					delete: false,
 					meta: false,
+					home: false,
+					end: false,
 				});
 			});
 
@@ -487,6 +491,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Force rerender with search active and query
@@ -545,6 +551,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -579,6 +587,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -637,6 +647,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -701,6 +713,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -735,6 +749,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -800,6 +816,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			await new Promise(resolve => setTimeout(resolve, 50));
@@ -820,6 +838,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			await new Promise(resolve => setTimeout(resolve, 50));
@@ -840,6 +860,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			await new Promise(resolve => setTimeout(resolve, 50));
