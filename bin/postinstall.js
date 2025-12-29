@@ -29,7 +29,7 @@ import { createGunzip } from "node:zlib";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
-const PACKAGE_NAME = "ccmanager-bun-test";
+const PACKAGE_NAME = "ccmanager";
 const BINARY_NAME = "ccmanager";
 const VERSION = process.env.npm_package_version || "3.1.5";
 

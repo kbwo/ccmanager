@@ -119,7 +119,7 @@ async function main() {
 		}
 	}
 
-	console.log("Building binaries for @kodaikabasawa/ccmanager-bun-test\n");
+	console.log("Building binaries for ccmanager\n");
 	console.log(`Entry point: ${ENTRY_POINT}`);
 	console.log(`Output directory: ${NPM_DIR}`);
 	console.log(`Targets: ${targetsToBuild.map((t) => t.npmPlatform).join(", ")}\n`);
