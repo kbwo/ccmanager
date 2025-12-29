@@ -1,6 +1,6 @@
 {
 	"name": "@kodaikabasawa/ccmanager-win32-x64",
-	"version": "3.2.3",
+	"version": "3.2.4",
 	"description": "ccmanager binary for Windows x64",
 	"license": "MIT",
 	"author": "Kodai Kabasawa",
