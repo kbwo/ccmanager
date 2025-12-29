@@ -119,9 +119,6 @@ class BunTerminal implements IPty {
 		this._terminal.outputFlags = this._terminal.outputFlags & ~ONLCR_FLAG;
 
 		// Keep Bun defaults for other termios flags.
-		logger.debug(
-			`[bunTerminal] Terminal flags (post-setup) - input: ${this._terminal.inputFlags}, output: ${this._terminal.outputFlags}, local: ${this._terminal.localFlags}`,
-		);
 
 		// Spawn the process with the pre-configured terminal
 		this._subprocess = Bun.spawn([file, ...args], {
@@ -159,9 +156,6 @@ class BunTerminal implements IPty {
 		if (payload.length === 0 || this._closed) {
 			return;
 		}
-		logger.debug(
-			`[bunTerminal] Flushing buffered data (len=${payload.length}): ${JSON.stringify(payload.slice(0, 200))}`,
-		);
 		for (const listener of this._dataListeners) {
 			listener(payload);
 		}
