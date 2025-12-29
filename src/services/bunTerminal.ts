@@ -6,8 +6,6 @@
  * when running compiled Bun binaries.
  */
 
-import {logger} from '../utils/logger.js';
-
 /**
  * Interface for disposable resources.
  */
@@ -62,7 +60,9 @@ class BunTerminal implements IPty {
 	private _exitListeners: Array<(event: IExitEvent) => void> = [];
 	private _subprocess: ReturnType<typeof Bun.spawn> | null = null;
 	private _terminal: Bun.Terminal | null = null;
-	private _decoder: TextDecoder = new TextDecoder('utf-8');
+	private _decoder: globalThis.TextDecoder = new globalThis.TextDecoder(
+		'utf-8',
+	);
 
 	// Buffering to combine fragmented data chunks from the same event loop
 	private _dataBuffer: string = '';
@@ -187,9 +187,7 @@ class BunTerminal implements IPty {
 			madeProgress = false;
 
 			if (this._syncOutputMode) {
-				const endIndex = this._dataBuffer.indexOf(
-					BunTerminal.SYNC_OUTPUT_END,
-				);
+				const endIndex = this._dataBuffer.indexOf(BunTerminal.SYNC_OUTPUT_END);
 				if (endIndex !== -1) {
 					const endOffset = endIndex + BunTerminal.SYNC_OUTPUT_END.length;
 					const frame = this._dataBuffer.slice(0, endOffset);
