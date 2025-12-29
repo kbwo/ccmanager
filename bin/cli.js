@@ -9,15 +9,16 @@ import { createRequire } from "node:module";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
+const PACKAGE_SCOPE = "@kodaikabasawa";
 const PACKAGE_NAME = "ccmanager";
 const BINARY_NAME = "ccmanager";
 
 const PLATFORM_PACKAGES = {
-	"darwin-arm64": `${PACKAGE_NAME}-darwin-arm64`,
-	"darwin-x64": `${PACKAGE_NAME}-darwin-x64`,
-	"linux-arm64": `${PACKAGE_NAME}-linux-arm64`,
-	"linux-x64": `${PACKAGE_NAME}-linux-x64`,
-	"win32-x64": `${PACKAGE_NAME}-win32-x64`,
+	"darwin-arm64": `${PACKAGE_SCOPE}/${PACKAGE_NAME}-darwin-arm64`,
+	"darwin-x64": `${PACKAGE_SCOPE}/${PACKAGE_NAME}-darwin-x64`,
+	"linux-arm64": `${PACKAGE_SCOPE}/${PACKAGE_NAME}-linux-arm64`,
+	"linux-x64": `${PACKAGE_SCOPE}/${PACKAGE_NAME}-linux-x64`,
+	"win32-x64": `${PACKAGE_SCOPE}/${PACKAGE_NAME}-win32-x64`,
 };
 
 function getPlatformKey() {
