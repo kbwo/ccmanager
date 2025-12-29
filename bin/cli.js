@@ -64,7 +64,7 @@ function getBinaryPath() {
 
 	console.error(`Could not find ${BINARY_NAME} binary for ${platformKey}`);
 	console.error("Please try reinstalling the package:");
-	console.error(`  npm install ${PACKAGE_NAME}`);
+	console.error(`  npm install -g ${PACKAGE_NAME}`);
 	process.exit(1);
 }
 
