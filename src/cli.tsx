@@ -6,6 +6,11 @@ import App from './components/App.js';
 import {worktreeConfigManager} from './services/worktreeConfigManager.js';
 import {globalSessionOrchestrator} from './services/globalSessionOrchestrator.js';
 
+// Version is injected at build time via --define flag
+declare const CCMANAGER_VERSION: string;
+const version =
+	typeof CCMANAGER_VERSION !== 'undefined' ? CCMANAGER_VERSION : 'dev';
+
 const cli = meow(
 	`
 	Usage
@@ -25,6 +30,7 @@ const cli = meow(
 `,
 	{
 		importMeta: import.meta,
+		version: version,
 		flags: {
 			multiProject: {
 				type: 'boolean',

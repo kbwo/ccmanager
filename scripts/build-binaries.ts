@@ -10,6 +10,10 @@ const ROOT_DIR = join(__dirname, "..");
 const NPM_DIR = join(ROOT_DIR, "npm");
 const ENTRY_POINT = join(ROOT_DIR, "src", "cli.tsx");
 
+// Read version from package.json
+const PACKAGE_JSON = JSON.parse(readFileSync(join(ROOT_DIR, "package.json"), "utf-8"));
+const VERSION = PACKAGE_JSON.version;
+
 // Map of npm platform names to Bun target names
 const TARGETS = [
 	{
@@ -48,7 +52,7 @@ async function buildBinary(target: (typeof TARGETS)[number]) {
 	mkdirSync(outputDir, { recursive: true });
 
 	try {
-		await $`bun build ${ENTRY_POINT} --compile --target=${target.bunTarget} --outfile=${outputPath}`;
+		await $`bun build ${ENTRY_POINT} --compile --target=${target.bunTarget} --outfile=${outputPath} --define CCMANAGER_VERSION='"${VERSION}"'`;
 		console.log(`  -> Created ${outputPath}`);
 		return true;
 	} catch (error) {
