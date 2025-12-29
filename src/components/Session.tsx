@@ -105,6 +105,22 @@ const Session: React.FC<SessionProps> = ({
 		return input.replace(/\x1B\](?:10|11);[^\x07\x1B]*(?:\x07|\x1B\\)/g, '');
 	};
 
+	const normalizeLineEndings = (input: string): string => {
+		// Ensure LF moves to column 0 to prevent cursor drift when ONLCR is disabled.
+		let normalized = '';
+		for (let i = 0; i < input.length; i++) {
+			const char = input[i];
+			if (char === '\n') {
+				const prev = i > 0 ? input[i - 1] : '';
+				if (prev !== '\r') {
+					normalized += '\r';
+				}
+			}
+			normalized += char;
+		}
+		return normalized;
+	};
+
 	useEffect(() => {
 		if (!stdout) return;
 
@@ -116,6 +132,7 @@ const Session: React.FC<SessionProps> = ({
 			stdout.write('\x1b[>4m'); // Disable xterm modifyOtherKeys extensions
 			stdout.write('\x1b[?1004l'); // Disable focus reporting
 			stdout.write('\x1b[?2004l'); // Disable bracketed paste (can interfere with shortcuts)
+			stdout.write('\x1b[?7h'); // Re-enable auto-wrap
 		};
 
 		const sanitizeReplayBuffer = (input: string): string => {
@@ -130,6 +147,8 @@ const Session: React.FC<SessionProps> = ({
 
 		// Reset modes immediately on entry in case a previous session left them on
 		resetTerminalInputModes();
+		// Prevent line wrapping from drifting redraws in TUIs that rely on cursor-up clears.
+		stdout.write('\x1b[?7l');
 
 		// Clear screen when entering session
 		stdout.write('\x1B[2J\x1B[H');
@@ -142,7 +161,9 @@ const Session: React.FC<SessionProps> = ({
 					const buffer = restoredSession.outputHistory[i];
 					if (!buffer) continue;
 
-					const str = sanitizeReplayBuffer(buffer.toString('utf8'));
+					const str = normalizeLineEndings(
+						sanitizeReplayBuffer(buffer.toString('utf8')),
+					);
 
 					// Skip clear screen sequences at the beginning
 					if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
@@ -151,7 +172,7 @@ const Session: React.FC<SessionProps> = ({
 							.replace(/\x1B\[2J/g, '')
 							.replace(/\x1B\[H/g, '');
 						if (cleaned.length > 0) {
-							stdout.write(cleaned);
+							stdout.write(normalizeLineEndings(cleaned));
 						}
 					} else {
 						if (str.length > 0) {
@@ -189,7 +210,7 @@ const Session: React.FC<SessionProps> = ({
 		const handleSessionData = (activeSession: ISession, data: string) => {
 			// Only handle data for our session
 			if (activeSession.id === session.id && !isExiting) {
-				stdout.write(data);
+				stdout.write(normalizeLineEndings(data));
 			}
 		};
 
