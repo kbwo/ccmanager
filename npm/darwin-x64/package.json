@@ -1,6 +1,6 @@
 {
 	"name": "@kodaikabasawa/ccmanager-darwin-x64",
-	"version": "3.1.5",
+	"version": "3.2.1",
 	"description": "ccmanager binary for macOS x64 (Intel)",
 	"license": "MIT",
 	"author": "Kodai Kabasawa",
@@ -8,8 +8,14 @@
 		"type": "git",
 		"url": "https://github.com/kbwo/ccmanager.git"
 	},
-	"os": ["darwin"],
-	"cpu": ["x64"],
-	"files": ["bin/ccmanager"],
+	"os": [
+		"darwin"
+	],
+	"cpu": [
+		"x64"
+	],
+	"files": [
+		"bin/ccmanager"
+	],
 	"preferUnplugged": true
 }
