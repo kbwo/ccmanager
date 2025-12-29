@@ -3,9 +3,11 @@ import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {GitProject} from '../types/index.js';
 
-// Mock node-pty to avoid native module loading issues
-vi.mock('node-pty', () => ({
-	spawn: vi.fn(),
+// Mock bunTerminal to avoid native module loading issues
+vi.mock('../services/bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Type for the key parameter in useInput
@@ -24,6 +26,8 @@ type InputKey = {
 	backspace: boolean;
 	delete: boolean;
 	meta: boolean;
+	home: boolean;
+	end: boolean;
 };
 
 // Import the actual component code but skip the useInput hook
@@ -427,6 +431,8 @@ describe('ProjectList', () => {
 					backspace: false,
 					delete: false,
 					meta: false,
+					home: false,
+					end: false,
 				});
 			});
 
@@ -487,6 +493,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Force rerender with search active and query
@@ -545,6 +553,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -579,6 +589,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -637,6 +649,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -701,6 +715,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -735,6 +751,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			// Wait a bit for state update
@@ -800,6 +818,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			await new Promise(resolve => setTimeout(resolve, 50));
@@ -820,6 +840,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			await new Promise(resolve => setTimeout(resolve, 50));
@@ -840,6 +862,8 @@ describe('ProjectList', () => {
 				backspace: false,
 				delete: false,
 				meta: false,
+				home: false,
+				end: false,
 			});
 
 			await new Promise(resolve => setTimeout(resolve, 50));

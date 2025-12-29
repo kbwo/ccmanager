@@ -34,7 +34,8 @@ export default [
         clearTimeout: true,
         NodeJS: true,
         AbortController: true,
-        AbortSignal: true
+        AbortSignal: true,
+        Bun: true
       }
     },
     plugins: {

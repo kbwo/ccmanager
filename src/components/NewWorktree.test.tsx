@@ -3,9 +3,11 @@ import {render} from 'ink-testing-library';
 import NewWorktree from './NewWorktree.js';
 import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
 
-// Mock node-pty to avoid native module issues in tests
-vi.mock('node-pty', () => ({
-	spawn: vi.fn(),
+// Mock bunTerminal to avoid native module issues in tests
+vi.mock('../services/bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock ink to avoid stdin issues
@@ -76,7 +78,9 @@ vi.mock('../hooks/useSearchMode.js', () => ({
 
 // Mock WorktreeService
 vi.mock('../services/worktreeService.js', () => ({
-	WorktreeService: vi.fn(),
+	WorktreeService: vi.fn(function () {
+		return {};
+	}),
 }));
 
 describe('NewWorktree component Effect integration', () => {
@@ -93,21 +97,20 @@ describe('NewWorktree component Effect integration', () => {
 		const {WorktreeService} = await import('../services/worktreeService.js');
 
 		// Mock WorktreeService to return Effects that never resolve (simulating loading)
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getAllBranchesEffect: vi.fn(() =>
-						Effect.async<string[], never>(() => {
-							// Never resolves to simulate loading state
-						}),
-					),
-					getDefaultBranchEffect: vi.fn(() =>
-						Effect.async<string, never>(() => {
-							// Never resolves to simulate loading state
-						}),
-					),
-				}) as unknown as InstanceType<typeof WorktreeService>,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() =>
+					Effect.async<string[], never>(() => {
+						// Never resolves to simulate loading state
+					}),
+				),
+				getDefaultBranchEffect: vi.fn(() =>
+					Effect.async<string, never>(() => {
+						// Never resolves to simulate loading state
+					}),
+				),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -135,13 +138,12 @@ describe('NewWorktree component Effect integration', () => {
 		});
 
 		// Mock WorktreeService to fail with GitError
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getAllBranchesEffect: vi.fn(() => Effect.fail(gitError)),
-					getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
-				}) as unknown as InstanceType<typeof WorktreeService>,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.fail(gitError)),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -170,13 +172,12 @@ describe('NewWorktree component Effect integration', () => {
 		const getAllBranchesSpy = vi.fn(() => Effect.succeed(mockBranches));
 		const getDefaultBranchSpy = vi.fn(() => Effect.succeed(mockDefaultBranch));
 
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getAllBranchesEffect: getAllBranchesSpy,
-					getDefaultBranchEffect: getDefaultBranchSpy,
-				}) as unknown as InstanceType<typeof WorktreeService>,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: getAllBranchesSpy,
+				getDefaultBranchEffect: getDefaultBranchSpy,
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -204,15 +205,12 @@ describe('NewWorktree component Effect integration', () => {
 		});
 
 		// Mock WorktreeService - branches succeed, default branch fails
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getAllBranchesEffect: vi.fn(() =>
-						Effect.succeed(['main', 'develop']),
-					),
-					getDefaultBranchEffect: vi.fn(() => Effect.fail(gitError)),
-				}) as unknown as InstanceType<typeof WorktreeService>,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.succeed(['main', 'develop'])),
+				getDefaultBranchEffect: vi.fn(() => Effect.fail(gitError)),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -235,9 +233,8 @@ describe('NewWorktree component Effect integration', () => {
 	it('should handle empty branch list', async () => {
 		const {Effect} = await import('effect');
 		const {WorktreeService} = await import('../services/worktreeService.js');
-		const {configurationManager} = await import(
-			'../services/configurationManager.js'
-		);
+		const {configurationManager} =
+			await import('../services/configurationManager.js');
 
 		// Mock autoDirectory to true so component starts at base-branch step
 		vi.spyOn(configurationManager, 'getWorktreeConfig').mockReturnValue({
@@ -247,13 +244,12 @@ describe('NewWorktree component Effect integration', () => {
 		});
 
 		// Mock WorktreeService to return empty branch list
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getAllBranchesEffect: vi.fn(() => Effect.succeed([])),
-					getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
-				}) as unknown as InstanceType<typeof WorktreeService>,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.succeed([])),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -276,9 +272,8 @@ describe('NewWorktree component Effect integration', () => {
 	it('should display branches after successful loading', async () => {
 		const {Effect} = await import('effect');
 		const {WorktreeService} = await import('../services/worktreeService.js');
-		const {configurationManager} = await import(
-			'../services/configurationManager.js'
-		);
+		const {configurationManager} =
+			await import('../services/configurationManager.js');
 
 		// Mock autoDirectory to true so component starts at base-branch step
 		vi.spyOn(configurationManager, 'getWorktreeConfig').mockReturnValue({
@@ -291,15 +286,12 @@ describe('NewWorktree component Effect integration', () => {
 		const mockDefaultBranch = 'main';
 
 		// Mock WorktreeService to succeed
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getAllBranchesEffect: vi.fn(() => Effect.succeed(mockBranches)),
-					getDefaultBranchEffect: vi.fn(() =>
-						Effect.succeed(mockDefaultBranch),
-					),
-				}) as unknown as InstanceType<typeof WorktreeService>,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.succeed(mockBranches)),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed(mockDefaultBranch)),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();
@@ -333,16 +325,15 @@ describe('NewWorktree component Effect integration', () => {
 
 		// Track Effect execution
 		let effectExecuted = false;
-		vi.mocked(WorktreeService).mockImplementation(
-			() =>
-				({
-					getAllBranchesEffect: vi.fn(() => {
-						effectExecuted = true;
-						return Effect.fail(gitError);
-					}),
-					getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
-				}) as unknown as InstanceType<typeof WorktreeService>,
-		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => {
+					effectExecuted = true;
+					return Effect.fail(gitError);
+				}),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
 
 		const onComplete = vi.fn();
 		const onCancel = vi.fn();

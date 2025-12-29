@@ -17,41 +17,40 @@
 		"cli"
 	],
 	"bin": {
-		"ccmanager": "dist/cli.js"
+		"ccmanager": "bin/cli.js"
 	},
 	"type": "module",
-	"engines": {
-		"node": ">=22"
-	},
 	"scripts": {
-		"build": "tsc",
-		"dev": "tsc --watch",
-		"start": "node dist/cli.js",
+		"build": "bun run tsc",
+		"build:binary": "bun run scripts/build-binaries.ts",
+		"build:binary:native": "bun run scripts/build-binaries.ts --target=native",
+		"build:binary:all": "bun run scripts/build-binaries.ts --target=all",
+		"dev": "bun run tsc --watch",
+		"start": "bun dist/cli.js",
 		"test": "vitest --run",
-		"lint": "eslint src",
-		"lint:fix": "eslint src --fix",
-		"typecheck": "tsc --noEmit",
-		"prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build",
-		"prepare": "npm run build"
+		"lint": "bun run eslint src",
+		"lint:fix": "bun run eslint src --fix",
+		"typecheck": "bun run tsc --noEmit",
+		"prepublishOnly": "bun run lint && bun run typecheck && bun run test && bun run build",
+		"prepare": "bun run build",
+		"publish:packages": "bun run scripts/publish-packages.ts",
+		"publish:packages:dry": "bun run scripts/publish-packages.ts --dry-run"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"bin"
 	],
-	"dependencies": {
-		"@xterm/headless": "^5.5.0",
-		"effect": "^3.18.2",
-		"ink": "^4.1.0",
-		"ink-select-input": "^5.0.0",
-		"ink-text-input": "^5.0.1",
-		"meow": "^11.0.0",
-		"node-pty": "^1.0.0",
-		"react": "^18.2.0",
-		"strip-ansi": "^7.1.0"
+	"optionalDependencies": {
+		"ccmanager-darwin-arm64": "3.1.5",
+		"ccmanager-darwin-x64": "3.1.5",
+		"ccmanager-linux-arm64": "3.1.5",
+		"ccmanager-linux-x64": "3.1.5",
+		"ccmanager-win32-x64": "3.1.5"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.28.0",
 		"@sindresorhus/tsconfig": "^3.0.1",
-		"@types/node": "^20.0.0",
+		"@types/bun": "latest",
 		"@types/react": "^18.0.32",
 		"@typescript-eslint/eslint-plugin": "^8.33.1",
 		"@typescript-eslint/parser": "^8.33.1",
@@ -62,11 +61,22 @@
 		"eslint-plugin-prettier": "^5.4.1",
 		"eslint-plugin-react": "^7.32.2",
 		"eslint-plugin-react-hooks": "^5.2.0",
-		"ink-testing-library": "^3.0.0",
+		"ink-testing-library": "4.0.0",
 		"prettier": "^3.0.0",
-		"ts-node": "^10.9.1",
 		"typescript": "^5.0.3",
-		"vitest": "^3.2.2"
+		"vitest": "^4.0.16"
 	},
-	"prettier": "@vdemedes/prettier-config"
+	"prettier": "@vdemedes/prettier-config",
+	"dependencies": {
+		"@xterm/headless": "^5.5.0",
+		"effect": "^3.18.2",
+		"ink": "5.2.1",
+		"ink-select-input": "^6.0.0",
+		"ink-text-input": "^6.0.0",
+		"meow": "^11.0.0",
+		"react": "18.3.1",
+		"react-devtools-core": "^4.19.1",
+		"react-dom": "18.3.1",
+		"strip-ansi": "^7.1.0"
+	}
 }

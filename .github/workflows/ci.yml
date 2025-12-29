@@ -10,32 +10,36 @@ jobs:
   test:
     name: Test, Lint, and Typecheck
     runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x, 23.x]
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
       with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    
+        bun-version: latest
+
     - name: Install dependencies
-      run: npm ci
-    
+      run: bun install
+
     - name: Run typecheck
-      run: npm run typecheck
-    
+      run: bun run typecheck
+
     - name: Run lint
-      run: npm run lint
-    
+      run: bun run lint
+
     - name: Run tests
-      run: npm test
-    
-    - name: Build
-      run: npm run build
+      run: bun run test
+
+    - name: Build TypeScript
+      run: bun run build
+
+    - name: Build native binary
+      run: bun run build:binary:native
+
+    - name: Test binary
+      run: |
+        if [ "$(uname)" = "Linux" ]; then
+          ./npm/linux-x64/bin/ccmanager --help
+        fi

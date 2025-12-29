@@ -7,6 +7,30 @@ import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {projectManager} from '../services/projectManager.js';
 
+// Mock bunTerminal to avoid native module issues in tests
+vi.mock('../services/bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
+}));
+
+// Mock @xterm/headless
+vi.mock('@xterm/headless', () => ({
+	default: {
+		Terminal: vi.fn().mockImplementation(function () {
+			return {
+				buffer: {
+					active: {
+						length: 0,
+						getLine: vi.fn(),
+					},
+				},
+				write: vi.fn(),
+			};
+		}),
+	},
+}));
+
 // Import the actual component code but skip the useInput hook
 vi.mock('ink', async () => {
 	const actual = await vi.importActual<typeof import('ink')>('ink');

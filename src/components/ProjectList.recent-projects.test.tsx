@@ -6,9 +6,11 @@ import {projectManager} from '../services/projectManager.js';
 import {GitProject} from '../types/index.js';
 import {Effect} from 'effect';
 
-// Mock node-pty to avoid native module loading issues
-vi.mock('node-pty', () => ({
-	spawn: vi.fn(),
+// Mock bunTerminal to avoid native module loading issues
+vi.mock('../services/bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Type for the key parameter in useInput

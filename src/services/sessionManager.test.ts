@@ -1,19 +1,25 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {Effect} from 'effect';
-import {spawn, IPty} from 'node-pty';
+import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {Session, DevcontainerConfig} from '../types/index.js';
 import {exec} from 'child_process';
 
-// Mock node-pty
-vi.mock('node-pty', () => ({
-	spawn: vi.fn(),
+// Mock bunTerminal
+vi.mock('./bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock child_process
 vi.mock('child_process', () => ({
-	exec: vi.fn(),
-	execFile: vi.fn(),
+	exec: vi.fn(function () {
+		return null;
+	}),
+	execFile: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock configuration manager
@@ -34,21 +40,29 @@ vi.mock('./configurationManager.js', () => ({
 // Mock Terminal
 vi.mock('@xterm/headless', () => ({
 	default: {
-		Terminal: vi.fn().mockImplementation(() => ({
-			buffer: {
-				active: {
-					length: 0,
-					getLine: vi.fn(),
+		Terminal: vi.fn(function () {
+			return {
+				buffer: {
+					active: {
+						length: 0,
+						getLine: vi.fn(function () {
+							return null;
+						}),
+					},
 				},
-			},
-			write: vi.fn(),
-		})),
+				write: vi.fn(function () {
+					return undefined;
+				}),
+			};
+		}),
 	},
 }));
 
 // Mock worktreeService
 vi.mock('./worktreeService.js', () => ({
-	WorktreeService: vi.fn(),
+	WorktreeService: vi.fn(function () {
+		return {};
+	}),
 }));
 
 // Create a mock IPty class

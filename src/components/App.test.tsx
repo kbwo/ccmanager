@@ -147,12 +147,14 @@ vi.mock('../services/configurationManager.js', () => ({
 }));
 
 vi.mock('../services/worktreeService.js', () => ({
-	WorktreeService: vi.fn().mockImplementation(() => ({
-		createWorktreeEffect: (...args: Parameters<CreateWorktreeEffect>) =>
-			createWorktreeEffectMock(...args),
-		deleteWorktreeEffect: (...args: Parameters<DeleteWorktreeEffect>) =>
-			deleteWorktreeEffectMock(...args),
-	})),
+	WorktreeService: vi.fn(function () {
+		return {
+			createWorktreeEffect: (...args: Parameters<CreateWorktreeEffect>) =>
+				createWorktreeEffectMock(...args),
+			deleteWorktreeEffect: (...args: Parameters<DeleteWorktreeEffect>) =>
+				deleteWorktreeEffectMock(...args),
+		};
+	}),
 }));
 
 vi.mock(

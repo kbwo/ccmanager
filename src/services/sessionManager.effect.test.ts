@@ -1,12 +1,14 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {Effect, Either} from 'effect';
-import {spawn, IPty} from 'node-pty';
+import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {DevcontainerConfig, CommandPreset} from '../types/index.js';
 
-// Mock node-pty
-vi.mock('node-pty', () => ({
-	spawn: vi.fn(),
+// Mock bunTerminal
+vi.mock('./bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock child_process
@@ -29,15 +31,17 @@ vi.mock('./configurationManager.js', () => ({
 // Mock Terminal
 vi.mock('@xterm/headless', () => ({
 	default: {
-		Terminal: vi.fn().mockImplementation(() => ({
-			buffer: {
-				active: {
-					length: 0,
-					getLine: vi.fn(),
+		Terminal: vi.fn().mockImplementation(function () {
+			return {
+				buffer: {
+					active: {
+						length: 0,
+						getLine: vi.fn(),
+					},
 				},
-			},
-			write: vi.fn(),
-		})),
+				write: vi.fn(),
+			};
+		}),
 	},
 }));
 

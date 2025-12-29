@@ -1,4 +1,4 @@
-import {IPty} from 'node-pty';
+import type {IPty} from '../services/bunTerminal.js';
 import type pkg from '@xterm/headless';
 import {GitStatus} from '../utils/gitStatus.js';
 import {Mutex, SessionStateData} from '../utils/mutex.js';

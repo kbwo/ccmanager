@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach, afterEach, vi, Mock} from 'vitest';
 import {EventEmitter} from 'events';
-import {spawn, IPty} from 'node-pty';
+import {spawn, type IPty} from './bunTerminal.js';
 import {
 	STATE_CHECK_INTERVAL_MS,
 	STATE_PERSISTENCE_DURATION_MS,
@@ -21,8 +21,10 @@ const verifyNeedsPermissionMock = vi.fn(() =>
 	),
 );
 
-vi.mock('node-pty', () => ({
-	spawn: vi.fn(),
+vi.mock('./bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 vi.mock('./stateDetector.js', () => ({
@@ -66,15 +68,17 @@ vi.mock('./configurationManager.js', () => ({
 
 vi.mock('@xterm/headless', () => ({
 	default: {
-		Terminal: vi.fn().mockImplementation(() => ({
-			buffer: {
-				active: {
-					length: 0,
-					getLine: vi.fn(),
+		Terminal: vi.fn().mockImplementation(function () {
+			return {
+				buffer: {
+					active: {
+						length: 0,
+						getLine: vi.fn(),
+					},
 				},
-			},
-			write: vi.fn(),
-		})),
+				write: vi.fn(),
+			};
+		}),
 	},
 }));
 

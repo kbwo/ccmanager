@@ -5,9 +5,11 @@ import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
 
-// Mock node-pty to avoid native module issues in tests
-vi.mock('node-pty', () => ({
-	spawn: vi.fn(),
+// Mock bunTerminal to avoid native module issues in tests
+vi.mock('../services/bunTerminal.js', () => ({
+	spawn: vi.fn(function () {
+		return null;
+	}),
 }));
 
 // Mock ink to avoid stdin issues

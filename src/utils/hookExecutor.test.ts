@@ -23,7 +23,11 @@ vi.mock('../services/configurationManager.js', () => ({
 
 // Mock the WorktreeService
 vi.mock('../services/worktreeService.js', () => ({
-	WorktreeService: vi.fn(),
+	WorktreeService: vi.fn(function () {
+		return {
+			getWorktreesEffect: vi.fn(),
+		};
+	}),
 }));
 
 // Note: This file contains integration tests that execute real commands
@@ -359,21 +363,20 @@ describe('hookExecutor Integration Tests', () => {
 			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
-			vi.mocked(WorktreeService).mockImplementation(
-				() =>
-					({
-						getWorktreesEffect: vi.fn(() =>
-							Effect.succeed([
-								{
-									path: tmpDir,
-									branch: 'test-branch',
-									isMainWorktree: false,
-									hasSession: true,
-								},
-							]),
-						),
-					}) as unknown as InstanceType<typeof WorktreeService>,
-			);
+			vi.mocked(WorktreeService).mockImplementation(function () {
+				return {
+					getWorktreesEffect: vi.fn(() =>
+						Effect.succeed([
+							{
+								path: tmpDir,
+								branch: 'test-branch',
+								isMainWorktree: false,
+								hasSession: true,
+							},
+						]),
+					),
+				} as unknown as InstanceType<typeof WorktreeService>;
+			});
 
 			// Configure mock to return a hook that writes to a file with delay
 			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
@@ -421,21 +424,20 @@ describe('hookExecutor Integration Tests', () => {
 			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
-			vi.mocked(WorktreeService).mockImplementation(
-				() =>
-					({
-						getWorktreesEffect: vi.fn(() =>
-							Effect.succeed([
-								{
-									path: tmpDir,
-									branch: 'test-branch',
-									isMainWorktree: false,
-									hasSession: true,
-								},
-							]),
-						),
-					}) as unknown as InstanceType<typeof WorktreeService>,
-			);
+			vi.mocked(WorktreeService).mockImplementation(function () {
+				return {
+					getWorktreesEffect: vi.fn(() =>
+						Effect.succeed([
+							{
+								path: tmpDir,
+								branch: 'test-branch',
+								isMainWorktree: false,
+								hasSession: true,
+							},
+						]),
+					),
+				} as unknown as InstanceType<typeof WorktreeService>;
+			});
 
 			// Configure mock to return a hook that fails
 			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
@@ -482,21 +484,20 @@ describe('hookExecutor Integration Tests', () => {
 			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
-			vi.mocked(WorktreeService).mockImplementation(
-				() =>
-					({
-						getWorktreesEffect: vi.fn(() =>
-							Effect.succeed([
-								{
-									path: tmpDir,
-									branch: 'test-branch',
-									isMainWorktree: false,
-									hasSession: true,
-								},
-							]),
-						),
-					}) as unknown as InstanceType<typeof WorktreeService>,
-			);
+			vi.mocked(WorktreeService).mockImplementation(function () {
+				return {
+					getWorktreesEffect: vi.fn(() =>
+						Effect.succeed([
+							{
+								path: tmpDir,
+								branch: 'test-branch',
+								isMainWorktree: false,
+								hasSession: true,
+							},
+						]),
+					),
+				} as unknown as InstanceType<typeof WorktreeService>;
+			});
 
 			// Configure mock to return a disabled hook
 			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
@@ -544,20 +545,19 @@ describe('hookExecutor Integration Tests', () => {
 			};
 
 			// Mock WorktreeService to fail with GitError
-			vi.mocked(WorktreeService).mockImplementation(
-				() =>
-					({
-						getWorktreesEffect: vi.fn(() =>
-							Effect.fail(
-								new GitError({
-									command: 'git worktree list --porcelain',
-									exitCode: 128,
-									stderr: 'not a git repository',
-								}),
-							),
+			vi.mocked(WorktreeService).mockImplementation(function () {
+				return {
+					getWorktreesEffect: vi.fn(() =>
+						Effect.fail(
+							new GitError({
+								command: 'git worktree list --porcelain',
+								exitCode: 128,
+								stderr: 'not a git repository',
+							}),
 						),
-					}) as unknown as InstanceType<typeof WorktreeService>,
-			);
+					),
+				} as unknown as InstanceType<typeof WorktreeService>;
+			});
 
 			// Configure mock to return a hook that should execute despite worktree query failure
 			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
