@@ -38,7 +38,7 @@ async function publishPlatformPackage(platform: string, dryRun: boolean) {
 		return false;
 	}
 
-	console.log(`Publishing ccmanager-${platform}...`);
+	console.log(`Publishing @kodaikabasawa/ccmanager-${platform}...`);
 
 	try {
 		if (dryRun) {
