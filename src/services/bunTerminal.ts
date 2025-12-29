@@ -60,11 +60,7 @@ class BunTerminal implements IPty {
 	private _exitListeners: Array<(event: IExitEvent) => void> = [];
 	private _subprocess: ReturnType<typeof Bun.spawn> | null = null;
 
-	constructor(
-		file: string,
-		args: string[],
-		options: IPtyForkOptions,
-	) {
+	constructor(file: string, args: string[], options: IPtyForkOptions) {
 		this._cols = options.cols ?? 80;
 		this._rows = options.rows ?? 24;
 		this._process = file;
@@ -79,7 +75,9 @@ class BunTerminal implements IPty {
 				data: (_terminal, data) => {
 					if (!this._closed) {
 						const str =
-							typeof data === 'string' ? data : Buffer.from(data).toString('utf8');
+							typeof data === 'string'
+								? data
+								: Buffer.from(data).toString('utf8');
 						for (const listener of this._dataListeners) {
 							listener(str);
 						}
