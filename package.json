@@ -68,7 +68,6 @@
 	},
 	"prettier": "@vdemedes/prettier-config",
 	"dependencies": {
-		"@skitee3000/bun-pty": "^0.3.3",
 		"@xterm/headless": "^5.5.0",
 		"effect": "^3.18.2",
 		"ink": "5.2.1",

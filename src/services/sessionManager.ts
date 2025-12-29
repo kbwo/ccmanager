@@ -1,4 +1,4 @@
-import {spawn, type IPty} from '@skitee3000/bun-pty';
+import {spawn, type IPty, type IExitEvent} from './bunTerminal.js';
 import {
 	Session,
 	SessionManager as ISessionManager,
@@ -431,7 +431,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	 * If no fallbackArgs are configured, the command will be retried with no arguments.
 	 */
 	private setupExitHandler(session: Session): void {
-		session.process.onExit(async (e: {exitCode: number; signal?: number}) => {
+		session.process.onExit(async (e: IExitEvent) => {
 			// Check if we should attempt fallback
 			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
 				try {

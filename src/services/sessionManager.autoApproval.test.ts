@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach, afterEach, vi, Mock} from 'vitest';
 import {EventEmitter} from 'events';
-import {spawn, type IPty} from '@skitee3000/bun-pty';
+import {spawn, type IPty} from './bunTerminal.js';
 import {
 	STATE_CHECK_INTERVAL_MS,
 	STATE_PERSISTENCE_DURATION_MS,
@@ -21,7 +21,7 @@ const verifyNeedsPermissionMock = vi.fn(() =>
 	),
 );
 
-vi.mock('@skitee3000/bun-pty', () => ({
+vi.mock('./bunTerminal.js', () => ({
 	spawn: vi.fn(function () {
 		return null;
 	}),

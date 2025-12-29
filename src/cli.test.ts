@@ -7,12 +7,11 @@ import {dirname} from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Check if bun-pty native module is available
-function isBunPtyAvailable(): boolean {
+// Check if Bun.Terminal API is available (requires Bun v1.3.5+)
+function isBunTerminalAvailable(): boolean {
 	try {
-		// Use eval to bypass linter's require() check
-		new Function('return require("@skitee3000/bun-pty")')();
-		return true;
+		// Check if Bun.Terminal is available
+		return typeof Bun !== 'undefined' && typeof Bun.spawn === 'function';
 	} catch {
 		return false;
 	}
@@ -30,7 +29,7 @@ describe('CLI', () => {
 	});
 
 	describe('--multi-project flag', () => {
-		it.skipIf(!isBunPtyAvailable())(
+		it.skipIf(!isBunTerminalAvailable())(
 			'should exit with error when CCMANAGER_MULTI_PROJECT_ROOT is not set',
 			async () => {
 				// Ensure the env var is not set
@@ -74,7 +73,7 @@ describe('CLI', () => {
 			},
 		);
 
-		it.skipIf(!isBunPtyAvailable())(
+		it.skipIf(!isBunTerminalAvailable())(
 			'should not check for env var when --multi-project is not used',
 			async () => {
 				// Ensure the env var is not set

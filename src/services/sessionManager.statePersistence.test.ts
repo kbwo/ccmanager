@@ -1,13 +1,13 @@
 import {describe, it, expect, beforeEach, vi, afterEach, Mock} from 'vitest';
 import {SessionManager} from './sessionManager.js';
-import {spawn, type IPty} from '@skitee3000/bun-pty';
+import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {
 	STATE_PERSISTENCE_DURATION_MS,
 	STATE_CHECK_INTERVAL_MS,
 } from '../constants/statePersistence.js';
 
-vi.mock('@skitee3000/bun-pty', () => ({
+vi.mock('./bunTerminal.js', () => ({
 	spawn: vi.fn(function () {
 		return null;
 	}),

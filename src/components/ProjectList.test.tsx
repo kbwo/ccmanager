@@ -3,8 +3,8 @@ import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {GitProject} from '../types/index.js';
 
-// Mock bun-pty to avoid native module loading issues
-vi.mock('@skitee3000/bun-pty', () => ({
+// Mock bunTerminal to avoid native module loading issues
+vi.mock('../services/bunTerminal.js', () => ({
 	spawn: vi.fn(function () {
 		return null;
 	}),
