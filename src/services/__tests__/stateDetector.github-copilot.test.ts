@@ -28,10 +28,7 @@ describe('GitHubCopilotStateDetector', () => {
 
 	it('detects waiting_input when "Confirm with ... Enter" pattern is present', () => {
 		// Arrange
-		terminal = createMockTerminal([
-			'Some output',
-			'Confirm with Y Enter',
-		]);
+		terminal = createMockTerminal(['Some output', 'Confirm with Y Enter']);
 
 		// Act
 		const state = detector.detectState(terminal, 'idle');

@@ -152,10 +152,7 @@ describe('CodexStateDetector', () => {
 
 	it('should detect waiting_input state for "Confirm with ... Enter" pattern', () => {
 		// Arrange
-		terminal = createMockTerminal([
-			'Some output',
-			'Confirm with Y Enter',
-		]);
+		terminal = createMockTerminal(['Some output', 'Confirm with Y Enter']);
 
 		// Act
 		const state = detector.detectState(terminal, 'idle');
@@ -180,10 +177,7 @@ describe('CodexStateDetector', () => {
 
 	it('should prioritize "Confirm with ... Enter" over busy state', () => {
 		// Arrange
-		terminal = createMockTerminal([
-			'Esc to interrupt',
-			'Confirm with Y Enter',
-		]);
+		terminal = createMockTerminal(['Esc to interrupt', 'Confirm with Y Enter']);
 
 		// Act
 		const state = detector.detectState(terminal, 'idle');
