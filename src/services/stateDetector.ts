@@ -137,6 +137,11 @@ export class CodexStateDetector extends BaseStateDetector {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
 
+		// Check for explicit confirmation prompt - highest priority
+		if (lowerContent.includes('press enter to confirm or esc to cancel')) {
+			return 'waiting_input';
+		}
+
 		// Check for waiting prompts
 		if (
 			lowerContent.includes('allow command?') ||
