@@ -149,4 +149,46 @@ describe('CodexStateDetector', () => {
 		// Assert
 		expect(state).toBe('waiting_input');
 	});
+
+	it('should detect waiting_input state for "Confirm with ... Enter" pattern', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Some output',
+			'Confirm with Y Enter',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input for "Confirm with" pattern with longer text', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Some output',
+			'Confirm with Shift + Y Enter',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should prioritize "Confirm with ... Enter" over busy state', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Esc to interrupt',
+			'Confirm with Y Enter',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
 });
