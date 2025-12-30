@@ -99,11 +99,16 @@ export class GeminiStateDetector extends BaseStateDetector {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
 
-		// Check for waiting prompts with box character
+		// Check for explicit user confirmation message - highest priority
+		if (lowerContent.includes('waiting for user confirmation')) {
+			return 'waiting_input';
+		}
+
+		// Check for waiting prompts with box character (with or without trailing ?)
 		if (
-			content.includes('│ Apply this change?') ||
-			content.includes('│ Allow execution?') ||
-			content.includes('│ Do you want to proceed?')
+			/│ Apply this change\??/.test(content) ||
+			/│ Allow execution\??/.test(content) ||
+			/│ Do you want to proceed\??/.test(content)
 		) {
 			return 'waiting_input';
 		}
