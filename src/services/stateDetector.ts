@@ -198,17 +198,22 @@ export class GitHubCopilotStateDetector extends BaseStateDetector {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
 
-		// Waiting prompt has priority 1
+		// Check for confirmation prompt pattern - highest priority
+		if (/confirm with .+ enter/i.test(content)) {
+			return 'waiting_input';
+		}
+
+		// Waiting prompt has priority 2
 		if (lowerContent.includes('│ do you want')) {
 			return 'waiting_input';
 		}
 
-		// Busy state detection has priority 2
+		// Busy state detection has priority 3
 		if (lowerContent.includes('esc to cancel')) {
 			return 'busy';
 		}
 
-		// Otherwise idle as priority 3
+		// Otherwise idle as priority 4
 		return 'idle';
 	}
 }
