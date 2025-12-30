@@ -1,7 +1,7 @@
-# Auto Verification (Experimental)
+# Auto Approval (Experimental)
 
 ## Overview
-- Auto verification lets CCManager decide whether a paused Claude Code session can continue without you typing Enter.
+- Auto approval lets CCManager decide whether a paused Claude Code session can continue without you typing Enter.
 - When enabled, CCManager checks a waiting prompt and either auto-approves it or leaves it for your manual review.
 - The feature is experimental—expect occasional false positives/negatives and keep an eye on prompts that matter.
 - Default expectation: CCManager assumes the `claude` CLI is already installed and on your PATH; it is **not** bundled. If you don’t have `claude`, either install it or set a custom command.
@@ -10,7 +10,7 @@
 1. Run `ccmanager`.
 2. Open **Configuration** → **Other & Experimental**.
 3. Choose **Auto Approval (experimental)** to toggle it to ✅ Enabled.
-4. (Optional) Pick **Edit Custom Command** to supply your own verifier command (see “Custom Command” below).
+4. (Optional) Pick **Edit Custom Command** to supply your own approver command (see "Custom Command" below).
 5. Select **Save Changes**.
 
 ## Enabling It (config file)
@@ -41,7 +41,7 @@ Leave `"enabled": false` to turn it off. You can also add `"customCommand": "my-
   - Keep it lightweight; long-running analysis will delay your prompt.
   - You can wrap other models/tools as long as you emit the JSON schema above.
   - Log to stderr if you need debugging—stderr is ignored except for debug logging.
-- Example (Codex): combine the source-tree schema [`auto-approval.schema.json`](./auto-approval.schema.json) with Codex to perform the verification instead of Claude. The schema ships in the repo but is **not bundled** into installed binaries—use your local copy or download it first:
+- Example (Codex): combine the source-tree schema [`auto-approval.schema.json`](./auto-approval.schema.json) with Codex to perform the approval check instead of Claude. The schema ships in the repo but is **not bundled** into installed binaries—use your local copy or download it first:
   ```bash
   codex exec --json "$DEFAULT_PROMPT" \
     --output-schema <path to json>/auto-approval.schema.json \
@@ -52,8 +52,8 @@ Leave `"enabled": false` to turn it off. You can also add `"customCommand": "my-
 
 ## How It Works
 - **When it runs:** If a session enters a prompt state that normally waits for your input, CCManager marks it as “Auto-approval pending…” and grabs the most recent terminal output (up to 300 lines).
-- **Verification step:** By default CCManager runs `claude --model haiku -p --output-format json --json-schema …`, passing the captured terminal output into the prompt so Claude can judge whether the action needs your permission.
-- **Decision:** If Claude replies that permission is not needed and the session is still waiting, CCManager sends a carriage return (`\r`) to the session—equivalent to pressing Enter for you. If Claude says permission is needed, the check times out (60s), errors, or you press any key while it’s pending, auto verification stops and the session stays in manual approval with a short reason displayed.
+- **Approval step:** By default CCManager runs `claude --model haiku -p --output-format json --json-schema …`, passing the captured terminal output into the prompt so Claude can judge whether the action needs your permission.
+- **Decision:** If Claude replies that permission is not needed and the session is still waiting, CCManager sends a carriage return (`\r`) to the session—equivalent to pressing Enter for you. If Claude says permission is needed, the check times out (60s), errors, or you press any key while it’s pending, auto approval stops and the session stays in manual approval with a short reason displayed.
 - **Safety:** When the helper fails for any reason, CCManager defaults to requiring your approval instead of proceeding automatically.
 
 ## Things to Keep in Mind

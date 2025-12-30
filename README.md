@@ -20,6 +20,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Configurable state detection strategies for different CLI tools
 - Status change hooks for automation and notifications
 - Devcontainer integration
+- **Auto Approval (experimental)**: Automatically approve safe prompts using AI verification
 
 ## Why CCManager over Claude Squad?
 
@@ -248,6 +249,25 @@ CCManager can automatically generate worktree directory paths based on branch na
 - **Smart sanitization**: Branch names are automatically made filesystem-safe
 
 For detailed configuration and examples, see [docs/worktree-auto-directory.md](docs/worktree-auto-directory.md).
+
+## Auto Approval (Experimental)
+
+CCManager can automatically approve Claude Code prompts that don't require user permission, reducing manual intervention while maintaining safety for sensitive operations.
+
+### Features
+
+- **Automatic decision**: Uses Claude (Haiku) to analyze prompts and determine if they need manual approval
+- **Custom commands**: Replace the default verifier with your own script or different AI model
+- **Safe fallback**: Always defaults to manual approval on errors or timeouts
+- **Interruptible**: Press any key to cancel auto-approval and review manually
+
+### Quick Start
+
+1. Navigate to **Configuration** → **Other & Experimental**
+2. Enable **Auto Approval (experimental)**
+3. (Optional) Configure a custom command for verification
+
+For detailed configuration and usage, see [docs/auto-approval.md](docs/auto-approval.md).
 
 ## Devcontainer Integration
 
