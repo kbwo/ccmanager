@@ -104,11 +104,11 @@ export class GeminiStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
-		// Check for waiting prompts with box character (with or without trailing ?)
+		// Check for waiting prompts with box character
 		if (
-			/│ Apply this change\??/.test(content) ||
-			/│ Allow execution\??/.test(content) ||
-			/│ Do you want to proceed\??/.test(content)
+			content.includes('│ Apply this change') ||
+			content.includes('│ Allow execution') ||
+			content.includes('│ Do you want to proceed')
 		) {
 			return 'waiting_input';
 		}
