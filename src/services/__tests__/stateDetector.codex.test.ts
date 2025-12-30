@@ -70,6 +70,34 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
+	it('should detect waiting_input state for "Press enter to confirm or esc to cancel" pattern', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Some output',
+			'Press enter to confirm or esc to cancel',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should prioritize "Press enter to confirm" over busy state with esc interrupt', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'esc to interrupt',
+			'Press enter to confirm or esc to cancel',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
 	it('should detect busy state for Esc to interrupt pattern', () => {
 		// Arrange
 		terminal = createMockTerminal([
@@ -114,6 +142,42 @@ describe('CodexStateDetector', () => {
 	it('should prioritize waiting_input over busy', () => {
 		// Arrange
 		terminal = createMockTerminal(['press esc to interrupt', '[y/n]']);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input state for "Confirm with ... Enter" pattern', () => {
+		// Arrange
+		terminal = createMockTerminal(['Some output', 'Confirm with Y Enter']);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input for "Confirm with" pattern with longer text', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Some output',
+			'Confirm with Shift + Y Enter',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should prioritize "Confirm with ... Enter" over busy state', () => {
+		// Arrange
+		terminal = createMockTerminal(['Esc to interrupt', 'Confirm with Y Enter']);
 
 		// Act
 		const state = detector.detectState(terminal, 'idle');

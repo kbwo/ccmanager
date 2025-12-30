@@ -99,11 +99,16 @@ export class GeminiStateDetector extends BaseStateDetector {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
 
+		// Check for explicit user confirmation message - highest priority
+		if (lowerContent.includes('waiting for user confirmation')) {
+			return 'waiting_input';
+		}
+
 		// Check for waiting prompts with box character
 		if (
-			content.includes('│ Apply this change?') ||
-			content.includes('│ Allow execution?') ||
-			content.includes('│ Do you want to proceed?')
+			content.includes('│ Apply this change') ||
+			content.includes('│ Allow execution') ||
+			content.includes('│ Do you want to proceed')
 		) {
 			return 'waiting_input';
 		}
@@ -131,6 +136,14 @@ export class CodexStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
+
+		// Check for confirmation prompt patterns - highest priority
+		if (
+			lowerContent.includes('press enter to confirm or esc to cancel') ||
+			/confirm with .+ enter/i.test(content)
+		) {
+			return 'waiting_input';
+		}
 
 		// Check for waiting prompts
 		if (
@@ -188,17 +201,22 @@ export class GitHubCopilotStateDetector extends BaseStateDetector {
 		const content = this.getTerminalContent(terminal);
 		const lowerContent = content.toLowerCase();
 
-		// Waiting prompt has priority 1
+		// Check for confirmation prompt pattern - highest priority
+		if (/confirm with .+ enter/i.test(content)) {
+			return 'waiting_input';
+		}
+
+		// Waiting prompt has priority 2
 		if (lowerContent.includes('│ do you want')) {
 			return 'waiting_input';
 		}
 
-		// Busy state detection has priority 2
+		// Busy state detection has priority 3
 		if (lowerContent.includes('esc to cancel')) {
 			return 'busy';
 		}
 
-		// Otherwise idle as priority 3
+		// Otherwise idle as priority 4
 		return 'idle';
 	}
 }

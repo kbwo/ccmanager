@@ -26,6 +26,45 @@ describe('GitHubCopilotStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
+	it('detects waiting_input when "Confirm with ... Enter" pattern is present', () => {
+		// Arrange
+		terminal = createMockTerminal(['Some output', 'Confirm with Y Enter']);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('detects waiting_input for "Confirm with" pattern with longer text', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Some output',
+			'Confirm with Shift + Y Enter',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('prioritizes "Confirm with ... Enter" over busy state', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Press Esc to cancel',
+			'Confirm with Y Enter',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
 	it('detects busy when "Esc to cancel" is present', () => {
 		// Arrange
 		terminal = createMockTerminal([

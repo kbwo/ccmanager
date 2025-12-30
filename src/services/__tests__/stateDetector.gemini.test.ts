@@ -27,11 +27,41 @@ describe('GeminiStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
+		it('should detect waiting_input when "Apply this change" prompt is present (without ?)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some output from Gemini',
+				'│ Apply this change',
+				'│ > ',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
 		it('should detect waiting_input when "Allow execution?" prompt is present', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Command found: npm install',
 				'│ Allow execution?',
+				'│ > ',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "Allow execution" prompt is present (without ?)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Command found: npm install',
+				'│ Allow execution',
 				'│ > ',
 			]);
 
@@ -48,6 +78,49 @@ describe('GeminiStateDetector', () => {
 				'Changes detected',
 				'│ Do you want to proceed?',
 				'│ > ',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "Do you want to proceed" prompt is present (without ?)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Changes detected',
+				'│ Do you want to proceed',
+				'│ > ',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "Waiting for user confirmation..." is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Processing...',
+				'Waiting for user confirmation...',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should prioritize "Waiting for user confirmation" over busy state', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Press ESC to cancel',
+				'Waiting for user confirmation...',
 			]);
 
 			// Act
