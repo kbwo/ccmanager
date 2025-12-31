@@ -207,5 +207,67 @@ describe('ClaudeStateDetector', () => {
 			// Assert
 			expect(state).toBe('waiting_input');
 		});
+
+		it('should detect busy when running an Explore agent with "ctrl+b to run in background"', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'⏺ Explore(Verify which ClientRepository is used) Haiku 4.5',
+				'  ⎿  Search(pattern: "EvaluatePreconditionsService", path: "backend-jvm", type: "java")',
+				'     Search(pattern: "AbstractApplicationDataClientBR", path: "backend-jvm", type: "java")',
+				'     +42 more tool uses (ctrl+o to expand)',
+				'     ctrl+b to run in background',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
+		it('should detect busy when running a Task agent with "ctrl+b to run in background"', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'⏺ Task(Analyze state detection logic)',
+				'  ⎿  Reading file: src/services/stateDetector.ts',
+				'     ctrl+b to run in background',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
+		it('should detect busy with "ctrl+b to run in background" (case insensitive)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Running some agent...',
+				'CTRL+B to run in background',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
+		it('should prioritize waiting_input over agent busy state', () => {
+			// Arrange - unlikely scenario but tests priority
+			terminal = createMockTerminal([
+				'ctrl+b to run in background',
+				'Do you want to continue?',
+				'❯ 1. Yes',
+				'2. No',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input'); // waiting_input should take precedence
+		});
 	});
 });

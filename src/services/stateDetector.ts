@@ -83,8 +83,14 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
-		// Check for busy state
+		// Check for busy state - standard processing indicator
 		if (lowerContent.includes('esc to interrupt')) {
+			return 'busy';
+		}
+
+		// Check for running agents/subprocesses (Task tool, Explore, Plan, etc.)
+		// These show "ctrl+b to run in background" while actively running
+		if (lowerContent.includes('ctrl+b to run in background')) {
 			return 'busy';
 		}
 
