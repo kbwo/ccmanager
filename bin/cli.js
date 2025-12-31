@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
+
+// Read version from package.json
+const packageJsonPath = join(__dirname, "..", "package.json");
+const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+const version = packageJson.version;
 
 const PACKAGE_SCOPE = "@kodaikabasawa";
 const PACKAGE_NAME = "ccmanager";
@@ -73,9 +78,15 @@ try {
 	const binaryPath = getBinaryPath();
 	const args = process.argv.slice(2);
 
+	// Pass version via environment variable
+	const env = {
+		...process.env,
+		CCMANAGER_VERSION: version,
+	};
+
 	execFileSync(binaryPath, args, {
 		stdio: "inherit",
-		env: process.env,
+		env: env,
 	});
 } catch (error) {
 	if (error.status !== undefined) {
