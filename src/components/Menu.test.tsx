@@ -119,6 +119,7 @@ describe('Menu component Effect-based error handling', () => {
 				worktreeService={worktreeService}
 				onSelectWorktree={onSelectWorktree}
 				onDismissError={onDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -167,6 +168,7 @@ describe('Menu component Effect-based error handling', () => {
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
 				onSelectWorktree={onSelectWorktree}
+				version="1.0.0"
 			/>,
 		);
 
@@ -219,6 +221,7 @@ describe('Menu component Effect-based error handling', () => {
 				worktreeService={worktreeService}
 				onSelectWorktree={onSelectWorktree}
 				onDismissError={onDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -262,6 +265,7 @@ describe('Menu component Effect-based error handling', () => {
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
 				onSelectWorktree={onSelectWorktree}
+				version="1.0.0"
 			/>,
 		);
 
@@ -309,6 +313,7 @@ describe('Menu component rendering', () => {
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
 				onSelectWorktree={onSelectWorktree}
+				version="1.0.0"
 			/>,
 		);
 
@@ -333,6 +338,7 @@ describe('Menu component rendering', () => {
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
 				onSelectWorktree={onSelectWorktree}
+				version="1.0.0"
 			/>,
 		);
 
@@ -354,6 +360,7 @@ describe('Menu component rendering', () => {
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
 				onSelectWorktree={onSelectWorktree}
+				version="1.0.0"
 			/>,
 		);
 
@@ -436,6 +443,7 @@ describe('Menu component rendering', () => {
 				onSelectWorktree={onSelectWorktree}
 				onSelectRecentProject={onSelectRecentProject}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 
@@ -501,6 +509,7 @@ describe('Menu component rendering', () => {
 				onSelectWorktree={onSelectWorktree}
 				onSelectRecentProject={onSelectRecentProject}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 

@@ -128,6 +128,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -147,6 +148,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -160,6 +162,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -173,6 +176,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -198,6 +202,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error="Failed to load projects"
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -212,6 +217,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -225,6 +231,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -250,6 +257,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -263,6 +271,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -286,6 +295,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -299,6 +309,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -321,6 +332,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -346,6 +358,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -359,6 +372,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -381,6 +395,7 @@ describe('ProjectList', () => {
 				onSelectProject={mockOnSelectProject}
 				error="Test error"
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -406,6 +421,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -446,6 +462,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -469,6 +486,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -504,6 +522,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -529,6 +548,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -567,6 +587,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -603,6 +624,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -630,6 +652,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error="Test error"
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -663,6 +686,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error="Test error"
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -691,6 +715,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -729,6 +754,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -765,6 +791,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -794,6 +821,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -875,6 +903,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -909,6 +938,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -922,6 +952,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -960,6 +991,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -971,6 +1003,7 @@ describe('ProjectList', () => {
 						onSelectProject={mockOnSelectProject}
 						error={null}
 						onDismissError={mockOnDismissError}
+						version="1.0.0"
 					/>,
 				);
 				return !lastFrame()?.includes('Loading projects...');
@@ -997,6 +1030,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -1027,6 +1061,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 
@@ -1040,6 +1075,7 @@ describe('ProjectList', () => {
 					onSelectProject={mockOnSelectProject}
 					error={null}
 					onDismissError={mockOnDismissError}
+					version="1.0.0"
 				/>,
 			);
 

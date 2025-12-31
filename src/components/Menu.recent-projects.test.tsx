@@ -137,7 +137,9 @@ describe('Menu - Recent Projects', () => {
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
 				onSelectWorktree={vi.fn()}
+				version="1.0.0"
 				multiProject={false}
+				version="1.0.0"
 			/>,
 		);
 
@@ -167,8 +169,10 @@ describe('Menu - Recent Projects', () => {
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
 				onSelectWorktree={vi.fn()}
+				version="1.0.0"
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 
@@ -189,8 +193,10 @@ describe('Menu - Recent Projects', () => {
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
 				onSelectWorktree={vi.fn()}
+				version="1.0.0"
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 
@@ -221,8 +227,10 @@ describe('Menu - Recent Projects', () => {
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
 				onSelectWorktree={vi.fn()}
+				version="1.0.0"
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 
@@ -254,8 +262,10 @@ describe('Menu - Recent Projects', () => {
 				sessionManager={mockSessionManager}
 				worktreeService={worktreeServiceWithGitRoot}
 				onSelectWorktree={vi.fn()}
+				version="1.0.0"
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 
@@ -265,8 +275,10 @@ describe('Menu - Recent Projects', () => {
 				sessionManager={mockSessionManager}
 				worktreeService={worktreeServiceWithGitRoot}
 				onSelectWorktree={vi.fn()}
+				version="1.0.0"
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 
@@ -299,8 +311,10 @@ describe('Menu - Recent Projects', () => {
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
 				onSelectWorktree={vi.fn()}
+				version="1.0.0"
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="1.0.0"
 			/>,
 		);
 

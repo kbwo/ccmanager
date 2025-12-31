@@ -125,6 +125,7 @@ describe('ProjectList - Recent Projects', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -156,6 +157,7 @@ describe('ProjectList - Recent Projects', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -199,6 +201,7 @@ describe('ProjectList - Recent Projects', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -243,6 +246,7 @@ describe('ProjectList - Recent Projects', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
@@ -281,6 +285,7 @@ describe('ProjectList - Recent Projects', () => {
 				onSelectProject={mockOnSelectProject}
 				error={null}
 				onDismissError={mockOnDismissError}
+				version="1.0.0"
 			/>,
 		);
 
