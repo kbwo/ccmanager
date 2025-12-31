@@ -17,6 +17,7 @@ interface ProjectListProps {
 	onSelectProject: (project: GitProject) => void;
 	error: string | null;
 	onDismissError: () => void;
+	version?: string;
 }
 
 interface MenuItem {
@@ -30,6 +31,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 	onSelectProject,
 	error,
 	onDismissError,
+	version,
 }) => {
 	const [projects, setProjects] = useState<GitProject[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -297,7 +299,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					CCManager - Multi-Project Mode
+					CCManager - Multi-Project Mode{version ? ` v${version}` : ''}
 				</Text>
 			</Box>
 
