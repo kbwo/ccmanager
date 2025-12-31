@@ -1,6 +1,6 @@
 {
 	"name": "@kodaikabasawa/ccmanager-linux-arm64",
-	"version": "3.2.6",
+	"version": "3.2.7",
 	"description": "ccmanager binary for Linux ARM64",
 	"license": "MIT",
 	"author": "Kodai Kabasawa",
