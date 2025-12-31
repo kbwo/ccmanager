@@ -145,15 +145,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					logger.info(
 						`[${session.id}] Auto-approval verification determined user permission needed`,
 					);
-					await session.stateMutex.update(data => ({
-						...data,
-						state: 'waiting_input',
+					await this.updateSessionState(session, 'waiting_input', {
 						autoApprovalFailed: true,
 						autoApprovalReason: autoApprovalResult.reason,
-						pendingState: undefined,
-						pendingStateStart: undefined,
-					}));
-					this.emit('sessionStateChanged', session);
+					});
 				} else {
 					// Auto-approve by simulating Enter key press
 					logger.info(
@@ -162,14 +157,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					session.process.write('\r');
 					// Force state to busy to prevent endless auto-approval
 					// when the state detection still sees pending_auto_approval
-					await session.stateMutex.update(data => ({
-						...data,
-						state: 'busy',
+					await this.updateSessionState(session, 'busy', {
 						autoApprovalReason: undefined,
-						pendingState: undefined,
-						pendingStateStart: undefined,
-					}));
-					this.emit('sessionStateChanged', session);
+					});
 				}
 			})
 			.catch(async (error: unknown) => {
@@ -188,17 +178,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 				const currentState = session.stateMutex.getSnapshot().state;
 				if (currentState === 'pending_auto_approval') {
-					await session.stateMutex.update(data => ({
-						...data,
-						state: 'waiting_input',
+					await this.updateSessionState(session, 'waiting_input', {
 						autoApprovalFailed: true,
 						autoApprovalReason:
 							(error as Error | undefined)?.message ??
 							'Auto-approval verification failed',
-						pendingState: undefined,
-						pendingStateStart: undefined,
-					}));
-					this.emit('sessionStateChanged', session);
+					});
 				}
 			})
 			.finally(async () => {
@@ -234,6 +219,37 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		logger.info(
 			`[${session.id}] Cancelled auto-approval verification: ${reason}`,
 		);
+	}
+
+	/**
+	 * Update session state with automatic status hook execution.
+	 * This method ensures that executeStatusHook is always called when state changes.
+	 *
+	 * @param session - The session to update
+	 * @param newState - The new state to set
+	 * @param additionalUpdates - Optional additional state data updates
+	 */
+	private async updateSessionState(
+		session: Session,
+		newState: SessionState,
+		additionalUpdates: Partial<
+			Omit<import('../utils/mutex.js').SessionStateData, 'state'>
+		> = {},
+	): Promise<void> {
+		const oldState = session.stateMutex.getSnapshot().state;
+
+		await session.stateMutex.update(data => ({
+			...data,
+			state: newState,
+			pendingState: undefined,
+			pendingStateStart: undefined,
+			...additionalUpdates,
+		}));
+
+		if (oldState !== newState) {
+			void Effect.runPromise(executeStatusHook(oldState, newState, session));
+			this.emit('sessionStateChanged', session);
+		}
 	}
 
 	constructor() {
@@ -517,29 +533,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					// Check if the pending state has persisted long enough
 					const duration = now - stateData.pendingStateStart;
 					if (duration >= STATE_PERSISTENCE_DURATION_MS) {
-						// Confirm the state change
-						void session.stateMutex.update(data => {
-							const newData = {
-								...data,
-								state: detectedState,
-								pendingState: undefined,
-								pendingStateStart: undefined,
-							};
-
-							// If we previously blocked auto-approval and have moved out of a user prompt,
-							// allow future auto-approval attempts.
-							if (
-								data.autoApprovalFailed &&
-								detectedState !== 'waiting_input' &&
-								detectedState !== 'pending_auto_approval'
-							) {
-								newData.autoApprovalFailed = false;
-								newData.autoApprovalReason = undefined;
-							}
-
-							return newData;
-						});
-
+						// Cancel auto-approval verification if state is changing away from pending_auto_approval
 						if (
 							stateData.autoApprovalAbortController &&
 							detectedState !== 'pending_auto_approval'
@@ -550,11 +544,28 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 							);
 						}
 
-						// Execute status hook asynchronously (non-blocking) using Effect
-						void Effect.runPromise(
-							executeStatusHook(oldState, detectedState, session),
+						// Build additional updates for auto-approval reset
+						const additionalUpdates: Partial<
+							Omit<import('../utils/mutex.js').SessionStateData, 'state'>
+						> = {};
+
+						// If we previously blocked auto-approval and have moved out of a user prompt,
+						// allow future auto-approval attempts.
+						if (
+							stateData.autoApprovalFailed &&
+							detectedState !== 'waiting_input' &&
+							detectedState !== 'pending_auto_approval'
+						) {
+							additionalUpdates.autoApprovalFailed = false;
+							additionalUpdates.autoApprovalReason = undefined;
+						}
+
+						// Confirm the state change with hook execution
+						void this.updateSessionState(
+							session,
+							detectedState,
+							additionalUpdates,
 						);
-						this.emit('sessionStateChanged', session);
 					}
 				}
 			} else {
@@ -594,13 +605,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			session.stateCheckInterval = undefined;
 		}
 		// Clear any pending state and update state to idle before destroying
-		void session.stateMutex.update(data => ({
-			...data,
-			state: 'idle',
-			pendingState: undefined,
-			pendingStateStart: undefined,
-		}));
-		this.emit('sessionStateChanged', session);
+		void this.updateSessionState(session, 'idle');
 		this.destroySession(session.worktreePath);
 		this.emit('sessionExit', session);
 	}
@@ -644,24 +649,22 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 
 		this.cancelAutoApprovalVerification(session, reason);
-		void session.stateMutex.update(data => {
-			const newData = {
+
+		if (stateData.state === 'pending_auto_approval') {
+			// State change: pending_auto_approval -> waiting_input
+			void this.updateSessionState(session, 'waiting_input', {
+				autoApprovalFailed: true,
+				autoApprovalReason: reason,
+			});
+		} else {
+			// No state change, just update other fields
+			void session.stateMutex.update(data => ({
 				...data,
 				autoApprovalFailed: true,
 				autoApprovalReason: reason,
 				pendingState: undefined,
 				pendingStateStart: undefined,
-			};
-
-			if (data.state === 'pending_auto_approval') {
-				newData.state = 'waiting_input';
-			}
-
-			return newData;
-		});
-
-		if (stateData.state === 'pending_auto_approval') {
-			this.emit('sessionStateChanged', session);
+			}));
 		}
 	}
 
