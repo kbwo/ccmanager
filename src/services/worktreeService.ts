@@ -958,7 +958,9 @@ export class WorktreeService {
 			}
 
 			// Execute post-creation hook if configured
-			const worktreeHooks = configurationManager.getWorktreeHooks();
+			// Use context-aware getter to support per-project hook configuration
+			const worktreeHooks =
+				configurationManager.getWorktreeHooksWithContext(absoluteGitRoot);
 			if (
 				worktreeHooks.post_creation?.enabled &&
 				worktreeHooks.post_creation?.command

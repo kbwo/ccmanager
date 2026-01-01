@@ -18,6 +18,7 @@ import {
 	ConfigError,
 	ValidationError,
 } from '../types/errors.js';
+import {projectConfigurationManager} from './projectConfigurationManager.js';
 
 export class ConfigurationManager {
 	private configPath: string;
@@ -25,6 +26,7 @@ export class ConfigurationManager {
 	private configDir: string;
 	private config: ConfigurationData = {};
 	private worktreeLastOpened: Map<string, number> = new Map();
+	private projectConfigManager = projectConfigurationManager;
 
 	constructor() {
 		// Determine config directory based on platform
@@ -735,6 +737,246 @@ export class ConfigurationManager {
 	 */
 	isAutoApprovalEnabled(): boolean {
 		return this.config.autoApproval?.enabled ?? false;
+	}
+
+	// Per-project configuration methods
+
+	/**
+	 * Get merged configuration combining global and project-specific settings
+	 *
+	 * @param gitRoot - Optional git repository root path. If provided, loads .ccmanager.json
+	 *                 from that directory and merges with global config
+	 * @returns Effect that resolves to merged configuration
+	 */
+	getMergedConfig(
+		gitRoot?: string,
+	): Effect.Effect<ConfigurationData, FileSystemError | ConfigError> {
+		return Effect.gen(this, function* () {
+			// Start with global config
+			const globalConfig = this.config;
+
+			// If no git root provided, return global config
+			if (!gitRoot) {
+				return globalConfig;
+			}
+
+			// Load project config
+			const projectConfig = yield* this.projectConfigManager.loadProjectConfigEffect(
+				gitRoot,
+			);
+
+			// If no project config, return global config
+			if (!projectConfig) {
+				return globalConfig;
+			}
+
+			// Merge project config with global config
+			return this.deepMergeConfigs(globalConfig, projectConfig);
+		});
+	}
+
+	/**
+	 * Deep merge project configuration into global configuration
+	 *
+	 * Project settings override global settings on a per-field basis.
+	 * For nested objects (hooks, worktree settings), performs shallow merge
+	 * to allow partial overrides.
+	 *
+	 * @param global - Global configuration
+	 * @param project - Project-specific configuration
+	 * @returns Merged configuration with project overrides
+	 */
+	private deepMergeConfigs(
+		global: ConfigurationData,
+		project: ConfigurationData,
+	): ConfigurationData {
+		return {
+			// Simple field overrides (project completely replaces global if present)
+			shortcuts: project.shortcuts ?? global.shortcuts,
+			command: project.command ?? global.command,
+
+			// Nested object merges (merge at property level)
+			statusHooks: {
+				...global.statusHooks,
+				...project.statusHooks,
+			},
+			worktreeHooks: {
+				...global.worktreeHooks,
+				...project.worktreeHooks,
+			},
+			worktree: {
+				...global.worktree,
+				...project.worktree,
+			},
+			autoApproval: {
+				...global.autoApproval,
+				...project.autoApproval,
+			},
+
+			// Command presets merge (project replaces global if present)
+			commandPresets: project.commandPresets ?? global.commandPresets,
+		};
+	}
+
+	/**
+	 * Get worktree hooks with optional project-specific overrides
+	 *
+	 * @param gitRoot - Optional git repository root for project config
+	 * @returns Worktree hooks configuration (merged if gitRoot provided)
+	 */
+	getWorktreeHooksWithContext(gitRoot?: string): WorktreeHookConfig {
+		if (!gitRoot) {
+			return this.getWorktreeHooks();
+		}
+
+		// Synchronously try to get merged config
+		// Fall back to global config on any error
+		const mergedConfigEffect = Effect.catchAll(
+			this.getMergedConfig(gitRoot),
+			() => Effect.succeed(this.config),
+		);
+
+		const mergedConfig = Effect.runSync(mergedConfigEffect);
+		return mergedConfig.worktreeHooks || {};
+	}
+
+	/**
+	 * Get worktree configuration with optional project-specific overrides
+	 *
+	 * @param gitRoot - Optional git repository root for project config
+	 * @returns Worktree configuration (merged if gitRoot provided)
+	 */
+	getWorktreeConfigWithContext(gitRoot?: string): WorktreeConfig {
+		if (!gitRoot) {
+			return this.getWorktreeConfig();
+		}
+
+		// Synchronously try to get merged config
+		// Fall back to global config on any error
+		const mergedConfigEffect = Effect.catchAll(
+			this.getMergedConfig(gitRoot),
+			() => Effect.succeed(this.config),
+		);
+
+		const mergedConfig = Effect.runSync(mergedConfigEffect);
+		return (
+			mergedConfig.worktree || {
+				autoDirectory: false,
+			}
+		);
+	}
+
+	/**
+	 * Get status hooks with optional project-specific overrides
+	 *
+	 * @param gitRoot - Optional git repository root for project config
+	 * @returns Status hooks configuration (merged if gitRoot provided)
+	 */
+	getStatusHooksWithContext(gitRoot?: string): StatusHookConfig {
+		if (!gitRoot) {
+			return this.getStatusHooks();
+		}
+
+		// Synchronously try to get merged config
+		// Fall back to global config on any error
+		const mergedConfigEffect = Effect.catchAll(
+			this.getMergedConfig(gitRoot),
+			() => Effect.succeed(this.config),
+		);
+
+		const mergedConfig = Effect.runSync(mergedConfigEffect);
+		return mergedConfig.statusHooks || {};
+	}
+
+	/**
+	 * Get shortcuts with optional project-specific overrides
+	 *
+	 * @param gitRoot - Optional git repository root for project config
+	 * @returns Shortcuts configuration (merged if gitRoot provided)
+	 */
+	getShortcutsWithContext(gitRoot?: string): ShortcutConfig {
+		if (!gitRoot) {
+			return this.getShortcuts();
+		}
+
+		// Synchronously try to get merged config
+		// Fall back to global config on any error
+		const mergedConfigEffect = Effect.catchAll(
+			this.getMergedConfig(gitRoot),
+			() => Effect.succeed(this.config),
+		);
+
+		const mergedConfig = Effect.runSync(mergedConfigEffect);
+		return mergedConfig.shortcuts || DEFAULT_SHORTCUTS;
+	}
+
+	/**
+	 * Get command configuration with optional project-specific overrides
+	 *
+	 * @param gitRoot - Optional git repository root for project config
+	 * @returns Command configuration (merged if gitRoot provided)
+	 */
+	getCommandConfigWithContext(gitRoot?: string): CommandConfig {
+		if (!gitRoot) {
+			return this.getCommandConfig();
+		}
+
+		// Synchronously try to get merged config
+		// Fall back to global config on any error
+		const mergedConfigEffect = Effect.catchAll(
+			this.getMergedConfig(gitRoot),
+			() => Effect.succeed(this.config),
+		);
+
+		const mergedConfig = Effect.runSync(mergedConfigEffect);
+
+		// For backward compatibility, return the default preset as CommandConfig
+		if (mergedConfig.commandPresets) {
+			const defaultPreset =
+				mergedConfig.commandPresets.presets.find(
+					p => p.id === mergedConfig.commandPresets!.defaultPresetId,
+				) || mergedConfig.commandPresets.presets[0]!;
+
+			return {
+				command: defaultPreset.command,
+				args: defaultPreset.args,
+				fallbackArgs: defaultPreset.fallbackArgs,
+			};
+		}
+
+		return mergedConfig.command || {command: 'claude'};
+	}
+
+	/**
+	 * Get auto-approval configuration with optional project-specific overrides
+	 *
+	 * @param gitRoot - Optional git repository root for project config
+	 * @returns Auto-approval configuration (merged if gitRoot provided)
+	 */
+	getAutoApprovalConfigWithContext(
+		gitRoot?: string,
+	): NonNullable<ConfigurationData['autoApproval']> {
+		if (!gitRoot) {
+			return this.getAutoApprovalConfig();
+		}
+
+		// Synchronously try to get merged config
+		// Fall back to global config on any error
+		const mergedConfigEffect = Effect.catchAll(
+			this.getMergedConfig(gitRoot),
+			() => Effect.succeed(this.config),
+		);
+
+		const mergedConfig = Effect.runSync(mergedConfigEffect);
+		const config = mergedConfig.autoApproval || {
+			enabled: false,
+		};
+
+		// Default timeout to 30 seconds if not set
+		return {
+			...config,
+			timeout: config.timeout ?? 30,
+		};
 	}
 }
 

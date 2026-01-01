@@ -10,6 +10,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 
 - Run multiple AI assistant sessions in parallel across different Git worktrees
 - **Multi-project support**: Manage multiple git repositories from a single interface
+- **Per-project configuration**: Override global settings with repository-specific `.ccmanager.json` files
 - Support for multiple AI coding assistants (Claude Code, Gemini CLI)
 - Switch between sessions seamlessly
 - Visual status indicators for session states (busy, waiting, idle)
@@ -239,6 +240,42 @@ Worktree hooks execute custom commands when worktrees are created, enabling auto
 - Initialize branch-specific configurations
 
 For configuration and examples, see [docs/worktree-hooks.md](docs/worktree-hooks.md).
+
+## Per-Project Configuration
+
+CCManager supports repository-specific configuration through `.ccmanager.json` files placed at the root of your git repository. This allows teams to define project-specific defaults while maintaining personal global settings.
+
+### Features
+
+- **Override any global setting**: Customize hooks, worktree settings, shortcuts, and more per-project
+- **Smart merging**: Project settings override global settings on a per-field basis
+- **Team collaboration**: Commit `.ccmanager.json` to share team defaults
+- **Flexible workflow**: Use global config for personal preferences, project config for team standards
+
+### Quick Start
+
+1. Create `.ccmanager.json` at your git repository root (same level as `.git/`)
+2. Add project-specific configuration (same structure as global config)
+3. CCManager automatically detects and merges it with your global configuration
+
+### Example
+
+```json
+{
+  "worktreeHooks": {
+    "post_creation": {
+      "command": "npm install && npm run build",
+      "enabled": true
+    }
+  },
+  "worktree": {
+    "autoDirectory": true,
+    "copySessionData": false
+  }
+}
+```
+
+For detailed configuration options, merge behavior, and examples, see [docs/per-project-configuration.md](docs/per-project-configuration.md).
 
 ## Automatic Worktree Directory Generation
 
