@@ -1,6 +1,5 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, statSync} from 'fs';
-import {execSync} from 'child_process';
 import {ConfigurationManager} from './configurationManager.js';
 import type {ConfigurationData} from '../types/index.js';
 import {Effect} from 'effect';

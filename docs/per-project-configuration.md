@@ -203,6 +203,40 @@ Use project-specific verification logic for auto-approval:
 }
 ```
 
+## Security Considerations
+
+**⚠️ Important Security Warning**
+
+Project configuration files can execute **arbitrary commands** through hooks when users work with worktrees. This is similar to `.github/workflows` files or npm `postinstall` scripts.
+
+### Security Best Practices
+
+1. **Review before trusting**: Always review `.ccmanager.json` in repositories you clone, especially from untrusted sources
+2. **Inspect hooks**: Check `worktreeHooks.post_creation` and `statusHooks` for potentially malicious commands
+3. **Use .gitignore for sensitive configs**: Don't commit configs that contain secrets or machine-specific paths
+4. **Team repositories**: Only commit hooks that the entire team needs and has reviewed
+5. **Disable hooks temporarily**: If unsure, you can temporarily disable hooks in the UI (Configuration → Configure Worktree Hooks)
+
+### Example Security Review
+
+Before running operations in a new repository:
+
+```bash
+# Check if .ccmanager.json exists
+cat .ccmanager.json
+
+# Look for suspicious commands in hooks
+grep -A 5 "post_creation" .ccmanager.json
+```
+
+**What to watch for:**
+- Commands that download and execute scripts (`curl | bash`)
+- Commands that access sensitive data or credentials
+- Commands that make network requests to unknown hosts
+- Overly complex or obfuscated shell commands
+
+If you're unsure about a hook command, ask the repository maintainer or disable hooks before creating worktrees.
+
 ## Version Control Considerations
 
 ### Should You Commit `.ccmanager.json`?

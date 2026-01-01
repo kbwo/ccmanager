@@ -1,5 +1,5 @@
 import {execSync} from 'child_process';
-import {join} from 'path';
+import {join, resolve, isAbsolute, dirname} from 'path';
 import {existsSync, readFileSync, statSync} from 'fs';
 import {Effect} from 'effect';
 import {ConfigurationData} from '../types/index.js';
@@ -39,14 +39,15 @@ export class ProjectConfigurationManager {
 				}).trim();
 
 				// Convert .git directory path to repository root
-				// If path is absolute, use it directly; otherwise resolve relative to fromPath
-				const gitDirPath = gitCommonDir.startsWith('/')
+				// Use path.isAbsolute() for cross-platform compatibility (Windows/Unix)
+				const gitDirPath = isAbsolute(gitCommonDir)
 					? gitCommonDir
 					: join(fromPath, gitCommonDir);
 
 				// Git root is the parent of the .git directory
 				// For worktrees, git-common-dir points to main .git, so we get the correct root
-				const gitRoot = join(gitDirPath, '..');
+				// Normalize the path to avoid cache key issues with /path/to/repo/.git/..
+				const gitRoot = resolve(dirname(gitDirPath));
 
 				return gitRoot;
 			},
@@ -99,23 +100,32 @@ export class ProjectConfigurationManager {
 			}
 
 			// Load and parse config file
-			const config = yield* Effect.try({
-				try: () => {
-					const content = readFileSync(configPath, 'utf-8');
-					const parsed = JSON.parse(content) as ConfigurationData;
-					return parsed;
-				},
-				catch: (error: unknown) => {
-					logger.warn(
-						`Failed to load project config from ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
-					);
-					logger.warn('Falling back to global configuration');
-					return new ConfigError({
-						message: `Invalid project configuration: ${error instanceof Error ? error.message : String(error)}`,
-						path: configPath,
-					});
-				},
-			});
+			const configResult = yield* Effect.either(
+				Effect.try({
+					try: () => {
+						const content = readFileSync(configPath, 'utf-8');
+						const parsed = JSON.parse(content) as ConfigurationData;
+						return parsed;
+					},
+					catch: (error: unknown) => {
+						return new ConfigError({
+							message: `Invalid project configuration: ${error instanceof Error ? error.message : String(error)}`,
+							path: configPath,
+						});
+					},
+				}),
+			);
+
+			// Gracefully fall back to global configuration on malformed JSON
+			if (configResult._tag === 'Left') {
+				logger.warn(
+					`Failed to load project config from ${configPath}: ${configResult.left.message}`,
+				);
+				logger.warn('Falling back to global configuration');
+				return null;
+			}
+
+			const config = configResult.right;
 
 			// Validate config structure (basic validation)
 			const validatedConfig = this.validateConfig(config);
@@ -155,14 +165,22 @@ export class ProjectConfigurationManager {
 		}
 
 		// If specific fields are present, validate their types
-		if (config.shortcuts !== undefined && typeof config.shortcuts !== 'object') {
+		// Check for plain objects (not arrays) since typeof [] === 'object'
+		if (
+			config.shortcuts !== undefined &&
+			(typeof config.shortcuts !== 'object' ||
+				config.shortcuts === null ||
+				Array.isArray(config.shortcuts))
+		) {
 			logger.warn('Invalid shortcuts configuration in project config');
 			return null;
 		}
 
 		if (
 			config.statusHooks !== undefined &&
-			typeof config.statusHooks !== 'object'
+			(typeof config.statusHooks !== 'object' ||
+				config.statusHooks === null ||
+				Array.isArray(config.statusHooks))
 		) {
 			logger.warn('Invalid statusHooks configuration in project config');
 			return null;
@@ -170,25 +188,39 @@ export class ProjectConfigurationManager {
 
 		if (
 			config.worktreeHooks !== undefined &&
-			typeof config.worktreeHooks !== 'object'
+			(typeof config.worktreeHooks !== 'object' ||
+				config.worktreeHooks === null ||
+				Array.isArray(config.worktreeHooks))
 		) {
 			logger.warn('Invalid worktreeHooks configuration in project config');
 			return null;
 		}
 
-		if (config.worktree !== undefined && typeof config.worktree !== 'object') {
+		if (
+			config.worktree !== undefined &&
+			(typeof config.worktree !== 'object' ||
+				config.worktree === null ||
+				Array.isArray(config.worktree))
+		) {
 			logger.warn('Invalid worktree configuration in project config');
 			return null;
 		}
 
-		if (config.command !== undefined && typeof config.command !== 'object') {
+		if (
+			config.command !== undefined &&
+			(typeof config.command !== 'object' ||
+				config.command === null ||
+				Array.isArray(config.command))
+		) {
 			logger.warn('Invalid command configuration in project config');
 			return null;
 		}
 
 		if (
 			config.commandPresets !== undefined &&
-			typeof config.commandPresets !== 'object'
+			(typeof config.commandPresets !== 'object' ||
+				config.commandPresets === null ||
+				Array.isArray(config.commandPresets))
 		) {
 			logger.warn('Invalid commandPresets configuration in project config');
 			return null;
@@ -196,7 +228,9 @@ export class ProjectConfigurationManager {
 
 		if (
 			config.autoApproval !== undefined &&
-			typeof config.autoApproval !== 'object'
+			(typeof config.autoApproval !== 'object' ||
+				config.autoApproval === null ||
+				Array.isArray(config.autoApproval))
 		) {
 			logger.warn('Invalid autoApproval configuration in project config');
 			return null;

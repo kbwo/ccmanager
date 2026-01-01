@@ -49,7 +49,7 @@ describe('ProjectConfigurationManager', () => {
 				projectConfigManager.findGitRoot('/path/to/repo/src'),
 			);
 
-			expect(result).toBe('/path/to/repo/.git/..');
+			expect(result).toBe('/path/to/repo');
 			expect(execSync).toHaveBeenCalledWith(
 				'git rev-parse --git-common-dir',
 				expect.objectContaining({
@@ -66,7 +66,8 @@ describe('ProjectConfigurationManager', () => {
 				projectConfigManager.findGitRoot('/path/to/repo'),
 			);
 
-			expect(result).toContain('.git/..');
+			// Path should be normalized, not contain '.git/..'
+			expect(result).toBe('/path/to/repo');
 		});
 
 		it('should fail when git command fails', async () => {

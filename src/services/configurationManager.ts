@@ -796,21 +796,22 @@ export class ConfigurationManager {
 			command: project.command ?? global.command,
 
 			// Nested object merges (merge at property level)
+			// Use nullish coalescing to handle undefined values explicitly
 			statusHooks: {
-				...global.statusHooks,
-				...project.statusHooks,
+				...(global.statusHooks ?? {}),
+				...(project.statusHooks ?? {}),
 			},
 			worktreeHooks: {
-				...global.worktreeHooks,
-				...project.worktreeHooks,
+				...(global.worktreeHooks ?? {}),
+				...(project.worktreeHooks ?? {}),
 			},
 			worktree: {
-				...global.worktree,
-				...project.worktree,
+				...(global.worktree ?? {}),
+				...(project.worktree ?? {}),
 			},
 			autoApproval: {
-				...global.autoApproval,
-				...project.autoApproval,
+				...(global.autoApproval ?? {}),
+				...(project.autoApproval ?? {}),
 			},
 
 			// Command presets merge (project replaces global if present)
@@ -932,16 +933,20 @@ export class ConfigurationManager {
 
 		// For backward compatibility, return the default preset as CommandConfig
 		if (mergedConfig.commandPresets) {
-			const defaultPreset =
-				mergedConfig.commandPresets.presets.find(
-					p => p.id === mergedConfig.commandPresets!.defaultPresetId,
-				) || mergedConfig.commandPresets.presets[0]!;
+			const presets = mergedConfig.commandPresets.presets;
+			// Guard against empty presets array
+			if (presets && presets.length > 0) {
+				const defaultPreset =
+					presets.find(
+						p => p.id === mergedConfig.commandPresets!.defaultPresetId,
+					) || presets[0]!;
 
-			return {
-				command: defaultPreset.command,
-				args: defaultPreset.args,
-				fallbackArgs: defaultPreset.fallbackArgs,
-			};
+				return {
+					command: defaultPreset.command,
+					args: defaultPreset.args,
+					fallbackArgs: defaultPreset.fallbackArgs,
+				};
+			}
 		}
 
 		return mergedConfig.command || {command: 'claude'};
