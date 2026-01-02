@@ -631,6 +631,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 					</Box>
 				)}
 				<DeleteWorktree
+					projectPath={selectedProject?.path}
 					onComplete={handleDeleteWorktrees}
 					onCancel={handleCancelDeleteWorktree}
 				/>

@@ -65,7 +65,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	// Initialize worktree service and load branches using Effect
 	useEffect(() => {
 		let cancelled = false;
-		const service = new WorktreeService();
+		const service = new WorktreeService(projectPath);
 
 		const loadBranches = async () => {
 			// Use Effect.all to load branches and defaultBranch in parallel
@@ -110,7 +110,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [projectPath]);
 
 	// Create branch items with default branch first (memoized)
 	const allBranchItems: BranchItem[] = useMemo(

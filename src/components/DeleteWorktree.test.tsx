@@ -53,6 +53,75 @@ describe('DeleteWorktree - Effect Integration', () => {
 		vi.clearAllMocks();
 	});
 
+	it('should pass projectPath to WorktreeService when provided', async () => {
+		// GIVEN: projectPath is provided
+		const projectPath = '/test/project';
+		const mockWorktrees: Worktree[] = [
+			{
+				path: '/test/project/wt1',
+				branch: 'feature-1',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+		];
+
+		const mockEffect = Effect.succeed(mockWorktrees);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: vi.fn(() => mockEffect),
+			} as Partial<WorktreeService> as WorktreeService;
+		});
+
+		const onComplete = vi.fn();
+		const onCancel = vi.fn();
+
+		// WHEN: Component renders with projectPath
+		render(
+			<DeleteWorktree
+				projectPath={projectPath}
+				onComplete={onComplete}
+				onCancel={onCancel}
+			/>,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		// THEN: WorktreeService was called with projectPath
+		expect(WorktreeService).toHaveBeenCalledWith(projectPath);
+	});
+
+	it('should use undefined when projectPath not provided', async () => {
+		// GIVEN: No projectPath
+		const mockWorktrees: Worktree[] = [
+			{
+				path: '/test/wt1',
+				branch: 'feature-1',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+		];
+
+		const mockEffect = Effect.succeed(mockWorktrees);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: vi.fn(() => mockEffect),
+			} as Partial<WorktreeService> as WorktreeService;
+		});
+
+		const onComplete = vi.fn();
+		const onCancel = vi.fn();
+
+		// WHEN: Component renders without projectPath
+		render(<DeleteWorktree onComplete={onComplete} onCancel={onCancel} />);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		// THEN: WorktreeService was called with undefined (defaults to cwd)
+		expect(WorktreeService).toHaveBeenCalledWith(undefined);
+	});
+
 	it('should load worktrees using Effect-based method', async () => {
 		// GIVEN: Mock worktrees returned by Effect
 		const mockWorktrees: Worktree[] = [
