@@ -58,6 +58,7 @@ describe('ConfigureWorktreeHooks', () => {
 
 		expect(lastFrame()).toContain('Configure Worktree Hooks');
 		expect(lastFrame()).toContain('Set commands to run on worktree events');
+		expect(lastFrame()).toContain('Pre Creation:');
 		expect(lastFrame()).toContain('Post Creation:');
 	});
 
@@ -85,6 +86,44 @@ describe('ConfigureWorktreeHooks', () => {
 			<ConfigureWorktreeHooks onComplete={onComplete} />,
 		);
 
+		expect(lastFrame()).toContain('Pre Creation: ✗ (not set)');
 		expect(lastFrame()).toContain('Post Creation: ✗ (not set)');
+	});
+
+	it('should display pre-creation hook configuration', () => {
+		mockedConfigurationManager.getWorktreeHooks.mockReturnValue({
+			pre_creation: {
+				command: 'echo "Pre-creation check"',
+				enabled: true,
+			},
+		});
+
+		const onComplete = vi.fn();
+		const {lastFrame} = render(
+			<ConfigureWorktreeHooks onComplete={onComplete} />,
+		);
+
+		expect(lastFrame()).toContain('Pre Creation: ✓ echo "Pre-creation check"');
+	});
+
+	it('should display both pre and post creation hooks', () => {
+		mockedConfigurationManager.getWorktreeHooks.mockReturnValue({
+			pre_creation: {
+				command: 'validate-branch',
+				enabled: true,
+			},
+			post_creation: {
+				command: 'npm install',
+				enabled: false,
+			},
+		});
+
+		const onComplete = vi.fn();
+		const {lastFrame} = render(
+			<ConfigureWorktreeHooks onComplete={onComplete} />,
+		);
+
+		expect(lastFrame()).toContain('Pre Creation: ✓ validate-branch');
+		expect(lastFrame()).toContain('Post Creation: ✗ npm install');
 	});
 });

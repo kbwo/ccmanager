@@ -2,6 +2,7 @@ import {describe, it, expect, vi} from 'vitest';
 import {Effect} from 'effect';
 import {
 	executeHook,
+	executeWorktreePreCreationHook,
 	executeWorktreePostCreationHook,
 	executeStatusHook,
 } from './hookExecutor.js';
@@ -198,6 +199,96 @@ describe('hookExecutor Integration Tests', () => {
 			} finally {
 				// Cleanup
 				await rm(tmpDir, {recursive: true});
+			}
+		});
+	});
+
+	describe('executeWorktreePreCreationHook (real execution)', () => {
+		it('should throw when command fails', async () => {
+			// Arrange
+			const tmpGitRoot = await mkdtemp(join(tmpdir(), 'hook-gitroot-'));
+			const worktreePath = join(tmpGitRoot, 'new-worktree');
+
+			try {
+				// Act & Assert - should throw when command fails
+				await expect(
+					Effect.runPromise(
+						executeWorktreePreCreationHook(
+							'exit 1',
+							worktreePath,
+							'test-branch',
+							tmpGitRoot,
+							'main',
+						),
+					),
+				).rejects.toThrow();
+			} finally {
+				// Cleanup
+				await rm(tmpGitRoot, {recursive: true});
+			}
+		});
+
+		it('should execute pre-creation hook in git root directory', async () => {
+			// Arrange
+			const tmpGitRoot = await mkdtemp(join(tmpdir(), 'hook-gitroot-'));
+			const outputFile = join(tmpGitRoot, 'cwd.txt');
+			const worktreePath = join(tmpGitRoot, 'new-worktree');
+
+			try {
+				// Act - write current directory to file
+				await Effect.runPromise(
+					executeWorktreePreCreationHook(
+						`pwd > "${outputFile}"`,
+						worktreePath,
+						'test-branch',
+						tmpGitRoot,
+						'main',
+					),
+				);
+
+				// Read the output
+				const output = await readFile(outputFile, 'utf-8');
+
+				// Assert - should be executed in git root, not worktree path
+				const expectedPath = await realpath(tmpGitRoot);
+				const actualPath = await realpath(output.trim());
+				expect(actualPath).toBe(expectedPath);
+			} finally {
+				// Cleanup
+				await rm(tmpGitRoot, {recursive: true});
+			}
+		});
+
+		it('should provide environment variables to hook', async () => {
+			// Arrange
+			const tmpGitRoot = await mkdtemp(join(tmpdir(), 'hook-env-'));
+			const outputFile = join(tmpGitRoot, 'env.txt');
+			const worktreePath = join(tmpGitRoot, 'new-worktree');
+
+			try {
+				// Act - write environment variables to file
+				await Effect.runPromise(
+					executeWorktreePreCreationHook(
+						`echo "PATH:$CCMANAGER_WORKTREE_PATH" > "${outputFile}" && echo "BRANCH:$CCMANAGER_WORKTREE_BRANCH" >> "${outputFile}" && echo "ROOT:$CCMANAGER_GIT_ROOT" >> "${outputFile}" && echo "BASE:$CCMANAGER_BASE_BRANCH" >> "${outputFile}"`,
+						worktreePath,
+						'feature-123',
+						tmpGitRoot,
+						'main',
+					),
+				);
+
+				// Read the output
+				const output = await readFile(outputFile, 'utf-8');
+				const lines = output.trim().split('\n');
+
+				// Assert - environment variables should be set correctly
+				expect(lines[0]).toBe(`PATH:${worktreePath}`);
+				expect(lines[1]).toBe('BRANCH:feature-123');
+				expect(lines[2]).toBe(`ROOT:${tmpGitRoot}`);
+				expect(lines[3]).toBe('BASE:main');
+			} finally {
+				// Cleanup
+				await rm(tmpGitRoot, {recursive: true});
 			}
 		});
 	});

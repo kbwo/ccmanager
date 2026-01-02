@@ -7,13 +7,16 @@ import {
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
-import {GitError, FileSystemError} from '../types/errors.js';
+import {GitError, FileSystemError, ProcessError} from '../types/errors.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 import {
 	getClaudeProjectsDir,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
-import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
+import {
+	executeWorktreePreCreationHook,
+	executeWorktreePostCreationHook,
+} from '../utils/hookExecutor.js';
 import {configurationManager} from './configurationManager.js';
 
 const CLAUDE_DIR = '.claude';
@@ -841,6 +844,7 @@ export class WorktreeService {
 	 *
 	 * @throws {GitError} When git worktree add command fails
 	 * @throws {FileSystemError} When session data copy fails
+	 * @throws {ProcessError} When pre-creation hook fails
 	 */
 	createWorktreeEffect(
 		worktreePath: string,
@@ -848,7 +852,7 @@ export class WorktreeService {
 		baseBranch: string,
 		copySessionData = false,
 		copyClaudeDirectory = false,
-	): Effect.Effect<Worktree, GitError | FileSystemError, never> {
+	): Effect.Effect<Worktree, GitError | FileSystemError | ProcessError, never> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
 		const self = this;
 
@@ -892,6 +896,23 @@ export class WorktreeService {
 				// Resolve the base branch to its proper git reference
 				const resolvedBaseBranch = self.resolveBranchReference(baseBranch);
 				command = `git worktree add -b "${branch}" "${resolvedPath}" "${resolvedBaseBranch}"`;
+			}
+
+			// Execute pre-creation hook if configured
+			// Use context-aware getter to support per-project hook configuration
+			const worktreeHooks =
+				configurationManager.getWorktreeHooksWithContext(absoluteGitRoot);
+			if (
+				worktreeHooks.pre_creation?.enabled &&
+				worktreeHooks.pre_creation?.command
+			) {
+				yield* executeWorktreePreCreationHook(
+					worktreeHooks.pre_creation.command,
+					resolvedPath,
+					branch,
+					absoluteGitRoot,
+					baseBranch,
+				);
 			}
 
 			// Execute the worktree creation command
