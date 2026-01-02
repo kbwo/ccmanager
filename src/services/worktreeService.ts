@@ -899,7 +899,6 @@ export class WorktreeService {
 			}
 
 			// Execute pre-creation hook if configured
-			// Use context-aware getter to support per-project hook configuration
 			const worktreeHooks =
 				configurationManager.getWorktreeHooksWithContext(absoluteGitRoot);
 			if (
