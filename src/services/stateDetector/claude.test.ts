@@ -1,5 +1,5 @@
 import {describe, it, expect, beforeEach} from 'vitest';
-import {ClaudeStateDetector} from '../stateDetector.js';
+import {ClaudeStateDetector} from './claude.js';
 import type {Terminal} from '../../types/index.js';
 import {createMockTerminal} from './testUtils.js';
 
@@ -199,6 +199,61 @@ describe('ClaudeStateDetector', () => {
 				'❯ 1. Apply all',
 				'  2. Review first',
 				'  3. Skip',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "Yes" has characters before it (e.g., "❯ 1. Yes")', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Do you want to continue?',
+				'❯ 1. Yes',
+				'  2. No',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "esc to cancel" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Enter your message:',
+				'Press esc to cancel',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "esc to cancel" is present (case insensitive)', () => {
+			// Arrange
+			terminal = createMockTerminal(['Waiting for input', 'ESC TO CANCEL']);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should prioritize "esc to cancel" over "esc to interrupt" when both present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Press esc to interrupt',
+				'Some input prompt',
+				'Press esc to cancel',
 			]);
 
 			// Act

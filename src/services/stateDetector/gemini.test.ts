@@ -1,5 +1,5 @@
 import {describe, it, expect, beforeEach} from 'vitest';
-import {GeminiStateDetector} from '../stateDetector.js';
+import {GeminiStateDetector} from './gemini.js';
 import type {Terminal} from '../../types/index.js';
 import {createMockTerminal} from './testUtils.js';
 
