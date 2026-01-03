@@ -27,7 +27,7 @@ vi.mock('./bunTerminal.js', () => ({
 	}),
 }));
 
-vi.mock('./stateDetector.js', () => ({
+vi.mock('./stateDetector/index.js', () => ({
 	createStateDetector: () => ({detectState: detectStateMock}),
 }));
 

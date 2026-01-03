@@ -1,5 +1,5 @@
 import {describe, it, expect, beforeEach} from 'vitest';
-import {ClaudeStateDetector} from '../stateDetector.js';
+import {ClaudeStateDetector} from './claude.js';
 import type {Terminal} from '../../types/index.js';
 import {createMockTerminal} from './testUtils.js';
 

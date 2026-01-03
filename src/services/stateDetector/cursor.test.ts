@@ -1,5 +1,5 @@
 import {describe, it, expect, beforeEach} from 'vitest';
-import {CursorStateDetector} from '../stateDetector.js';
+import {CursorStateDetector} from './cursor.js';
 import type {Terminal} from '../../types/index.js';
 import {createMockTerminal} from './testUtils.js';
 

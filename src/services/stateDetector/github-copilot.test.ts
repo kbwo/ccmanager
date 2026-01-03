@@ -1,5 +1,5 @@
 import {describe, it, expect, beforeEach} from 'vitest';
-import {GitHubCopilotStateDetector} from '../stateDetector.js';
+import {GitHubCopilotStateDetector} from './github-copilot.js';
 import type {Terminal} from '../../types/index.js';
 import {createMockTerminal} from './testUtils.js';
 

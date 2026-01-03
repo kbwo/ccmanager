@@ -12,7 +12,7 @@ import {exec} from 'child_process';
 import {promisify} from 'util';
 import {configurationManager} from './configurationManager.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
-import {createStateDetector} from './stateDetector.js';
+import {createStateDetector} from './stateDetector/index.js';
 import {
 	STATE_PERSISTENCE_DURATION_MS,
 	STATE_CHECK_INTERVAL_MS,
