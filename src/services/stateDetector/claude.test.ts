@@ -239,10 +239,7 @@ describe('ClaudeStateDetector', () => {
 
 		it('should detect waiting_input when "esc to cancel" is present (case insensitive)', () => {
 			// Arrange
-			terminal = createMockTerminal([
-				'Waiting for input',
-				'ESC TO CANCEL',
-			]);
+			terminal = createMockTerminal(['Waiting for input', 'ESC TO CANCEL']);
 
 			// Act
 			const state = detector.detectState(terminal, 'idle');
