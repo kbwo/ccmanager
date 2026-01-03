@@ -19,6 +19,11 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		// Check for "esc to cancel" - indicates waiting for user input
+		if (lowerContent.includes('esc to cancel')) {
+			return 'waiting_input';
+		}
+
 		// Check for busy state
 		if (lowerContent.includes('esc to interrupt')) {
 			return 'busy';

@@ -207,5 +207,48 @@ describe('ClaudeStateDetector', () => {
 			// Assert
 			expect(state).toBe('waiting_input');
 		});
+
+		it('should detect waiting_input when "esc to cancel" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Enter your message:',
+				'Press esc to cancel',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input when "esc to cancel" is present (case insensitive)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Waiting for input',
+				'ESC TO CANCEL',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should prioritize "esc to cancel" over "esc to interrupt" when both present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Press esc to interrupt',
+				'Some input prompt',
+				'Press esc to cancel',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
 	});
 });
