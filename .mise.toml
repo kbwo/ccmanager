@@ -1,3 +1,2 @@
 [tools]
-"npm:@github/copilot" = "latest"
-node = "22"
+bun = "latest"

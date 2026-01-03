@@ -44,28 +44,10 @@ Claude Squad doesn't show session states in its menu, making it hard to know whi
 ### 🎯 Simple and intuitive interface
 Following Claude Code's philosophy, CCManager keeps things minimal and intuitive. The interface is so simple you'll understand it in seconds - no manual needed.
 
-## Requirements
-
-- **Node.js 22 or later** is required to run CCManager.
-
 ## Install
 
 ```bash
 npm install -g ccmanager
-```
-
-### Using mise
-
-If you use [mise](https://mise.jdx.dev/) as a version manager, you can install CCManager with:
-
-```bash
-mise install npm:ccmanager && mise use -g npm:ccmanager
-```
-
-To run CCManager with Node.js 22:
-
-```bash
-mise exec node@22 -- ccmanager
 ```
 
 ### Local Development
