@@ -208,6 +208,21 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
+		it('should detect waiting_input when "Yes" has characters before it (e.g., "❯ 1. Yes")', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Do you want to continue?',
+				'❯ 1. Yes',
+				'  2. No',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
 		it('should detect waiting_input when "esc to cancel" is present', () => {
 			// Arrange
 			terminal = createMockTerminal([
