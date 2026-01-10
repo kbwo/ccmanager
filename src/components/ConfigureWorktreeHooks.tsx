@@ -142,7 +142,7 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 
 				<Box marginTop={1}>
 					<Text dimColor>
-						Environment variables available: CCMANAGER_WORKTREE,
+						Environment variables available: CCMANAGER_WORKTREE_PATH,
 						CCMANAGER_WORKTREE_BRANCH,
 					</Text>
 				</Box>

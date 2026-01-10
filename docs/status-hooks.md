@@ -31,7 +31,7 @@ noti -t "Claude Code" -m "Claude is waiting for your input in $CCMANAGER_WORKTRE
 
 **Send to Slack (using webhook):**
 ```bash
-curl -X POST -H 'Content-type: application/json' --data '{"text":"Claude is now '"$CCMANAGER_NEW_STATE"' in '"$CCMANAGER_WORKTREE"'"}' YOUR_SLACK_WEBHOOK_URL
+curl -X POST -H 'Content-type: application/json' --data '{"text":"Claude is now '"$CCMANAGER_NEW_STATE"' in '"$CCMANAGER_WORKTREE_PATH"'"}' YOUR_SLACK_WEBHOOK_URL
 ```
 
 **Update tmux status:**
@@ -49,6 +49,6 @@ tmux set -g status-right "Claude: $CCMANAGER_NEW_STATE" && noti -t "Claude Statu
 
 - `CCMANAGER_OLD_STATE`: Previous state (idle, busy, waiting_input)
 - `CCMANAGER_NEW_STATE`: New state (idle, busy, waiting_input)
-- `CCMANAGER_WORKTREE`: Path to the worktree where status changed
+- `CCMANAGER_WORKTREE_PATH`: Path to the worktree where status changed
 - `CCMANAGER_WORKTREE_BRANCH`: Git branch name of the worktree
 - `CCMANAGER_SESSION_ID`: Unique session identifier
