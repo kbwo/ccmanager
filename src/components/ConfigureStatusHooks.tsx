@@ -170,7 +170,7 @@ const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
 				</Box>
 				<Box>
 					<Text dimColor>
-						CCMANAGER_WORKTREE_PATH, CCMANAGER_WORKTREE_BRANCH, CCMANAGER_SESSION_ID
+						{`CCMANAGER_WORKTREE_PATH, CCMANAGER_WORKTREE_BRANCH, CCMANAGER_SESSION_ID`}
 					</Text>
 				</Box>
 
