@@ -8,11 +8,13 @@ import DeleteConfirmation from './DeleteConfirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 
 interface DeleteWorktreeProps {
+	projectPath?: string;
 	onComplete: (worktreePaths: string[], deleteBranch: boolean) => void;
 	onCancel: () => void;
 }
 
 const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
+	projectPath,
 	onComplete,
 	onCancel,
 }) => {
@@ -29,7 +31,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		let cancelled = false;
 
 		const loadWorktrees = async () => {
-			const worktreeService = new WorktreeService();
+			const worktreeService = new WorktreeService(projectPath);
 
 			try {
 				const allWorktrees = await Effect.runPromise(
@@ -57,7 +59,7 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [projectPath]);
 
 	// Create menu items from worktrees
 	const menuItems = worktrees.map((worktree, index) => {
