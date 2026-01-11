@@ -89,6 +89,7 @@ export interface SessionStateData {
 	autoApprovalFailed: boolean;
 	autoApprovalReason: string | undefined;
 	autoApprovalAbortController: AbortController | undefined;
+	hasBackgroundTask: boolean;
 }
 
 /**
@@ -102,5 +103,6 @@ export function createInitialSessionStateData(): SessionStateData {
 		autoApprovalFailed: false,
 		autoApprovalReason: undefined,
 		autoApprovalAbortController: undefined,
+		hasBackgroundTask: false,
 	};
 }

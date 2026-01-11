@@ -263,4 +263,107 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 	});
+
+	describe('detectBackgroundTask', () => {
+		it('should detect background task when pattern is in last 3 lines (status bar)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Previous conversation content',
+				'More content',
+				'> Some command output',
+				'1 background task | api-call',
+			]);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(true);
+		});
+
+		it('should detect background task with plural "background tasks"', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some output',
+				'More output',
+				'2 background tasks running',
+			]);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(true);
+		});
+
+		it('should detect background task case-insensitively', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Output line 1',
+				'Output line 2',
+				'1 BACKGROUND TASK running',
+			]);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(true);
+		});
+
+		it('should return false when no background task pattern in last 3 lines', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Command completed successfully',
+				'Ready for next command',
+				'> ',
+			]);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(false);
+		});
+
+		it('should not detect background task when pattern is in conversation content (not status bar)', () => {
+			// Arrange - "background task" mentioned earlier in conversation, but not in last 3 lines
+			terminal = createMockTerminal([
+				'User: Tell me about background task handling',
+				'Assistant: Background task detection works by...',
+				'The pattern "background task" appears in text but...',
+				'This is the status bar area',
+				'> idle',
+				'Ready',
+			]);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert - should only check last 3 lines, not the conversation content
+			expect(hasBackgroundTask).toBe(false);
+		});
+
+		it('should handle empty terminal', () => {
+			// Arrange
+			terminal = createMockTerminal([]);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(false);
+		});
+
+		it('should handle terminal with fewer than 3 lines', () => {
+			// Arrange
+			terminal = createMockTerminal(['1 background task']);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(true);
+		});
+	});
 });

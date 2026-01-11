@@ -32,4 +32,10 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		// Otherwise idle
 		return 'idle';
 	}
+
+	override detectBackgroundTask(terminal: Terminal): boolean {
+		const lines = this.getTerminalLines(terminal, 3);
+		const content = lines.join('\n').toLowerCase();
+		return content.includes('background task');
+	}
 }
