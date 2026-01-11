@@ -25,7 +25,10 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		}
 
 		// Check for busy state
-		if (lowerContent.includes('esc to interrupt')) {
+		if (
+			lowerContent.includes('esc to interrupt') ||
+			lowerContent.includes('ctrl+c to interrupt')
+		) {
 			return 'busy';
 		}
 
