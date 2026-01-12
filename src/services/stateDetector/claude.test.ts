@@ -40,6 +40,20 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
+		it('should detect busy when "ctrl+c to interrupt" is present (web search)', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Googling. (ctrl+c to interrupt',
+				'Searching for relevant information...',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
 		it('should detect idle when no specific patterns are found', () => {
 			// Arrange
 			terminal = createMockTerminal([
