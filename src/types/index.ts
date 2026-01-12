@@ -17,7 +17,8 @@ export type StateDetectionStrategy =
 	| 'codex'
 	| 'cursor'
 	| 'github-copilot'
-	| 'cline';
+	| 'cline'
+	| 'opencode';
 
 export interface Worktree {
 	path: string;

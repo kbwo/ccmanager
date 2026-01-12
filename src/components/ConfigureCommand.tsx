@@ -30,6 +30,7 @@ const createStrategyItems = (): {
 			value: 'github-copilot',
 		},
 		cline: {label: 'Cline', value: 'cline'},
+		opencode: {label: 'OpenCode', value: 'opencode'},
 	};
 
 	return Object.values(strategies);
@@ -61,6 +62,10 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 			return 'Cursor';
 		case 'github-copilot':
 			return 'GitHub Copilot CLI';
+		case 'cline':
+			return 'Cline';
+		case 'opencode':
+			return 'OpenCode';
 		default:
 			return 'Claude';
 	}
