@@ -6,6 +6,7 @@ import {CodexStateDetector} from './codex.js';
 import {CursorStateDetector} from './cursor.js';
 import {GitHubCopilotStateDetector} from './github-copilot.js';
 import {ClineStateDetector} from './cline.js';
+import {OpenCodeStateDetector} from './opencode.js';
 
 export function createStateDetector(
 	strategy: StateDetectionStrategy = 'claude',
@@ -23,6 +24,8 @@ export function createStateDetector(
 			return new GitHubCopilotStateDetector();
 		case 'cline':
 			return new ClineStateDetector();
+		case 'opencode':
+			return new OpenCodeStateDetector();
 		default:
 			return new ClaudeStateDetector();
 	}

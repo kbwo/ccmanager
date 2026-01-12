@@ -23,6 +23,7 @@ import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
 import {STATUS_TAGS} from '../constants/statusIcons.js';
+import {getTerminalScreenContent} from '../utils/screenCapture.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const TERMINAL_CONTENT_MAX_LINES = 300;
@@ -86,26 +87,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	private getTerminalContent(session: Session): string {
-		const buffer = session.terminal.buffer.active;
-		const lines: string[] = [];
-
-		// Start from the bottom and work our way up
-		for (
-			let i = buffer.length - 1;
-			i >= 0 && lines.length < TERMINAL_CONTENT_MAX_LINES;
-			i--
-		) {
-			const line = buffer.getLine(i);
-			if (line) {
-				const text = line.translateToString(true);
-				// Skip empty lines at the bottom
-				if (lines.length > 0 || text.trim() !== '') {
-					lines.unshift(text);
-				}
-			}
-		}
-
-		return lines.join('\n');
+		// Use the new screen capture utility that correctly handles
+		// both normal and alternate screen buffers
+		return getTerminalScreenContent(
+			session.terminal,
+			TERMINAL_CONTENT_MAX_LINES,
+		);
 	}
 
 	private handleAutoApproval(session: Session): void {
