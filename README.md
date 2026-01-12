@@ -112,23 +112,24 @@ Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.
 
 ## Supported AI Assistants
 
-CCManager now supports multiple AI coding assistants with tailored state detection:
+CCManager supports multiple AI coding assistants with tailored state detection for each:
 
-### Claude Code (Default)
-- Command: `claude`
-- State detection: Built-in patterns for Claude's prompts and status messages
-
-### Gemini CLI
-- Command: `gemini`
-- State detection: Custom patterns for Gemini's confirmation prompts
-- Installation: [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
+| Assistant | Command | Installation |
+|-----------|---------|--------------|
+| Claude Code (Default) | `claude` | [code.claude.com](https://code.claude.com/docs/en/setup) |
+| Gemini CLI | `gemini` | [github.com/google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) |
+| Codex CLI | `codex` | [github.com/openai/codex](https://github.com/openai/codex) |
+| Cursor Agent | `cursor-agent` | [cursor.com/cli](https://cursor.com/docs/cli/overview) |
+| Copilot CLI | `copilot` | [github.com/github/copilot-cli](https://github.com/github/copilot-cli) |
+| Cline CLI | `cline` | [github.com/cline/cline](https://github.com/cline/cline) |
+| OpenCode | `opencode` | [opencode.ai/docs](https://opencode.ai/docs) |
 
 Each assistant has its own state detection strategy to properly track:
 - **Idle**: Ready for new input
 - **Busy**: Processing a request
 - **Waiting**: Awaiting user confirmation
 
-See [Gemini Support Documentation](docs/gemini-support.md) for detailed configuration instructions.
+See [Gemini Support Documentation](docs/gemini-support.md) for CCManager-specific configuration.
 
 
 ## Command Configuration
