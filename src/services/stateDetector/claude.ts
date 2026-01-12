@@ -39,8 +39,6 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		// Detect background task patterns:
 		// - "N background task(s)" in status bar
 		// - "(running)" in status bar for active background commands
-		return (
-			content.includes('background task') || content.includes('(running)')
-		);
+		return content.includes('background task') || content.includes('(running)');
 	}
 }
