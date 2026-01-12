@@ -365,5 +365,31 @@ describe('ClaudeStateDetector', () => {
 			// Assert
 			expect(hasBackgroundTask).toBe(true);
 		});
+
+		it('should detect "(running)" status bar indicator', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some conversation output',
+				'More output',
+				'bypass permissions on - uv run pytest tests/integration/e2e/tes... (running)',
+			]);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(true);
+		});
+
+		it('should detect "(running)" case-insensitively', () => {
+			// Arrange
+			terminal = createMockTerminal(['Some output', 'command name (RUNNING)']);
+
+			// Act
+			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(hasBackgroundTask).toBe(true);
+		});
 	});
 });
