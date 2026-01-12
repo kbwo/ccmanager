@@ -82,6 +82,6 @@ jobs:
 
       - name: Commit and push version update
         run: |
-          git add package.json npm/*/package.json
+          git add package.json bun.lock npm/*/package.json
           git commit -m "chore: update version to ${{ steps.get_version.outputs.VERSION }}"
           git push origin HEAD:main
