@@ -311,13 +311,7 @@ const Session: React.FC<SessionProps> = ({
 		};
 	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
 
-	return statusLineText ? (
-		<Box width="100%">
-			<Text backgroundColor={backgroundColor} color={textColor} bold>
-				{statusLineText}
-			</Text>
-		</Box>
-	) : null;
+	return null;
 };
 
 export default Session;
