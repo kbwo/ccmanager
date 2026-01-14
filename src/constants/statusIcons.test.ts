@@ -42,20 +42,24 @@ describe('getStatusDisplay', () => {
 			expect(result).toBe(`${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE}`);
 		});
 
-		it('should not append [BG] badge when busy even if hasBackgroundTask is true', () => {
+		it('should append [BG] badge when busy and hasBackgroundTask is true', () => {
 			const result = getStatusDisplay('busy', true);
-			expect(result).toBe(`${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY}`);
+			expect(result).toBe(
+				`${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY} ${STATUS_TAGS.BACKGROUND_TASK}`,
+			);
 		});
 
-		it('should not append [BG] badge when waiting_input even if hasBackgroundTask is true', () => {
+		it('should append [BG] badge when waiting_input and hasBackgroundTask is true', () => {
 			const result = getStatusDisplay('waiting_input', true);
-			expect(result).toBe(`${STATUS_ICONS.WAITING} ${STATUS_LABELS.WAITING}`);
+			expect(result).toBe(
+				`${STATUS_ICONS.WAITING} ${STATUS_LABELS.WAITING} ${STATUS_TAGS.BACKGROUND_TASK}`,
+			);
 		});
 
-		it('should not append [BG] badge when pending_auto_approval even if hasBackgroundTask is true', () => {
+		it('should append [BG] badge when pending_auto_approval and hasBackgroundTask is true', () => {
 			const result = getStatusDisplay('pending_auto_approval', true);
 			expect(result).toBe(
-				`${STATUS_ICONS.WAITING} ${STATUS_LABELS.PENDING_AUTO_APPROVAL}`,
+				`${STATUS_ICONS.WAITING} ${STATUS_LABELS.PENDING_AUTO_APPROVAL} ${STATUS_TAGS.BACKGROUND_TASK}`,
 			);
 		});
 	});

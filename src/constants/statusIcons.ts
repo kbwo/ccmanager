@@ -25,10 +25,7 @@ export const MENU_ICONS = {
 	EXIT: '⏻',
 } as const;
 
-export const getStatusDisplay = (
-	status: SessionState,
-	hasBackgroundTask: boolean = false,
-): string => {
+const getBaseStatusDisplay = (status: SessionState): string => {
 	switch (status) {
 		case 'busy':
 			return `${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY}`;
@@ -37,8 +34,16 @@ export const getStatusDisplay = (
 		case 'pending_auto_approval':
 			return `${STATUS_ICONS.WAITING} ${STATUS_LABELS.PENDING_AUTO_APPROVAL}`;
 		case 'idle':
-			return hasBackgroundTask
-				? `${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE} ${STATUS_TAGS.BACKGROUND_TASK}`
-				: `${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE}`;
+			return `${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE}`;
 	}
+};
+
+export const getStatusDisplay = (
+	status: SessionState,
+	hasBackgroundTask: boolean = false,
+): string => {
+	const display = getBaseStatusDisplay(status);
+	return hasBackgroundTask
+		? `${display} ${STATUS_TAGS.BACKGROUND_TASK}`
+		: display;
 };
