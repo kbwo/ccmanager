@@ -39,6 +39,17 @@ const createStrategyItems = (): {
 // Type-safe strategy items that ensures all StateDetectionStrategy values are included
 const ALL_STRATEGY_ITEMS = createStrategyItems();
 
+// Default command mapping for each strategy
+const DEFAULT_COMMANDS: Record<StateDetectionStrategy, string> = {
+	claude: 'claude',
+	gemini: 'gemini',
+	codex: 'codex',
+	cursor: 'cursor',
+	'github-copilot': 'copilot',
+	cline: 'cline',
+	opencode: 'opencode',
+};
+
 interface ConfigureCommandProps {
 	onComplete: () => void;
 }
@@ -90,8 +101,8 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		useState(false);
 	const [newPreset, setNewPreset] = useState<Partial<CommandPreset>>({});
 	const [addStep, setAddStep] = useState<
-		'name' | 'command' | 'args' | 'fallbackArgs' | 'detectionStrategy'
-	>('name');
+		'detectionStrategy' | 'command' | 'args' | 'fallbackArgs' | 'name'
+	>('detectionStrategy');
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
 	// Remove handleListNavigation as SelectInput handles navigation internally
@@ -189,21 +200,8 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 
 	const handleAddPresetInput = (value: string) => {
 		switch (addStep) {
-			case 'name':
-				// Prevent using "Default" as a name to avoid confusion
-				if (value.trim().toLowerCase() === 'default') {
-					setErrorMessage(
-						'Cannot use "Default" as a preset name. Please choose a different name.',
-					);
-					return;
-				}
-				setNewPreset({...newPreset, name: value});
-				setAddStep('command');
-				setInputValue('');
-				setErrorMessage(null);
-				break;
 			case 'command':
-				setNewPreset({...newPreset, command: value || 'claude'});
+				setNewPreset({...newPreset, command: value});
 				setAddStep('args');
 				setInputValue('');
 				break;
@@ -219,8 +217,42 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 					? value.trim().split(/\s+/)
 					: undefined;
 				setNewPreset({...newPreset, fallbackArgs});
+				setAddStep('name');
+				setInputValue('');
+				break;
+			}
+			case 'name': {
+				if (!value.trim()) {
+					setErrorMessage('Preset name cannot be empty. Please enter a name.');
+					return;
+				}
+				if (value.trim().toLowerCase() === 'default') {
+					setErrorMessage(
+						'Cannot use "Default" as a preset name. Please choose a different name.',
+					);
+					return;
+				}
+				const id = Date.now().toString();
+				const completePreset: CommandPreset = {
+					id,
+					name: value,
+					command: newPreset.command || 'claude',
+					args: newPreset.args,
+					fallbackArgs: newPreset.fallbackArgs,
+					detectionStrategy: newPreset.detectionStrategy || 'claude',
+				};
+
+				const updatedPresets = [...presets, completePreset];
+				setPresets(updatedPresets);
+				configurationManager.addPreset(completePreset);
+
+				setViewMode('list');
+				setSelectedIndex(updatedPresets.length - 1);
+				setNewPreset({});
 				setAddStep('detectionStrategy');
-				setIsSelectingStrategyInAdd(true);
+				setInputValue('');
+				setIsSelectingStrategyInAdd(false);
+				setErrorMessage(null);
 				break;
 			}
 		}
@@ -243,27 +275,18 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	};
 
 	const handleAddStrategySelect = (item: {label: string; value: string}) => {
-		const id = Date.now().toString();
-		const completePreset: CommandPreset = {
-			id,
-			name: newPreset.name || 'New Preset',
-			command: newPreset.command || 'claude',
-			args: newPreset.args,
-			fallbackArgs: newPreset.fallbackArgs,
-			detectionStrategy: item.value as StateDetectionStrategy,
-		};
+		const strategy = item.value as StateDetectionStrategy;
+		const defaultCommand = DEFAULT_COMMANDS[strategy];
 
-		const updatedPresets = [...presets, completePreset];
-		setPresets(updatedPresets);
-		configurationManager.addPreset(completePreset);
+		setNewPreset({
+			...newPreset,
+			detectionStrategy: strategy,
+			command: defaultCommand,
+		});
 
-		setViewMode('list');
-		setSelectedIndex(updatedPresets.length - 1);
-		setNewPreset({});
-		setAddStep('name');
-		setInputValue('');
+		setAddStep('command');
+		setInputValue(defaultCommand);
 		setIsSelectingStrategyInAdd(false);
-		setErrorMessage(null);
 	};
 
 	const handleDeleteConfirm = () => {
@@ -299,7 +322,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			} else if (isSelectingStrategyInAdd) {
 				setIsSelectingStrategyInAdd(false);
 				setViewMode('list');
-				setAddStep('name');
+				setAddStep('detectionStrategy');
 				setNewPreset({});
 			} else if (editField) {
 				setEditField(null);
@@ -451,6 +474,13 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 						<Text>Choose the state detection strategy for this preset:</Text>
 					</Box>
 
+					<Box marginBottom={1}>
+						<Text dimColor>
+							The command will be auto-set based on the strategy (can be changed
+							later)
+						</Text>
+					</Box>
+
 					<SelectInput
 						items={strategyItems}
 						onSelect={handleAddStrategySelect}
@@ -468,10 +498,11 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		}
 
 		const titles = {
-			name: 'Enter preset name:',
-			command: 'Enter command (e.g., claude):',
+			detectionStrategy: 'Select detection strategy:',
+			command: 'Enter command (default set by strategy, can be modified):',
 			args: 'Enter command arguments (space-separated):',
 			fallbackArgs: 'Enter fallback arguments (space-separated):',
+			name: 'Enter preset name (freely customizable):',
 		};
 
 		return (
@@ -486,6 +517,15 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 					<Text>{titles[addStep as keyof typeof titles]}</Text>
 				</Box>
 
+				{addStep === 'command' && (
+					<Box marginBottom={1}>
+						<Text dimColor>
+							Auto-filled from your strategy selection. You can change this if
+							needed.
+						</Text>
+					</Box>
+				)}
+
 				{errorMessage && (
 					<Box marginBottom={1}>
 						<Text color="red">{errorMessage}</Text>
@@ -498,10 +538,10 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 						onChange={setInputValue}
 						onSubmit={handleAddPresetInput}
 						placeholder={
-							addStep === 'args' || addStep === 'fallbackArgs'
-								? 'e.g., --resume or leave empty'
-								: addStep === 'name'
-									? 'e.g., Development'
+							addStep === 'name'
+								? 'e.g., Development'
+								: addStep === 'args' || addStep === 'fallbackArgs'
+									? 'e.g., --resume or leave empty'
 									: ''
 						}
 					/>
@@ -667,7 +707,8 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			// Add New Preset
 			setViewMode('add');
 			setNewPreset({});
-			setAddStep('name');
+			setAddStep('detectionStrategy');
+			setIsSelectingStrategyInAdd(true);
 			setInputValue('');
 		} else if (item.value === 'exit') {
 			// Exit
