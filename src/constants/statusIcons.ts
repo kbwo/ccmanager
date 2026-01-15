@@ -13,6 +13,10 @@ export const STATUS_LABELS = {
 	IDLE: 'Idle',
 } as const;
 
+export const STATUS_TAGS = {
+	BACKGROUND_TASK: '\x1b[2m[BG]\x1b[0m',
+} as const;
+
 export const MENU_ICONS = {
 	NEW_WORKTREE: '⊕',
 	MERGE_WORKTREE: '⇄',
@@ -21,7 +25,7 @@ export const MENU_ICONS = {
 	EXIT: '⏻',
 } as const;
 
-export const getStatusDisplay = (status: SessionState): string => {
+const getBaseStatusDisplay = (status: SessionState): string => {
 	switch (status) {
 		case 'busy':
 			return `${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY}`;
@@ -32,4 +36,14 @@ export const getStatusDisplay = (status: SessionState): string => {
 		case 'idle':
 			return `${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE}`;
 	}
+};
+
+export const getStatusDisplay = (
+	status: SessionState,
+	hasBackgroundTask: boolean = false,
+): string => {
+	const display = getBaseStatusDisplay(status);
+	return hasBackgroundTask
+		? `${display} ${STATUS_TAGS.BACKGROUND_TASK}`
+		: display;
 };

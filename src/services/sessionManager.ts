@@ -22,6 +22,7 @@ import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
+import {STATUS_TAGS} from '../constants/statusIcons.js';
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
@@ -33,6 +34,7 @@ export interface SessionCounts {
 	waiting_input: number;
 	pending_auto_approval: number;
 	total: number;
+	backgroundTasks: number;
 }
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -76,6 +78,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 
 		return detectedState;
+	}
+
+	detectBackgroundTask(session: Session): boolean {
+		const strategy = session.detectionStrategy || 'claude';
+		const detector = createStateDetector(strategy);
+		return detector.detectBackgroundTask(session.terminal);
 	}
 
 	private getTerminalContent(session: Session): string {
@@ -574,6 +582,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			) {
 				this.handleAutoApproval(session);
 			}
+
+			// Detect and update background task flag
+			const hasBackgroundTask = this.detectBackgroundTask(session);
+			if (currentStateData.hasBackgroundTask !== hasBackgroundTask) {
+				void session.stateMutex.update(data => ({
+					...data,
+					hasBackgroundTask,
+				}));
+			}
 		}, STATE_CHECK_INTERVAL_MS);
 
 		// Setup exit handler
@@ -875,6 +892,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			waiting_input: 0,
 			pending_auto_approval: 0,
 			total: sessions.length,
+			backgroundTasks: 0,
 		};
 
 		sessions.forEach(session => {
@@ -892,6 +910,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				case 'pending_auto_approval':
 					counts.pending_auto_approval++;
 					break;
+			}
+			if (stateData.hasBackgroundTask) {
+				counts.backgroundTasks++;
 			}
 		});
 
@@ -914,6 +935,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			parts.push(`${counts.waiting_input} Waiting`);
 		}
 
-		return parts.length > 0 ? ` (${parts.join(' / ')})` : '';
+		if (parts.length === 0) {
+			return '';
+		}
+
+		const bgTag =
+			counts.backgroundTasks > 0 ? ` ${STATUS_TAGS.BACKGROUND_TASK}` : '';
+		return ` (${parts.join(' / ')}${bgTag})`;
 	}
 }

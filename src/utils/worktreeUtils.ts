@@ -117,8 +117,9 @@ export function prepareWorktreeItems(
 ): WorktreeItem[] {
 	return worktrees.map(wt => {
 		const session = sessions.find(s => s.worktreePath === wt.path);
-		const status = session
-			? ` [${getStatusDisplay(session.stateMutex.getSnapshot().state)}]`
+		const stateData = session?.stateMutex.getSnapshot();
+		const status = stateData
+			? ` [${getStatusDisplay(stateData.state, stateData.hasBackgroundTask)}]`
 			: '';
 		const fullBranchName = wt.branch
 			? wt.branch.replace('refs/heads/', '')
