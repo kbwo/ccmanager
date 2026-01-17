@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
-import {configurationManager} from '../services/configurationManager.js';
+import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import Confirmation from './Confirmation.js';
 import {CommandPreset, StateDetectionStrategy} from '../types/index.js';
@@ -72,14 +72,38 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 };
 
 const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
-	const presetsConfig = configurationManager.getCommandPresets();
+	const configEditor = useConfigEditor();
+	const scope = configEditor.getScope();
+
+	// Get initial presets based on scope
+	const presetsConfig =
+		configEditor.getCommandPresets() ||
+		configEditor.getEffectiveCommandPresets();
 	const [presets, setPresets] = useState(presetsConfig.presets);
 	const [defaultPresetId, setDefaultPresetId] = useState(
 		presetsConfig.defaultPresetId,
 	);
 	const [selectPresetOnStart, setSelectPresetOnStart] = useState(
-		configurationManager.getSelectPresetOnStart(),
+		presetsConfig.selectPresetOnStart ?? false,
 	);
+
+	// Show if inheriting from global (for project scope)
+	const isInheriting =
+		scope === 'project' && !configEditor.hasProjectOverride('commandPresets');
+
+	// Helper function to save presets config
+	const savePresetsConfig = (
+		updatedPresets: CommandPreset[],
+		updatedDefaultId?: string,
+		updatedSelectOnStart?: boolean,
+	) => {
+		configEditor.setCommandPresets({
+			presets: updatedPresets,
+			defaultPresetId: updatedDefaultId ?? defaultPresetId,
+			selectPresetOnStart: updatedSelectOnStart ?? selectPresetOnStart,
+		});
+	};
+
 	const [viewMode, setViewMode] = useState<ViewMode>('list');
 	const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 	const [selectedIndex, setSelectedIndex] = useState(0);
@@ -129,7 +153,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 				break;
 			case 'setDefault':
 				setDefaultPresetId(preset.id);
-				configurationManager.setDefaultPreset(preset.id);
+				savePresetsConfig(presets, preset.id);
 				break;
 			case 'delete':
 				if (presets.length > 1) {
@@ -180,7 +204,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			p.id === preset.id ? updatedPreset : p,
 		);
 		setPresets(updatedPresets);
-		configurationManager.addPreset(updatedPreset);
+		savePresetsConfig(updatedPresets);
 
 		setEditField(null);
 		setInputValue('');
@@ -237,7 +261,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			p.id === preset.id ? updatedPreset : p,
 		);
 		setPresets(updatedPresets);
-		configurationManager.addPreset(updatedPreset);
+		savePresetsConfig(updatedPresets);
 
 		setIsSelectingStrategy(false);
 	};
@@ -255,7 +279,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 
 		const updatedPresets = [...presets, completePreset];
 		setPresets(updatedPresets);
-		configurationManager.addPreset(completePreset);
+		savePresetsConfig(updatedPresets);
 
 		setViewMode('list');
 		setSelectedIndex(updatedPresets.length - 1);
@@ -273,15 +297,16 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			setPresets(newPresets);
 
 			// Update default if needed
+			let newDefaultId = defaultPresetId;
 			if (defaultPresetId === selectedPresetId && newPresets.length > 0) {
 				const firstPreset = newPresets[0];
 				if (firstPreset) {
+					newDefaultId = firstPreset.id;
 					setDefaultPresetId(firstPreset.id);
-					configurationManager.setDefaultPreset(firstPreset.id);
 				}
 			}
 
-			configurationManager.deletePreset(selectedPresetId!);
+			savePresetsConfig(newPresets, newDefaultId);
 
 			setViewMode('list');
 			setSelectedIndex(0);
@@ -676,7 +701,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 			// Toggle select preset on start
 			const newValue = !selectPresetOnStart;
 			setSelectPresetOnStart(newValue);
-			configurationManager.setSelectPresetOnStart(newValue);
+			savePresetsConfig(presets, undefined, newValue);
 		} else if (item.value.startsWith('separator')) {
 			// Ignore separator selections
 			return;
@@ -691,13 +716,24 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		}
 	};
 
+	const scopeLabel = scope === 'project' ? 'Project' : 'Global';
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Command Command Presets
+					Command Presets ({scopeLabel})
 				</Text>
 			</Box>
+
+			{isInheriting && (
+				<Box marginBottom={1}>
+					<Text backgroundColor="cyan" color="black">
+						{' '}
+						📋 Inheriting from global configuration{' '}
+					</Text>
+				</Box>
+			)}
 
 			<Box marginBottom={1}>
 				<Text dimColor>

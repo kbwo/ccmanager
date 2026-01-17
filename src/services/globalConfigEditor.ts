@@ -12,6 +12,7 @@ import {
 	CommandPreset,
 	CommandPresetsConfig,
 	DEFAULT_SHORTCUTS,
+	IConfigEditor,
 } from '../types/index.js';
 import {
 	FileSystemError,
@@ -19,7 +20,7 @@ import {
 	ValidationError,
 } from '../types/errors.js';
 
-export class ConfigurationManager {
+export class GlobalConfigEditor implements IConfigEditor {
 	private configPath: string;
 	private legacyShortcutsPath: string;
 	private configDir: string;
@@ -157,7 +158,10 @@ export class ConfigurationManager {
 
 	private saveConfig(): void {
 		try {
-			writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
+			const jsonData = JSON.stringify(this.config, null, 2);
+			writeFileSync(this.configPath, jsonData);
+			// Re-parse to ensure in-memory state matches what was written to disk
+			this.config = JSON.parse(jsonData);
 		} catch (error) {
 			console.error('Failed to save configuration:', error);
 		}
@@ -736,6 +740,13 @@ export class ConfigurationManager {
 	isAutoApprovalEnabled(): boolean {
 		return this.config.autoApproval?.enabled ?? false;
 	}
+
+	/**
+	 * Reload configuration from disk
+	 */
+	reload(): void {
+		this.loadConfig();
+	}
 }
 
-export const configurationManager = new ConfigurationManager();
+export const globalConfigEditor = new GlobalConfigEditor();

@@ -10,7 +10,7 @@ import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {promisify} from 'util';
-import {configurationManager} from './configurationManager.js';
+import {configReader} from './configReader.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector/index.js';
 import {
@@ -69,7 +69,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// If auto-approval is enabled and state is waiting_input, convert to pending_auto_approval
 		if (
 			detectedState === 'waiting_input' &&
-			configurationManager.isAutoApprovalEnabled() &&
+			configReader.isAutoApprovalEnabled() &&
 			!stateData.autoApprovalFailed
 		) {
 			return 'pending_auto_approval';
@@ -297,7 +297,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions.set(worktreePath, session);
 
 		// Record the timestamp when this worktree was opened
-		configurationManager.setWorktreeLastOpened(worktreePath, Date.now());
+		configReader.setWorktreeLastOpened(worktreePath, Date.now());
 
 		this.emit('sessionCreated', session);
 
@@ -335,11 +335,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 
 				// Get preset configuration
-				let preset = presetId
-					? configurationManager.getPresetById(presetId)
-					: null;
+				let preset = presetId ? configReader.getPresetById(presetId) : null;
 				if (!preset) {
-					preset = configurationManager.getDefaultPreset();
+					preset = configReader.getDefaultPreset();
 				}
 
 				// Validate preset exists
@@ -608,7 +606,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			// If becoming active, record the timestamp when this worktree was opened
 			if (active) {
-				configurationManager.setWorktreeLastOpened(worktreePath, Date.now());
+				configReader.setWorktreeLastOpened(worktreePath, Date.now());
 
 				// Emit a restore event with the output history if available
 				if (session.outputHistory.length > 0) {
@@ -788,11 +786,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 
 				// Get preset configuration
-				let preset = presetId
-					? configurationManager.getPresetById(presetId)
-					: null;
+				let preset = presetId ? configReader.getPresetById(presetId) : null;
 				if (!preset) {
-					preset = configurationManager.getDefaultPreset();
+					preset = configReader.getDefaultPreset();
 				}
 
 				// Validate preset exists

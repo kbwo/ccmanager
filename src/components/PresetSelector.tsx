@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import {configurationManager} from '../services/configurationManager.js';
+import {configReader} from '../services/configReader.js';
 
 interface PresetSelectorProps {
 	onSelect: (presetId: string) => void;
@@ -12,7 +12,7 @@ const PresetSelector: React.FC<PresetSelectorProps> = ({
 	onSelect,
 	onCancel,
 }) => {
-	const presetsConfig = configurationManager.getCommandPresets();
+	const presetsConfig = configReader.getCommandPresets();
 	const [presets] = useState(presetsConfig.presets);
 	const defaultPresetId = presetsConfig.defaultPresetId;
 

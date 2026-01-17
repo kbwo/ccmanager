@@ -3,7 +3,7 @@ import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {Worktree, Session, SessionState} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {configReader} from '../services/configReader.js';
 
 export interface HookEnvironment {
 	CCMANAGER_WORKTREE_PATH: string;
@@ -149,7 +149,7 @@ export function executeStatusHook(
 	newState: SessionState,
 	session: Session,
 ): Effect.Effect<void, never> {
-	const statusHooks = configurationManager.getStatusHooks();
+	const statusHooks = configReader.getStatusHooks();
 	const hook = statusHooks[newState];
 
 	if (!hook || !hook.enabled || !hook.command) {

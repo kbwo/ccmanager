@@ -57,8 +57,8 @@ vi.mock('../services/shortcutManager.js', () => ({
 	},
 }));
 
-vi.mock('../services/configurationManager.js', () => ({
-	configurationManager: {
+vi.mock('../services/configReader.js', () => ({
+	configReader: {
 		getWorktreeConfig: () => ({
 			autoDirectory: false,
 			autoDirectoryPattern: '../{project}-{branch}',
@@ -233,11 +233,10 @@ describe('NewWorktree component Effect integration', () => {
 	it('should handle empty branch list', async () => {
 		const {Effect} = await import('effect');
 		const {WorktreeService} = await import('../services/worktreeService.js');
-		const {configurationManager} =
-			await import('../services/configurationManager.js');
+		const {configReader} = await import('../services/configReader.js');
 
 		// Mock autoDirectory to true so component starts at base-branch step
-		vi.spyOn(configurationManager, 'getWorktreeConfig').mockReturnValue({
+		vi.spyOn(configReader, 'getWorktreeConfig').mockReturnValue({
 			autoDirectory: true,
 			autoDirectoryPattern: '../{project}-{branch}',
 			copySessionData: true,
@@ -272,11 +271,10 @@ describe('NewWorktree component Effect integration', () => {
 	it('should display branches after successful loading', async () => {
 		const {Effect} = await import('effect');
 		const {WorktreeService} = await import('../services/worktreeService.js');
-		const {configurationManager} =
-			await import('../services/configurationManager.js');
+		const {configReader} = await import('../services/configReader.js');
 
 		// Mock autoDirectory to true so component starts at base-branch step
-		vi.spyOn(configurationManager, 'getWorktreeConfig').mockReturnValue({
+		vi.spyOn(configReader, 'getWorktreeConfig').mockReturnValue({
 			autoDirectory: true,
 			autoDirectoryPattern: '../{project}-{branch}',
 			copySessionData: true,

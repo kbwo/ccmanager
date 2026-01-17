@@ -1,6 +1,6 @@
 import {describe, expect, it, beforeEach, afterEach, vi} from 'vitest';
 import {shortcutManager} from './shortcutManager.js';
-import {configurationManager} from './configurationManager.js';
+import {configReader} from './configReader.js';
 
 describe('shortcutManager.matchesRawInput', () => {
 	const shortcuts = {
@@ -9,7 +9,7 @@ describe('shortcutManager.matchesRawInput', () => {
 	};
 
 	beforeEach(() => {
-		vi.spyOn(configurationManager, 'getShortcuts').mockReturnValue(shortcuts);
+		vi.spyOn(configReader, 'getShortcuts').mockReturnValue(shortcuts);
 	});
 
 	afterEach(() => {

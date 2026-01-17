@@ -149,6 +149,57 @@ export interface ConfigurationData {
 	};
 }
 
+// Per-project configuration support
+export type ConfigScope = 'project' | 'global';
+
+export interface AutoApprovalConfig {
+	enabled: boolean;
+	customCommand?: string;
+	timeout?: number;
+}
+
+export interface ProjectConfigurationData {
+	shortcuts?: ShortcutConfig;
+	statusHooks?: StatusHookConfig;
+	worktreeHooks?: WorktreeHookConfig;
+	worktree?: WorktreeConfig;
+	commandPresets?: CommandPresetsConfig;
+	autoApproval?: AutoApprovalConfig;
+}
+
+/**
+ * Common interface for configuration editors.
+ * Implemented by both GlobalConfigEditor and ProjectConfigEditor.
+ */
+export interface IConfigEditor {
+	// Shortcuts
+	getShortcuts(): ShortcutConfig | undefined;
+	setShortcuts(value: ShortcutConfig): void;
+
+	// Status Hooks
+	getStatusHooks(): StatusHookConfig | undefined;
+	setStatusHooks(value: StatusHookConfig): void;
+
+	// Worktree Hooks
+	getWorktreeHooks(): WorktreeHookConfig | undefined;
+	setWorktreeHooks(value: WorktreeHookConfig): void;
+
+	// Worktree Config
+	getWorktreeConfig(): WorktreeConfig | undefined;
+	setWorktreeConfig(value: WorktreeConfig): void;
+
+	// Command Presets
+	getCommandPresets(): CommandPresetsConfig | undefined;
+	setCommandPresets(value: CommandPresetsConfig): void;
+
+	// Auto Approval
+	getAutoApprovalConfig(): AutoApprovalConfig | undefined;
+	setAutoApprovalConfig(value: AutoApprovalConfig): void;
+
+	// Reload config from disk
+	reload(): void;
+}
+
 // Multi-project support interfaces
 export interface GitProject {
 	name: string; // Project name (directory name)

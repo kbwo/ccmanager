@@ -1,11 +1,8 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import {Effect} from 'effect';
-import {shortcutManager} from '../services/shortcutManager.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {ShortcutConfig, ShortcutKey} from '../types/index.js';
-import {AppError} from '../types/errors.js';
 
 interface ConfigureShortcutsProps {
 	onComplete: () => void;
@@ -18,76 +15,25 @@ interface MenuItem {
 	value: string;
 }
 
-/**
- * Format error using TaggedError discrimination
- * Pattern matches on _tag for type-safe error display
- */
-const formatError = (error: AppError): string => {
-	switch (error._tag) {
-		case 'FileSystemError':
-			return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
-		case 'ConfigError':
-			return `Configuration error (${error.reason}): ${error.details}`;
-		case 'ValidationError':
-			return `Validation failed for ${error.field}: ${error.constraint}`;
-		case 'GitError':
-			return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
-		case 'ProcessError':
-			return `Process error: ${error.message}`;
-	}
-};
-
 const ConfigureShortcuts: React.FC<ConfigureShortcutsProps> = ({
 	onComplete,
 }) => {
+	const configEditor = useConfigEditor();
+	const scope = configEditor.getScope();
 	const [step, setStep] = useState<ConfigStep>('menu');
-	const [shortcuts, setShortcuts] = useState<ShortcutConfig>(
-		shortcutManager.getShortcuts(),
-	);
+
+	// Get initial shortcuts based on scope
+	const initialShortcuts =
+		configEditor.getShortcuts() || configEditor.getEffectiveShortcuts();
+	const [shortcuts, setShortcuts] = useState<ShortcutConfig>(initialShortcuts);
 	const [editingShortcut, setEditingShortcut] = useState<
 		keyof ShortcutConfig | null
 	>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [isLoading, setIsLoading] = useState<boolean>(true);
 
-	// Load configuration using Effect on component mount
-	useEffect(() => {
-		let cancelled = false;
-
-		const loadConfig = async () => {
-			const result = await Effect.runPromise(
-				Effect.match(configurationManager.loadConfigEffect(), {
-					onFailure: (err: AppError) => ({
-						type: 'error' as const,
-						error: err,
-					}),
-					onSuccess: config => ({type: 'success' as const, data: config}),
-				}),
-			);
-
-			if (!cancelled) {
-				if (result.type === 'error') {
-					// Display error using TaggedError discrimination
-					const errorMsg = formatError(result.error);
-					setError(errorMsg);
-				} else if (result.data.shortcuts) {
-					setShortcuts(result.data.shortcuts);
-				}
-				setIsLoading(false);
-			}
-		};
-
-		loadConfig().catch(err => {
-			if (!cancelled) {
-				setError(`Unexpected error loading config: ${String(err)}`);
-				setIsLoading(false);
-			}
-		});
-
-		return () => {
-			cancelled = true;
-		};
-	}, []);
+	// Show if inheriting from global (for project scope)
+	const isInheriting =
+		scope === 'project' && !configEditor.hasProjectOverride('shortcuts');
 
 	const getShortcutDisplayFromState = (key: keyof ShortcutConfig): string => {
 		const shortcut = shortcuts[key];
@@ -178,31 +124,13 @@ const ConfigureShortcuts: React.FC<ConfigureShortcutsProps> = ({
 			return;
 		}
 		if (item.value === 'save') {
-			// Save shortcuts using Effect-based method
-			const saveConfig = async () => {
-				const result = await Effect.runPromise(
-					Effect.match(configurationManager.setShortcutsEffect(shortcuts), {
-						onFailure: (err: AppError) => ({
-							type: 'error' as const,
-							error: err,
-						}),
-						onSuccess: () => ({type: 'success' as const}),
-					}),
-				);
-
-				if (result.type === 'error') {
-					// Display error using TaggedError discrimination
-					const errorMsg = formatError(result.error);
-					setError(errorMsg);
-				} else {
-					// Success - call onComplete
-					onComplete();
-				}
-			};
-
-			saveConfig().catch(err => {
-				setError(`Unexpected error saving shortcuts: ${String(err)}`);
-			});
+			// Save shortcuts using ConfigEditor
+			try {
+				configEditor.setShortcuts(shortcuts);
+				onComplete();
+			} catch (err) {
+				setError(`Error saving shortcuts: ${String(err)}`);
+			}
 			return;
 		}
 		if (item.value === 'exit') {
@@ -215,15 +143,6 @@ const ConfigureShortcuts: React.FC<ConfigureShortcutsProps> = ({
 		setStep('capturing');
 		setError(null);
 	};
-
-	// Show loading indicator while loading config
-	if (isLoading) {
-		return (
-			<Box flexDirection="column">
-				<Text>Loading configuration...</Text>
-			</Box>
-		);
-	}
 
 	if (step === 'capturing') {
 		return (
@@ -244,13 +163,24 @@ const ConfigureShortcuts: React.FC<ConfigureShortcutsProps> = ({
 		);
 	}
 
+	const scopeLabel = scope === 'project' ? 'Project' : 'Global';
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Configure Keyboard Shortcuts
+					Configure Keyboard Shortcuts ({scopeLabel})
 				</Text>
 			</Box>
+
+			{isInheriting && (
+				<Box marginBottom={1}>
+					<Text backgroundColor="cyan" color="black">
+						{' '}
+						📋 Inheriting from global configuration{' '}
+					</Text>
+				</Box>
+			)}
 
 			{error && (
 				<Box marginBottom={1}>

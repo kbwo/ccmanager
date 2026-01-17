@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
-import {ConfigurationManager} from './configurationManager.js';
+import {GlobalConfigEditor} from './globalConfigEditor.js';
 import type {ConfigurationData} from '../types/index.js';
 
 // Mock fs module
@@ -16,13 +16,15 @@ vi.mock('os', () => ({
 	homedir: vi.fn(() => '/home/test'),
 }));
 
-describe('ConfigurationManager - selectPresetOnStart', () => {
-	let configManager: ConfigurationManager;
+describe('GlobalConfigEditor - selectPresetOnStart', () => {
+	let configManager: GlobalConfigEditor;
 	let mockConfigData: ConfigurationData;
+	let savedConfigData: string | null = null;
 
 	beforeEach(() => {
 		// Reset all mocks
 		vi.clearAllMocks();
+		savedConfigData = null;
 
 		// Default mock config data
 		mockConfigData = {
@@ -56,14 +58,20 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 		);
 
 		(readFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
-			return JSON.stringify(mockConfigData);
+			// Return saved data if available, otherwise return initial mock data
+			return savedConfigData ?? JSON.stringify(mockConfigData);
 		});
 
 		(mkdirSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
-		(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
+		(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(_path: string, data: string) => {
+				// Track written data so subsequent reads return it
+				savedConfigData = data;
+			},
+		);
 
 		// Create new instance for each test
-		configManager = new ConfigurationManager();
+		configManager = new GlobalConfigEditor();
 	});
 
 	afterEach(() => {
@@ -78,7 +86,7 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 
 		it('should return true when configured', () => {
 			mockConfigData.commandPresets!.selectPresetOnStart = true;
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = configManager.getSelectPresetOnStart();
 			expect(result).toBe(true);
@@ -86,7 +94,7 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 
 		it('should return false when explicitly set to false', () => {
 			mockConfigData.commandPresets!.selectPresetOnStart = false;
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = configManager.getSelectPresetOnStart();
 			expect(result).toBe(false);

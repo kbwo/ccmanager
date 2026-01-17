@@ -3,7 +3,7 @@ import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {configReader} from '../services/configReader.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
@@ -40,7 +40,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	onComplete,
 	onCancel,
 }) => {
-	const worktreeConfig = configurationManager.getWorktreeConfig();
+	const worktreeConfig = configReader.getWorktreeConfig();
 	const isAutoDirectory = worktreeConfig.autoDirectory;
 	const limit = 10;
 

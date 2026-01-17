@@ -2,7 +2,7 @@ import React from 'react';
 import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import ConfigureOther from './ConfigureOther.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {ConfigEditorProvider} from '../contexts/ConfigEditorContext.js';
 
 // Mock ink to avoid stdin issues during tests
 vi.mock('ink', async () => {
@@ -30,12 +30,26 @@ vi.mock('ink-select-input', async () => {
 	};
 });
 
-vi.mock('../services/configurationManager.js', () => ({
-	configurationManager: {
-		getAutoApprovalConfig: vi.fn(),
-		setAutoApprovalConfig: vi.fn(),
-	},
-}));
+// Create mock functions that will be used by the mock class
+const mockFns = {
+	getAutoApprovalConfig: vi.fn(),
+	setAutoApprovalConfig: vi.fn(),
+	getEffectiveAutoApprovalConfig: vi.fn(),
+	hasProjectOverride: vi.fn().mockReturnValue(false),
+	getScope: vi.fn().mockReturnValue('global'),
+};
+
+vi.mock('../services/configEditor.js', () => {
+	return {
+		ConfigEditor: class {
+			getAutoApprovalConfig = mockFns.getAutoApprovalConfig;
+			setAutoApprovalConfig = mockFns.setAutoApprovalConfig;
+			getEffectiveAutoApprovalConfig = mockFns.getEffectiveAutoApprovalConfig;
+			hasProjectOverride = mockFns.hasProjectOverride;
+			getScope = mockFns.getScope;
+		},
+	};
+});
 
 vi.mock('../services/shortcutManager.js', () => ({
 	shortcutManager: {
@@ -73,23 +87,28 @@ vi.mock('./CustomCommandSummary.js', async () => {
 	};
 });
 
-const mockedConfigurationManager = configurationManager as unknown as {
-	getAutoApprovalConfig: ReturnType<typeof vi.fn>;
-	setAutoApprovalConfig: ReturnType<typeof vi.fn>;
-};
-
 describe('ConfigureOther', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
 	it('renders experimental settings with auto-approval status', () => {
-		mockedConfigurationManager.getAutoApprovalConfig.mockReturnValue({
+		mockFns.getAutoApprovalConfig.mockReturnValue({
 			enabled: true,
 			customCommand: '',
+			timeout: 30,
+		});
+		mockFns.getEffectiveAutoApprovalConfig.mockReturnValue({
+			enabled: true,
+			customCommand: '',
+			timeout: 30,
 		});
 
-		const {lastFrame} = render(<ConfigureOther onComplete={vi.fn()} />);
+		const {lastFrame} = render(
+			<ConfigEditorProvider scope="global">
+				<ConfigureOther onComplete={vi.fn()} />
+			</ConfigEditorProvider>,
+		);
 
 		expect(lastFrame()).toContain('Other & Experimental Settings');
 		expect(lastFrame()).toContain('Auto Approval (experimental): ✅ Enabled');
@@ -99,12 +118,22 @@ describe('ConfigureOther', () => {
 	});
 
 	it('shows current custom command summary', () => {
-		mockedConfigurationManager.getAutoApprovalConfig.mockReturnValue({
+		mockFns.getAutoApprovalConfig.mockReturnValue({
 			enabled: false,
 			customCommand: 'jq -n \'{"needsPermission":true}\'',
+			timeout: 30,
+		});
+		mockFns.getEffectiveAutoApprovalConfig.mockReturnValue({
+			enabled: false,
+			customCommand: 'jq -n \'{"needsPermission":true}\'',
+			timeout: 30,
 		});
 
-		const {lastFrame} = render(<ConfigureOther onComplete={vi.fn()} />);
+		const {lastFrame} = render(
+			<ConfigEditorProvider scope="global">
+				<ConfigureOther onComplete={vi.fn()} />
+			</ConfigEditorProvider>,
+		);
 
 		expect(lastFrame()).toContain('Custom auto-approval command:');
 		expect(lastFrame()).toContain('jq -n');

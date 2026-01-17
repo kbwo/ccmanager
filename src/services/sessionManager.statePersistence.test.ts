@@ -12,8 +12,8 @@ vi.mock('./bunTerminal.js', () => ({
 		return null;
 	}),
 }));
-vi.mock('./configurationManager.js', () => ({
-	configurationManager: {
+vi.mock('./configReader.js', () => ({
+	configReader: {
 		getConfig: vi.fn().mockReturnValue({
 			commands: [
 				{

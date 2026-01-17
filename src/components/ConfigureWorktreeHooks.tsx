@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
-import {configurationManager} from '../services/configurationManager.js';
+import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {WorktreeHookConfig} from '../types/index.js';
 
 interface ConfigureWorktreeHooksProps {
@@ -19,13 +19,22 @@ interface MenuItem {
 const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 	onComplete,
 }) => {
+	const configEditor = useConfigEditor();
+	const scope = configEditor.getScope();
 	const [view, setView] = useState<View>('menu');
-	const [worktreeHooks, setWorktreeHooks] = useState<WorktreeHookConfig>(
-		configurationManager.getWorktreeHooks(),
-	);
+
+	// Get initial worktree hooks based on scope
+	const initialWorktreeHooks =
+		configEditor.getWorktreeHooks() || configEditor.getEffectiveWorktreeHooks();
+	const [worktreeHooks, setWorktreeHooks] =
+		useState<WorktreeHookConfig>(initialWorktreeHooks);
 	const [currentCommand, setCurrentCommand] = useState('');
 	const [currentEnabled, setCurrentEnabled] = useState(false);
 	const [showSaveMessage, setShowSaveMessage] = useState(false);
+
+	// Show if inheriting from global (for project scope)
+	const isInheriting =
+		scope === 'project' && !configEditor.hasProjectOverride('worktreeHooks');
 
 	useInput((input, key) => {
 		if (key.escape) {
@@ -71,7 +80,7 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 
 	const handleMenuSelect = (item: MenuItem) => {
 		if (item.value === 'save') {
-			configurationManager.setWorktreeHooks(worktreeHooks);
+			configEditor.setWorktreeHooks(worktreeHooks);
 			setShowSaveMessage(true);
 			setTimeout(() => {
 				onComplete();
@@ -159,13 +168,24 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 		);
 	}
 
+	const scopeLabel = scope === 'project' ? 'Project' : 'Global';
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Configure Worktree Hooks
+					Configure Worktree Hooks ({scopeLabel})
 				</Text>
 			</Box>
+
+			{isInheriting && (
+				<Box marginBottom={1}>
+					<Text backgroundColor="cyan" color="black">
+						{' '}
+						📋 Inheriting from global configuration{' '}
+					</Text>
+				</Box>
+			)}
 
 			<Box marginBottom={1}>
 				<Text dimColor>Set commands to run on worktree events:</Text>

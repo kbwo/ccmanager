@@ -1,7 +1,7 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {Effect, Either} from 'effect';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
-import {ConfigurationManager} from './configurationManager.js';
+import {GlobalConfigEditor} from './globalConfigEditor.js';
 import {
 	FileSystemError,
 	ConfigError,
@@ -26,8 +26,8 @@ vi.mock('os', () => ({
 	homedir: vi.fn(() => '/home/test'),
 }));
 
-describe('ConfigurationManager - Effect-based operations', () => {
-	let configManager: ConfigurationManager;
+describe('GlobalConfigEditor - Effect-based operations', () => {
+	let configManager: GlobalConfigEditor;
 	let mockConfigData: ConfigurationData;
 
 	beforeEach(() => {
@@ -61,7 +61,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 		(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
 
 		// Create new instance for each test
-		configManager = new ConfigurationManager();
+		configManager = new GlobalConfigEditor();
 	});
 
 	afterEach(() => {
@@ -82,7 +82,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				throw new Error('EACCES: permission denied');
 			});
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = await Effect.runPromise(
 				Effect.either(configManager.loadConfigEffect()),
@@ -103,7 +103,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				return 'invalid json{';
 			});
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = await Effect.runPromise(
 				Effect.either(configManager.loadConfigEffect()),
@@ -138,7 +138,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				},
 			);
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = await Effect.runPromise(configManager.loadConfigEffect());
 
@@ -244,7 +244,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = configManager.getPresetByIdEffect('2');
 
@@ -265,7 +265,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = configManager.getPresetByIdEffect('999');
 
@@ -284,7 +284,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = configManager.getPresetByIdEffect('invalid-id');
 
@@ -374,7 +374,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const newPreset: CommandPreset = {
 				id: '2',
@@ -394,7 +394,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const updatedPreset: CommandPreset = {
 				id: '1',
@@ -440,7 +440,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			await Effect.runPromise(configManager.deletePresetEffect('2'));
 
@@ -453,7 +453,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = await Effect.runPromise(
 				Effect.either(configManager.deletePresetEffect('1')),
@@ -478,7 +478,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
 				throw new Error('Save failed');
@@ -505,7 +505,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			await Effect.runPromise(configManager.setDefaultPresetEffect('2'));
 
@@ -518,7 +518,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			const result = await Effect.runPromise(
 				Effect.either(configManager.setDefaultPresetEffect('999')),
@@ -540,7 +540,7 @@ describe('ConfigurationManager - Effect-based operations', () => {
 				defaultPresetId: '1',
 			};
 
-			configManager = new ConfigurationManager();
+			configManager = new GlobalConfigEditor();
 
 			(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
 				throw new Error('Save failed');

@@ -14,7 +14,7 @@ import {
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
 import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
-import {configurationManager} from './configurationManager.js';
+import {configReader} from './configReader.js';
 
 const CLAUDE_DIR = '.claude';
 
@@ -738,12 +738,8 @@ export class WorktreeService {
 					if (sortByLastSession) {
 						worktrees.sort((a, b) => {
 							// Get last opened timestamps for both worktrees
-							const timeA = configurationManager.getWorktreeLastOpenedTime(
-								a.path,
-							);
-							const timeB = configurationManager.getWorktreeLastOpenedTime(
-								b.path,
-							);
+							const timeA = configReader.getWorktreeLastOpenedTime(a.path);
+							const timeB = configReader.getWorktreeLastOpenedTime(b.path);
 
 							// If both timestamps are undefined, preserve original order
 							if (timeA === undefined && timeB === undefined) {
@@ -958,7 +954,7 @@ export class WorktreeService {
 			}
 
 			// Execute post-creation hook if configured
-			const worktreeHooks = configurationManager.getWorktreeHooks();
+			const worktreeHooks = configReader.getWorktreeHooks();
 			if (
 				worktreeHooks.post_creation?.enabled &&
 				worktreeHooks.post_creation?.command
