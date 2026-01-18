@@ -22,6 +22,7 @@ import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
+import {STATUS_TAGS} from '../constants/statusIcons.js';
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
@@ -33,6 +34,7 @@ export interface SessionCounts {
 	waiting_input: number;
 	pending_auto_approval: number;
 	total: number;
+	backgroundTasks: number;
 }
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -57,11 +59,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	detectTerminalState(session: Session): SessionState {
-		// Create a detector based on the session's detection strategy
-		const strategy = session.detectionStrategy || 'claude';
-		const detector = createStateDetector(strategy);
 		const stateData = session.stateMutex.getSnapshot();
-		const detectedState = detector.detectState(
+		const detectedState = session.stateDetector.detectState(
 			session.terminal,
 			stateData.state,
 		);
@@ -76,6 +75,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 
 		return detectedState;
+	}
+
+	detectBackgroundTask(session: Session): boolean {
+		return session.stateDetector.detectBackgroundTask(session.terminal);
 	}
 
 	private getTerminalContent(session: Session): string {
@@ -273,6 +276,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	): Promise<Session> {
 		const id = this.createSessionId();
 		const terminal = this.createTerminal();
+		const detectionStrategy = options.detectionStrategy ?? 'claude';
+		const stateDetector = createStateDetector(detectionStrategy);
 
 		const session: Session = {
 			id,
@@ -286,9 +291,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			commandConfig,
-			detectionStrategy: options.detectionStrategy ?? 'claude',
+			detectionStrategy,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
+			stateDetector,
 		};
 
 		// Set up persistent background data handler for state detection
@@ -573,6 +579,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				!currentStateData.autoApprovalAbortController
 			) {
 				this.handleAutoApproval(session);
+			}
+
+			// Detect and update background task flag
+			const hasBackgroundTask = this.detectBackgroundTask(session);
+			if (currentStateData.hasBackgroundTask !== hasBackgroundTask) {
+				void session.stateMutex.update(data => ({
+					...data,
+					hasBackgroundTask,
+				}));
 			}
 		}, STATE_CHECK_INTERVAL_MS);
 
@@ -875,6 +890,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			waiting_input: 0,
 			pending_auto_approval: 0,
 			total: sessions.length,
+			backgroundTasks: 0,
 		};
 
 		sessions.forEach(session => {
@@ -892,6 +908,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				case 'pending_auto_approval':
 					counts.pending_auto_approval++;
 					break;
+			}
+			if (stateData.hasBackgroundTask) {
+				counts.backgroundTasks++;
 			}
 		});
 
@@ -914,6 +933,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			parts.push(`${counts.waiting_input} Waiting`);
 		}
 
-		return parts.length > 0 ? ` (${parts.join(' / ')})` : '';
+		if (parts.length === 0) {
+			return '';
+		}
+
+		const bgTag =
+			counts.backgroundTasks > 0 ? ` ${STATUS_TAGS.BACKGROUND_TASK}` : '';
+		return ` (${parts.join(' / ')}${bgTag})`;
 	}
 }

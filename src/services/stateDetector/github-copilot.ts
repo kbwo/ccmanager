@@ -24,4 +24,8 @@ export class GitHubCopilotStateDetector extends BaseStateDetector {
 		// Otherwise idle as priority 4
 		return 'idle';
 	}
+
+	detectBackgroundTask(_terminal: Terminal): boolean {
+		return false;
+	}
 }
