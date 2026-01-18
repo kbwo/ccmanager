@@ -2,6 +2,7 @@ import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {Effect, Either} from 'effect';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
 import {GlobalConfigManager} from './globalConfigManager.js';
+import {loadConfigEffect, validateConfig} from './testUtils.js';
 import {
 	FileSystemError,
 	ConfigError,
@@ -12,6 +13,11 @@ import type {
 	ConfigurationData,
 	CommandPreset,
 } from '../../types/index.js';
+
+// Test paths (matching what GlobalConfigManager constructs with mocked homedir)
+const TEST_CONFIG_PATH = '/home/test/.config/ccmanager/config.json';
+const TEST_LEGACY_SHORTCUTS_PATH =
+	'/home/test/.config/ccmanager/shortcuts.json';
 
 // Mock fs module
 vi.mock('fs', () => ({
@@ -66,7 +72,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 
 	describe('loadConfigEffect', () => {
 		it('should return Effect with ConfigurationData on success', async () => {
-			const result = await Effect.runPromise(configManager.loadConfigEffect());
+			const result = await Effect.runPromise(
+				loadConfigEffect(TEST_CONFIG_PATH, TEST_LEGACY_SHORTCUTS_PATH),
+			);
 
 			expect(result).toBeDefined();
 			expect(result.shortcuts).toBeDefined();
@@ -77,10 +85,10 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				throw new Error('EACCES: permission denied');
 			});
 
-			configManager = new GlobalConfigManager();
-
 			const result = await Effect.runPromise(
-				Effect.either(configManager.loadConfigEffect()),
+				Effect.either(
+					loadConfigEffect(TEST_CONFIG_PATH, TEST_LEGACY_SHORTCUTS_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -98,10 +106,10 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				return 'invalid json{';
 			});
 
-			configManager = new GlobalConfigManager();
-
 			const result = await Effect.runPromise(
-				Effect.either(configManager.loadConfigEffect()),
+				Effect.either(
+					loadConfigEffect(TEST_CONFIG_PATH, TEST_LEGACY_SHORTCUTS_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -133,9 +141,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				},
 			);
 
-			configManager = new GlobalConfigManager();
-
-			const result = await Effect.runPromise(configManager.loadConfigEffect());
+			const result = await Effect.runPromise(
+				loadConfigEffect(TEST_CONFIG_PATH, TEST_LEGACY_SHORTCUTS_PATH),
+			);
 
 			expect(result.shortcuts).toEqual(legacyShortcuts);
 			expect(writeFileSync).toHaveBeenCalled();
@@ -195,7 +203,7 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				},
 			};
 
-			const result = configManager.validateConfig(validConfig);
+			const result = validateConfig(validConfig);
 
 			expect(Either.isRight(result)).toBe(true);
 			if (Either.isRight(result)) {
@@ -208,7 +216,7 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				shortcuts: 'not an object',
 			};
 
-			const result = configManager.validateConfig(invalidConfig);
+			const result = validateConfig(invalidConfig);
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {
@@ -219,7 +227,7 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 		});
 
 		it('should return Left for null config', () => {
-			const result = configManager.validateConfig(null);
+			const result = validateConfig(null);
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {

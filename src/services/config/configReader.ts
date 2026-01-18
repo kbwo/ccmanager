@@ -1,4 +1,4 @@
-import {Effect, Either} from 'effect';
+import {Either} from 'effect';
 import {
 	ShortcutConfig,
 	StatusHookConfig,
@@ -8,11 +8,7 @@ import {
 	CommandPreset,
 	ConfigurationData,
 } from '../../types/index.js';
-import {
-	FileSystemError,
-	ConfigError,
-	ValidationError,
-} from '../../types/errors.js';
+import {ValidationError} from '../../types/errors.js';
 import {globalConfigManager} from './globalConfigManager.js';
 import {projectConfigManager} from './projectConfigManager.js';
 
@@ -104,66 +100,6 @@ export class ConfigReader {
 	getSelectPresetOnStart(): boolean {
 		const presets = this.getCommandPresets();
 		return presets.selectPresetOnStart ?? false;
-	}
-
-	// Effect-based methods for type-safe error handling
-	loadConfigEffect(): Effect.Effect<
-		ConfigurationData,
-		FileSystemError | ConfigError,
-		never
-	> {
-		const configPath = projectConfigManager.getConfigPath();
-		return Effect.try({
-			try: () => this.getConfiguration(),
-			catch: (error: unknown) => {
-				if (error instanceof SyntaxError) {
-					return new ConfigError({
-						configPath,
-						reason: 'parse',
-						details: String(error),
-					});
-				}
-				return new FileSystemError({
-					operation: 'read',
-					path: configPath,
-					cause: String(error),
-				});
-			},
-		});
-	}
-
-	// Validate configuration structure
-	validateConfig(
-		config: unknown,
-	): Either.Either<ValidationError, ConfigurationData> {
-		if (!config || typeof config !== 'object') {
-			return Either.left(
-				new ValidationError({
-					field: 'config',
-					constraint: 'must be a valid configuration object',
-					receivedValue: config,
-				}),
-			) as Either.Either<ValidationError, ConfigurationData>;
-		}
-
-		const configObj = config as Record<string, unknown>;
-		if (
-			configObj['shortcuts'] !== undefined &&
-			(typeof configObj['shortcuts'] !== 'object' ||
-				configObj['shortcuts'] === null)
-		) {
-			return Either.left(
-				new ValidationError({
-					field: 'config',
-					constraint: 'shortcuts must be a valid object',
-					receivedValue: config,
-				}),
-			) as unknown as Either.Either<ValidationError, ConfigurationData>;
-		}
-
-		return Either.right(
-			config as ConfigurationData,
-		) as unknown as Either.Either<ValidationError, ConfigurationData>;
 	}
 
 	// Get preset by ID with Either-based error handling
