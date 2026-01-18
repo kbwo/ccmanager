@@ -8,16 +8,16 @@ import {
 	CommandPresetsConfig,
 	IConfigEditor,
 	AutoApprovalConfig,
-} from '../types/index.js';
-import {globalConfigEditor} from './globalConfigEditor.js';
-import {projectConfigEditor} from './projectConfigEditor.js';
+} from '../../types/index.js';
+import {globalConfigManager} from './globalConfigManager.js';
+import {projectConfigManager} from './projectConfigManager.js';
 
 /**
  * ConfigEditor provides scope-aware configuration editing.
  * The scope is determined at construction time.
  *
- * - When scope='global', uses GlobalConfigEditor singleton
- * - When scope='project', uses ProjectConfigEditor singleton
+ * - When scope='global', uses GlobalConfigManager singleton
+ * - When scope='project', uses ProjectConfigManager singleton
  *   (with fallback to global if project value is undefined)
  *
  * IMPORTANT: Uses singletons to ensure that config changes are
@@ -30,14 +30,14 @@ export class ConfigEditor implements IConfigEditor {
 	constructor(scope: ConfigScope) {
 		this.scope = scope;
 		this.configEditor =
-			scope === 'global' ? globalConfigEditor : projectConfigEditor;
+			scope === 'global' ? globalConfigManager : projectConfigManager;
 	}
 
 	// IConfigEditor implementation - delegates to configEditor with fallback to global
 
 	getShortcuts(): ShortcutConfig | undefined {
 		return (
-			this.configEditor.getShortcuts() ?? globalConfigEditor.getShortcuts()
+			this.configEditor.getShortcuts() ?? globalConfigManager.getShortcuts()
 		);
 	}
 
@@ -47,7 +47,7 @@ export class ConfigEditor implements IConfigEditor {
 
 	getStatusHooks(): StatusHookConfig | undefined {
 		return (
-			this.configEditor.getStatusHooks() ?? globalConfigEditor.getStatusHooks()
+			this.configEditor.getStatusHooks() ?? globalConfigManager.getStatusHooks()
 		);
 	}
 
@@ -58,7 +58,7 @@ export class ConfigEditor implements IConfigEditor {
 	getWorktreeHooks(): WorktreeHookConfig | undefined {
 		return (
 			this.configEditor.getWorktreeHooks() ??
-			globalConfigEditor.getWorktreeHooks()
+			globalConfigManager.getWorktreeHooks()
 		);
 	}
 
@@ -69,7 +69,7 @@ export class ConfigEditor implements IConfigEditor {
 	getWorktreeConfig(): WorktreeConfig | undefined {
 		return (
 			this.configEditor.getWorktreeConfig() ??
-			globalConfigEditor.getWorktreeConfig()
+			globalConfigManager.getWorktreeConfig()
 		);
 	}
 
@@ -80,7 +80,7 @@ export class ConfigEditor implements IConfigEditor {
 	getCommandPresets(): CommandPresetsConfig | undefined {
 		return (
 			this.configEditor.getCommandPresets() ??
-			globalConfigEditor.getCommandPresets()
+			globalConfigManager.getCommandPresets()
 		);
 	}
 
@@ -91,7 +91,7 @@ export class ConfigEditor implements IConfigEditor {
 	getAutoApprovalConfig(): AutoApprovalConfig | undefined {
 		return (
 			this.configEditor.getAutoApprovalConfig() ??
-			globalConfigEditor.getAutoApprovalConfig()
+			globalConfigManager.getAutoApprovalConfig()
 		);
 	}
 
@@ -116,14 +116,14 @@ export class ConfigEditor implements IConfigEditor {
 	 * Check if project has an override for a specific field
 	 */
 	hasProjectOverride(field: keyof ProjectConfigurationData): boolean {
-		return projectConfigEditor.hasOverride(field);
+		return projectConfigManager.hasOverride(field);
 	}
 
 	/**
 	 * Remove project override for a specific field
 	 */
 	removeProjectOverride(field: keyof ProjectConfigurationData): void {
-		projectConfigEditor.removeOverride(field);
+		projectConfigManager.removeOverride(field);
 	}
 }
 

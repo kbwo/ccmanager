@@ -1,6 +1,6 @@
 import {describe, expect, it, beforeEach, afterEach, vi} from 'vitest';
 import {shortcutManager} from './shortcutManager.js';
-import {configReader} from './configReader.js';
+import {configReader} from './config/configReader.js';
 
 describe('shortcutManager.matchesRawInput', () => {
 	const shortcuts = {

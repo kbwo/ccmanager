@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import {configReader} from '../services/configReader.js';
+import {configReader} from '../services/config/configReader.js';
 
 interface PresetSelectorProps {
 	onSelect: (presetId: string) => void;

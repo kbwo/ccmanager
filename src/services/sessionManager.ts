@@ -10,7 +10,7 @@ import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {promisify} from 'util';
-import {configReader} from './configReader.js';
+import {configReader} from './config/configReader.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector/index.js';
 import {

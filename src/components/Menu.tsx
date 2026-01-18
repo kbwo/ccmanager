@@ -22,7 +22,7 @@ import {RecentProject} from '../types/index.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
-import {configReader} from '../services/configReader.js';
+import {configReader} from '../services/config/configReader.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;

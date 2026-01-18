@@ -23,7 +23,7 @@ import {
 	RemoteBranchMatch,
 } from '../types/index.js';
 import {type AppError} from '../types/errors.js';
-import {configReader} from '../services/configReader.js';
+import {configReader} from '../services/config/configReader.js';
 import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';

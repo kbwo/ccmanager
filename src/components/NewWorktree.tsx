@@ -3,7 +3,7 @@ import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
-import {configReader} from '../services/configReader.js';
+import {configReader} from '../services/config/configReader.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';

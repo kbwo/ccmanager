@@ -1,7 +1,10 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
-import {GlobalConfigEditor} from './globalConfigEditor.js';
-import type {CommandPresetsConfig, ConfigurationData} from '../types/index.js';
+import {GlobalConfigManager} from './globalConfigManager.js';
+import type {
+	CommandPresetsConfig,
+	ConfigurationData,
+} from '../../types/index.js';
 
 // Mock fs module
 vi.mock('fs', () => ({
@@ -16,8 +19,8 @@ vi.mock('os', () => ({
 	homedir: vi.fn(() => '/home/test'),
 }));
 
-describe('GlobalConfigEditor - Command Presets', () => {
-	let configManager: GlobalConfigEditor;
+describe('GlobalConfigManager - Command Presets', () => {
+	let configManager: GlobalConfigManager;
 	let mockConfigData: ConfigurationData;
 	let savedConfigData: string | null = null;
 
@@ -60,7 +63,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 		);
 
 		// Create new instance for each test
-		configManager = new GlobalConfigEditor();
+		configManager = new GlobalConfigManager();
 	});
 
 	afterEach(() => {
@@ -70,7 +73,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 	describe('getCommandPresets', () => {
 		it('should return default presets when no presets are configured', () => {
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 
 			const presets = configManager.getCommandPresets();
 
@@ -94,7 +97,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			const presets = configManager.getCommandPresets();
 
 			expect(presets.presets).toHaveLength(2);
@@ -132,7 +135,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			const defaultPreset = configManager.getDefaultPreset();
 
 			expect(defaultPreset).toEqual({
@@ -153,7 +156,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			const defaultPreset = configManager.getDefaultPreset();
 
 			expect(defaultPreset).toEqual({
@@ -175,7 +178,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			const preset = configManager.getPresetById('2');
 
 			expect(preset).toEqual({
@@ -193,7 +196,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			const preset = configManager.getPresetById('999');
 
 			expect(preset).toBeUndefined();
@@ -208,7 +211,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			const newPreset = {
 				id: '2',
 				name: 'New Preset',
@@ -230,7 +233,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			const updatedPreset = {
 				id: '1',
 				name: 'Updated Default',
@@ -257,7 +260,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			configManager.deletePreset('2');
 
 			const presets = configManager.getCommandPresets();
@@ -272,7 +275,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			configManager.deletePreset('1');
 
 			const presets = configManager.getCommandPresets();
@@ -289,7 +292,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			configManager.deletePreset('2');
 
 			const presets = configManager.getCommandPresets();
@@ -308,7 +311,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			configManager.setDefaultPreset('2');
 
 			const presets = configManager.getCommandPresets();
@@ -322,7 +325,7 @@ describe('GlobalConfigEditor - Command Presets', () => {
 			};
 
 			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
+			configManager = new GlobalConfigManager();
 			configManager.setDefaultPreset('999');
 
 			const presets = configManager.getCommandPresets();

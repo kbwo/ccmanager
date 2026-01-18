@@ -10,7 +10,7 @@ vi.mock('child_process', () => ({
 	execFile: (...args: unknown[]) => execFileMock(...args),
 }));
 
-vi.mock('./configReader.js', () => ({
+vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getAutoApprovalConfig: vi.fn().mockReturnValue({enabled: false}),
 	},

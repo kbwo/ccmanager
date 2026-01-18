@@ -142,7 +142,7 @@ vi.mock('../services/projectManager.js', () => ({
 	projectManager: projectManagerMock,
 }));
 
-vi.mock('../services/configReader.js', () => ({
+vi.mock('../services/config/configReader.js', () => ({
 	configReader: configReaderMock,
 }));
 

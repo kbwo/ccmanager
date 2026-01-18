@@ -1,5 +1,5 @@
 import React, {createContext, useContext, useMemo} from 'react';
-import {ConfigEditor} from '../services/configEditor.js';
+import {ConfigEditor} from '../services/config/configEditor.js';
 import {ConfigScope} from '../types/index.js';
 
 const ConfigEditorContext = createContext<ConfigEditor | null>(null);

@@ -18,7 +18,7 @@ vi.mock('child_process', () => ({
 }));
 
 // Mock configuration manager
-vi.mock('./configReader.js', () => ({
+vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getDefaultPreset: vi.fn(),
 		getPresetById: vi.fn(),
@@ -64,13 +64,13 @@ describe('SessionManager Effect-based Operations', () => {
 	let sessionManager: import('./sessionManager.js').SessionManager;
 	let mockPty: MockPty;
 	let SessionManager: typeof import('./sessionManager.js').SessionManager;
-	let configReader: typeof import('./configReader.js').configReader;
+	let configReader: typeof import('./config/configReader.js').configReader;
 
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		// Dynamically import after mocks are set up
 		const sessionManagerModule = await import('./sessionManager.js');
-		const configManagerModule = await import('./configReader.js');
+		const configManagerModule = await import('./config/configReader.js');
 		SessionManager = sessionManagerModule.SessionManager;
 		configReader = configManagerModule.configReader;
 		sessionManager = new SessionManager();

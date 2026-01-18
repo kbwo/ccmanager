@@ -1,7 +1,7 @@
 import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {AutoApprovalResponse} from '../types/index.js';
-import {configReader} from './configReader.js';
+import {configReader} from './config/configReader.js';
 import {logger} from '../utils/logger.js';
 import {
 	execFile,

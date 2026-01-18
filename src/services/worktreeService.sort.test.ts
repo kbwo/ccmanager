@@ -2,7 +2,7 @@ import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {Effect} from 'effect';
 import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
-import {configReader} from './configReader.js';
+import {configReader} from './config/configReader.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -20,7 +20,7 @@ vi.mock('./worktreeConfigManager.js', () => ({
 }));
 
 // Mock configReader
-vi.mock('./configReader.js', () => ({
+vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getWorktreeLastOpenedTime: vi.fn(),
 		setWorktreeLastOpened: vi.fn(),

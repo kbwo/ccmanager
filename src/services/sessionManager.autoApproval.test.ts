@@ -34,7 +34,7 @@ vi.mock('./stateDetector/index.js', () => ({
 	}),
 }));
 
-vi.mock('./configReader.js', () => ({
+vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getConfig: vi.fn().mockReturnValue({
 			commands: [

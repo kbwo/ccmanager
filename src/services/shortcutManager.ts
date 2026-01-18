@@ -1,6 +1,6 @@
 import {ShortcutKey, ShortcutConfig} from '../types/index.js';
 import {Key} from 'ink';
-import {configReader} from './configReader.js';
+import {configReader} from './config/configReader.js';
 
 export class ShortcutManager {
 	private reservedKeys: ShortcutKey[] = [

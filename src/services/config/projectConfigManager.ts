@@ -1,3 +1,8 @@
+/**
+ * @internal
+ * This module is for internal use within the config directory only.
+ * External code should use ConfigEditor or ConfigReader instead.
+ */
 import {existsSync, readFileSync, writeFileSync, unlinkSync} from 'fs';
 import {join} from 'path';
 import {
@@ -9,16 +14,16 @@ import {
 	CommandPresetsConfig,
 	IConfigEditor,
 	AutoApprovalConfig,
-} from '../types/index.js';
+} from '../../types/index.js';
 
 const PROJECT_CONFIG_FILENAME = '.ccmanager.json';
 
 /**
- * ProjectConfigEditor handles project-specific configuration.
+ * ProjectConfigManager handles project-specific configuration.
  * Reads/writes from `<projectPath>/.ccmanager.json`.
- * Implements IConfigEditor for consistent API with GlobalConfigEditor.
+ * Implements IConfigEditor for consistent API with GlobalConfigManager.
  */
-export class ProjectConfigEditor implements IConfigEditor {
+export class ProjectConfigManager implements IConfigEditor {
 	private projectPath: string;
 	private projectConfigPath: string;
 	private projectConfig: ProjectConfigurationData | null = null;
@@ -183,4 +188,4 @@ export class ProjectConfigEditor implements IConfigEditor {
 /**
  * Default singleton instance using current working directory
  */
-export const projectConfigEditor = new ProjectConfigEditor();
+export const projectConfigManager = new ProjectConfigManager();

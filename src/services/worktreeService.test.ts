@@ -2,7 +2,7 @@ import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
-import {configReader} from './configReader.js';
+import {configReader} from './config/configReader.js';
 import {Effect} from 'effect';
 import {GitError} from '../types/errors.js';
 
@@ -22,7 +22,7 @@ vi.mock('./worktreeConfigManager.js', () => ({
 }));
 
 // Mock configReader
-vi.mock('./configReader.js', () => ({
+vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getWorktreeHooks: vi.fn(),
 	},

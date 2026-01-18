@@ -8,28 +8,28 @@ import {
 	CommandPreset,
 	ConfigurationData,
 	DEFAULT_SHORTCUTS,
-} from '../types/index.js';
+} from '../../types/index.js';
 import {
 	FileSystemError,
 	ConfigError,
 	ValidationError,
-} from '../types/errors.js';
-import {globalConfigEditor} from './globalConfigEditor.js';
-import {projectConfigEditor} from './projectConfigEditor.js';
+} from '../../types/errors.js';
+import {globalConfigManager} from './globalConfigManager.js';
+import {projectConfigManager} from './projectConfigManager.js';
 
 /**
  * ConfigReader provides merged configuration reading for runtime components.
  * It combines project-level config (from `.ccmanager.json`) with global config,
  * with project config taking priority.
  *
- * Uses the singleton projectConfigEditor (cwd-based) for project config.
+ * Uses the singleton projectConfigManager (cwd-based) for project config.
  */
 export class ConfigReader {
 	// Shortcuts - returns merged value (project > global)
 	getShortcuts(): ShortcutConfig {
 		return (
-			projectConfigEditor.getShortcuts() ||
-			globalConfigEditor.getShortcuts() ||
+			projectConfigManager.getShortcuts() ||
+			globalConfigManager.getShortcuts() ||
 			DEFAULT_SHORTCUTS
 		);
 	}
@@ -37,8 +37,8 @@ export class ConfigReader {
 	// Status Hooks - returns merged value (project > global)
 	getStatusHooks(): StatusHookConfig {
 		return (
-			projectConfigEditor.getStatusHooks() ||
-			globalConfigEditor.getStatusHooks() ||
+			projectConfigManager.getStatusHooks() ||
+			globalConfigManager.getStatusHooks() ||
 			{}
 		);
 	}
@@ -46,8 +46,8 @@ export class ConfigReader {
 	// Worktree Hooks - returns merged value (project > global)
 	getWorktreeHooks(): WorktreeHookConfig {
 		return (
-			projectConfigEditor.getWorktreeHooks() ||
-			globalConfigEditor.getWorktreeHooks() ||
+			projectConfigManager.getWorktreeHooks() ||
+			globalConfigManager.getWorktreeHooks() ||
 			{}
 		);
 	}
@@ -55,8 +55,8 @@ export class ConfigReader {
 	// Worktree Config - returns merged value (project > global)
 	getWorktreeConfig(): WorktreeConfig {
 		return (
-			projectConfigEditor.getWorktreeConfig() ||
-			globalConfigEditor.getWorktreeConfig() || {
+			projectConfigManager.getWorktreeConfig() ||
+			globalConfigManager.getWorktreeConfig() || {
 				autoDirectory: false,
 				copySessionData: true,
 				sortByLastSession: false,
@@ -67,8 +67,8 @@ export class ConfigReader {
 	// Command Presets - returns merged value (project > global)
 	getCommandPresets(): CommandPresetsConfig {
 		return (
-			projectConfigEditor.getCommandPresets() ||
-			globalConfigEditor.getCommandPresets()
+			projectConfigManager.getCommandPresets() ||
+			globalConfigManager.getCommandPresets()
 		);
 	}
 
@@ -86,14 +86,14 @@ export class ConfigReader {
 
 	// Auto Approval Config - returns merged value (project > global)
 	getAutoApprovalConfig(): NonNullable<ConfigurationData['autoApproval']> {
-		const projectConfig = projectConfigEditor.getAutoApprovalConfig();
+		const projectConfig = projectConfigManager.getAutoApprovalConfig();
 		if (projectConfig) {
 			return {
 				...projectConfig,
 				timeout: projectConfig.timeout ?? 30,
 			};
 		}
-		return globalConfigEditor.getAutoApprovalConfig();
+		return globalConfigManager.getAutoApprovalConfig();
 	}
 
 	// Check if auto-approval is enabled
@@ -122,15 +122,15 @@ export class ConfigReader {
 
 	// Worktree last opened tracking - delegate to global config
 	getWorktreeLastOpened(): Record<string, number> {
-		return globalConfigEditor.getWorktreeLastOpened();
+		return globalConfigManager.getWorktreeLastOpened();
 	}
 
 	setWorktreeLastOpened(worktreePath: string, timestamp: number): void {
-		globalConfigEditor.setWorktreeLastOpened(worktreePath, timestamp);
+		globalConfigManager.setWorktreeLastOpened(worktreePath, timestamp);
 	}
 
 	getWorktreeLastOpenedTime(worktreePath: string): number | undefined {
-		return globalConfigEditor.getWorktreeLastOpenedTime(worktreePath);
+		return globalConfigManager.getWorktreeLastOpenedTime(worktreePath);
 	}
 
 	// Effect-based methods for type-safe error handling
@@ -139,7 +139,7 @@ export class ConfigReader {
 		FileSystemError | ConfigError,
 		never
 	> {
-		const configPath = projectConfigEditor.getConfigPath();
+		const configPath = projectConfigManager.getConfigPath();
 		return Effect.try({
 			try: () => this.getConfiguration(),
 			catch: (error: unknown) => {
@@ -217,7 +217,7 @@ export class ConfigReader {
 
 	// Reload project config from disk
 	reload(): void {
-		projectConfigEditor.reload();
+		projectConfigManager.reload();
 	}
 }
 

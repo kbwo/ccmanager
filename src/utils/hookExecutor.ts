@@ -3,7 +3,7 @@ import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {Worktree, Session, SessionState} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {configReader} from '../services/configReader.js';
+import {configReader} from '../services/config/configReader.js';
 
 export interface HookEnvironment {
 	CCMANAGER_WORKTREE_PATH: string;

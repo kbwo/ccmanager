@@ -9,14 +9,14 @@ import {mkdtemp, rm, readFile, realpath} from 'fs/promises';
 import {tmpdir} from 'os';
 import {join} from 'path';
 import type {Session} from '../types/index.js';
-import {configReader} from '../services/configReader.js';
+import {configReader} from '../services/config/configReader.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {GitError} from '../types/errors.js';
 import {Mutex, createInitialSessionStateData} from './mutex.js';
 import {createStateDetector} from '../services/stateDetector/index.js';
 
 // Mock the configReader
-vi.mock('../services/configReader.js', () => ({
+vi.mock('../services/config/configReader.js', () => ({
 	configReader: {
 		getStatusHooks: vi.fn(),
 	},

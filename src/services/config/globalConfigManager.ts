@@ -1,3 +1,8 @@
+/**
+ * @internal
+ * This module is for internal use within the config directory only.
+ * External code should use ConfigEditor or ConfigReader instead.
+ */
 import {homedir} from 'os';
 import {join} from 'path';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
@@ -12,14 +17,14 @@ import {
 	CommandPresetsConfig,
 	DEFAULT_SHORTCUTS,
 	IConfigEditor,
-} from '../types/index.js';
+} from '../../types/index.js';
 import {
 	FileSystemError,
 	ConfigError,
 	ValidationError,
-} from '../types/errors.js';
+} from '../../types/errors.js';
 
-export class GlobalConfigEditor implements IConfigEditor {
+export class GlobalConfigManager implements IConfigEditor {
 	private configPath: string;
 	private legacyShortcutsPath: string;
 	private configDir: string;
@@ -692,4 +697,4 @@ export class GlobalConfigEditor implements IConfigEditor {
 	}
 }
 
-export const globalConfigEditor = new GlobalConfigEditor();
+export const globalConfigManager = new GlobalConfigManager();

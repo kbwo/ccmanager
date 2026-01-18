@@ -14,7 +14,7 @@ import {
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
 import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
-import {configReader} from './configReader.js';
+import {configReader} from './config/configReader.js';
 
 const CLAUDE_DIR = '.claude';
 

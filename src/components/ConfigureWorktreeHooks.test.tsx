@@ -39,7 +39,7 @@ const mockFns = {
 	getScope: vi.fn().mockReturnValue('global'),
 };
 
-vi.mock('../services/configEditor.js', () => {
+vi.mock('../services/config/configEditor.js', () => {
 	return {
 		ConfigEditor: class {
 			getWorktreeHooks = mockFns.getWorktreeHooks;

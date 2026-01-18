@@ -12,7 +12,7 @@ vi.mock('./bunTerminal.js', () => ({
 		return null;
 	}),
 }));
-vi.mock('./configReader.js', () => ({
+vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getConfig: vi.fn().mockReturnValue({
 			commands: [
