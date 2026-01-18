@@ -1,10 +1,7 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
 import {ConfigEditor} from './configEditor.js';
-import {
-	getSelectPresetOnStart,
-	setSelectPresetOnStart,
-} from './testUtils.js';
+import {getSelectPresetOnStart, setSelectPresetOnStart} from './testUtils.js';
 import type {ConfigurationData} from '../../types/index.js';
 
 // Mock fs module

@@ -488,9 +488,7 @@ describe('ConfigEditor (global scope) - Effect-based operations', () => {
 			configEditor.reload();
 
 			const result = await Effect.runPromise(
-				Effect.either(
-					deletePresetEffect(configEditor, '1', TEST_CONFIG_PATH),
-				),
+				Effect.either(deletePresetEffect(configEditor, '1', TEST_CONFIG_PATH)),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -519,9 +517,7 @@ describe('ConfigEditor (global scope) - Effect-based operations', () => {
 			});
 
 			const result = await Effect.runPromise(
-				Effect.either(
-					deletePresetEffect(configEditor, '2', TEST_CONFIG_PATH),
-				),
+				Effect.either(deletePresetEffect(configEditor, '2', TEST_CONFIG_PATH)),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);

@@ -209,10 +209,7 @@ export function addPreset(
 /**
  * TEST ONLY: Delete a preset by ID
  */
-export function deletePreset(
-	configManager: IConfigEditor,
-	id: string,
-): void {
+export function deletePreset(configManager: IConfigEditor, id: string): void {
 	const presets = configManager.getCommandPresets()!;
 
 	// Don't delete if it's the last preset

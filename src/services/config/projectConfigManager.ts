@@ -169,7 +169,6 @@ export class ProjectConfigManager implements IConfigEditor {
 			this.saveProjectConfig();
 		}
 	}
-
 }
 
 /**

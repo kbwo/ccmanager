@@ -12,7 +12,6 @@ import {
 	WorktreeHookConfig,
 	ShortcutConfig,
 	WorktreeConfig,
-	CommandPreset,
 	CommandPresetsConfig,
 	DEFAULT_SHORTCUTS,
 	IConfigEditor,
