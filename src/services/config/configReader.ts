@@ -7,7 +7,6 @@ import {
 	CommandPresetsConfig,
 	CommandPreset,
 	ConfigurationData,
-	DEFAULT_SHORTCUTS,
 } from '../../types/index.js';
 import {
 	FileSystemError,
@@ -28,9 +27,7 @@ export class ConfigReader {
 	// Shortcuts - returns merged value (project > global)
 	getShortcuts(): ShortcutConfig {
 		return (
-			projectConfigManager.getShortcuts() ||
-			globalConfigManager.getShortcuts() ||
-			DEFAULT_SHORTCUTS
+			projectConfigManager.getShortcuts() || globalConfigManager.getShortcuts()
 		);
 	}
 
@@ -38,8 +35,7 @@ export class ConfigReader {
 	getStatusHooks(): StatusHookConfig {
 		return (
 			projectConfigManager.getStatusHooks() ||
-			globalConfigManager.getStatusHooks() ||
-			{}
+			globalConfigManager.getStatusHooks()
 		);
 	}
 
@@ -47,8 +43,7 @@ export class ConfigReader {
 	getWorktreeHooks(): WorktreeHookConfig {
 		return (
 			projectConfigManager.getWorktreeHooks() ||
-			globalConfigManager.getWorktreeHooks() ||
-			{}
+			globalConfigManager.getWorktreeHooks()
 		);
 	}
 
@@ -56,11 +51,7 @@ export class ConfigReader {
 	getWorktreeConfig(): WorktreeConfig {
 		return (
 			projectConfigManager.getWorktreeConfig() ||
-			globalConfigManager.getWorktreeConfig() || {
-				autoDirectory: false,
-				copySessionData: true,
-				sortByLastSession: false,
-			}
+			globalConfigManager.getWorktreeConfig()
 		);
 	}
 
