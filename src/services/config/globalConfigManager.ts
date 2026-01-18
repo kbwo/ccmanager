@@ -280,11 +280,6 @@ export class GlobalConfigManager implements IConfigEditor {
 		return defaultPreset || presets.presets[0]!;
 	}
 
-	getPresetById(id: string): CommandPreset | undefined {
-		const presets = this.getCommandPresets();
-		return presets.presets.find(p => p.id === id);
-	}
-
 	addPreset(preset: CommandPreset): void {
 		const presets = this.getCommandPresets();
 
@@ -464,7 +459,7 @@ export class GlobalConfigManager implements IConfigEditor {
 	 */
 	getPresetByIdEffect(
 		id: string,
-	): Either.Either<ValidationError, CommandPreset> {
+	): Either.Either<CommandPreset, ValidationError> {
 		const presets = this.getCommandPresets();
 		const preset = presets.presets.find(p => p.id === id);
 
@@ -475,13 +470,10 @@ export class GlobalConfigManager implements IConfigEditor {
 					constraint: 'Preset not found',
 					receivedValue: id,
 				}),
-			) as unknown as Either.Either<ValidationError, CommandPreset>;
+			);
 		}
 
-		return Either.right(preset) as unknown as Either.Either<
-			ValidationError,
-			CommandPreset
-		>;
+		return Either.right(preset);
 	}
 
 	/**

@@ -3,6 +3,7 @@ import {Effect, Either} from 'effect';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {DevcontainerConfig, CommandPreset} from '../types/index.js';
+import {ValidationError} from '../types/errors.js';
 
 // Mock bunTerminal
 vi.mock('./bunTerminal.js', () => ({
@@ -21,7 +22,7 @@ vi.mock('child_process', () => ({
 vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getDefaultPreset: vi.fn(),
-		getPresetById: vi.fn(),
+		getPresetByIdEffect: vi.fn(),
 		setWorktreeLastOpened: vi.fn(),
 		getWorktreeLastOpenedTime: vi.fn(),
 		getWorktreeLastOpened: vi.fn(() => ({})),
@@ -107,8 +108,16 @@ describe('SessionManager Effect-based Operations', () => {
 		});
 
 		it('should return Effect that fails with ConfigError when preset not found', async () => {
-			// Setup mocks - both return null/undefined
-			vi.mocked(configReader.getPresetById).mockReturnValue(undefined);
+			// Setup mocks - getPresetByIdEffect returns Left, getDefaultPreset returns undefined
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.left(
+					new ValidationError({
+						field: 'presetId',
+						constraint: 'Preset not found',
+						receivedValue: 'invalid-preset',
+					}),
+				),
+			);
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue(
 				undefined as unknown as CommandPreset,
 			);
@@ -288,8 +297,16 @@ describe('SessionManager Effect-based Operations', () => {
 		});
 
 		it('should return Effect that fails with ConfigError when preset not found', async () => {
-			// Setup mocks - both return null/undefined
-			vi.mocked(configReader.getPresetById).mockReturnValue(undefined);
+			// Setup mocks - getPresetByIdEffect returns Left, getDefaultPreset returns undefined
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.left(
+					new ValidationError({
+						field: 'presetId',
+						constraint: 'Preset not found',
+						receivedValue: 'invalid-preset',
+					}),
+				),
+			);
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue(
 				undefined as unknown as CommandPreset,
 			);

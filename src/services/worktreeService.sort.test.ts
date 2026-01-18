@@ -1,9 +1,6 @@
 import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
 import {Effect} from 'effect';
-import {
-	WorktreeService,
-	setWorktreeLastOpened,
-} from './worktreeService.js';
+import {WorktreeService, setWorktreeLastOpened} from './worktreeService.js';
 import {execSync} from 'child_process';
 
 // We need to keep a reference to the original Map to clear it between tests

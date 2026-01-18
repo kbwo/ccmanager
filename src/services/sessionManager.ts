@@ -5,6 +5,7 @@ import {
 	SessionState,
 	DevcontainerConfig,
 	StateDetectionStrategy,
+	CommandPreset,
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
@@ -18,7 +19,7 @@ import {
 	STATE_PERSISTENCE_DURATION_MS,
 	STATE_CHECK_INTERVAL_MS,
 } from '../constants/statePersistence.js';
-import {Effect} from 'effect';
+import {Effect, Either} from 'effect';
 import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
@@ -335,8 +336,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					return existing;
 				}
 
-				// Get preset configuration
-				let preset = presetId ? configReader.getPresetById(presetId) : null;
+				// Get preset configuration using Either-based lookup
+				let preset: CommandPreset | null = presetId
+					? Either.getOrElse(
+							configReader.getPresetByIdEffect(presetId),
+							(): CommandPreset | null => null,
+						)
+					: null;
 				if (!preset) {
 					preset = configReader.getDefaultPreset();
 				}
@@ -778,8 +784,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					});
 				}
 
-				// Get preset configuration
-				let preset = presetId ? configReader.getPresetById(presetId) : null;
+				// Get preset configuration using Either-based lookup
+				let preset: CommandPreset | null = presetId
+					? Either.getOrElse(
+							configReader.getPresetByIdEffect(presetId),
+							(): CommandPreset | null => null,
+						)
+					: null;
 				if (!preset) {
 					preset = configReader.getDefaultPreset();
 				}

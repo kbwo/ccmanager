@@ -167,42 +167,6 @@ describe('GlobalConfigManager - Command Presets', () => {
 		});
 	});
 
-	describe('getPresetById', () => {
-		it('should return preset by id', () => {
-			mockConfigData.commandPresets = {
-				presets: [
-					{id: '1', name: 'Main', command: 'claude'},
-					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
-				],
-				defaultPresetId: '1',
-			};
-
-			resetSavedConfig();
-			configManager = new GlobalConfigManager();
-			const preset = configManager.getPresetById('2');
-
-			expect(preset).toEqual({
-				id: '2',
-				name: 'Custom',
-				command: 'claude',
-				args: ['--custom'],
-			});
-		});
-
-		it('should return undefined for non-existent id', () => {
-			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Main', command: 'claude'}],
-				defaultPresetId: '1',
-			};
-
-			resetSavedConfig();
-			configManager = new GlobalConfigManager();
-			const preset = configManager.getPresetById('999');
-
-			expect(preset).toBeUndefined();
-		});
-	});
-
 	describe('addPreset', () => {
 		it('should add a new preset', () => {
 			mockConfigData.commandPresets = {

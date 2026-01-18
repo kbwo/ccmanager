@@ -5,7 +5,7 @@ import {
 	STATE_CHECK_INTERVAL_MS,
 	STATE_PERSISTENCE_DURATION_MS,
 } from '../constants/statePersistence.js';
-import {Effect} from 'effect';
+import {Effect, Either} from 'effect';
 
 const detectStateMock = vi.fn();
 // Create a deferred promise pattern for controllable mock
@@ -47,12 +47,14 @@ vi.mock('./config/configReader.js', () => ({
 			],
 			defaultCommandId: 'test',
 		}),
-		getPresetById: vi.fn().mockReturnValue({
-			id: 'test',
-			name: 'Test',
-			command: 'test',
-			args: [],
-		}),
+		getPresetByIdEffect: vi.fn().mockReturnValue(
+			Either.right({
+				id: 'test',
+				name: 'Test',
+				command: 'test',
+				args: [],
+			}),
+		),
 		getDefaultPreset: vi.fn().mockReturnValue({
 			id: 'test',
 			name: 'Test',

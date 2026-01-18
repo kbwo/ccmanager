@@ -1,5 +1,6 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
-import {Effect} from 'effect';
+import {Effect, Either} from 'effect';
+import {ValidationError} from '../types/errors.js';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {Session, DevcontainerConfig} from '../types/index.js';
@@ -27,7 +28,7 @@ vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getStatusHooks: vi.fn(() => ({})),
 		getDefaultPreset: vi.fn(),
-		getPresetById: vi.fn(),
+		getPresetByIdEffect: vi.fn(),
 		setWorktreeLastOpened: vi.fn(),
 		getWorktreeLastOpenedTime: vi.fn(),
 		getWorktreeLastOpened: vi.fn(() => ({})),
@@ -133,13 +134,15 @@ describe('SessionManager', () => {
 
 		it('should use specific preset when ID provided', async () => {
 			// Setup mock preset
-			vi.mocked(configReader.getPresetById).mockReturnValue({
-				id: '2',
-				name: 'Development',
-				command: 'claude',
-				args: ['--resume', '--dev'],
-				fallbackArgs: ['--no-mcp'],
-			});
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.right({
+					id: '2',
+					name: 'Development',
+					command: 'claude',
+					args: ['--resume', '--dev'],
+					fallbackArgs: ['--no-mcp'],
+				}),
+			);
 
 			// Setup spawn mock
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
@@ -149,8 +152,8 @@ describe('SessionManager', () => {
 				sessionManager.createSessionWithPresetEffect('/test/worktree', '2'),
 			);
 
-			// Verify getPresetById was called with correct ID
-			expect(configReader.getPresetById).toHaveBeenCalledWith('2');
+			// Verify getPresetByIdEffect was called with correct ID
+			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 
 			// Verify spawn was called with preset config
 			expect(spawn).toHaveBeenCalledWith('claude', ['--resume', '--dev'], {
@@ -164,7 +167,15 @@ describe('SessionManager', () => {
 
 		it('should fall back to default preset if specified preset not found', async () => {
 			// Setup mocks
-			vi.mocked(configReader.getPresetById).mockReturnValue(undefined);
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.left(
+					new ValidationError({
+						field: 'presetId',
+						constraint: 'Preset not found',
+						receivedValue: 'invalid',
+					}),
+				),
+			);
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
@@ -568,12 +579,14 @@ describe('SessionManager', () => {
 
 		it('should use specific preset when ID provided', async () => {
 			// Setup mock preset
-			vi.mocked(configReader.getPresetById).mockReturnValue({
-				id: '2',
-				name: 'Development',
-				command: 'claude',
-				args: ['--resume', '--dev'],
-			});
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.right({
+					id: '2',
+					name: 'Development',
+					command: 'claude',
+					args: ['--resume', '--dev'],
+				}),
+			);
 
 			// Setup spawn mock
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
@@ -593,7 +606,7 @@ describe('SessionManager', () => {
 			);
 
 			// Verify correct preset was used
-			expect(configReader.getPresetById).toHaveBeenCalledWith('2');
+			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
 				['exec', '--', 'claude', '--resume', '--dev'],
@@ -865,12 +878,14 @@ describe('SessionManager', () => {
 				},
 			);
 
-			vi.mocked(configReader.getPresetById).mockReturnValue({
-				id: 'claude-with-args',
-				name: 'Claude with Args',
-				command: 'claude',
-				args: ['-m', 'claude-3-opus'],
-			});
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.right({
+					id: 'claude-with-args',
+					name: 'Claude with Args',
+					command: 'claude',
+					args: ['-m', 'claude-3-opus'],
+				}),
+			);
 
 			await Effect.runPromise(
 				sessionManager.createSessionWithDevcontainerEffect(

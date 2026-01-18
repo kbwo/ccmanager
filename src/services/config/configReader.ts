@@ -101,11 +101,6 @@ export class ConfigReader {
 		return defaultPreset || presets.presets[0]!;
 	}
 
-	getPresetById(id: string): CommandPreset | undefined {
-		const presets = this.getCommandPresets();
-		return presets.presets.find(p => p.id === id);
-	}
-
 	getSelectPresetOnStart(): boolean {
 		const presets = this.getCommandPresets();
 		return presets.selectPresetOnStart ?? false;
@@ -174,8 +169,9 @@ export class ConfigReader {
 	// Get preset by ID with Either-based error handling
 	getPresetByIdEffect(
 		id: string,
-	): Either.Either<ValidationError, CommandPreset> {
-		const preset = this.getPresetById(id);
+	): Either.Either<CommandPreset, ValidationError> {
+		const presets = this.getCommandPresets();
+		const preset = presets.presets.find(p => p.id === id);
 
 		if (!preset) {
 			return Either.left(
@@ -184,13 +180,10 @@ export class ConfigReader {
 					constraint: 'Preset not found',
 					receivedValue: id,
 				}),
-			) as unknown as Either.Either<ValidationError, CommandPreset>;
+			);
 		}
 
-		return Either.right(preset) as unknown as Either.Either<
-			ValidationError,
-			CommandPreset
-		>;
+		return Either.right(preset);
 	}
 
 	// Reload both project and global configs from disk
