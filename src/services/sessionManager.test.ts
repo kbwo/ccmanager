@@ -1067,11 +1067,11 @@ describe('SessionManager', () => {
 			const createMockSession = (
 				id: string,
 				state: 'idle' | 'busy' | 'waiting_input' | 'pending_auto_approval',
-				hasBackgroundTask: boolean = false,
+				backgroundTaskCount: number = 0,
 			): Partial<Session> => ({
 				id,
 				stateMutex: {
-					getSnapshot: () => ({state, hasBackgroundTask}),
+					getSnapshot: () => ({state, backgroundTaskCount}),
 				} as Session['stateMutex'],
 			});
 
@@ -1114,6 +1114,19 @@ describe('SessionManager', () => {
 				expect(counts.busy).toBe(3);
 				expect(counts.waiting_input).toBe(0);
 				expect(counts.total).toBe(3);
+			});
+
+			it('should sum background task counts across sessions', () => {
+				const sessions = [
+					createMockSession('1', 'idle', 0),
+					createMockSession('2', 'busy', 2),
+					createMockSession('3', 'busy', 3),
+					createMockSession('4', 'waiting_input', 1),
+				];
+
+				const counts = SessionManager.getSessionCounts(sessions as Session[]);
+
+				expect(counts.backgroundTasks).toBe(6);
 			});
 		});
 
@@ -1178,7 +1191,7 @@ describe('SessionManager', () => {
 				expect(formatted).toBe('');
 			});
 
-			it('should append [BG] tag when background tasks exist', () => {
+			it('should append [BG] tag when backgroundTasks is 1', () => {
 				const counts = {
 					idle: 1,
 					busy: 1,
@@ -1192,6 +1205,38 @@ describe('SessionManager', () => {
 
 				expect(formatted).toContain('[BG]');
 				expect(formatted).toBe(' (1 Idle / 1 Busy \x1b[2m[BG]\x1b[0m)');
+			});
+
+			it('should append [BG:N] tag when backgroundTasks is 2+', () => {
+				const counts = {
+					idle: 1,
+					busy: 1,
+					waiting_input: 0,
+					pending_auto_approval: 0,
+					total: 2,
+					backgroundTasks: 5,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toContain('[BG:5]');
+				expect(formatted).toBe(' (1 Idle / 1 Busy \x1b[2m[BG:5]\x1b[0m)');
+			});
+
+			it('should not append BG tag when backgroundTasks is 0', () => {
+				const counts = {
+					idle: 1,
+					busy: 1,
+					waiting_input: 0,
+					pending_auto_approval: 0,
+					total: 2,
+					backgroundTasks: 0,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).not.toContain('[BG');
+				expect(formatted).toBe(' (1 Idle / 1 Busy)');
 			});
 		});
 	});

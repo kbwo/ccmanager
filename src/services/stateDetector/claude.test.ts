@@ -279,7 +279,7 @@ describe('ClaudeStateDetector', () => {
 	});
 
 	describe('detectBackgroundTask', () => {
-		it('should detect background task when pattern is in last 3 lines (status bar)', () => {
+		it('should return count 1 when "1 background task" is in status bar', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Previous conversation content',
@@ -289,13 +289,13 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(true);
+			expect(count).toBe(1);
 		});
 
-		it('should detect background task with plural "background tasks"', () => {
+		it('should return count 2 when "2 background tasks" is in status bar', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Some output',
@@ -304,13 +304,28 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(true);
+			expect(count).toBe(2);
 		});
 
-		it('should detect background task case-insensitively', () => {
+		it('should return count 3 when "3 background tasks" is in status bar', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some output',
+				'More output',
+				'3 background tasks | build, test, lint',
+			]);
+
+			// Act
+			const count = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(count).toBe(3);
+		});
+
+		it('should detect background task count case-insensitively', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Output line 1',
@@ -319,13 +334,13 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(true);
+			expect(count).toBe(1);
 		});
 
-		it('should return false when no background task pattern in last 3 lines', () => {
+		it('should return 0 when no background task pattern in last 3 lines', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Command completed successfully',
@@ -334,10 +349,10 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(false);
+			expect(count).toBe(0);
 		});
 
 		it('should not detect background task when pattern is in conversation content (not status bar)', () => {
@@ -352,21 +367,21 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert - should only check last 3 lines, not the conversation content
-			expect(hasBackgroundTask).toBe(false);
+			expect(count).toBe(0);
 		});
 
-		it('should handle empty terminal', () => {
+		it('should return 0 for empty terminal', () => {
 			// Arrange
 			terminal = createMockTerminal([]);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(false);
+			expect(count).toBe(0);
 		});
 
 		it('should handle terminal with fewer than 3 lines', () => {
@@ -374,13 +389,13 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(['1 background task']);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(true);
+			expect(count).toBe(1);
 		});
 
-		it('should detect "(running)" status bar indicator', () => {
+		it('should return 1 when "(running)" status bar indicator is present', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Some conversation output',
@@ -389,10 +404,10 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(true);
+			expect(count).toBe(1);
 		});
 
 		it('should detect "(running)" case-insensitively', () => {
@@ -400,10 +415,24 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(['Some output', 'command name (RUNNING)']);
 
 			// Act
-			const hasBackgroundTask = detector.detectBackgroundTask(terminal);
+			const count = detector.detectBackgroundTask(terminal);
 
 			// Assert
-			expect(hasBackgroundTask).toBe(true);
+			expect(count).toBe(1);
+		});
+
+		it('should prioritize count from "N background task" over "(running)"', () => {
+			// Arrange - both patterns present, count should be from explicit pattern
+			terminal = createMockTerminal([
+				'Some output',
+				'3 background tasks | task1, task2 (running)',
+			]);
+
+			// Act
+			const count = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(count).toBe(3);
 		});
 	});
 });

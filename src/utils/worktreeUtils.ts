@@ -119,7 +119,7 @@ export function prepareWorktreeItems(
 		const session = sessions.find(s => s.worktreePath === wt.path);
 		const stateData = session?.stateMutex.getSnapshot();
 		const status = stateData
-			? ` [${getStatusDisplay(stateData.state, stateData.hasBackgroundTask)}]`
+			? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount)}]`
 			: '';
 		const fullBranchName = wt.branch
 			? wt.branch.replace('refs/heads/', '')
