@@ -14,13 +14,13 @@ import {
 	CommandPreset,
 	CommandPresetsConfig,
 	ShortcutConfig,
+	IConfigEditor,
 } from '../../types/index.js';
 import {
 	FileSystemError,
 	ConfigError,
 	ValidationError,
 } from '../../types/errors.js';
-import type {GlobalConfigManager} from './globalConfigManager.js';
 
 /**
  * TEST ONLY: Load configuration from file with Effect-based error handling
@@ -190,10 +190,10 @@ function migrateLegacyShortcutsSync(
  * TEST ONLY: Add or update a preset in the config manager
  */
 export function addPreset(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	preset: CommandPreset,
 ): void {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 
 	// Replace if exists, otherwise add
 	const existingIndex = presets.presets.findIndex(p => p.id === preset.id);
@@ -210,10 +210,10 @@ export function addPreset(
  * TEST ONLY: Delete a preset by ID
  */
 export function deletePreset(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	id: string,
 ): void {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 
 	// Don't delete if it's the last preset
 	if (presets.presets.length <= 1) {
@@ -235,10 +235,10 @@ export function deletePreset(
  * TEST ONLY: Set the default preset ID
  */
 export function setDefaultPreset(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	id: string,
 ): void {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 
 	// Only update if preset exists
 	if (presets.presets.some(p => p.id === id)) {
@@ -251,14 +251,14 @@ export function setDefaultPreset(
  * TEST ONLY: Save configuration to file with Effect-based error handling
  */
 export function saveConfigEffect(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	config: ConfigurationData,
 	configPath: string,
 ): Effect.Effect<void, FileSystemError, never> {
 	return Effect.try({
 		try: () => {
 			configManager.setCommandPresets(
-				config.commandPresets || configManager.getCommandPresets(),
+				config.commandPresets || configManager.getCommandPresets()!,
 			);
 			if (config.shortcuts) {
 				configManager.setShortcuts(config.shortcuts);
@@ -279,7 +279,7 @@ export function saveConfigEffect(
  * TEST ONLY: Set shortcuts with Effect-based error handling
  */
 export function setShortcutsEffect(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	shortcuts: ShortcutConfig,
 	configPath: string,
 ): Effect.Effect<void, FileSystemError, never> {
@@ -307,7 +307,7 @@ export function setShortcutsEffect(
  * TEST ONLY: Set command presets with Effect-based error handling
  */
 export function setCommandPresetsEffect(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	presets: CommandPresetsConfig,
 	configPath: string,
 ): Effect.Effect<void, FileSystemError, never> {
@@ -334,11 +334,11 @@ export function setCommandPresetsEffect(
  * TEST ONLY: Add or update preset with Effect-based error handling
  */
 export function addPresetEffect(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	preset: CommandPreset,
 	configPath: string,
 ): Effect.Effect<void, FileSystemError, never> {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 
 	// Replace if exists, otherwise add
 	const existingIndex = presets.presets.findIndex(p => p.id === preset.id);
@@ -355,11 +355,11 @@ export function addPresetEffect(
  * TEST ONLY: Delete preset with Effect-based error handling
  */
 export function deletePresetEffect(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	id: string,
 	configPath: string,
 ): Effect.Effect<void, ValidationError | FileSystemError, never> {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 
 	// Don't delete if it's the last preset
 	if (presets.presets.length <= 1) {
@@ -387,11 +387,11 @@ export function deletePresetEffect(
  * TEST ONLY: Set default preset with Effect-based error handling
  */
 export function setDefaultPresetEffect(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	id: string,
 	configPath: string,
 ): Effect.Effect<void, ValidationError | FileSystemError, never> {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 
 	// Only update if preset exists
 	if (!presets.presets.some(p => p.id === id)) {
@@ -411,8 +411,8 @@ export function setDefaultPresetEffect(
 /**
  * TEST ONLY: Get the default preset
  */
-export function getDefaultPreset(configManager: GlobalConfigManager): CommandPreset {
-	const presets = configManager.getCommandPresets();
+export function getDefaultPreset(configManager: IConfigEditor): CommandPreset {
+	const presets = configManager.getCommandPresets()!;
 	const defaultPreset = presets.presets.find(
 		p => p.id === presets.defaultPresetId,
 	);
@@ -422,8 +422,8 @@ export function getDefaultPreset(configManager: GlobalConfigManager): CommandPre
 /**
  * TEST ONLY: Get whether to select preset on start
  */
-export function getSelectPresetOnStart(configManager: GlobalConfigManager): boolean {
-	const presets = configManager.getCommandPresets();
+export function getSelectPresetOnStart(configManager: IConfigEditor): boolean {
+	const presets = configManager.getCommandPresets()!;
 	return presets.selectPresetOnStart ?? false;
 }
 
@@ -431,10 +431,10 @@ export function getSelectPresetOnStart(configManager: GlobalConfigManager): bool
  * TEST ONLY: Set whether to select preset on start
  */
 export function setSelectPresetOnStart(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	enabled: boolean,
 ): void {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 	presets.selectPresetOnStart = enabled;
 	configManager.setCommandPresets(presets);
 }
@@ -442,7 +442,7 @@ export function setSelectPresetOnStart(
 /**
  * TEST ONLY: Get whether auto-approval is enabled
  */
-export function isAutoApprovalEnabled(configManager: GlobalConfigManager): boolean {
+export function isAutoApprovalEnabled(configManager: IConfigEditor): boolean {
 	const config = configManager.getAutoApprovalConfig();
 	return config?.enabled ?? false;
 }
@@ -451,10 +451,10 @@ export function isAutoApprovalEnabled(configManager: GlobalConfigManager): boole
  * TEST ONLY: Get preset by ID with Either-based error handling
  */
 export function getPresetByIdEffect(
-	configManager: GlobalConfigManager,
+	configManager: IConfigEditor,
 	id: string,
 ): Either.Either<CommandPreset, ValidationError> {
-	const presets = configManager.getCommandPresets();
+	const presets = configManager.getCommandPresets()!;
 	const preset = presets.presets.find(p => p.id === id);
 
 	if (!preset) {
