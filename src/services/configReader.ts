@@ -4,7 +4,6 @@ import {
 	StatusHookConfig,
 	WorktreeHookConfig,
 	WorktreeConfig,
-	CommandConfig,
 	CommandPresetsConfig,
 	CommandPreset,
 	ConfigurationData,
@@ -65,11 +64,6 @@ export class ConfigReader {
 		);
 	}
 
-	// Command Config - for backward compatibility, return from global config
-	getCommandConfig(): CommandConfig {
-		return globalConfigEditor.getCommandConfig();
-	}
-
 	// Command Presets - returns merged value (project > global)
 	getCommandPresets(): CommandPresetsConfig {
 		return (
@@ -85,7 +79,6 @@ export class ConfigReader {
 			statusHooks: this.getStatusHooks(),
 			worktreeHooks: this.getWorktreeHooks(),
 			worktree: this.getWorktreeConfig(),
-			command: this.getCommandConfig(),
 			commandPresets: this.getCommandPresets(),
 			autoApproval: this.getAutoApprovalConfig(),
 		};

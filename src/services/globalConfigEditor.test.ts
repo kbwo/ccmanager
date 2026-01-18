@@ -1,11 +1,7 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
 import {GlobalConfigEditor} from './globalConfigEditor.js';
-import type {
-	CommandConfig,
-	CommandPresetsConfig,
-	ConfigurationData,
-} from '../types/index.js';
+import type {CommandPresetsConfig, ConfigurationData} from '../types/index.js';
 
 // Mock fs module
 vi.mock('fs', () => ({
@@ -41,10 +37,6 @@ describe('GlobalConfigEditor - Command Presets', () => {
 				returnToMenu: {ctrl: true, key: 'e'},
 				cancel: {key: 'escape'},
 			},
-			command: {
-				command: 'claude',
-				args: ['--existing'],
-			},
 		};
 
 		// Mock file system operations
@@ -77,8 +69,6 @@ describe('GlobalConfigEditor - Command Presets', () => {
 
 	describe('getCommandPresets', () => {
 		it('should return default presets when no presets are configured', () => {
-			// Remove command config for this test
-			delete mockConfigData.command;
 			resetSavedConfig();
 			configManager = new GlobalConfigEditor();
 
@@ -109,33 +99,6 @@ describe('GlobalConfigEditor - Command Presets', () => {
 
 			expect(presets.presets).toHaveLength(2);
 			expect(presets.defaultPresetId).toBe('2');
-		});
-
-		it('should migrate legacy command config to presets on first access', () => {
-			// Config has legacy command but no presets
-			mockConfigData.command = {
-				command: 'claude',
-				args: ['--resume'],
-				fallbackArgs: ['--no-mcp'],
-			};
-			delete mockConfigData.commandPresets;
-
-			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
-			const presets = configManager.getCommandPresets();
-
-			expect(presets.presets).toHaveLength(1);
-			expect(presets.presets[0]).toEqual({
-				id: '1',
-				name: 'Main',
-				command: 'claude',
-				args: ['--resume'],
-				fallbackArgs: ['--no-mcp'],
-			});
-			expect(presets.defaultPresetId).toBe('1');
-
-			// Verify that writeFileSync was called to save the migration
-			expect(writeFileSync).toHaveBeenCalled();
 		});
 	});
 
@@ -364,54 +327,6 @@ describe('GlobalConfigEditor - Command Presets', () => {
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.defaultPresetId).toBe('1');
-		});
-	});
-
-	describe('backward compatibility', () => {
-		it('should maintain getCommandConfig for backward compatibility', () => {
-			mockConfigData.commandPresets = {
-				presets: [
-					{id: '1', name: 'Main', command: 'claude', args: ['--resume']},
-					{id: '2', name: 'Custom', command: 'claude', args: ['--custom']},
-				],
-				defaultPresetId: '1',
-			};
-
-			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
-			const commandConfig = configManager.getCommandConfig();
-
-			// Should return the default preset as CommandConfig
-			expect(commandConfig).toEqual({
-				command: 'claude',
-				args: ['--resume'],
-			});
-		});
-
-		it('should update default preset when setCommandConfig is called', () => {
-			mockConfigData.commandPresets = {
-				presets: [{id: '1', name: 'Main', command: 'claude'}],
-				defaultPresetId: '1',
-			};
-
-			resetSavedConfig();
-			configManager = new GlobalConfigEditor();
-			const newConfig: CommandConfig = {
-				command: 'claude',
-				args: ['--new-args'],
-				fallbackArgs: ['--new-fallback'],
-			};
-
-			configManager.setCommandConfig(newConfig);
-
-			const presets = configManager.getCommandPresets();
-			expect(presets.presets[0]).toEqual({
-				id: '1',
-				name: 'Main',
-				command: 'claude',
-				args: ['--new-args'],
-				fallbackArgs: ['--new-fallback'],
-			});
 		});
 	});
 });

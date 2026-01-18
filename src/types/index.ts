@@ -40,7 +40,6 @@ export interface Session {
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
 	stateCheckInterval: NodeJS.Timeout | undefined; // Interval for checking terminal state
 	isPrimaryCommand: boolean; // Track if process was started with main command args
-	commandConfig: CommandConfig | undefined; // Store command config for fallback
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	/**
@@ -109,12 +108,6 @@ export interface WorktreeConfig {
 	sortByLastSession?: boolean; // Whether to sort worktrees by last opened session
 }
 
-export interface CommandConfig {
-	command: string; // The main command to execute (default: 'claude')
-	args?: string[]; // Arguments to pass to the command
-	fallbackArgs?: string[]; // Fallback arguments if main command fails
-}
-
 export interface CommandPreset {
 	id: string; // Unique identifier for the preset
 	name: string; // User-friendly name for the preset
@@ -140,8 +133,7 @@ export interface ConfigurationData {
 	statusHooks?: StatusHookConfig;
 	worktreeHooks?: WorktreeHookConfig;
 	worktree?: WorktreeConfig;
-	command?: CommandConfig;
-	commandPresets?: CommandPresetsConfig; // New field for command presets
+	commandPresets?: CommandPresetsConfig;
 	autoApproval?: {
 		enabled: boolean; // Whether auto-approval is enabled
 		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse

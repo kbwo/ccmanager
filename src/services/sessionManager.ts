@@ -260,11 +260,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private async createSessionInternal(
 		worktreePath: string,
 		ptyProcess: IPty,
-		commandConfig: {
-			command: string;
-			args?: string[];
-			fallbackArgs?: string[];
-		},
 		options: {
 			isPrimaryCommand?: boolean;
 			detectionStrategy?: StateDetectionStrategy;
@@ -285,7 +280,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
-			commandConfig,
 			detectionStrategy: options.detectionStrategy ?? 'claude',
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
@@ -353,24 +347,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 				const command = preset.command;
 				const args = preset.args || [];
-				const commandConfig = {
-					command: preset.command,
-					args: preset.args,
-					fallbackArgs: preset.fallbackArgs,
-				};
 
 				// Spawn the process - fallback will be handled by setupExitHandler
 				const ptyProcess = await this.spawn(command, args, worktreePath);
 
-				return this.createSessionInternal(
-					worktreePath,
-					ptyProcess,
-					commandConfig,
-					{
-						isPrimaryCommand: true,
-						detectionStrategy: preset.detectionStrategy,
-					},
-				);
+				return this.createSessionInternal(worktreePath, ptyProcess, {
+					isPrimaryCommand: true,
+					detectionStrategy: preset.detectionStrategy,
+				});
 			},
 			catch: (error: unknown) => {
 				// If it's already a ConfigError, return it
@@ -437,8 +421,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
 				try {
 					let fallbackProcess: IPty;
-					// Use fallback args if available, otherwise use empty args
-					const fallbackArgs = session.commandConfig?.fallbackArgs || [];
 
 					// Check if we're in a devcontainer session
 					if (session.devcontainerConfig) {
@@ -449,12 +431,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						const execArgs = execParts.slice(1);
 
 						// Build fallback command for devcontainer
-						const fallbackFullArgs = [
-							...execArgs,
-							'--',
-							session.commandConfig?.command || 'claude',
-							...fallbackArgs,
-						];
+						const fallbackFullArgs = [...execArgs, '--', 'claude'];
 
 						fallbackProcess = await this.spawn(
 							devcontainerCmd,
@@ -464,8 +441,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					} else {
 						// Regular fallback without devcontainer
 						fallbackProcess = await this.spawn(
-							session.commandConfig?.command || 'claude',
-							fallbackArgs,
+							'claude',
+							[],
 							session.worktreePath,
 						);
 					}
@@ -822,22 +799,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					worktreePath,
 				);
 
-				const commandConfig = {
-					command: preset.command,
-					args: preset.args,
-					fallbackArgs: preset.fallbackArgs,
-				};
-
-				return this.createSessionInternal(
-					worktreePath,
-					ptyProcess,
-					commandConfig,
-					{
-						isPrimaryCommand: true,
-						detectionStrategy: preset.detectionStrategy,
-						devcontainerConfig,
-					},
-				);
+				return this.createSessionInternal(worktreePath, ptyProcess, {
+					isPrimaryCommand: true,
+					detectionStrategy: preset.detectionStrategy,
+					devcontainerConfig,
+				});
 			},
 			catch: (error: unknown) => {
 				// If it's already a ConfigError or ProcessError, return it

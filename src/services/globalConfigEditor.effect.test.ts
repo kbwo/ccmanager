@@ -40,10 +40,6 @@ describe('GlobalConfigEditor - Effect-based operations', () => {
 				returnToMenu: {ctrl: true, key: 'e'},
 				cancel: {key: 'escape'},
 			},
-			command: {
-				command: 'claude',
-				args: ['--existing'],
-			},
 		};
 
 		// Mock file system operations
@@ -74,7 +70,6 @@ describe('GlobalConfigEditor - Effect-based operations', () => {
 
 			expect(result).toBeDefined();
 			expect(result.shortcuts).toBeDefined();
-			expect(result.command).toBeDefined();
 		});
 
 		it('should fail with FileSystemError when file read fails', async () => {

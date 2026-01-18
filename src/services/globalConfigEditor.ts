@@ -8,7 +8,6 @@ import {
 	WorktreeHookConfig,
 	ShortcutConfig,
 	WorktreeConfig,
-	CommandConfig,
 	CommandPreset,
 	CommandPresetsConfig,
 	DEFAULT_SHORTCUTS,
@@ -102,11 +101,6 @@ export class GlobalConfigEditor implements IConfigEditor {
 		) {
 			this.config.worktree.sortByLastSession = false;
 		}
-		if (!this.config.command) {
-			this.config.command = {
-				command: 'claude',
-			};
-		}
 		if (!this.config.autoApproval) {
 			this.config.autoApproval = {
 				enabled: false,
@@ -132,7 +126,7 @@ export class GlobalConfigEditor implements IConfigEditor {
 		}
 
 		// Migrate legacy command config to presets if needed
-		this.migrateLegacyCommandToPresets();
+		this.ensureDefaultPresets();
 	}
 
 	private migrateLegacyShortcuts(): void {
@@ -244,53 +238,7 @@ export class GlobalConfigEditor implements IConfigEditor {
 		this.setAutoApprovalConfig({...currentConfig, timeout});
 	}
 
-	getCommandConfig(): CommandConfig {
-		// For backward compatibility, return the default preset as CommandConfig
-		const defaultPreset = this.getDefaultPreset();
-		return {
-			command: defaultPreset.command,
-			args: defaultPreset.args,
-			fallbackArgs: defaultPreset.fallbackArgs,
-		};
-	}
-
-	setCommandConfig(commandConfig: CommandConfig): void {
-		this.config.command = commandConfig;
-
-		// Also update the default preset for backward compatibility
-		if (this.config.commandPresets) {
-			const defaultPreset = this.config.commandPresets.presets.find(
-				p => p.id === this.config.commandPresets!.defaultPresetId,
-			);
-			if (defaultPreset) {
-				defaultPreset.command = commandConfig.command;
-				defaultPreset.args = commandConfig.args;
-				defaultPreset.fallbackArgs = commandConfig.fallbackArgs;
-			}
-		}
-
-		this.saveConfig();
-	}
-
-	private migrateLegacyCommandToPresets(): void {
-		// Only migrate if we have legacy command config but no presets
-		if (this.config.command && !this.config.commandPresets) {
-			const defaultPreset: CommandPreset = {
-				id: '1',
-				name: 'Main',
-				command: this.config.command.command,
-				args: this.config.command.args,
-				fallbackArgs: this.config.command.fallbackArgs,
-			};
-
-			this.config.commandPresets = {
-				presets: [defaultPreset],
-				defaultPresetId: '1',
-			};
-
-			this.saveConfig();
-		}
-
+	private ensureDefaultPresets(): void {
 		// Ensure default presets if none exist
 		if (!this.config.commandPresets) {
 			this.config.commandPresets = {
@@ -308,7 +256,7 @@ export class GlobalConfigEditor implements IConfigEditor {
 
 	getCommandPresets(): CommandPresetsConfig {
 		if (!this.config.commandPresets) {
-			this.migrateLegacyCommandToPresets();
+			this.ensureDefaultPresets();
 		}
 		return this.config.commandPresets!;
 	}
@@ -680,11 +628,6 @@ export class GlobalConfigEditor implements IConfigEditor {
 			)
 		) {
 			config.worktree.sortByLastSession = false;
-		}
-		if (!config.command) {
-			config.command = {
-				command: 'claude',
-			};
 		}
 		if (!config.autoApproval) {
 			config.autoApproval = {

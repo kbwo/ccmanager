@@ -25,7 +25,6 @@ vi.mock('child_process', () => ({
 // Mock configuration manager
 vi.mock('./configReader.js', () => ({
 	configReader: {
-		getCommandConfig: vi.fn(),
 		getStatusHooks: vi.fn(() => ({})),
 		getDefaultPreset: vi.fn(),
 		getPresetById: vi.fn(),
@@ -264,14 +263,13 @@ describe('SessionManager', () => {
 			).rejects.toThrow('Command not found');
 		});
 
-		it('should use fallback args when main command exits with code 1', async () => {
-			// Setup mock preset with fallback
+		it('should fallback to default command when main command exits with code 1', async () => {
+			// Setup mock preset with args
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
 				args: ['--invalid-flag'],
-				fallbackArgs: ['--resume'],
 			});
 
 			// First spawn attempt - will exit with code 1
@@ -302,12 +300,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called
+			// Verify fallback spawn was called (with no args since commandConfig was removed)
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
-				['--resume'],
+				[],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -971,7 +969,7 @@ describe('SessionManager', () => {
 			expect(session.isPrimaryCommand).toBe(false);
 		});
 
-		it('should use fallback args in devcontainer when primary command exits with code 1', async () => {
+		it('should fallback to default command in devcontainer when primary command exits with code 1', async () => {
 			// Setup exec mock for devcontainer up
 			type MockExecParams = Parameters<typeof exec>;
 			const mockExec = vi.mocked(exec);
@@ -992,13 +990,12 @@ describe('SessionManager', () => {
 				},
 			);
 
-			// Setup preset with fallback
+			// Setup preset with args
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
 				args: ['--bad-flag'],
-				fallbackArgs: ['--good-flag'],
 			});
 
 			// First spawn attempt - will exit with code 1
@@ -1031,12 +1028,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called
+			// Verify fallback spawn was called (with no args since commandConfig was removed)
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--good-flag'],
+				['exec', '--workspace-folder', '.', '--', 'claude'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
