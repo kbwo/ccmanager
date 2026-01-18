@@ -10,6 +10,7 @@ import {
 import {Worktree, Session} from '../types/index.js';
 import {execSync} from 'child_process';
 import {Mutex, createInitialSessionStateData} from './mutex.js';
+import {createStateDetector} from '../services/stateDetector/index.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -247,6 +248,7 @@ describe('prepareWorktreeItems', () => {
 			...createInitialSessionStateData(),
 			state: 'idle',
 		}),
+		stateDetector: createStateDetector('claude'),
 	};
 
 	it('should prepare basic worktree without git status', () => {

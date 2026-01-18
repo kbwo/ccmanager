@@ -2,6 +2,7 @@ import type {IPty} from '../services/bunTerminal.js';
 import type pkg from '@xterm/headless';
 import {GitStatus} from '../utils/gitStatus.js';
 import {Mutex, SessionStateData} from '../utils/mutex.js';
+import type {StateDetector} from '../services/stateDetector/types.js';
 
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
@@ -48,6 +49,11 @@ export interface Session {
 	 * Contains: state, pendingState, pendingStateStart, autoApprovalFailed, autoApprovalReason, autoApprovalAbortController
 	 */
 	stateMutex: Mutex<SessionStateData>;
+	/**
+	 * State detector instance for this session.
+	 * Created once during session initialization based on detectionStrategy.
+	 */
+	stateDetector: StateDetector;
 }
 
 export interface AutoApprovalResponse {

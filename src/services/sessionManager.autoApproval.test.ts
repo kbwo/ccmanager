@@ -28,7 +28,10 @@ vi.mock('./bunTerminal.js', () => ({
 }));
 
 vi.mock('./stateDetector/index.js', () => ({
-	createStateDetector: () => ({detectState: detectStateMock}),
+	createStateDetector: () => ({
+		detectState: detectStateMock,
+		detectBackgroundTask: () => false,
+	}),
 }));
 
 vi.mock('./configReader.js', () => ({

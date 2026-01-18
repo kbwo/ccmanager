@@ -32,4 +32,8 @@ export class ClineStateDetector extends BaseStateDetector {
 		// Otherwise busy - Priority 3
 		return 'busy';
 	}
+
+	detectBackgroundTask(_terminal: Terminal): boolean {
+		return false;
+	}
 }

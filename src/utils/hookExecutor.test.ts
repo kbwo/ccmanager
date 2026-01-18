@@ -13,6 +13,7 @@ import {configReader} from '../services/configReader.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {GitError} from '../types/errors.js';
 import {Mutex, createInitialSessionStateData} from './mutex.js';
+import {createStateDetector} from '../services/stateDetector/index.js';
 
 // Mock the configReader
 vi.mock('../services/configReader.js', () => ({
@@ -359,6 +360,7 @@ describe('hookExecutor Integration Tests', () => {
 				lastActivity: new Date(),
 				isActive: true,
 				stateMutex: new Mutex(createInitialSessionStateData()),
+				stateDetector: createStateDetector('claude'),
 			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -419,6 +421,7 @@ describe('hookExecutor Integration Tests', () => {
 				lastActivity: new Date(),
 				isActive: true,
 				stateMutex: new Mutex(createInitialSessionStateData()),
+				stateDetector: createStateDetector('claude'),
 			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -478,6 +481,7 @@ describe('hookExecutor Integration Tests', () => {
 				lastActivity: new Date(),
 				isActive: true,
 				stateMutex: new Mutex(createInitialSessionStateData()),
+				stateDetector: createStateDetector('claude'),
 			};
 
 			// Mock WorktreeService to return a worktree with the tmpDir path
@@ -538,6 +542,7 @@ describe('hookExecutor Integration Tests', () => {
 				lastActivity: new Date(),
 				isActive: true,
 				stateMutex: new Mutex(createInitialSessionStateData()),
+				stateDetector: createStateDetector('claude'),
 			};
 
 			// Mock WorktreeService to fail with GitError

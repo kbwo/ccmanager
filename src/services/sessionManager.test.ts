@@ -1049,10 +1049,11 @@ describe('SessionManager', () => {
 			const createMockSession = (
 				id: string,
 				state: 'idle' | 'busy' | 'waiting_input' | 'pending_auto_approval',
+				hasBackgroundTask: boolean = false,
 			): Partial<Session> => ({
 				id,
 				stateMutex: {
-					getSnapshot: () => ({state}),
+					getSnapshot: () => ({state, hasBackgroundTask}),
 				} as Session['stateMutex'],
 			});
 
@@ -1106,6 +1107,7 @@ describe('SessionManager', () => {
 					waiting_input: 1,
 					pending_auto_approval: 0,
 					total: 4,
+					backgroundTasks: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1120,6 +1122,7 @@ describe('SessionManager', () => {
 					waiting_input: 1,
 					pending_auto_approval: 0,
 					total: 3,
+					backgroundTasks: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1134,6 +1137,7 @@ describe('SessionManager', () => {
 					waiting_input: 0,
 					pending_auto_approval: 0,
 					total: 3,
+					backgroundTasks: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1148,11 +1152,28 @@ describe('SessionManager', () => {
 					waiting_input: 0,
 					pending_auto_approval: 0,
 					total: 0,
+					backgroundTasks: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
 
 				expect(formatted).toBe('');
+			});
+
+			it('should append [BG] tag when background tasks exist', () => {
+				const counts = {
+					idle: 1,
+					busy: 1,
+					waiting_input: 0,
+					pending_auto_approval: 0,
+					total: 2,
+					backgroundTasks: 1,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toContain('[BG]');
+				expect(formatted).toBe(' (1 Idle / 1 Busy \x1b[2m[BG]\x1b[0m)');
 			});
 		});
 	});
