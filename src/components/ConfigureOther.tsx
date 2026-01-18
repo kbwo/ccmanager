@@ -23,9 +23,7 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	const scope = configEditor.getScope();
 
 	// Get initial auto-approval config based on scope
-	const autoApprovalConfig =
-		configEditor.getAutoApprovalConfig() ||
-		configEditor.getEffectiveAutoApprovalConfig();
+	const autoApprovalConfig = configEditor.getAutoApprovalConfig()!;
 	const [view, setView] = useState<OtherView>('main');
 	const [autoApprovalEnabled, setAutoApprovalEnabled] = useState(
 		autoApprovalConfig.enabled,

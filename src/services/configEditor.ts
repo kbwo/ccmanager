@@ -6,7 +6,6 @@ import {
 	WorktreeHookConfig,
 	WorktreeConfig,
 	CommandPresetsConfig,
-	DEFAULT_SHORTCUTS,
 	IConfigEditor,
 	AutoApprovalConfig,
 } from '../types/index.js';
@@ -19,9 +18,7 @@ import {projectConfigEditor} from './projectConfigEditor.js';
  *
  * - When scope='global', uses GlobalConfigEditor singleton
  * - When scope='project', uses ProjectConfigEditor singleton
- *
- * This class also provides methods to get effective values
- * (merged config where project overrides global).
+ *   (with fallback to global if project value is undefined)
  *
  * IMPORTANT: Uses singletons to ensure that config changes are
  * immediately visible to all components (e.g., shortcutManager, configReader).
@@ -36,10 +33,12 @@ export class ConfigEditor implements IConfigEditor {
 			scope === 'global' ? globalConfigEditor : projectConfigEditor;
 	}
 
-	// IConfigEditor implementation - delegates to configEditor
+	// IConfigEditor implementation - delegates to configEditor with fallback to global
 
 	getShortcuts(): ShortcutConfig | undefined {
-		return this.configEditor.getShortcuts();
+		return (
+			this.configEditor.getShortcuts() ?? globalConfigEditor.getShortcuts()
+		);
 	}
 
 	setShortcuts(value: ShortcutConfig): void {
@@ -47,7 +46,9 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getStatusHooks(): StatusHookConfig | undefined {
-		return this.configEditor.getStatusHooks();
+		return (
+			this.configEditor.getStatusHooks() ?? globalConfigEditor.getStatusHooks()
+		);
 	}
 
 	setStatusHooks(value: StatusHookConfig): void {
@@ -55,7 +56,10 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getWorktreeHooks(): WorktreeHookConfig | undefined {
-		return this.configEditor.getWorktreeHooks();
+		return (
+			this.configEditor.getWorktreeHooks() ??
+			globalConfigEditor.getWorktreeHooks()
+		);
 	}
 
 	setWorktreeHooks(value: WorktreeHookConfig): void {
@@ -63,7 +67,10 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getWorktreeConfig(): WorktreeConfig | undefined {
-		return this.configEditor.getWorktreeConfig();
+		return (
+			this.configEditor.getWorktreeConfig() ??
+			globalConfigEditor.getWorktreeConfig()
+		);
 	}
 
 	setWorktreeConfig(value: WorktreeConfig): void {
@@ -71,7 +78,10 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getCommandPresets(): CommandPresetsConfig | undefined {
-		return this.configEditor.getCommandPresets();
+		return (
+			this.configEditor.getCommandPresets() ??
+			globalConfigEditor.getCommandPresets()
+		);
 	}
 
 	setCommandPresets(value: CommandPresetsConfig): void {
@@ -79,7 +89,10 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getAutoApprovalConfig(): AutoApprovalConfig | undefined {
-		return this.configEditor.getAutoApprovalConfig();
+		return (
+			this.configEditor.getAutoApprovalConfig() ??
+			globalConfigEditor.getAutoApprovalConfig()
+		);
 	}
 
 	setAutoApprovalConfig(value: AutoApprovalConfig): void {
@@ -111,62 +124,6 @@ export class ConfigEditor implements IConfigEditor {
 	 */
 	removeProjectOverride(field: keyof ProjectConfigurationData): void {
 		projectConfigEditor.removeOverride(field);
-	}
-
-	// Effective value getters (merged: project overrides global)
-	// These are useful for displaying the current effective value
-
-	getEffectiveShortcuts(): ShortcutConfig {
-		return (
-			projectConfigEditor.getShortcuts() ||
-			globalConfigEditor.getShortcuts() ||
-			DEFAULT_SHORTCUTS
-		);
-	}
-
-	getEffectiveStatusHooks(): StatusHookConfig {
-		return (
-			projectConfigEditor.getStatusHooks() ||
-			globalConfigEditor.getStatusHooks() ||
-			{}
-		);
-	}
-
-	getEffectiveWorktreeHooks(): WorktreeHookConfig {
-		return (
-			projectConfigEditor.getWorktreeHooks() ||
-			globalConfigEditor.getWorktreeHooks() ||
-			{}
-		);
-	}
-
-	getEffectiveWorktreeConfig(): WorktreeConfig {
-		return (
-			projectConfigEditor.getWorktreeConfig() ||
-			globalConfigEditor.getWorktreeConfig() || {
-				autoDirectory: false,
-				copySessionData: true,
-				sortByLastSession: false,
-			}
-		);
-	}
-
-	getEffectiveCommandPresets(): CommandPresetsConfig {
-		return (
-			projectConfigEditor.getCommandPresets() ||
-			globalConfigEditor.getCommandPresets()
-		);
-	}
-
-	getEffectiveAutoApprovalConfig(): AutoApprovalConfig {
-		const projectConfig = projectConfigEditor.getAutoApprovalConfig();
-		if (projectConfig) {
-			return {
-				...projectConfig,
-				timeout: projectConfig.timeout ?? 30,
-			};
-		}
-		return globalConfigEditor.getAutoApprovalConfig();
 	}
 }
 

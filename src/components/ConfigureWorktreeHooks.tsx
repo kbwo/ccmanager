@@ -24,8 +24,7 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 	const [view, setView] = useState<View>('menu');
 
 	// Get initial worktree hooks based on scope
-	const initialWorktreeHooks =
-		configEditor.getWorktreeHooks() || configEditor.getEffectiveWorktreeHooks();
+	const initialWorktreeHooks = configEditor.getWorktreeHooks() ?? {};
 	const [worktreeHooks, setWorktreeHooks] =
 		useState<WorktreeHookConfig>(initialWorktreeHooks);
 	const [currentCommand, setCurrentCommand] = useState('');

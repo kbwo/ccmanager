@@ -23,8 +23,7 @@ const ConfigureShortcuts: React.FC<ConfigureShortcutsProps> = ({
 	const [step, setStep] = useState<ConfigStep>('menu');
 
 	// Get initial shortcuts based on scope
-	const initialShortcuts =
-		configEditor.getShortcuts() || configEditor.getEffectiveShortcuts();
+	const initialShortcuts = configEditor.getShortcuts()!;
 	const [shortcuts, setShortcuts] = useState<ShortcutConfig>(initialShortcuts);
 	const [editingShortcut, setEditingShortcut] = useState<
 		keyof ShortcutConfig | null

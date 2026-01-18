@@ -35,7 +35,6 @@ vi.mock('ink-select-input', async () => {
 const mockFns = {
 	getStatusHooks: vi.fn(),
 	setStatusHooks: vi.fn(),
-	getEffectiveStatusHooks: vi.fn(),
 	hasProjectOverride: vi.fn().mockReturnValue(false),
 	getScope: vi.fn().mockReturnValue('global'),
 };
@@ -45,7 +44,6 @@ vi.mock('../services/configEditor.js', () => {
 		ConfigEditor: class {
 			getStatusHooks = mockFns.getStatusHooks;
 			setStatusHooks = mockFns.setStatusHooks;
-			getEffectiveStatusHooks = mockFns.getEffectiveStatusHooks;
 			hasProjectOverride = mockFns.hasProjectOverride;
 			getScope = mockFns.getScope;
 		},
@@ -59,7 +57,6 @@ describe('ConfigureStatusHooks', () => {
 
 	it('should render status hooks configuration screen', () => {
 		mockFns.getStatusHooks.mockReturnValue({});
-		mockFns.getEffectiveStatusHooks.mockReturnValue({});
 
 		const onComplete = vi.fn();
 		const {lastFrame} = render(
@@ -79,16 +76,6 @@ describe('ConfigureStatusHooks', () => {
 
 	it('should display configured hooks', () => {
 		mockFns.getStatusHooks.mockReturnValue({
-			idle: {
-				command: 'notify-send "Idle"',
-				enabled: true,
-			},
-			busy: {
-				command: 'echo "Busy"',
-				enabled: false,
-			},
-		});
-		mockFns.getEffectiveStatusHooks.mockReturnValue({
 			idle: {
 				command: 'notify-send "Idle"',
 				enabled: true,

@@ -34,7 +34,6 @@ vi.mock('ink-select-input', async () => {
 const mockFns = {
 	getAutoApprovalConfig: vi.fn(),
 	setAutoApprovalConfig: vi.fn(),
-	getEffectiveAutoApprovalConfig: vi.fn(),
 	hasProjectOverride: vi.fn().mockReturnValue(false),
 	getScope: vi.fn().mockReturnValue('global'),
 };
@@ -44,7 +43,6 @@ vi.mock('../services/configEditor.js', () => {
 		ConfigEditor: class {
 			getAutoApprovalConfig = mockFns.getAutoApprovalConfig;
 			setAutoApprovalConfig = mockFns.setAutoApprovalConfig;
-			getEffectiveAutoApprovalConfig = mockFns.getEffectiveAutoApprovalConfig;
 			hasProjectOverride = mockFns.hasProjectOverride;
 			getScope = mockFns.getScope;
 		},
@@ -98,11 +96,6 @@ describe('ConfigureOther', () => {
 			customCommand: '',
 			timeout: 30,
 		});
-		mockFns.getEffectiveAutoApprovalConfig.mockReturnValue({
-			enabled: true,
-			customCommand: '',
-			timeout: 30,
-		});
 
 		const {lastFrame} = render(
 			<ConfigEditorProvider scope="global">
@@ -119,11 +112,6 @@ describe('ConfigureOther', () => {
 
 	it('shows current custom command summary', () => {
 		mockFns.getAutoApprovalConfig.mockReturnValue({
-			enabled: false,
-			customCommand: 'jq -n \'{"needsPermission":true}\'',
-			timeout: 30,
-		});
-		mockFns.getEffectiveAutoApprovalConfig.mockReturnValue({
 			enabled: false,
 			customCommand: 'jq -n \'{"needsPermission":true}\'',
 			timeout: 30,

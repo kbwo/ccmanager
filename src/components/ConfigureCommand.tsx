@@ -87,9 +87,7 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 	const scope = configEditor.getScope();
 
 	// Get initial presets based on scope
-	const presetsConfig =
-		configEditor.getCommandPresets() ||
-		configEditor.getEffectiveCommandPresets();
+	const presetsConfig = configEditor.getCommandPresets()!;
 	const [presets, setPresets] = useState(presetsConfig.presets);
 	const [defaultPresetId, setDefaultPresetId] = useState(
 		presetsConfig.defaultPresetId,

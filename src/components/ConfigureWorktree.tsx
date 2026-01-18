@@ -22,9 +22,7 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	const scope = configEditor.getScope();
 
 	// Get initial worktree config based on scope
-	const worktreeConfig =
-		configEditor.getWorktreeConfig() ||
-		configEditor.getEffectiveWorktreeConfig();
+	const worktreeConfig = configEditor.getWorktreeConfig()!;
 	const [autoDirectory, setAutoDirectory] = useState(
 		worktreeConfig.autoDirectory,
 	);

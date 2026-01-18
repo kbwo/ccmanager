@@ -35,7 +35,6 @@ vi.mock('ink-select-input', async () => {
 const mockFns = {
 	getWorktreeHooks: vi.fn(),
 	setWorktreeHooks: vi.fn(),
-	getEffectiveWorktreeHooks: vi.fn(),
 	hasProjectOverride: vi.fn().mockReturnValue(false),
 	getScope: vi.fn().mockReturnValue('global'),
 };
@@ -45,7 +44,6 @@ vi.mock('../services/configEditor.js', () => {
 		ConfigEditor: class {
 			getWorktreeHooks = mockFns.getWorktreeHooks;
 			setWorktreeHooks = mockFns.setWorktreeHooks;
-			getEffectiveWorktreeHooks = mockFns.getEffectiveWorktreeHooks;
 			hasProjectOverride = mockFns.hasProjectOverride;
 			getScope = mockFns.getScope;
 		},
@@ -59,7 +57,6 @@ describe('ConfigureWorktreeHooks', () => {
 
 	it('should render worktree hooks configuration screen', () => {
 		mockFns.getWorktreeHooks.mockReturnValue({});
-		mockFns.getEffectiveWorktreeHooks.mockReturnValue({});
 
 		const onComplete = vi.fn();
 		const {lastFrame} = render(
@@ -80,12 +77,6 @@ describe('ConfigureWorktreeHooks', () => {
 				enabled: true,
 			},
 		});
-		mockFns.getEffectiveWorktreeHooks.mockReturnValue({
-			post_creation: {
-				command: 'npm install',
-				enabled: true,
-			},
-		});
 
 		const onComplete = vi.fn();
 		const {lastFrame} = render(
@@ -99,7 +90,6 @@ describe('ConfigureWorktreeHooks', () => {
 
 	it('should display not set when no hook configured', () => {
 		mockFns.getWorktreeHooks.mockReturnValue({});
-		mockFns.getEffectiveWorktreeHooks.mockReturnValue({});
 
 		const onComplete = vi.fn();
 		const {lastFrame} = render(

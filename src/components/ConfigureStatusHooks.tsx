@@ -32,8 +32,7 @@ const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
 	const [selectedStatus, setSelectedStatus] = useState<SessionState>('idle');
 
 	// Get initial status hooks based on scope
-	const initialStatusHooks =
-		configEditor.getStatusHooks() || configEditor.getEffectiveStatusHooks();
+	const initialStatusHooks = configEditor.getStatusHooks() ?? {};
 	const [statusHooks, setStatusHooks] =
 		useState<StatusHookConfig>(initialStatusHooks);
 	const [currentCommand, setCurrentCommand] = useState('');
