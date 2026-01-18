@@ -1,6 +1,10 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
 import {GlobalConfigManager} from './globalConfigManager.js';
+import {
+	getSelectPresetOnStart,
+	setSelectPresetOnStart,
+} from './testUtils.js';
 import type {ConfigurationData} from '../../types/index.js';
 
 // Mock fs module
@@ -80,7 +84,7 @@ describe('GlobalConfigManager - selectPresetOnStart', () => {
 
 	describe('getSelectPresetOnStart', () => {
 		it('should return false by default', () => {
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configManager);
 			expect(result).toBe(false);
 		});
 
@@ -88,7 +92,7 @@ describe('GlobalConfigManager - selectPresetOnStart', () => {
 			mockConfigData.commandPresets!.selectPresetOnStart = true;
 			configManager = new GlobalConfigManager();
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configManager);
 			expect(result).toBe(true);
 		});
 
@@ -96,16 +100,16 @@ describe('GlobalConfigManager - selectPresetOnStart', () => {
 			mockConfigData.commandPresets!.selectPresetOnStart = false;
 			configManager = new GlobalConfigManager();
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configManager);
 			expect(result).toBe(false);
 		});
 	});
 
 	describe('setSelectPresetOnStart', () => {
 		it('should set selectPresetOnStart to true', () => {
-			configManager.setSelectPresetOnStart(true);
+			setSelectPresetOnStart(configManager, true);
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configManager);
 			expect(result).toBe(true);
 
 			// Verify that config was saved
@@ -117,11 +121,11 @@ describe('GlobalConfigManager - selectPresetOnStart', () => {
 
 		it('should set selectPresetOnStart to false', () => {
 			// First set to true
-			configManager.setSelectPresetOnStart(true);
+			setSelectPresetOnStart(configManager, true);
 			// Then set to false
-			configManager.setSelectPresetOnStart(false);
+			setSelectPresetOnStart(configManager, false);
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configManager);
 			expect(result).toBe(false);
 
 			// Verify that config was saved
@@ -132,7 +136,7 @@ describe('GlobalConfigManager - selectPresetOnStart', () => {
 		});
 
 		it('should preserve other preset configuration when setting selectPresetOnStart', () => {
-			configManager.setSelectPresetOnStart(true);
+			setSelectPresetOnStart(configManager, true);
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.presets).toHaveLength(2);

@@ -170,19 +170,6 @@ export class ProjectConfigManager implements IConfigEditor {
 		}
 	}
 
-	/**
-	 * Get the project config file path
-	 */
-	getConfigPath(): string {
-		return this.projectConfigPath;
-	}
-
-	/**
-	 * Check if project config file exists
-	 */
-	hasConfigFile(): boolean {
-		return existsSync(this.projectConfigPath);
-	}
 }
 
 /**

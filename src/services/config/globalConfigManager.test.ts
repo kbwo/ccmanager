@@ -1,6 +1,12 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
 import {GlobalConfigManager} from './globalConfigManager.js';
+import {
+	addPreset,
+	deletePreset,
+	setDefaultPreset,
+	getDefaultPreset,
+} from './testUtils.js';
 import type {
 	CommandPresetsConfig,
 	ConfigurationData,
@@ -136,7 +142,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 
 			resetSavedConfig();
 			configManager = new GlobalConfigManager();
-			const defaultPreset = configManager.getDefaultPreset();
+			const defaultPreset = getDefaultPreset(configManager);
 
 			expect(defaultPreset).toEqual({
 				id: '2',
@@ -157,7 +163,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 
 			resetSavedConfig();
 			configManager = new GlobalConfigManager();
-			const defaultPreset = configManager.getDefaultPreset();
+			const defaultPreset = getDefaultPreset(configManager);
 
 			expect(defaultPreset).toEqual({
 				id: '1',
@@ -183,7 +189,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 				args: ['--new'],
 			};
 
-			configManager.addPreset(newPreset);
+			addPreset(configManager, newPreset);
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.presets).toHaveLength(2);
@@ -205,7 +211,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 				args: ['--updated'],
 			};
 
-			configManager.addPreset(updatedPreset);
+			addPreset(configManager, updatedPreset);
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.presets).toHaveLength(1);
@@ -225,7 +231,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 
 			resetSavedConfig();
 			configManager = new GlobalConfigManager();
-			configManager.deletePreset('2');
+			deletePreset(configManager, '2');
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.presets).toHaveLength(1);
@@ -240,7 +246,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 
 			resetSavedConfig();
 			configManager = new GlobalConfigManager();
-			configManager.deletePreset('1');
+			deletePreset(configManager, '1');
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.presets).toHaveLength(1);
@@ -257,7 +263,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 
 			resetSavedConfig();
 			configManager = new GlobalConfigManager();
-			configManager.deletePreset('2');
+			deletePreset(configManager, '2');
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.defaultPresetId).toBe('1');
@@ -276,7 +282,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 
 			resetSavedConfig();
 			configManager = new GlobalConfigManager();
-			configManager.setDefaultPreset('2');
+			setDefaultPreset(configManager, '2');
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.defaultPresetId).toBe('2');
@@ -290,7 +296,7 @@ describe('GlobalConfigManager - Command Presets', () => {
 
 			resetSavedConfig();
 			configManager = new GlobalConfigManager();
-			configManager.setDefaultPreset('999');
+			setDefaultPreset(configManager, '999');
 
 			const presets = configManager.getCommandPresets();
 			expect(presets.defaultPresetId).toBe('1');

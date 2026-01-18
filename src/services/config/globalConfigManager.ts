@@ -6,7 +6,6 @@
 import {homedir} from 'os';
 import {join} from 'path';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
-import {Effect, Either} from 'effect';
 import {
 	ConfigurationData,
 	StatusHookConfig,
@@ -18,7 +17,6 @@ import {
 	DEFAULT_SHORTCUTS,
 	IConfigEditor,
 } from '../../types/index.js';
-import {FileSystemError, ValidationError} from '../../types/errors.js';
 
 export class GlobalConfigManager implements IConfigEditor {
 	private configPath: string;
@@ -188,15 +186,6 @@ export class GlobalConfigManager implements IConfigEditor {
 		this.saveConfig();
 	}
 
-	getConfiguration(): ConfigurationData {
-		return this.config;
-	}
-
-	setConfiguration(config: ConfigurationData): void {
-		this.config = config;
-		this.saveConfig();
-	}
-
 	getWorktreeConfig(): WorktreeConfig {
 		return (
 			this.config.worktree || {
@@ -228,16 +217,6 @@ export class GlobalConfigManager implements IConfigEditor {
 		this.saveConfig();
 	}
 
-	setAutoApprovalEnabled(enabled: boolean): void {
-		const currentConfig = this.getAutoApprovalConfig();
-		this.setAutoApprovalConfig({...currentConfig, enabled});
-	}
-
-	setAutoApprovalTimeout(timeout: number): void {
-		const currentConfig = this.getAutoApprovalConfig();
-		this.setAutoApprovalConfig({...currentConfig, timeout});
-	}
-
 	private ensureDefaultPresets(): void {
 		// Ensure default presets if none exist
 		if (!this.config.commandPresets) {
@@ -264,233 +243,6 @@ export class GlobalConfigManager implements IConfigEditor {
 	setCommandPresets(presets: CommandPresetsConfig): void {
 		this.config.commandPresets = presets;
 		this.saveConfig();
-	}
-
-	getDefaultPreset(): CommandPreset {
-		const presets = this.getCommandPresets();
-		const defaultPreset = presets.presets.find(
-			p => p.id === presets.defaultPresetId,
-		);
-
-		// If default preset not found, return the first one
-		return defaultPreset || presets.presets[0]!;
-	}
-
-	addPreset(preset: CommandPreset): void {
-		const presets = this.getCommandPresets();
-
-		// Replace if exists, otherwise add
-		const existingIndex = presets.presets.findIndex(p => p.id === preset.id);
-		if (existingIndex >= 0) {
-			presets.presets[existingIndex] = preset;
-		} else {
-			presets.presets.push(preset);
-		}
-
-		this.setCommandPresets(presets);
-	}
-
-	deletePreset(id: string): void {
-		const presets = this.getCommandPresets();
-
-		// Don't delete if it's the last preset
-		if (presets.presets.length <= 1) {
-			return;
-		}
-
-		// Remove the preset
-		presets.presets = presets.presets.filter(p => p.id !== id);
-
-		// Update default if needed
-		if (presets.defaultPresetId === id && presets.presets.length > 0) {
-			presets.defaultPresetId = presets.presets[0]!.id;
-		}
-
-		this.setCommandPresets(presets);
-	}
-
-	setDefaultPreset(id: string): void {
-		const presets = this.getCommandPresets();
-
-		// Only update if preset exists
-		if (presets.presets.some(p => p.id === id)) {
-			presets.defaultPresetId = id;
-			this.setCommandPresets(presets);
-		}
-	}
-
-	getSelectPresetOnStart(): boolean {
-		const presets = this.getCommandPresets();
-		return presets.selectPresetOnStart ?? false;
-	}
-
-	setSelectPresetOnStart(enabled: boolean): void {
-		const presets = this.getCommandPresets();
-		presets.selectPresetOnStart = enabled;
-		this.setCommandPresets(presets);
-	}
-
-	// Effect-based methods for type-safe error handling
-
-	/**
-	 * Save configuration to file with Effect-based error handling
-	 *
-	 * @returns {Effect.Effect<void, FileSystemError, never>} Void on success, FileSystemError on write failure
-	 *
-	 * @example
-	 * ```typescript
-	 * await Effect.runPromise(
-	 *   configManager.saveConfigEffect(config)
-	 * );
-	 * ```
-	 */
-	saveConfigEffect(
-		config: ConfigurationData,
-	): Effect.Effect<void, FileSystemError, never> {
-		return Effect.try({
-			try: () => {
-				this.config = config;
-				writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
-			},
-			catch: (error: unknown) => {
-				return new FileSystemError({
-					operation: 'write',
-					path: this.configPath,
-					cause: String(error),
-				});
-			},
-		});
-	}
-
-	/**
-	 * Get preset by ID with Either-based error handling
-	 * Synchronous lookup using Either
-	 */
-	getPresetByIdEffect(
-		id: string,
-	): Either.Either<CommandPreset, ValidationError> {
-		const presets = this.getCommandPresets();
-		const preset = presets.presets.find(p => p.id === id);
-
-		if (!preset) {
-			return Either.left(
-				new ValidationError({
-					field: 'presetId',
-					constraint: 'Preset not found',
-					receivedValue: id,
-				}),
-			);
-		}
-
-		return Either.right(preset);
-	}
-
-	/**
-	 * Set shortcuts with Effect-based error handling
-	 *
-	 * @returns {Effect.Effect<void, FileSystemError, never>} Void on success, FileSystemError on save failure
-	 *
-	 * @example
-	 * ```typescript
-	 * await Effect.runPromise(
-	 *   configManager.setShortcutsEffect(shortcuts)
-	 * );
-	 * ```
-	 */
-	setShortcutsEffect(
-		shortcuts: ShortcutConfig,
-	): Effect.Effect<void, FileSystemError, never> {
-		this.config.shortcuts = shortcuts;
-		return this.saveConfigEffect(this.config);
-	}
-
-	/**
-	 * Set command presets with Effect-based error handling
-	 */
-	setCommandPresetsEffect(
-		presets: CommandPresetsConfig,
-	): Effect.Effect<void, FileSystemError, never> {
-		this.config.commandPresets = presets;
-		return this.saveConfigEffect(this.config);
-	}
-
-	/**
-	 * Add or update preset with Effect-based error handling
-	 */
-	addPresetEffect(
-		preset: CommandPreset,
-	): Effect.Effect<void, FileSystemError, never> {
-		const presets = this.getCommandPresets();
-
-		// Replace if exists, otherwise add
-		const existingIndex = presets.presets.findIndex(p => p.id === preset.id);
-		if (existingIndex >= 0) {
-			presets.presets[existingIndex] = preset;
-		} else {
-			presets.presets.push(preset);
-		}
-
-		return this.setCommandPresetsEffect(presets);
-	}
-
-	/**
-	 * Delete preset with Effect-based error handling
-	 */
-	deletePresetEffect(
-		id: string,
-	): Effect.Effect<void, ValidationError | FileSystemError, never> {
-		const presets = this.getCommandPresets();
-
-		// Don't delete if it's the last preset
-		if (presets.presets.length <= 1) {
-			return Effect.fail(
-				new ValidationError({
-					field: 'presetId',
-					constraint: 'Cannot delete last preset',
-					receivedValue: id,
-				}),
-			);
-		}
-
-		// Remove the preset
-		presets.presets = presets.presets.filter(p => p.id !== id);
-
-		// Update default if needed
-		if (presets.defaultPresetId === id && presets.presets.length > 0) {
-			presets.defaultPresetId = presets.presets[0]!.id;
-		}
-
-		return this.setCommandPresetsEffect(presets);
-	}
-
-	/**
-	 * Set default preset with Effect-based error handling
-	 */
-	setDefaultPresetEffect(
-		id: string,
-	): Effect.Effect<void, ValidationError | FileSystemError, never> {
-		const presets = this.getCommandPresets();
-
-		// Only update if preset exists
-		if (!presets.presets.some(p => p.id === id)) {
-			return Effect.fail(
-				new ValidationError({
-					field: 'presetId',
-					constraint: 'Preset not found',
-					receivedValue: id,
-				}),
-			);
-		}
-
-		presets.defaultPresetId = id;
-		return this.setCommandPresetsEffect(presets);
-	}
-
-	/**
-	 * Get whether auto-approval is enabled
-	 */
-	isAutoApprovalEnabled(): boolean {
-		return this.config.autoApproval?.enabled ?? false;
 	}
 
 	/**

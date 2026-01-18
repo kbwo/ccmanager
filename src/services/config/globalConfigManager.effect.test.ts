@@ -2,7 +2,17 @@ import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {Effect, Either} from 'effect';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
 import {GlobalConfigManager} from './globalConfigManager.js';
-import {loadConfigEffect, validateConfig} from './testUtils.js';
+import {
+	loadConfigEffect,
+	validateConfig,
+	saveConfigEffect,
+	setShortcutsEffect,
+	setCommandPresetsEffect,
+	addPresetEffect,
+	deletePresetEffect,
+	setDefaultPresetEffect,
+	getPresetByIdEffect,
+} from './testUtils.js';
 import {
 	FileSystemError,
 	ConfigError,
@@ -159,7 +169,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				},
 			};
 
-			await Effect.runPromise(configManager.saveConfigEffect(newConfig));
+			await Effect.runPromise(
+				saveConfigEffect(configManager, newConfig, TEST_CONFIG_PATH),
+			);
 
 			expect(writeFileSync).toHaveBeenCalledWith(
 				expect.stringContaining('config.json'),
@@ -180,7 +192,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			};
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.saveConfigEffect(newConfig)),
+				Effect.either(
+					saveConfigEffect(configManager, newConfig, TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -249,7 +263,7 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 
 			configManager = new GlobalConfigManager();
 
-			const result = configManager.getPresetByIdEffect('2');
+			const result = getPresetByIdEffect(configManager, '2');
 
 			expect(Either.isRight(result)).toBe(true);
 			if (Either.isRight(result)) {
@@ -270,7 +284,7 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 
 			configManager = new GlobalConfigManager();
 
-			const result = configManager.getPresetByIdEffect('999');
+			const result = getPresetByIdEffect(configManager, '999');
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {
@@ -289,7 +303,7 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 
 			configManager = new GlobalConfigManager();
 
-			const result = configManager.getPresetByIdEffect('invalid-id');
+			const result = getPresetByIdEffect(configManager, 'invalid-id');
 
 			expect(Either.isLeft(result)).toBe(true);
 			if (Either.isLeft(result)) {
@@ -306,7 +320,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				cancel: {key: 'escape'},
 			};
 
-			await Effect.runPromise(configManager.setShortcutsEffect(newShortcuts));
+			await Effect.runPromise(
+				setShortcutsEffect(configManager, newShortcuts, TEST_CONFIG_PATH),
+			);
 
 			expect(writeFileSync).toHaveBeenCalled();
 		});
@@ -322,7 +338,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			};
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.setShortcutsEffect(newShortcuts)),
+				Effect.either(
+					setShortcutsEffect(configManager, newShortcuts, TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -343,7 +361,7 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			};
 
 			await Effect.runPromise(
-				configManager.setCommandPresetsEffect(newPresets),
+				setCommandPresetsEffect(configManager, newPresets, TEST_CONFIG_PATH),
 			);
 
 			expect(writeFileSync).toHaveBeenCalled();
@@ -360,7 +378,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			};
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.setCommandPresetsEffect(newPresets)),
+				Effect.either(
+					setCommandPresetsEffect(configManager, newPresets, TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -386,7 +406,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				args: ['--new'],
 			};
 
-			await Effect.runPromise(configManager.addPresetEffect(newPreset));
+			await Effect.runPromise(
+				addPresetEffect(configManager, newPreset, TEST_CONFIG_PATH),
+			);
 
 			expect(writeFileSync).toHaveBeenCalled();
 		});
@@ -406,7 +428,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 				args: ['--updated'],
 			};
 
-			await Effect.runPromise(configManager.addPresetEffect(updatedPreset));
+			await Effect.runPromise(
+				addPresetEffect(configManager, updatedPreset, TEST_CONFIG_PATH),
+			);
 
 			expect(writeFileSync).toHaveBeenCalled();
 		});
@@ -423,7 +447,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			};
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.addPresetEffect(newPreset)),
+				Effect.either(
+					addPresetEffect(configManager, newPreset, TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -445,7 +471,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 
 			configManager = new GlobalConfigManager();
 
-			await Effect.runPromise(configManager.deletePresetEffect('2'));
+			await Effect.runPromise(
+				deletePresetEffect(configManager, '2', TEST_CONFIG_PATH),
+			);
 
 			expect(writeFileSync).toHaveBeenCalled();
 		});
@@ -459,7 +487,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			configManager = new GlobalConfigManager();
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.deletePresetEffect('1')),
+				Effect.either(
+					deletePresetEffect(configManager, '1', TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -488,7 +518,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			});
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.deletePresetEffect('2')),
+				Effect.either(
+					deletePresetEffect(configManager, '2', TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -510,7 +542,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 
 			configManager = new GlobalConfigManager();
 
-			await Effect.runPromise(configManager.setDefaultPresetEffect('2'));
+			await Effect.runPromise(
+				setDefaultPresetEffect(configManager, '2', TEST_CONFIG_PATH),
+			);
 
 			expect(writeFileSync).toHaveBeenCalled();
 		});
@@ -524,7 +558,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			configManager = new GlobalConfigManager();
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.setDefaultPresetEffect('999')),
+				Effect.either(
+					setDefaultPresetEffect(configManager, '999', TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
@@ -550,7 +586,9 @@ describe('GlobalConfigManager - Effect-based operations', () => {
 			});
 
 			const result = await Effect.runPromise(
-				Effect.either(configManager.setDefaultPresetEffect('2')),
+				Effect.either(
+					setDefaultPresetEffect(configManager, '2', TEST_CONFIG_PATH),
+				),
 			);
 
 			expect(Either.isLeft(result)).toBe(true);
