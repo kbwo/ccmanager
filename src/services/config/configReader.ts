@@ -7,6 +7,7 @@ import {
 	CommandPresetsConfig,
 	CommandPreset,
 	ConfigurationData,
+	IConfigReader,
 } from '../../types/index.js';
 import {ValidationError} from '../../types/errors.js';
 import {globalConfigManager} from './globalConfigManager.js';
@@ -19,7 +20,7 @@ import {projectConfigManager} from './projectConfigManager.js';
  *
  * Uses the singleton projectConfigManager (cwd-based) for project config.
  */
-export class ConfigReader {
+export class ConfigReader implements IConfigReader {
 	// Shortcuts - returns merged value (project > global)
 	getShortcuts(): ShortcutConfig {
 		return (

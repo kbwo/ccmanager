@@ -166,36 +166,56 @@ export interface ProjectConfigurationData {
 }
 
 /**
- * Common interface for configuration editors.
- * Implemented by both GlobalConfigEditor and ProjectConfigEditor.
+ * Common interface for configuration readers.
+ * Provides read-only access to configuration values.
+ * Implemented by ConfigReader, ConfigEditor, GlobalConfigManager, ProjectConfigManager.
  */
-export interface IConfigEditor {
+export interface IConfigReader {
 	// Shortcuts
 	getShortcuts(): ShortcutConfig | undefined;
-	setShortcuts(value: ShortcutConfig): void;
 
 	// Status Hooks
 	getStatusHooks(): StatusHookConfig | undefined;
-	setStatusHooks(value: StatusHookConfig): void;
 
 	// Worktree Hooks
 	getWorktreeHooks(): WorktreeHookConfig | undefined;
-	setWorktreeHooks(value: WorktreeHookConfig): void;
 
 	// Worktree Config
 	getWorktreeConfig(): WorktreeConfig | undefined;
-	setWorktreeConfig(value: WorktreeConfig): void;
 
 	// Command Presets
 	getCommandPresets(): CommandPresetsConfig | undefined;
-	setCommandPresets(value: CommandPresetsConfig): void;
 
 	// Auto Approval
 	getAutoApprovalConfig(): AutoApprovalConfig | undefined;
-	setAutoApprovalConfig(value: AutoApprovalConfig): void;
 
 	// Reload config from disk
 	reload(): void;
+}
+
+/**
+ * Common interface for configuration editors.
+ * Extends IConfigReader with write capabilities.
+ * Implemented by ConfigEditor, GlobalConfigManager, ProjectConfigManager.
+ */
+export interface IConfigEditor extends IConfigReader {
+	// Shortcuts
+	setShortcuts(value: ShortcutConfig): void;
+
+	// Status Hooks
+	setStatusHooks(value: StatusHookConfig): void;
+
+	// Worktree Hooks
+	setWorktreeHooks(value: WorktreeHookConfig): void;
+
+	// Worktree Config
+	setWorktreeConfig(value: WorktreeConfig): void;
+
+	// Command Presets
+	setCommandPresets(value: CommandPresetsConfig): void;
+
+	// Auto Approval
+	setAutoApprovalConfig(value: AutoApprovalConfig): void;
 }
 
 // Multi-project support interfaces
