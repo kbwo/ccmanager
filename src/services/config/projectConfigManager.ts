@@ -15,6 +15,7 @@ import {
 	IConfigEditor,
 	AutoApprovalConfig,
 } from '../../types/index.js';
+import {ENV_VARS} from '../../constants/env.js';
 
 const PROJECT_CONFIG_FILENAME = '.ccmanager.json';
 
@@ -35,6 +36,12 @@ class ProjectConfigManager implements IConfigEditor {
 	}
 
 	private loadProjectConfig(): void {
+		// In multi-project mode, skip project config to ensure global config is used
+		if (process.env[ENV_VARS.MULTI_PROJECT_ROOT]) {
+			this.projectConfig = null;
+			return;
+		}
+
 		if (existsSync(this.projectConfigPath)) {
 			try {
 				const data = readFileSync(this.projectConfigPath, 'utf-8');
