@@ -62,6 +62,9 @@ vi.mock('./worktreeService.js', () => ({
 	WorktreeService: vi.fn(function () {
 		return {};
 	}),
+	setWorktreeLastOpened: vi.fn(),
+	getWorktreeLastOpened: vi.fn(() => ({})),
+	getWorktreeLastOpenedTime: vi.fn(),
 }));
 
 // Create a mock IPty class

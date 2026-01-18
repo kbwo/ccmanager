@@ -11,6 +11,7 @@ import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {promisify} from 'util';
 import {configReader} from './config/configReader.js';
+import {setWorktreeLastOpened} from './worktreeService.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector/index.js';
 import {
@@ -297,7 +298,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions.set(worktreePath, session);
 
 		// Record the timestamp when this worktree was opened
-		configReader.setWorktreeLastOpened(worktreePath, Date.now());
+		setWorktreeLastOpened(worktreePath, Date.now());
 
 		this.emit('sessionCreated', session);
 
@@ -598,7 +599,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			// If becoming active, record the timestamp when this worktree was opened
 			if (active) {
-				configReader.setWorktreeLastOpened(worktreePath, Date.now());
+				setWorktreeLastOpened(worktreePath, Date.now());
 
 				// Emit a restore event with the output history if available
 				if (session.outputHistory.length > 0) {

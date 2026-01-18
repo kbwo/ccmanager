@@ -111,19 +111,6 @@ export class ConfigReader {
 		return presets.selectPresetOnStart ?? false;
 	}
 
-	// Worktree last opened tracking - delegate to global config
-	getWorktreeLastOpened(): Record<string, number> {
-		return globalConfigManager.getWorktreeLastOpened();
-	}
-
-	setWorktreeLastOpened(worktreePath: string, timestamp: number): void {
-		globalConfigManager.setWorktreeLastOpened(worktreePath, timestamp);
-	}
-
-	getWorktreeLastOpenedTime(worktreePath: string): number | undefined {
-		return globalConfigManager.getWorktreeLastOpenedTime(worktreePath);
-	}
-
 	// Effect-based methods for type-safe error handling
 	loadConfigEffect(): Effect.Effect<
 		ConfigurationData,
@@ -206,9 +193,10 @@ export class ConfigReader {
 		>;
 	}
 
-	// Reload project config from disk
+	// Reload both project and global configs from disk
 	reload(): void {
 		projectConfigManager.reload();
+		globalConfigManager.reload();
 	}
 }
 

@@ -29,7 +29,6 @@ export class GlobalConfigManager implements IConfigEditor {
 	private legacyShortcutsPath: string;
 	private configDir: string;
 	private config: ConfigurationData = {};
-	private worktreeLastOpened: Map<string, number> = new Map();
 
 	constructor() {
 		// Determine config directory based on platform
@@ -338,18 +337,6 @@ export class GlobalConfigManager implements IConfigEditor {
 		const presets = this.getCommandPresets();
 		presets.selectPresetOnStart = enabled;
 		this.setCommandPresets(presets);
-	}
-
-	getWorktreeLastOpened(): Record<string, number> {
-		return Object.fromEntries(this.worktreeLastOpened);
-	}
-
-	setWorktreeLastOpened(worktreePath: string, timestamp: number): void {
-		this.worktreeLastOpened.set(worktreePath, timestamp);
-	}
-
-	getWorktreeLastOpenedTime(worktreePath: string): number | undefined {
-		return this.worktreeLastOpened.get(worktreePath);
 	}
 
 	// Effect-based methods for type-safe error handling

@@ -1,8 +1,13 @@
-import {describe, it, expect, beforeEach, vi} from 'vitest';
+import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest';
 import {Effect} from 'effect';
-import {WorktreeService} from './worktreeService.js';
+import {
+	WorktreeService,
+	setWorktreeLastOpened,
+} from './worktreeService.js';
 import {execSync} from 'child_process';
-import {configReader} from './config/configReader.js';
+
+// We need to keep a reference to the original Map to clear it between tests
+// Module-level state needs to be reset for isolated tests
 
 // Mock child_process module
 vi.mock('child_process');
@@ -19,12 +24,9 @@ vi.mock('./worktreeConfigManager.js', () => ({
 	},
 }));
 
-// Mock configReader
+// Mock configReader (still needed for getWorktreeHooks in createWorktreeEffect)
 vi.mock('./config/configReader.js', () => ({
 	configReader: {
-		getWorktreeLastOpenedTime: vi.fn(),
-		setWorktreeLastOpened: vi.fn(),
-		getWorktreeLastOpened: vi.fn(() => ({})),
 		getWorktreeConfig: vi.fn(() => ({
 			autoDirectory: false,
 			copySessionData: true,
@@ -41,9 +43,13 @@ vi.mock('../utils/hookExecutor.js', () => ({
 
 // Get the mocked functions with proper typing
 const mockedExecSync = vi.mocked(execSync);
-const mockedGetWorktreeLastOpenedTime = vi.mocked(
-	configReader.getWorktreeLastOpenedTime,
-);
+
+// Helper to clear worktree last opened state by setting all known paths to undefined time
+// Since we can't clear the Map directly, we'll set timestamps to 0 for cleanup
+const clearWorktreeTimestamps = () => {
+	// This is a workaround since we can't access the internal Map
+	// Tests should use unique paths or set their own timestamps
+};
 
 describe('WorktreeService - Sorting', () => {
 	let service: WorktreeService;
@@ -61,6 +67,10 @@ describe('WorktreeService - Sorting', () => {
 
 		// Create service instance
 		service = new WorktreeService('/test/repo');
+	});
+
+	afterEach(() => {
+		clearWorktreeTimestamps();
 	});
 
 	describe('getWorktreesEffect with sortByLastSession', () => {
@@ -129,12 +139,9 @@ branch refs/heads/feature-b
 			mockedExecSync.mockReturnValue(gitOutput);
 
 			// Setup timestamps - feature-b was opened most recently, then main, then feature-a
-			mockedGetWorktreeLastOpenedTime.mockImplementation((path: string) => {
-				if (path === '/test/repo') return 2000;
-				if (path === '/test/repo/feature-a') return 1000;
-				if (path === '/test/repo/feature-b') return 3000;
-				return undefined;
-			});
+			setWorktreeLastOpened('/test/repo', 2000);
+			setWorktreeLastOpened('/test/repo/feature-a', 1000);
+			setWorktreeLastOpened('/test/repo/feature-b', 3000);
 
 			// Execute
 			const result = await Effect.runPromise(
@@ -149,29 +156,26 @@ branch refs/heads/feature-b
 		});
 
 		it('should place worktrees without timestamps at the end', async () => {
-			// Setup mock git output
-			const gitOutput = `worktree /test/repo
+			// Setup mock git output - use unique paths to avoid state pollution
+			const gitOutput = `worktree /test/repo-no-ts/main
 branch refs/heads/main
 
-worktree /test/repo/feature-a
+worktree /test/repo-no-ts/feature-a
 branch refs/heads/feature-a
 
-worktree /test/repo/feature-b
+worktree /test/repo-no-ts/feature-b
 branch refs/heads/feature-b
 
-worktree /test/repo/feature-c
+worktree /test/repo-no-ts/feature-c
 branch refs/heads/feature-c
 `;
 
 			mockedExecSync.mockReturnValue(gitOutput);
 
 			// Setup timestamps - only feature-a and feature-b have timestamps
-			mockedGetWorktreeLastOpenedTime.mockImplementation((path: string) => {
-				if (path === '/test/repo/feature-a') return 1000;
-				if (path === '/test/repo/feature-b') return 2000;
-				// main and feature-c have no timestamps (undefined)
-				return undefined;
-			});
+			// main and feature-c have no timestamps set
+			setWorktreeLastOpened('/test/repo-no-ts/feature-a', 1000);
+			setWorktreeLastOpened('/test/repo-no-ts/feature-b', 2000);
 
 			// Execute
 			const result = await Effect.runPromise(
@@ -180,11 +184,11 @@ branch refs/heads/feature-c
 
 			// Verify sorted order
 			expect(result).toHaveLength(4);
-			expect(result[0]?.path).toBe('/test/repo/feature-b'); // 2000
-			expect(result[1]?.path).toBe('/test/repo/feature-a'); // 1000
+			expect(result[0]?.path).toBe('/test/repo-no-ts/feature-b'); // 2000
+			expect(result[1]?.path).toBe('/test/repo-no-ts/feature-a'); // 1000
 			// main and feature-c at the end with timestamp 0 (original order preserved)
-			expect(result[2]?.path).toBe('/test/repo'); // 0
-			expect(result[3]?.path).toBe('/test/repo/feature-c'); // 0
+			expect(result[2]?.path).toBe('/test/repo-no-ts/main'); // undefined -> 0
+			expect(result[3]?.path).toBe('/test/repo-no-ts/feature-c'); // undefined -> 0
 		});
 
 		it('should handle empty worktree list', async () => {
@@ -201,13 +205,13 @@ branch refs/heads/feature-c
 		});
 
 		it('should handle single worktree', async () => {
-			// Setup mock git output with single worktree
-			const gitOutput = `worktree /test/repo
+			// Setup mock git output with single worktree - unique path
+			const gitOutput = `worktree /test/repo-single
 branch refs/heads/main
 `;
 
 			mockedExecSync.mockReturnValue(gitOutput);
-			mockedGetWorktreeLastOpenedTime.mockReturnValue(1000);
+			setWorktreeLastOpened('/test/repo-single', 1000);
 
 			// Execute
 			const result = await Effect.runPromise(
@@ -216,25 +220,27 @@ branch refs/heads/main
 
 			// Verify single result
 			expect(result).toHaveLength(1);
-			expect(result[0]?.path).toBe('/test/repo');
+			expect(result[0]?.path).toBe('/test/repo-single');
 		});
 
 		it('should maintain stable sort for worktrees with same timestamp', async () => {
-			// Setup mock git output
-			const gitOutput = `worktree /test/repo/feature-a
+			// Setup mock git output - unique paths
+			const gitOutput = `worktree /test/repo-stable/feature-a
 branch refs/heads/feature-a
 
-worktree /test/repo/feature-b
+worktree /test/repo-stable/feature-b
 branch refs/heads/feature-b
 
-worktree /test/repo/feature-c
+worktree /test/repo-stable/feature-c
 branch refs/heads/feature-c
 `;
 
 			mockedExecSync.mockReturnValue(gitOutput);
 
 			// All have the same timestamp
-			mockedGetWorktreeLastOpenedTime.mockReturnValue(1000);
+			setWorktreeLastOpened('/test/repo-stable/feature-a', 1000);
+			setWorktreeLastOpened('/test/repo-stable/feature-b', 1000);
+			setWorktreeLastOpened('/test/repo-stable/feature-c', 1000);
 
 			// Execute
 			const result = await Effect.runPromise(
@@ -243,32 +249,29 @@ branch refs/heads/feature-c
 
 			// Verify original order is maintained (stable sort)
 			expect(result).toHaveLength(3);
-			expect(result[0]?.path).toBe('/test/repo/feature-a');
-			expect(result[1]?.path).toBe('/test/repo/feature-b');
-			expect(result[2]?.path).toBe('/test/repo/feature-c');
+			expect(result[0]?.path).toBe('/test/repo-stable/feature-a');
+			expect(result[1]?.path).toBe('/test/repo-stable/feature-b');
+			expect(result[2]?.path).toBe('/test/repo-stable/feature-c');
 		});
 
 		it('should sort correctly with mixed timestamps including zero', async () => {
-			// Setup mock git output
-			const gitOutput = `worktree /test/repo/zero-timestamp
+			// Setup mock git output - unique paths
+			const gitOutput = `worktree /test/repo-zero/zero-timestamp
 branch refs/heads/zero-timestamp
 
-worktree /test/repo/recent
+worktree /test/repo-zero/recent
 branch refs/heads/recent
 
-worktree /test/repo/older
+worktree /test/repo-zero/older
 branch refs/heads/older
 `;
 
 			mockedExecSync.mockReturnValue(gitOutput);
 
 			// Setup timestamps including explicit zero
-			mockedGetWorktreeLastOpenedTime.mockImplementation((path: string) => {
-				if (path === '/test/repo/zero-timestamp') return 0;
-				if (path === '/test/repo/recent') return 3000;
-				if (path === '/test/repo/older') return 1000;
-				return undefined;
-			});
+			setWorktreeLastOpened('/test/repo-zero/zero-timestamp', 0);
+			setWorktreeLastOpened('/test/repo-zero/recent', 3000);
+			setWorktreeLastOpened('/test/repo-zero/older', 1000);
 
 			// Execute
 			const result = await Effect.runPromise(
@@ -277,28 +280,25 @@ branch refs/heads/older
 
 			// Verify sorted order
 			expect(result).toHaveLength(3);
-			expect(result[0]?.path).toBe('/test/repo/recent'); // 3000
-			expect(result[1]?.path).toBe('/test/repo/older'); // 1000
-			expect(result[2]?.path).toBe('/test/repo/zero-timestamp'); // 0
+			expect(result[0]?.path).toBe('/test/repo-zero/recent'); // 3000
+			expect(result[1]?.path).toBe('/test/repo-zero/older'); // 1000
+			expect(result[2]?.path).toBe('/test/repo-zero/zero-timestamp'); // 0
 		});
 
 		it('should preserve worktree properties after sorting', async () => {
-			// Setup mock git output
-			const gitOutput = `worktree /test/repo
+			// Setup mock git output - unique paths
+			const gitOutput = `worktree /test/repo-props
 branch refs/heads/main
 bare
 
-worktree /test/repo/feature-a
+worktree /test/repo-props/feature-a
 branch refs/heads/feature-a
 `;
 
 			mockedExecSync.mockReturnValue(gitOutput);
 
-			mockedGetWorktreeLastOpenedTime.mockImplementation((path: string) => {
-				if (path === '/test/repo') return 1000;
-				if (path === '/test/repo/feature-a') return 2000;
-				return undefined;
-			});
+			setWorktreeLastOpened('/test/repo-props', 1000);
+			setWorktreeLastOpened('/test/repo-props/feature-a', 2000);
 
 			// Execute
 			const result = await Effect.runPromise(
@@ -307,21 +307,21 @@ branch refs/heads/feature-a
 
 			// Verify properties are preserved
 			expect(result).toHaveLength(2);
-			expect(result[0]?.path).toBe('/test/repo/feature-a');
+			expect(result[0]?.path).toBe('/test/repo-props/feature-a');
 			expect(result[0]?.branch).toBe('feature-a');
 			expect(result[0]?.isMainWorktree).toBe(false);
 
-			expect(result[1]?.path).toBe('/test/repo');
+			expect(result[1]?.path).toBe('/test/repo-props');
 			expect(result[1]?.branch).toBe('main');
 			expect(result[1]?.isMainWorktree).toBe(true);
 		});
 
 		it('should handle very large timestamps', async () => {
-			// Setup mock git output
-			const gitOutput = `worktree /test/repo/old
+			// Setup mock git output - unique paths
+			const gitOutput = `worktree /test/repo-large/old
 branch refs/heads/old
 
-worktree /test/repo/new
+worktree /test/repo-large/new
 branch refs/heads/new
 `;
 
@@ -331,11 +331,8 @@ branch refs/heads/new
 			const now = Date.now();
 			const yesterday = now - 24 * 60 * 60 * 1000;
 
-			mockedGetWorktreeLastOpenedTime.mockImplementation((path: string) => {
-				if (path === '/test/repo/old') return yesterday;
-				if (path === '/test/repo/new') return now;
-				return undefined;
-			});
+			setWorktreeLastOpened('/test/repo-large/old', yesterday);
+			setWorktreeLastOpened('/test/repo-large/new', now);
 
 			// Execute
 			const result = await Effect.runPromise(
@@ -344,61 +341,72 @@ branch refs/heads/new
 
 			// Verify sorted order
 			expect(result).toHaveLength(2);
-			expect(result[0]?.path).toBe('/test/repo/new');
-			expect(result[1]?.path).toBe('/test/repo/old');
+			expect(result[0]?.path).toBe('/test/repo-large/new');
+			expect(result[1]?.path).toBe('/test/repo-large/old');
 		});
 	});
 
 	describe('getWorktreesEffect error handling with sorting', () => {
-		it('should not call getWorktreeLastOpenedTime when sortByLastSession is false', async () => {
-			// Setup mock git output
-			const gitOutput = `worktree /test/repo
-branch refs/heads/main
-`;
-
-			mockedExecSync.mockReturnValue(gitOutput);
-
-			// Execute
-			await Effect.runPromise(
-				service.getWorktreesEffect({sortByLastSession: false}),
-			);
-
-			// Verify getWorktreeLastOpenedTime was not called
-			expect(mockedGetWorktreeLastOpenedTime).not.toHaveBeenCalled();
-		});
-
-		it('should call getWorktreeLastOpenedTime for each worktree when sorting', async () => {
-			// Setup mock git output
-			const gitOutput = `worktree /test/repo
+		it('should sort correctly when sortByLastSession is true', async () => {
+			// Setup mock git output - unique paths
+			const gitOutput = `worktree /test/repo-sort
 branch refs/heads/main
 
-worktree /test/repo/feature-a
+worktree /test/repo-sort/feature-a
 branch refs/heads/feature-a
 
-worktree /test/repo/feature-b
+worktree /test/repo-sort/feature-b
 branch refs/heads/feature-b
 `;
 
 			mockedExecSync.mockReturnValue(gitOutput);
-			mockedGetWorktreeLastOpenedTime.mockReturnValue(1000);
 
-			// Execute
-			await Effect.runPromise(
+			// Set timestamps to verify sorting works
+			setWorktreeLastOpened('/test/repo-sort', 1000);
+			setWorktreeLastOpened('/test/repo-sort/feature-a', 3000);
+			setWorktreeLastOpened('/test/repo-sort/feature-b', 2000);
+
+			// Execute with sorting
+			const result = await Effect.runPromise(
 				service.getWorktreesEffect({sortByLastSession: true}),
 			);
 
-			// Verify getWorktreeLastOpenedTime was called for each worktree
-			// Note: May be called multiple times during sort comparisons
-			expect(mockedGetWorktreeLastOpenedTime).toHaveBeenCalled();
-			expect(mockedGetWorktreeLastOpenedTime).toHaveBeenCalledWith(
-				'/test/repo',
+			// Verify sorting happened correctly (implicitly means getWorktreeLastOpenedTime was called)
+			expect(result).toHaveLength(3);
+			expect(result[0]?.path).toBe('/test/repo-sort/feature-a'); // 3000
+			expect(result[1]?.path).toBe('/test/repo-sort/feature-b'); // 2000
+			expect(result[2]?.path).toBe('/test/repo-sort'); // 1000
+		});
+
+		it('should not sort when sortByLastSession is false', async () => {
+			// Setup mock git output - unique paths
+			const gitOutput = `worktree /test/repo-nosort
+branch refs/heads/main
+
+worktree /test/repo-nosort/feature-a
+branch refs/heads/feature-a
+
+worktree /test/repo-nosort/feature-b
+branch refs/heads/feature-b
+`;
+
+			mockedExecSync.mockReturnValue(gitOutput);
+
+			// Set timestamps that would cause reordering if sorting was applied
+			setWorktreeLastOpened('/test/repo-nosort', 1000);
+			setWorktreeLastOpened('/test/repo-nosort/feature-a', 3000);
+			setWorktreeLastOpened('/test/repo-nosort/feature-b', 2000);
+
+			// Execute without sorting
+			const result = await Effect.runPromise(
+				service.getWorktreesEffect({sortByLastSession: false}),
 			);
-			expect(mockedGetWorktreeLastOpenedTime).toHaveBeenCalledWith(
-				'/test/repo/feature-a',
-			);
-			expect(mockedGetWorktreeLastOpenedTime).toHaveBeenCalledWith(
-				'/test/repo/feature-b',
-			);
+
+			// Verify original order is preserved
+			expect(result).toHaveLength(3);
+			expect(result[0]?.path).toBe('/test/repo-nosort');
+			expect(result[1]?.path).toBe('/test/repo-nosort/feature-a');
+			expect(result[2]?.path).toBe('/test/repo-nosort/feature-b');
 		});
 	});
 });

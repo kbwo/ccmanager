@@ -18,6 +18,35 @@ import {configReader} from './config/configReader.js';
 
 const CLAUDE_DIR = '.claude';
 
+// Module-level state for worktree last opened tracking (runtime state, not persisted)
+const worktreeLastOpened: Map<string, number> = new Map();
+
+/**
+ * Get all worktree last opened timestamps
+ */
+export function getWorktreeLastOpened(): Record<string, number> {
+	return Object.fromEntries(worktreeLastOpened);
+}
+
+/**
+ * Set the last opened timestamp for a worktree
+ */
+export function setWorktreeLastOpened(
+	worktreePath: string,
+	timestamp: number,
+): void {
+	worktreeLastOpened.set(worktreePath, timestamp);
+}
+
+/**
+ * Get the last opened timestamp for a specific worktree
+ */
+export function getWorktreeLastOpenedTime(
+	worktreePath: string,
+): number | undefined {
+	return worktreeLastOpened.get(worktreePath);
+}
+
 /**
  * WorktreeService - Git worktree management with Effect-based error handling
  *
@@ -738,8 +767,8 @@ export class WorktreeService {
 					if (sortByLastSession) {
 						worktrees.sort((a, b) => {
 							// Get last opened timestamps for both worktrees
-							const timeA = configReader.getWorktreeLastOpenedTime(a.path);
-							const timeB = configReader.getWorktreeLastOpenedTime(b.path);
+							const timeA = getWorktreeLastOpenedTime(a.path);
+							const timeB = getWorktreeLastOpenedTime(b.path);
 
 							// If both timestamps are undefined, preserve original order
 							if (timeA === undefined && timeB === undefined) {
