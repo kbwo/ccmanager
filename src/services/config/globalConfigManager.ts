@@ -17,7 +17,7 @@ import {
 	IConfigEditor,
 } from '../../types/index.js';
 
-export class GlobalConfigManager implements IConfigEditor {
+class GlobalConfigManager implements IConfigEditor {
 	private configPath: string;
 	private legacyShortcutsPath: string;
 	private configDir: string;

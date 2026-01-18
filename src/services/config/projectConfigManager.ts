@@ -23,7 +23,7 @@ const PROJECT_CONFIG_FILENAME = '.ccmanager.json';
  * Reads/writes from `<projectPath>/.ccmanager.json`.
  * Implements IConfigEditor for consistent API with GlobalConfigManager.
  */
-export class ProjectConfigManager implements IConfigEditor {
+class ProjectConfigManager implements IConfigEditor {
 	private projectPath: string;
 	private projectConfigPath: string;
 	private projectConfig: ProjectConfigurationData | null = null;
