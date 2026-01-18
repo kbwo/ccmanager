@@ -59,11 +59,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	detectTerminalState(session: Session): SessionState {
-		// Create a detector based on the session's detection strategy
-		const strategy = session.detectionStrategy || 'claude';
-		const detector = createStateDetector(strategy);
 		const stateData = session.stateMutex.getSnapshot();
-		const detectedState = detector.detectState(
+		const detectedState = session.stateDetector.detectState(
 			session.terminal,
 			stateData.state,
 		);
@@ -81,9 +78,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	detectBackgroundTask(session: Session): boolean {
-		const strategy = session.detectionStrategy || 'claude';
-		const detector = createStateDetector(strategy);
-		return detector.detectBackgroundTask(session.terminal);
+		return session.stateDetector.detectBackgroundTask(session.terminal);
 	}
 
 	private getTerminalContent(session: Session): string {
@@ -281,6 +276,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	): Promise<Session> {
 		const id = this.createSessionId();
 		const terminal = this.createTerminal();
+		const detectionStrategy = options.detectionStrategy ?? 'claude';
+		const stateDetector = createStateDetector(detectionStrategy);
 
 		const session: Session = {
 			id,
@@ -294,9 +291,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			commandConfig,
-			detectionStrategy: options.detectionStrategy ?? 'claude',
+			detectionStrategy,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
+			stateDetector,
 		};
 
 		// Set up persistent background data handler for state detection

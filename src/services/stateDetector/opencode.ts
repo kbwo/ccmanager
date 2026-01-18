@@ -19,4 +19,8 @@ export class OpenCodeStateDetector extends BaseStateDetector {
 		// Otherwise idle
 		return 'idle';
 	}
+
+	detectBackgroundTask(_terminal: Terminal): boolean {
+		return false;
+	}
 }

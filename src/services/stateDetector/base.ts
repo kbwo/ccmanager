@@ -36,7 +36,5 @@ export abstract class BaseStateDetector implements StateDetector {
 		return this.getTerminalLines(terminal, maxLines).join('\n');
 	}
 
-	detectBackgroundTask(_terminal: Terminal): boolean {
-		return false;
-	}
+	abstract detectBackgroundTask(terminal: Terminal): boolean;
 }

@@ -23,4 +23,8 @@ export class CursorStateDetector extends BaseStateDetector {
 		// Otherwise idle - Priority 3
 		return 'idle';
 	}
+
+	detectBackgroundTask(_terminal: Terminal): boolean {
+		return false;
+	}
 }

@@ -36,7 +36,7 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		return 'idle';
 	}
 
-	override detectBackgroundTask(terminal: Terminal): boolean {
+	detectBackgroundTask(terminal: Terminal): boolean {
 		const lines = this.getTerminalLines(terminal, 3);
 		const content = lines.join('\n').toLowerCase();
 		// Detect background task patterns:
