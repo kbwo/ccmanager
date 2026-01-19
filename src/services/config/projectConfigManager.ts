@@ -16,22 +16,26 @@ import {
 	AutoApprovalConfig,
 } from '../../types/index.js';
 import {ENV_VARS} from '../../constants/env.js';
+import {getGitRepositoryRoot} from '../../utils/gitUtils.js';
 
 const PROJECT_CONFIG_FILENAME = '.ccmanager.json';
 
 /**
  * ProjectConfigManager handles project-specific configuration.
- * Reads/writes from `<projectPath>/.ccmanager.json`.
+ * Reads/writes from `<git repository root>/.ccmanager.json`.
  * Implements IConfigEditor for consistent API with GlobalConfigManager.
  */
 class ProjectConfigManager implements IConfigEditor {
-	private projectPath: string;
-	private projectConfigPath: string;
+	private gitRoot: string | null;
+	private configPath: string | null;
 	private projectConfig: ProjectConfigurationData | null = null;
 
-	constructor(projectPath?: string) {
-		this.projectPath = projectPath || process.cwd();
-		this.projectConfigPath = join(this.projectPath, PROJECT_CONFIG_FILENAME);
+	constructor(cwd: string) {
+		// Use git repository root
+		this.gitRoot = getGitRepositoryRoot(cwd);
+		this.configPath = this.gitRoot
+			? join(this.gitRoot, PROJECT_CONFIG_FILENAME)
+			: null;
 		this.loadProjectConfig();
 	}
 
@@ -42,9 +46,15 @@ class ProjectConfigManager implements IConfigEditor {
 			return;
 		}
 
-		if (existsSync(this.projectConfigPath)) {
+		// No git repository found
+		if (!this.configPath) {
+			this.projectConfig = null;
+			return;
+		}
+
+		if (existsSync(this.configPath)) {
 			try {
-				const data = readFileSync(this.projectConfigPath, 'utf-8');
+				const data = readFileSync(this.configPath, 'utf-8');
 				this.projectConfig = JSON.parse(data);
 			} catch {
 				this.projectConfig = null;
@@ -55,12 +65,12 @@ class ProjectConfigManager implements IConfigEditor {
 	}
 
 	private saveProjectConfig(): void {
-		if (this.projectConfig === null) {
+		if (this.projectConfig === null || !this.configPath) {
 			return;
 		}
 		try {
 			const jsonData = JSON.stringify(this.projectConfig, null, 2);
-			writeFileSync(this.projectConfigPath, jsonData);
+			writeFileSync(this.configPath, jsonData);
 			// Re-parse to ensure in-memory state matches what was written to disk
 			this.projectConfig = JSON.parse(jsonData);
 		} catch {
@@ -157,7 +167,7 @@ class ProjectConfigManager implements IConfigEditor {
 	 * Remove a project-level override for a specific field
 	 */
 	removeOverride(field: keyof ProjectConfigurationData): void {
-		if (this.projectConfig === null) {
+		if (this.projectConfig === null || !this.configPath) {
 			return;
 		}
 		delete this.projectConfig[field];
@@ -166,8 +176,8 @@ class ProjectConfigManager implements IConfigEditor {
 		if (Object.keys(this.projectConfig).length === 0) {
 			this.projectConfig = null;
 			try {
-				if (existsSync(this.projectConfigPath)) {
-					unlinkSync(this.projectConfigPath);
+				if (existsSync(this.configPath)) {
+					unlinkSync(this.configPath);
 				}
 			} catch {
 				// Silently fail
@@ -181,4 +191,9 @@ class ProjectConfigManager implements IConfigEditor {
 /**
  * Default singleton instance using current working directory
  */
-export const projectConfigManager = new ProjectConfigManager();
+export const projectConfigManager = new ProjectConfigManager(process.cwd());
+
+/**
+ * @internal - Exported for testing only
+ */
+export {ProjectConfigManager};
