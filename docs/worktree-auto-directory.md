@@ -16,7 +16,7 @@ This streamlines the worktree creation process, especially for teams with consis
 
 ### Via UI
 
-1. Navigate to **Configuration** → **Configure Worktree Settings**
+1. Navigate to **Global Configuration** → **Configure Worktree Settings**
 2. Enable "Auto-generate directory from branch name"
 3. Customize the pattern (default: `../{branch}`)
 4. Save changes

@@ -9,7 +9,7 @@ Below, I'll provide an example using the [noti](https://github.com/variadico/not
 Configure CCManager to send notifications for each status:
 
 1. Run `ccmanager`
-2. Navigate to **Configuration** → **Configure Status Hooks**
+2. Navigate to **Global Configuration** → **Configure Status Hooks**
 3. Set up the following hooks:
 
 **Idle Hook:**
