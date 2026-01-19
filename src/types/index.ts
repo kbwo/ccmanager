@@ -41,7 +41,6 @@ export interface Session {
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
 	stateCheckInterval: NodeJS.Timeout | undefined; // Interval for checking terminal state
 	isPrimaryCommand: boolean; // Track if process was started with main command args
-	commandConfig: CommandConfig | undefined; // Store command config for fallback
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	/**
@@ -115,12 +114,6 @@ export interface WorktreeConfig {
 	sortByLastSession?: boolean; // Whether to sort worktrees by last opened session
 }
 
-export interface CommandConfig {
-	command: string; // The main command to execute (default: 'claude')
-	args?: string[]; // Arguments to pass to the command
-	fallbackArgs?: string[]; // Fallback arguments if main command fails
-}
-
 export interface CommandPreset {
 	id: string; // Unique identifier for the preset
 	name: string; // User-friendly name for the preset
@@ -146,13 +139,83 @@ export interface ConfigurationData {
 	statusHooks?: StatusHookConfig;
 	worktreeHooks?: WorktreeHookConfig;
 	worktree?: WorktreeConfig;
-	command?: CommandConfig;
-	commandPresets?: CommandPresetsConfig; // New field for command presets
+	commandPresets?: CommandPresetsConfig;
 	autoApproval?: {
 		enabled: boolean; // Whether auto-approval is enabled
 		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse
 		timeout?: number; // Timeout in seconds for auto-approval verification (default: 30)
 	};
+}
+
+// Per-project configuration support
+export type ConfigScope = 'project' | 'global';
+
+export interface AutoApprovalConfig {
+	enabled: boolean;
+	customCommand?: string;
+	timeout?: number;
+}
+
+export interface ProjectConfigurationData {
+	shortcuts?: ShortcutConfig;
+	statusHooks?: StatusHookConfig;
+	worktreeHooks?: WorktreeHookConfig;
+	worktree?: WorktreeConfig;
+	commandPresets?: CommandPresetsConfig;
+	autoApproval?: AutoApprovalConfig;
+}
+
+/**
+ * Common interface for configuration readers.
+ * Provides read-only access to configuration values.
+ * Implemented by ConfigReader, ConfigEditor, GlobalConfigManager, ProjectConfigManager.
+ */
+export interface IConfigReader {
+	// Shortcuts
+	getShortcuts(): ShortcutConfig | undefined;
+
+	// Status Hooks
+	getStatusHooks(): StatusHookConfig | undefined;
+
+	// Worktree Hooks
+	getWorktreeHooks(): WorktreeHookConfig | undefined;
+
+	// Worktree Config
+	getWorktreeConfig(): WorktreeConfig | undefined;
+
+	// Command Presets
+	getCommandPresets(): CommandPresetsConfig | undefined;
+
+	// Auto Approval
+	getAutoApprovalConfig(): AutoApprovalConfig | undefined;
+
+	// Reload config from disk
+	reload(): void;
+}
+
+/**
+ * Common interface for configuration editors.
+ * Extends IConfigReader with write capabilities.
+ * Implemented by ConfigEditor, GlobalConfigManager, ProjectConfigManager.
+ */
+export interface IConfigEditor extends IConfigReader {
+	// Shortcuts
+	setShortcuts(value: ShortcutConfig): void;
+
+	// Status Hooks
+	setStatusHooks(value: StatusHookConfig): void;
+
+	// Worktree Hooks
+	setWorktreeHooks(value: WorktreeHookConfig): void;
+
+	// Worktree Config
+	setWorktreeConfig(value: WorktreeConfig): void;
+
+	// Command Presets
+	setCommandPresets(value: CommandPresetsConfig): void;
+
+	// Auto Approval
+	setAutoApprovalConfig(value: AutoApprovalConfig): void;
 }
 
 // Multi-project support interfaces

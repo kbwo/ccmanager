@@ -99,7 +99,7 @@ const getManagerForProjectMock = vi.fn((_: string | undefined) => {
 	return manager;
 });
 
-const configurationManagerMock = {
+const configReaderMock = {
 	getSelectPresetOnStart: vi.fn(() => false),
 };
 
@@ -142,8 +142,8 @@ vi.mock('../services/projectManager.js', () => ({
 	projectManager: projectManagerMock,
 }));
 
-vi.mock('../services/configurationManager.js', () => ({
-	configurationManager: configurationManagerMock,
+vi.mock('../services/config/configReader.js', () => ({
+	configReader: configReaderMock,
 }));
 
 vi.mock('../services/worktreeService.js', () => ({
@@ -236,8 +236,8 @@ beforeEach(() => {
 	deleteWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
 	sessionManagers.length = 0;
 	getManagerForProjectMock.mockClear();
-	configurationManagerMock.getSelectPresetOnStart.mockReset();
-	configurationManagerMock.getSelectPresetOnStart.mockReturnValue(false);
+	configReaderMock.getSelectPresetOnStart.mockReset();
+	configReaderMock.getSelectPresetOnStart.mockReturnValue(false);
 	projectManagerMock.addRecentProject.mockReset();
 });
 

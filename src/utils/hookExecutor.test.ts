@@ -9,15 +9,15 @@ import {mkdtemp, rm, readFile, realpath} from 'fs/promises';
 import {tmpdir} from 'os';
 import {join} from 'path';
 import type {Session} from '../types/index.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {configReader} from '../services/config/configReader.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {GitError} from '../types/errors.js';
 import {Mutex, createInitialSessionStateData} from './mutex.js';
 import {createStateDetector} from '../services/stateDetector/index.js';
 
-// Mock the configurationManager
-vi.mock('../services/configurationManager.js', () => ({
-	configurationManager: {
+// Mock the configReader
+vi.mock('../services/config/configReader.js', () => ({
+	configReader: {
 		getStatusHooks: vi.fn(),
 	},
 }));
@@ -355,7 +355,6 @@ describe('hookExecutor Integration Tests', () => {
 				outputHistory: [],
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
-				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
 				lastActivity: new Date(),
@@ -381,7 +380,7 @@ describe('hookExecutor Integration Tests', () => {
 			});
 
 			// Configure mock to return a hook that writes to a file with delay
-			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
+			vi.mocked(configReader.getStatusHooks).mockReturnValue({
 				busy: {
 					enabled: true,
 					command: `sleep 0.1 && echo "Hook executed" > "${outputFile}"`,
@@ -417,7 +416,6 @@ describe('hookExecutor Integration Tests', () => {
 				outputHistory: [],
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
-				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
 				lastActivity: new Date(),
@@ -443,7 +441,7 @@ describe('hookExecutor Integration Tests', () => {
 			});
 
 			// Configure mock to return a hook that fails
-			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
+			vi.mocked(configReader.getStatusHooks).mockReturnValue({
 				busy: {
 					enabled: true,
 					command: 'exit 1',
@@ -478,7 +476,6 @@ describe('hookExecutor Integration Tests', () => {
 				outputHistory: [],
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
-				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
 				lastActivity: new Date(),
@@ -504,7 +501,7 @@ describe('hookExecutor Integration Tests', () => {
 			});
 
 			// Configure mock to return a disabled hook
-			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
+			vi.mocked(configReader.getStatusHooks).mockReturnValue({
 				busy: {
 					enabled: false,
 					command: `echo "Should not run" > "${outputFile}"`,
@@ -540,7 +537,6 @@ describe('hookExecutor Integration Tests', () => {
 				outputHistory: [],
 				stateCheckInterval: undefined,
 				isPrimaryCommand: true,
-				commandConfig: undefined,
 				detectionStrategy: 'claude',
 				devcontainerConfig: undefined,
 				lastActivity: new Date(),
@@ -565,7 +561,7 @@ describe('hookExecutor Integration Tests', () => {
 			});
 
 			// Configure mock to return a hook that should execute despite worktree query failure
-			vi.mocked(configurationManager.getStatusHooks).mockReturnValue({
+			vi.mocked(configReader.getStatusHooks).mockReturnValue({
 				busy: {
 					enabled: true,
 					command: `echo "Hook ran with branch: $CCMANAGER_WORKTREE_BRANCH" > "${outputFile}"`,

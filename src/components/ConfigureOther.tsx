@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import {configurationManager} from '../services/configurationManager.js';
+import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import ConfigureCustomCommand from './ConfigureCustomCommand.js';
 import ConfigureTimeout from './ConfigureTimeout.js';
@@ -19,7 +19,11 @@ interface MenuItem {
 type OtherView = 'main' | 'customCommand' | 'timeout';
 
 const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
-	const autoApprovalConfig = configurationManager.getAutoApprovalConfig();
+	const configEditor = useConfigEditor();
+	const scope = configEditor.getScope();
+
+	// Get initial auto-approval config based on scope
+	const autoApprovalConfig = configEditor.getAutoApprovalConfig()!;
 	const [view, setView] = useState<OtherView>('main');
 	const [autoApprovalEnabled, setAutoApprovalEnabled] = useState(
 		autoApprovalConfig.enabled,
@@ -30,6 +34,10 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	const [customCommandDraft, setCustomCommandDraft] = useState(customCommand);
 	const [timeout, setTimeout] = useState(autoApprovalConfig.timeout ?? 30);
 	const [timeoutDraft, setTimeoutDraft] = useState(timeout);
+
+	// Show if inheriting from global (for project scope)
+	const isInheriting =
+		scope === 'project' && !configEditor.hasProjectOverride('autoApproval');
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
@@ -84,7 +92,7 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 				setView('timeout');
 				break;
 			case 'save':
-				configurationManager.setAutoApprovalConfig({
+				configEditor.setAutoApprovalConfig({
 					enabled: autoApprovalEnabled,
 					customCommand: customCommand.trim() || undefined,
 					timeout,
@@ -133,13 +141,24 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 		);
 	}
 
+	const scopeLabel = scope === 'project' ? 'Project' : 'Global';
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Other & Experimental Settings
+					Other & Experimental Settings ({scopeLabel})
 				</Text>
 			</Box>
+
+			{isInheriting && (
+				<Box marginBottom={1}>
+					<Text backgroundColor="cyan" color="black">
+						{' '}
+						📋 Inheriting from global configuration{' '}
+					</Text>
+				</Box>
+			)}
 
 			<Box marginBottom={1}>
 				<Text dimColor>

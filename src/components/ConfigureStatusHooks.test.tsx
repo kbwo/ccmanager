@@ -2,7 +2,7 @@ import React from 'react';
 import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import ConfigureStatusHooks from './ConfigureStatusHooks.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {ConfigEditorProvider} from '../contexts/ConfigEditorContext.js';
 
 // Mock ink to avoid stdin issues
 vi.mock('ink', async () => {
@@ -31,17 +31,24 @@ vi.mock('ink-select-input', async () => {
 	};
 });
 
-vi.mock('../services/configurationManager.js', () => ({
-	configurationManager: {
-		getStatusHooks: vi.fn(),
-		setStatusHooks: vi.fn(),
-	},
-}));
-
-const mockedConfigurationManager = configurationManager as unknown as {
-	getStatusHooks: ReturnType<typeof vi.fn>;
-	setStatusHooks: ReturnType<typeof vi.fn>;
+// Create mock functions that will be used by the mock class
+const mockFns = {
+	getStatusHooks: vi.fn(),
+	setStatusHooks: vi.fn(),
+	hasProjectOverride: vi.fn().mockReturnValue(false),
+	getScope: vi.fn().mockReturnValue('global'),
 };
+
+vi.mock('../services/config/configEditor.js', () => {
+	return {
+		ConfigEditor: class {
+			getStatusHooks = mockFns.getStatusHooks;
+			setStatusHooks = mockFns.setStatusHooks;
+			hasProjectOverride = mockFns.hasProjectOverride;
+			getScope = mockFns.getScope;
+		},
+	};
+});
 
 describe('ConfigureStatusHooks', () => {
 	beforeEach(() => {
@@ -49,11 +56,13 @@ describe('ConfigureStatusHooks', () => {
 	});
 
 	it('should render status hooks configuration screen', () => {
-		mockedConfigurationManager.getStatusHooks.mockReturnValue({});
+		mockFns.getStatusHooks.mockReturnValue({});
 
 		const onComplete = vi.fn();
 		const {lastFrame} = render(
-			<ConfigureStatusHooks onComplete={onComplete} />,
+			<ConfigEditorProvider scope="global">
+				<ConfigureStatusHooks onComplete={onComplete} />
+			</ConfigEditorProvider>,
 		);
 
 		expect(lastFrame()).toContain('Configure Status Hooks');
@@ -66,7 +75,7 @@ describe('ConfigureStatusHooks', () => {
 	});
 
 	it('should display configured hooks', () => {
-		mockedConfigurationManager.getStatusHooks.mockReturnValue({
+		mockFns.getStatusHooks.mockReturnValue({
 			idle: {
 				command: 'notify-send "Idle"',
 				enabled: true,
@@ -79,7 +88,9 @@ describe('ConfigureStatusHooks', () => {
 
 		const onComplete = vi.fn();
 		const {lastFrame} = render(
-			<ConfigureStatusHooks onComplete={onComplete} />,
+			<ConfigEditorProvider scope="global">
+				<ConfigureStatusHooks onComplete={onComplete} />
+			</ConfigEditorProvider>,
 		);
 
 		expect(lastFrame()).toContain('Idle: ✓ notify-send "Idle"');

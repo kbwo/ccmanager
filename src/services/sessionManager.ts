@@ -5,19 +5,21 @@ import {
 	SessionState,
 	DevcontainerConfig,
 	StateDetectionStrategy,
+	CommandPreset,
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {promisify} from 'util';
-import {configurationManager} from './configurationManager.js';
+import {configReader} from './config/configReader.js';
+import {setWorktreeLastOpened} from './worktreeService.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector/index.js';
 import {
 	STATE_PERSISTENCE_DURATION_MS,
 	STATE_CHECK_INTERVAL_MS,
 } from '../constants/statePersistence.js';
-import {Effect} from 'effect';
+import {Effect, Either} from 'effect';
 import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
@@ -68,7 +70,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// If auto-approval is enabled and state is waiting_input, convert to pending_auto_approval
 		if (
 			detectedState === 'waiting_input' &&
-			configurationManager.isAutoApprovalEnabled() &&
+			configReader.isAutoApprovalEnabled() &&
 			!stateData.autoApprovalFailed
 		) {
 			return 'pending_auto_approval';
@@ -263,11 +265,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private async createSessionInternal(
 		worktreePath: string,
 		ptyProcess: IPty,
-		commandConfig: {
-			command: string;
-			args?: string[];
-			fallbackArgs?: string[];
-		},
 		options: {
 			isPrimaryCommand?: boolean;
 			detectionStrategy?: StateDetectionStrategy;
@@ -290,7 +287,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
-			commandConfig,
 			detectionStrategy,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
@@ -303,7 +299,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions.set(worktreePath, session);
 
 		// Record the timestamp when this worktree was opened
-		configurationManager.setWorktreeLastOpened(worktreePath, Date.now());
+		setWorktreeLastOpened(worktreePath, Date.now());
 
 		this.emit('sessionCreated', session);
 
@@ -340,12 +336,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					return existing;
 				}
 
-				// Get preset configuration
-				let preset = presetId
-					? configurationManager.getPresetById(presetId)
+				// Get preset configuration using Either-based lookup
+				let preset: CommandPreset | null = presetId
+					? Either.getOrElse(
+							configReader.getPresetByIdEffect(presetId),
+							(): CommandPreset | null => null,
+						)
 					: null;
 				if (!preset) {
-					preset = configurationManager.getDefaultPreset();
+					preset = configReader.getDefaultPreset();
 				}
 
 				// Validate preset exists
@@ -361,24 +360,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 				const command = preset.command;
 				const args = preset.args || [];
-				const commandConfig = {
-					command: preset.command,
-					args: preset.args,
-					fallbackArgs: preset.fallbackArgs,
-				};
 
 				// Spawn the process - fallback will be handled by setupExitHandler
 				const ptyProcess = await this.spawn(command, args, worktreePath);
 
-				return this.createSessionInternal(
-					worktreePath,
-					ptyProcess,
-					commandConfig,
-					{
-						isPrimaryCommand: true,
-						detectionStrategy: preset.detectionStrategy,
-					},
-				);
+				return this.createSessionInternal(worktreePath, ptyProcess, {
+					isPrimaryCommand: true,
+					detectionStrategy: preset.detectionStrategy,
+				});
 			},
 			catch: (error: unknown) => {
 				// If it's already a ConfigError, return it
@@ -445,8 +434,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
 				try {
 					let fallbackProcess: IPty;
-					// Use fallback args if available, otherwise use empty args
-					const fallbackArgs = session.commandConfig?.fallbackArgs || [];
 
 					// Check if we're in a devcontainer session
 					if (session.devcontainerConfig) {
@@ -457,12 +444,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						const execArgs = execParts.slice(1);
 
 						// Build fallback command for devcontainer
-						const fallbackFullArgs = [
-							...execArgs,
-							'--',
-							session.commandConfig?.command || 'claude',
-							...fallbackArgs,
-						];
+						const fallbackFullArgs = [...execArgs, '--', 'claude'];
 
 						fallbackProcess = await this.spawn(
 							devcontainerCmd,
@@ -472,8 +454,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					} else {
 						// Regular fallback without devcontainer
 						fallbackProcess = await this.spawn(
-							session.commandConfig?.command || 'claude',
-							fallbackArgs,
+							'claude',
+							[],
 							session.worktreePath,
 						);
 					}
@@ -623,7 +605,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			// If becoming active, record the timestamp when this worktree was opened
 			if (active) {
-				configurationManager.setWorktreeLastOpened(worktreePath, Date.now());
+				setWorktreeLastOpened(worktreePath, Date.now());
 
 				// Emit a restore event with the output history if available
 				if (session.outputHistory.length > 0) {
@@ -802,12 +784,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					});
 				}
 
-				// Get preset configuration
-				let preset = presetId
-					? configurationManager.getPresetById(presetId)
+				// Get preset configuration using Either-based lookup
+				let preset: CommandPreset | null = presetId
+					? Either.getOrElse(
+							configReader.getPresetByIdEffect(presetId),
+							(): CommandPreset | null => null,
+						)
 					: null;
 				if (!preset) {
-					preset = configurationManager.getDefaultPreset();
+					preset = configReader.getDefaultPreset();
 				}
 
 				// Validate preset exists
@@ -841,22 +826,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					worktreePath,
 				);
 
-				const commandConfig = {
-					command: preset.command,
-					args: preset.args,
-					fallbackArgs: preset.fallbackArgs,
-				};
-
-				return this.createSessionInternal(
-					worktreePath,
-					ptyProcess,
-					commandConfig,
-					{
-						isPrimaryCommand: true,
-						detectionStrategy: preset.detectionStrategy,
-						devcontainerConfig,
-					},
-				);
+				return this.createSessionInternal(worktreePath, ptyProcess, {
+					isPrimaryCommand: true,
+					detectionStrategy: preset.detectionStrategy,
+					devcontainerConfig,
+				});
 			},
 			catch: (error: unknown) => {
 				// If it's already a ConfigError or ProcessError, return it

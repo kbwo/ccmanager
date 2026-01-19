@@ -8,7 +8,7 @@
 
 ## Enabling It (UI)
 1. Run `ccmanager`.
-2. Open **Configuration** → **Other & Experimental**.
+2. Open **Global Configuration** → **Other & Experimental**.
 3. Choose **Auto Approval (experimental)** to toggle it to ✅ Enabled.
 4. (Optional) Pick **Edit Custom Command** to supply your own approver command (see "Custom Command" below).
 5. Select **Save Changes**.

@@ -23,7 +23,8 @@ import {
 	RemoteBranchMatch,
 } from '../types/index.js';
 import {type AppError} from '../types/errors.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {configReader} from '../services/config/configReader.js';
+import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
 import {projectManager} from '../services/projectManager.js';
@@ -69,6 +70,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
 		null,
 	); // Store selected project in multi-project mode
+	const [configScope, setConfigScope] = useState<ConfigScope>('global'); // Store config scope for configuration view
 
 	// State for remote branch disambiguation
 	const [pendingWorktreeCreation, setPendingWorktreeCreation] = useState<{
@@ -279,6 +281,21 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 		// Check if this is the configuration option
 		if (worktree.path === 'CONFIGURATION') {
+			setConfigScope('global');
+			navigateWithClear('configuration');
+			return;
+		}
+
+		// Check if this is the project configuration option
+		if (worktree.path === 'CONFIGURATION_PROJECT') {
+			setConfigScope('project');
+			navigateWithClear('configuration');
+			return;
+		}
+
+		// Check if this is the global configuration option
+		if (worktree.path === 'CONFIGURATION_GLOBAL') {
+			setConfigScope('global');
 			navigateWithClear('configuration');
 			return;
 		}
@@ -301,7 +318,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 
 		if (!session) {
 			// Check if we should show preset selector
-			if (configurationManager.getSelectPresetOnStart()) {
+			if (configReader.getSelectPresetOnStart()) {
 				setSelectedWorktree(worktree);
 				navigateWithClear('preset-selector');
 				return;
@@ -669,7 +686,9 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 	}
 
 	if (view === 'configuration') {
-		return <Configuration onComplete={handleReturnToMenu} />;
+		return (
+			<Configuration scope={configScope} onComplete={handleReturnToMenu} />
+		);
 	}
 
 	if (view === 'preset-selector') {

@@ -3,6 +3,7 @@ import {Effect, Either} from 'effect';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {DevcontainerConfig, CommandPreset} from '../types/index.js';
+import {ValidationError} from '../types/errors.js';
 
 // Mock bunTerminal
 vi.mock('./bunTerminal.js', () => ({
@@ -18,10 +19,10 @@ vi.mock('child_process', () => ({
 }));
 
 // Mock configuration manager
-vi.mock('./configurationManager.js', () => ({
-	configurationManager: {
+vi.mock('./config/configReader.js', () => ({
+	configReader: {
 		getDefaultPreset: vi.fn(),
-		getPresetById: vi.fn(),
+		getPresetByIdEffect: vi.fn(),
 		setWorktreeLastOpened: vi.fn(),
 		getWorktreeLastOpenedTime: vi.fn(),
 		getWorktreeLastOpened: vi.fn(() => ({})),
@@ -64,15 +65,15 @@ describe('SessionManager Effect-based Operations', () => {
 	let sessionManager: import('./sessionManager.js').SessionManager;
 	let mockPty: MockPty;
 	let SessionManager: typeof import('./sessionManager.js').SessionManager;
-	let configurationManager: typeof import('./configurationManager.js').configurationManager;
+	let configReader: typeof import('./config/configReader.js').configReader;
 
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		// Dynamically import after mocks are set up
 		const sessionManagerModule = await import('./sessionManager.js');
-		const configManagerModule = await import('./configurationManager.js');
+		const configManagerModule = await import('./config/configReader.js');
 		SessionManager = sessionManagerModule.SessionManager;
-		configurationManager = configManagerModule.configurationManager;
+		configReader = configManagerModule.configReader;
 		sessionManager = new SessionManager();
 		mockPty = new MockPty();
 	});
@@ -84,7 +85,7 @@ describe('SessionManager Effect-based Operations', () => {
 	describe('createSessionWithPreset returning Effect', () => {
 		it('should return Effect that succeeds with Session', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -107,9 +108,17 @@ describe('SessionManager Effect-based Operations', () => {
 		});
 
 		it('should return Effect that fails with ConfigError when preset not found', async () => {
-			// Setup mocks - both return null/undefined
-			vi.mocked(configurationManager.getPresetById).mockReturnValue(undefined);
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue(
+			// Setup mocks - getPresetByIdEffect returns Left, getDefaultPreset returns undefined
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.left(
+					new ValidationError({
+						field: 'presetId',
+						constraint: 'Preset not found',
+						receivedValue: 'invalid-preset',
+					}),
+				),
+			);
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue(
 				undefined as unknown as CommandPreset,
 			);
 
@@ -134,7 +143,7 @@ describe('SessionManager Effect-based Operations', () => {
 
 		it('should return Effect that fails with ProcessError when spawn fails', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'invalid-command',
@@ -165,7 +174,7 @@ describe('SessionManager Effect-based Operations', () => {
 
 		it('should return existing session without creating new Effect', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -193,7 +202,7 @@ describe('SessionManager Effect-based Operations', () => {
 	describe('createSessionWithDevcontainer returning Effect', () => {
 		it('should return Effect that succeeds with Session', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -288,9 +297,17 @@ describe('SessionManager Effect-based Operations', () => {
 		});
 
 		it('should return Effect that fails with ConfigError when preset not found', async () => {
-			// Setup mocks - both return null/undefined
-			vi.mocked(configurationManager.getPresetById).mockReturnValue(undefined);
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue(
+			// Setup mocks - getPresetByIdEffect returns Left, getDefaultPreset returns undefined
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.left(
+					new ValidationError({
+						field: 'presetId',
+						constraint: 'Preset not found',
+						receivedValue: 'invalid-preset',
+					}),
+				),
+			);
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue(
 				undefined as unknown as CommandPreset,
 			);
 
@@ -339,7 +356,7 @@ describe('SessionManager Effect-based Operations', () => {
 	describe('terminateSession returning Effect', () => {
 		it('should return Effect that succeeds when session exists', async () => {
 			// Setup mock preset and create a session first
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -381,7 +398,7 @@ describe('SessionManager Effect-based Operations', () => {
 
 		it('should return Effect that succeeds even when process kill fails', async () => {
 			// Setup mock preset and create a session
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',

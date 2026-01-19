@@ -1,4 +1,5 @@
 import {describe, it, expect, beforeEach, vi, afterEach, Mock} from 'vitest';
+import {Either} from 'effect';
 import {SessionManager} from './sessionManager.js';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
@@ -12,8 +13,8 @@ vi.mock('./bunTerminal.js', () => ({
 		return null;
 	}),
 }));
-vi.mock('./configurationManager.js', () => ({
-	configurationManager: {
+vi.mock('./config/configReader.js', () => ({
+	configReader: {
 		getConfig: vi.fn().mockReturnValue({
 			commands: [
 				{
@@ -25,12 +26,14 @@ vi.mock('./configurationManager.js', () => ({
 			],
 			defaultCommandId: 'test',
 		}),
-		getPresetById: vi.fn().mockReturnValue({
-			id: 'test',
-			name: 'Test',
-			command: 'test',
-			args: [],
-		}),
+		getPresetByIdEffect: vi.fn().mockReturnValue(
+			Either.right({
+				id: 'test',
+				name: 'Test',
+				command: 'test',
+				args: [],
+			}),
+		),
 		getDefaultPreset: vi.fn().mockReturnValue({
 			id: 'test',
 			name: 'Test',

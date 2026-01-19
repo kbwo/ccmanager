@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInputWrapper from './TextInputWrapper.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 
@@ -18,7 +18,11 @@ interface MenuItem {
 }
 
 const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
-	const worktreeConfig = configurationManager.getWorktreeConfig();
+	const configEditor = useConfigEditor();
+	const scope = configEditor.getScope();
+
+	// Get initial worktree config based on scope
+	const worktreeConfig = configEditor.getWorktreeConfig()!;
 	const [autoDirectory, setAutoDirectory] = useState(
 		worktreeConfig.autoDirectory,
 	);
@@ -33,6 +37,10 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	);
 	const [editMode, setEditMode] = useState<EditMode>('menu');
 	const [tempPattern, setTempPattern] = useState(pattern);
+
+	// Show if inheriting from global (for project scope)
+	const isInheriting =
+		scope === 'project' && !configEditor.hasProjectOverride('worktree');
 
 	// Example values for preview
 	const exampleProjectPath = '/home/user/src/myproject';
@@ -91,7 +99,7 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 				break;
 			case 'save':
 				// Save the configuration
-				configurationManager.setWorktreeConfig({
+				configEditor.setWorktreeConfig({
 					autoDirectory,
 					autoDirectoryPattern: pattern,
 					copySessionData,
@@ -149,13 +157,24 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 		);
 	}
 
+	const scopeLabel = scope === 'project' ? 'Project' : 'Global';
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Configure Worktree Settings
+					Configure Worktree Settings ({scopeLabel})
 				</Text>
 			</Box>
+
+			{isInheriting && (
+				<Box marginBottom={1}>
+					<Text backgroundColor="cyan" color="black">
+						{' '}
+						📋 Inheriting from global configuration{' '}
+					</Text>
+				</Box>
+			)}
 
 			<Box marginBottom={1}>
 				<Text dimColor>Configure worktree creation settings</Text>

@@ -1,7 +1,8 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
-import {ConfigurationManager} from './configurationManager.js';
-import type {ConfigurationData} from '../types/index.js';
+import {ConfigEditor} from './configEditor.js';
+import {getSelectPresetOnStart, setSelectPresetOnStart} from './testUtils.js';
+import type {ConfigurationData} from '../../types/index.js';
 
 // Mock fs module
 vi.mock('fs', () => ({
@@ -16,13 +17,15 @@ vi.mock('os', () => ({
 	homedir: vi.fn(() => '/home/test'),
 }));
 
-describe('ConfigurationManager - selectPresetOnStart', () => {
-	let configManager: ConfigurationManager;
+describe('ConfigEditor (global scope) - selectPresetOnStart', () => {
+	let configEditor: ConfigEditor;
 	let mockConfigData: ConfigurationData;
+	let savedConfigData: string | null = null;
 
 	beforeEach(() => {
 		// Reset all mocks
 		vi.clearAllMocks();
+		savedConfigData = null;
 
 		// Default mock config data
 		mockConfigData = {
@@ -56,14 +59,21 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 		);
 
 		(readFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
-			return JSON.stringify(mockConfigData);
+			// Return saved data if available, otherwise return initial mock data
+			return savedConfigData ?? JSON.stringify(mockConfigData);
 		});
 
 		(mkdirSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
-		(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
+		(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(_path: string, data: string) => {
+				// Track written data so subsequent reads return it
+				savedConfigData = data;
+			},
+		);
 
-		// Create new instance for each test
-		configManager = new ConfigurationManager();
+		// Create new instance for each test and reload to pick up mocked fs
+		configEditor = new ConfigEditor('global');
+		configEditor.reload();
 	});
 
 	afterEach(() => {
@@ -72,32 +82,32 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 
 	describe('getSelectPresetOnStart', () => {
 		it('should return false by default', () => {
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configEditor);
 			expect(result).toBe(false);
 		});
 
 		it('should return true when configured', () => {
 			mockConfigData.commandPresets!.selectPresetOnStart = true;
-			configManager = new ConfigurationManager();
+			configEditor.reload();
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configEditor);
 			expect(result).toBe(true);
 		});
 
 		it('should return false when explicitly set to false', () => {
 			mockConfigData.commandPresets!.selectPresetOnStart = false;
-			configManager = new ConfigurationManager();
+			configEditor.reload();
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configEditor);
 			expect(result).toBe(false);
 		});
 	});
 
 	describe('setSelectPresetOnStart', () => {
 		it('should set selectPresetOnStart to true', () => {
-			configManager.setSelectPresetOnStart(true);
+			setSelectPresetOnStart(configEditor, true);
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configEditor);
 			expect(result).toBe(true);
 
 			// Verify that config was saved
@@ -109,11 +119,11 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 
 		it('should set selectPresetOnStart to false', () => {
 			// First set to true
-			configManager.setSelectPresetOnStart(true);
+			setSelectPresetOnStart(configEditor, true);
 			// Then set to false
-			configManager.setSelectPresetOnStart(false);
+			setSelectPresetOnStart(configEditor, false);
 
-			const result = configManager.getSelectPresetOnStart();
+			const result = getSelectPresetOnStart(configEditor);
 			expect(result).toBe(false);
 
 			// Verify that config was saved
@@ -124,9 +134,9 @@ describe('ConfigurationManager - selectPresetOnStart', () => {
 		});
 
 		it('should preserve other preset configuration when setting selectPresetOnStart', () => {
-			configManager.setSelectPresetOnStart(true);
+			setSelectPresetOnStart(configEditor, true);
 
-			const presets = configManager.getCommandPresets();
+			const presets = configEditor.getCommandPresets()!;
 			expect(presets.presets).toHaveLength(2);
 			expect(presets.defaultPresetId).toBe('1');
 			expect(presets.selectPresetOnStart).toBe(true);

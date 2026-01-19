@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInputWrapper from './TextInputWrapper.js';
 import SelectInput from 'ink-select-input';
-import {configurationManager} from '../services/configurationManager.js';
+import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {StatusHookConfig, SessionState} from '../types/index.js';
 
 interface ConfigureStatusHooksProps {
@@ -26,14 +26,22 @@ const STATUS_LABELS: Record<SessionState, string> = {
 const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
 	onComplete,
 }) => {
+	const configEditor = useConfigEditor();
+	const scope = configEditor.getScope();
 	const [view, setView] = useState<View>('menu');
 	const [selectedStatus, setSelectedStatus] = useState<SessionState>('idle');
-	const [statusHooks, setStatusHooks] = useState<StatusHookConfig>(
-		configurationManager.getStatusHooks(),
-	);
+
+	// Get initial status hooks based on scope
+	const initialStatusHooks = configEditor.getStatusHooks() ?? {};
+	const [statusHooks, setStatusHooks] =
+		useState<StatusHookConfig>(initialStatusHooks);
 	const [currentCommand, setCurrentCommand] = useState('');
 	const [currentEnabled, setCurrentEnabled] = useState(false);
 	const [showSaveMessage, setShowSaveMessage] = useState(false);
+
+	// Show if inheriting from global (for project scope)
+	const isInheriting =
+		scope === 'project' && !configEditor.hasProjectOverride('statusHooks');
 
 	useInput((input, key) => {
 		if (key.escape) {
@@ -88,7 +96,7 @@ const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
 
 	const handleMenuSelect = (item: MenuItem) => {
 		if (item.value === 'save') {
-			configurationManager.setStatusHooks(statusHooks);
+			configEditor.setStatusHooks(statusHooks);
 			setShowSaveMessage(true);
 			setTimeout(() => {
 				onComplete();
@@ -183,13 +191,24 @@ const ConfigureStatusHooks: React.FC<ConfigureStatusHooksProps> = ({
 		);
 	}
 
+	const scopeLabel = scope === 'project' ? 'Project' : 'Global';
+
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Configure Status Hooks
+					Configure Status Hooks ({scopeLabel})
 				</Text>
 			</Box>
+
+			{isInheriting && (
+				<Box marginBottom={1}>
+					<Text backgroundColor="cyan" color="black">
+						{' '}
+						📋 Inheriting from global configuration{' '}
+					</Text>
+				</Box>
+			)}
 
 			<Box marginBottom={1}>
 				<Text dimColor>Set commands to run when session status changes:</Text>

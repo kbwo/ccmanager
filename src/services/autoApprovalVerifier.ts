@@ -1,7 +1,7 @@
 import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {AutoApprovalResponse} from '../types/index.js';
-import {configurationManager} from './configurationManager.js';
+import {configReader} from './config/configReader.js';
 import {logger} from '../utils/logger.js';
 import {
 	execFile,
@@ -14,7 +14,7 @@ import {
 const DEFAULT_TIMEOUT_SECONDS = 30;
 
 const getTimeoutMs = (): number => {
-	const config = configurationManager.getAutoApprovalConfig();
+	const config = configReader.getAutoApprovalConfig();
 	const timeoutSeconds = config.timeout ?? DEFAULT_TIMEOUT_SECONDS;
 	return timeoutSeconds * 1000;
 };
@@ -282,7 +282,7 @@ export class AutoApprovalVerifier {
 	): Effect.Effect<AutoApprovalResponse, ProcessError, never> {
 		const attemptVerification = Effect.tryPromise({
 			try: async () => {
-				const autoApprovalConfig = configurationManager.getAutoApprovalConfig();
+				const autoApprovalConfig = configReader.getAutoApprovalConfig();
 				const customCommand = autoApprovalConfig.customCommand?.trim();
 				const prompt = buildPrompt(terminalOutput);
 

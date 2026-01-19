@@ -2,7 +2,7 @@ import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {WorktreeService} from './worktreeService.js';
 import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
-import {configurationManager} from './configurationManager.js';
+import {configReader} from './config/configReader.js';
 import {Effect} from 'effect';
 import {GitError} from '../types/errors.js';
 
@@ -21,9 +21,9 @@ vi.mock('./worktreeConfigManager.js', () => ({
 	},
 }));
 
-// Mock configurationManager
-vi.mock('./configurationManager.js', () => ({
-	configurationManager: {
+// Mock configReader
+vi.mock('./config/configReader.js', () => ({
+	configReader: {
 		getWorktreeHooks: vi.fn(),
 	},
 }));
@@ -37,7 +37,7 @@ vi.mock('../utils/hookExecutor.js', () => ({
 const mockedExecSync = vi.mocked(execSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
-const mockedGetWorktreeHooks = vi.mocked(configurationManager.getWorktreeHooks);
+const mockedGetWorktreeHooks = vi.mocked(configReader.getWorktreeHooks);
 
 // Mock error interface for git command errors
 interface MockGitError extends Error {

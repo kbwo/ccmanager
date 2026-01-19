@@ -1,5 +1,6 @@
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
-import {Effect} from 'effect';
+import {Effect, Either} from 'effect';
+import {ValidationError} from '../types/errors.js';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {Session, DevcontainerConfig} from '../types/index.js';
@@ -23,12 +24,11 @@ vi.mock('child_process', () => ({
 }));
 
 // Mock configuration manager
-vi.mock('./configurationManager.js', () => ({
-	configurationManager: {
-		getCommandConfig: vi.fn(),
+vi.mock('./config/configReader.js', () => ({
+	configReader: {
 		getStatusHooks: vi.fn(() => ({})),
 		getDefaultPreset: vi.fn(),
-		getPresetById: vi.fn(),
+		getPresetByIdEffect: vi.fn(),
 		setWorktreeLastOpened: vi.fn(),
 		getWorktreeLastOpenedTime: vi.fn(),
 		getWorktreeLastOpened: vi.fn(() => ({})),
@@ -63,6 +63,9 @@ vi.mock('./worktreeService.js', () => ({
 	WorktreeService: vi.fn(function () {
 		return {};
 	}),
+	setWorktreeLastOpened: vi.fn(),
+	getWorktreeLastOpened: vi.fn(() => ({})),
+	getWorktreeLastOpenedTime: vi.fn(),
 }));
 
 // Create a mock IPty class
@@ -84,15 +87,15 @@ describe('SessionManager', () => {
 	let sessionManager: import('./sessionManager.js').SessionManager;
 	let mockPty: MockPty;
 	let SessionManager: typeof import('./sessionManager.js').SessionManager;
-	let configurationManager: typeof import('./configurationManager.js').configurationManager;
+	let configReader: typeof import('./config/configReader.js').configReader;
 
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		// Dynamically import after mocks are set up
 		const sessionManagerModule = await import('./sessionManager.js');
-		const configManagerModule = await import('./configurationManager.js');
+		const configManagerModule = await import('./config/configReader.js');
 		SessionManager = sessionManagerModule.SessionManager;
-		configurationManager = configManagerModule.configurationManager;
+		configReader = configManagerModule.configReader;
 		sessionManager = new SessionManager();
 		mockPty = new MockPty();
 	});
@@ -104,7 +107,7 @@ describe('SessionManager', () => {
 	describe('createSessionWithPresetEffect', () => {
 		it('should use default preset when no preset ID specified', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -131,13 +134,15 @@ describe('SessionManager', () => {
 
 		it('should use specific preset when ID provided', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getPresetById).mockReturnValue({
-				id: '2',
-				name: 'Development',
-				command: 'claude',
-				args: ['--resume', '--dev'],
-				fallbackArgs: ['--no-mcp'],
-			});
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.right({
+					id: '2',
+					name: 'Development',
+					command: 'claude',
+					args: ['--resume', '--dev'],
+					fallbackArgs: ['--no-mcp'],
+				}),
+			);
 
 			// Setup spawn mock
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
@@ -147,8 +152,8 @@ describe('SessionManager', () => {
 				sessionManager.createSessionWithPresetEffect('/test/worktree', '2'),
 			);
 
-			// Verify getPresetById was called with correct ID
-			expect(configurationManager.getPresetById).toHaveBeenCalledWith('2');
+			// Verify getPresetByIdEffect was called with correct ID
+			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 
 			// Verify spawn was called with preset config
 			expect(spawn).toHaveBeenCalledWith('claude', ['--resume', '--dev'], {
@@ -162,8 +167,16 @@ describe('SessionManager', () => {
 
 		it('should fall back to default preset if specified preset not found', async () => {
 			// Setup mocks
-			vi.mocked(configurationManager.getPresetById).mockReturnValue(undefined);
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.left(
+					new ValidationError({
+						field: 'presetId',
+						constraint: 'Preset not found',
+						receivedValue: 'invalid',
+					}),
+				),
+			);
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -181,13 +194,13 @@ describe('SessionManager', () => {
 			);
 
 			// Verify fallback to default preset
-			expect(configurationManager.getDefaultPreset).toHaveBeenCalled();
+			expect(configReader.getDefaultPreset).toHaveBeenCalled();
 			expect(spawn).toHaveBeenCalledWith('claude', [], expect.any(Object));
 		});
 
 		it('should throw error when spawn fails with preset', async () => {
 			// Setup mock preset with fallback
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -218,7 +231,7 @@ describe('SessionManager', () => {
 
 		it('should return existing session if already created', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -243,7 +256,7 @@ describe('SessionManager', () => {
 
 		it('should throw error when spawn fails with fallback args', async () => {
 			// Setup mock preset with fallback
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'nonexistent-command',
@@ -264,14 +277,13 @@ describe('SessionManager', () => {
 			).rejects.toThrow('Command not found');
 		});
 
-		it('should use fallback args when main command exits with code 1', async () => {
-			// Setup mock preset with fallback
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+		it('should fallback to default command when main command exits with code 1', async () => {
+			// Setup mock preset with args
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
 				args: ['--invalid-flag'],
-				fallbackArgs: ['--resume'],
 			});
 
 			// First spawn attempt - will exit with code 1
@@ -302,12 +314,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called
+			// Verify fallback spawn was called (with no args since commandConfig was removed)
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
-				['--resume'],
+				[],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -318,7 +330,7 @@ describe('SessionManager', () => {
 
 		it('should not use fallback if main command succeeds', async () => {
 			// Setup mock preset with fallback
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -348,7 +360,7 @@ describe('SessionManager', () => {
 
 		it('should use empty args as fallback when no fallback args specified', async () => {
 			// Setup mock preset without fallback args
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -400,7 +412,7 @@ describe('SessionManager', () => {
 
 		it('should handle custom command configuration', async () => {
 			// Setup mock preset with custom command
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'my-custom-claude',
@@ -427,7 +439,7 @@ describe('SessionManager', () => {
 
 		it('should throw error when spawn fails and no fallback configured', async () => {
 			// Setup mock preset without fallback
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -451,7 +463,7 @@ describe('SessionManager', () => {
 	describe('session lifecycle', () => {
 		it('should destroy session and clean up resources', async () => {
 			// Setup
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -471,7 +483,7 @@ describe('SessionManager', () => {
 
 		it('should handle session exit event', async () => {
 			// Setup
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -532,7 +544,7 @@ describe('SessionManager', () => {
 
 		it('should execute devcontainer up command before creating session', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -567,12 +579,14 @@ describe('SessionManager', () => {
 
 		it('should use specific preset when ID provided', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getPresetById).mockReturnValue({
-				id: '2',
-				name: 'Development',
-				command: 'claude',
-				args: ['--resume', '--dev'],
-			});
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.right({
+					id: '2',
+					name: 'Development',
+					command: 'claude',
+					args: ['--resume', '--dev'],
+				}),
+			);
 
 			// Setup spawn mock
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
@@ -592,7 +606,7 @@ describe('SessionManager', () => {
 			);
 
 			// Verify correct preset was used
-			expect(configurationManager.getPresetById).toHaveBeenCalledWith('2');
+			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
 				['exec', '--', 'claude', '--resume', '--dev'],
@@ -627,7 +641,7 @@ describe('SessionManager', () => {
 
 		it('should return existing session if already created', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -663,7 +677,7 @@ describe('SessionManager', () => {
 
 		it('should handle complex exec commands with multiple arguments', async () => {
 			// Setup mock preset
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -710,7 +724,7 @@ describe('SessionManager', () => {
 			vi.clearAllMocks();
 			sessionManager = new SessionManager();
 
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -864,12 +878,14 @@ describe('SessionManager', () => {
 				},
 			);
 
-			vi.mocked(configurationManager.getPresetById).mockReturnValue({
-				id: 'claude-with-args',
-				name: 'Claude with Args',
-				command: 'claude',
-				args: ['-m', 'claude-3-opus'],
-			});
+			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
+				Either.right({
+					id: 'claude-with-args',
+					name: 'Claude with Args',
+					command: 'claude',
+					args: ['-m', 'claude-3-opus'],
+				}),
+			);
 
 			await Effect.runPromise(
 				sessionManager.createSessionWithDevcontainerEffect(
@@ -919,7 +935,7 @@ describe('SessionManager', () => {
 			);
 
 			// Setup preset without fallback args
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
@@ -971,7 +987,7 @@ describe('SessionManager', () => {
 			expect(session.isPrimaryCommand).toBe(false);
 		});
 
-		it('should use fallback args in devcontainer when primary command exits with code 1', async () => {
+		it('should fallback to default command in devcontainer when primary command exits with code 1', async () => {
 			// Setup exec mock for devcontainer up
 			type MockExecParams = Parameters<typeof exec>;
 			const mockExec = vi.mocked(exec);
@@ -992,13 +1008,12 @@ describe('SessionManager', () => {
 				},
 			);
 
-			// Setup preset with fallback
-			vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+			// Setup preset with args
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
 				args: ['--bad-flag'],
-				fallbackArgs: ['--good-flag'],
 			});
 
 			// First spawn attempt - will exit with code 1
@@ -1031,12 +1046,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called
+			// Verify fallback spawn was called (with no args since commandConfig was removed)
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--good-flag'],
+				['exec', '--workspace-folder', '.', '--', 'claude'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 

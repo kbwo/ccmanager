@@ -81,8 +81,8 @@ npx ccmanager
 
 You can customize keyboard shortcuts in two ways:
 
-1. **Through the UI**: Select "Configuration" → "Configure Shortcuts" from the main menu
-2. **Configuration file**: Edit `~/.config/ccmanager/config.json`
+1. **Through the UI**: Select **Global Configuration** → **Configure Shortcuts** from the main menu
+2. **Configuration file**: Edit `~/.config/ccmanager/config.json` or `.ccmanager.json` for per-project settings (see [Per-Project Configuration](#per-project-configuration))
 
 Example configuration:
 ```json
@@ -109,6 +109,12 @@ Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.
   - Ctrl+C
   - Ctrl+D
   - Ctrl+[ (equivalent to Escape)
+
+## Per-Project Configuration
+
+CCManager supports per-project configuration by placing a `.ccmanager.json` file in your git repository root. Project settings are merged with the global config (`~/.config/ccmanager/config.json`), with project settings always taking priority.
+
+For detailed configuration options and examples, see [docs/project-config.md](docs/project-config.md).
 
 ## Supported AI Assistants
 
@@ -148,7 +154,7 @@ CCManager supports configuring the command and arguments used to run Claude Code
 
 ### Quick Start
 
-1. Navigate to **Configuration** → **Configure Command Presets**
+1. Navigate to **Global Configuration** → **Configure Command Presets**
 2. Set your desired arguments (e.g., `--resume` for resuming sessions)
 3. Optionally set fallback arguments
 4. Save changes
@@ -177,7 +183,7 @@ When creating a new worktree, CCManager:
 
 ### Configuration
 
-1. Navigate to **Configuration** → **Configure Worktree**
+1. Navigate to **Global Configuration** → **Configure Worktree**
 2. Toggle **Copy Session Data** to set the default behavior
 3. Save changes
 
@@ -246,7 +252,7 @@ CCManager can automatically approve Claude Code prompts that don't require user 
 
 ### Quick Start
 
-1. Navigate to **Configuration** → **Other & Experimental**
+1. Navigate to **Global Configuration** → **Other & Experimental**
 2. Enable **Auto Approval (experimental)**
 3. (Optional) Configure a custom command for verification
 

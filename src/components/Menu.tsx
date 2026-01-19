@@ -22,7 +22,7 @@ import {RecentProject} from '../types/index.js';
 import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
-import {configurationManager} from '../services/configurationManager.js';
+import {configReader} from '../services/config/configReader.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -98,7 +98,7 @@ const Menu: React.FC<MenuProps> = ({
 	const limit = 10;
 
 	// Get worktree configuration for sorting
-	const worktreeConfig = configurationManager.getWorktreeConfig();
+	const worktreeConfig = configReader.getWorktreeConfig();
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -304,12 +304,30 @@ const Menu: React.FC<MenuProps> = ({
 					label: `D ${MENU_ICONS.DELETE_WORKTREE} Delete Worktree`,
 					value: 'delete-worktree',
 				},
-				{
+			];
+
+			// Add configuration menu items based on multiProject mode
+			if (multiProject) {
+				// In multi-project mode, only show global configuration (backward compatible)
+				otherMenuItems.push({
 					type: 'common',
 					label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Configuration`,
 					value: 'configuration',
-				},
-			];
+				});
+			} else {
+				// In single-project mode, show both Project and Global configuration
+				otherMenuItems.push({
+					type: 'common',
+					label: `P ${MENU_ICONS.CONFIGURE_SHORTCUTS} Project Configuration`,
+					value: 'configuration-project',
+				});
+				otherMenuItems.push({
+					type: 'common',
+					label: `C ${MENU_ICONS.CONFIGURE_SHORTCUTS} Global Configuration`,
+					value: 'configuration-global',
+				});
+			}
+
 			menuItems.push(...otherMenuItems);
 			if (projectName) {
 				// In multi-project mode, show 'Back to project list'
@@ -420,14 +438,36 @@ const Menu: React.FC<MenuProps> = ({
 					hasSession: false,
 				});
 				break;
+			case 'p':
+				// Trigger project configuration action (only in single-project mode)
+				if (!multiProject) {
+					onSelectWorktree({
+						path: 'CONFIGURATION_PROJECT',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				}
+				break;
 			case 'c':
 				// Trigger configuration action
-				onSelectWorktree({
-					path: 'CONFIGURATION',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				if (multiProject) {
+					// In multi-project mode, 'c' opens global configuration (backward compatible)
+					onSelectWorktree({
+						path: 'CONFIGURATION',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				} else {
+					// In single-project mode, 'c' opens global configuration
+					onSelectWorktree({
+						path: 'CONFIGURATION_GLOBAL',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				}
 				break;
 			case 'b':
 				// In multi-project mode, go back to project list
@@ -494,9 +534,25 @@ const Menu: React.FC<MenuProps> = ({
 				hasSession: false,
 			});
 		} else if (item.value === 'configuration') {
-			// Handle in parent component - use special marker
+			// Handle in parent component - use special marker (backward compatible for multi-project mode)
 			onSelectWorktree({
 				path: 'CONFIGURATION',
+				branch: '',
+				isMainWorktree: false,
+				hasSession: false,
+			});
+		} else if (item.value === 'configuration-project') {
+			// Handle in parent component - use special marker for project config
+			onSelectWorktree({
+				path: 'CONFIGURATION_PROJECT',
+				branch: '',
+				isMainWorktree: false,
+				hasSession: false,
+			});
+		} else if (item.value === 'configuration-global') {
+			// Handle in parent component - use special marker for global config
+			onSelectWorktree({
+				path: 'CONFIGURATION_GLOBAL',
 				branch: '',
 				isMainWorktree: false,
 				hasSession: false,
@@ -603,12 +659,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete C-Config ${
-									projectName ? 'B-Back' : 'Q-Quit'
-								}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete C-Config ${
-									projectName ? 'B-Back' : 'Q-Quit'
-								}`}
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete ${
+									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
+								} ${projectName ? 'B-Back' : 'Q-Quit'}`
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete ${
+									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
+								} ${projectName ? 'B-Back' : 'Q-Quit'}`}
 				</Text>
 			</Box>
 		</Box>

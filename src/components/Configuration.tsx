@@ -8,8 +8,11 @@ import ConfigureWorktree from './ConfigureWorktree.js';
 import ConfigureCommand from './ConfigureCommand.js';
 import ConfigureOther from './ConfigureOther.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {ConfigScope} from '../types/index.js';
+import {ConfigEditorProvider} from '../contexts/ConfigEditorContext.js';
 
 interface ConfigurationProps {
+	scope: ConfigScope;
 	onComplete: () => void;
 }
 
@@ -27,8 +30,14 @@ interface MenuItem {
 	value: string;
 }
 
-const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
+const ConfigurationContent: React.FC<{
+	scope: ConfigScope;
+	onComplete: () => void;
+}> = ({scope, onComplete}) => {
 	const [view, setView] = useState<ConfigView>('menu');
+
+	const title =
+		scope === 'project' ? 'Project Configuration' : 'Global Configuration';
 
 	const menuItems: MenuItem[] = [
 		{
@@ -147,7 +156,7 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					Configuration
+					{title}
 				</Text>
 			</Box>
 
@@ -164,5 +173,11 @@ const Configuration: React.FC<ConfigurationProps> = ({onComplete}) => {
 		</Box>
 	);
 };
+
+const Configuration: React.FC<ConfigurationProps> = ({scope, onComplete}) => (
+	<ConfigEditorProvider scope={scope}>
+		<ConfigurationContent scope={scope} onComplete={onComplete} />
+	</ConfigEditorProvider>
+);
 
 export default Configuration;

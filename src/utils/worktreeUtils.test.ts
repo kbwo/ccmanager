@@ -242,7 +242,6 @@ describe('prepareWorktreeItems', () => {
 		terminal: {} as Session['terminal'],
 		stateCheckInterval: undefined,
 		isPrimaryCommand: true,
-		commandConfig: undefined,
 		detectionStrategy: 'claude',
 		devcontainerConfig: undefined,
 		stateMutex: new Mutex({

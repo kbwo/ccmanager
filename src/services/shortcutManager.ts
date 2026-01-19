@@ -1,6 +1,6 @@
 import {ShortcutKey, ShortcutConfig} from '../types/index.js';
 import {Key} from 'ink';
-import {configurationManager} from './configurationManager.js';
+import {configReader} from './config/configReader.js';
 
 export class ShortcutManager {
 	private reservedKeys: ShortcutKey[] = [
@@ -57,23 +57,8 @@ export class ShortcutManager {
 		);
 	}
 
-	public saveShortcuts(shortcuts: ShortcutConfig): boolean {
-		// Validate all shortcuts
-		const currentShortcuts = configurationManager.getShortcuts();
-		const validated: ShortcutConfig = {
-			returnToMenu:
-				this.validateShortcut(shortcuts.returnToMenu) ||
-				currentShortcuts.returnToMenu,
-			cancel:
-				this.validateShortcut(shortcuts.cancel) || currentShortcuts.cancel,
-		};
-
-		configurationManager.setShortcuts(validated);
-		return true;
-	}
-
 	public getShortcuts(): ShortcutConfig {
-		return configurationManager.getShortcuts();
+		return configReader.getShortcuts();
 	}
 
 	private getRawShortcutCodes(shortcut: ShortcutKey): string[] {
@@ -136,7 +121,7 @@ export class ShortcutManager {
 		input: string,
 		key: Key,
 	): boolean {
-		const shortcuts = configurationManager.getShortcuts();
+		const shortcuts = configReader.getShortcuts();
 		const shortcut = shortcuts[shortcutName];
 		if (!shortcut) return false;
 
@@ -156,7 +141,7 @@ export class ShortcutManager {
 	}
 
 	public getShortcutDisplay(shortcutName: keyof ShortcutConfig): string {
-		const shortcuts = configurationManager.getShortcuts();
+		const shortcuts = configReader.getShortcuts();
 		const shortcut = shortcuts[shortcutName];
 		if (!shortcut) return '';
 
@@ -196,7 +181,7 @@ export class ShortcutManager {
 		shortcutName: keyof ShortcutConfig,
 		input: string,
 	): boolean {
-		const shortcuts = configurationManager.getShortcuts();
+		const shortcuts = configReader.getShortcuts();
 		const shortcut = shortcuts[shortcutName];
 		if (!shortcut) return false;
 
