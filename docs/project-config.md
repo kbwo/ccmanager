@@ -37,3 +37,7 @@ Example `.ccmanager.json`:
 ```
 
 All options available in the global config can be used in the project config.
+
+## Limitations
+
+- **Multi-project mode**: Project configuration is not available when running CCManager with the `--multi-project` flag. In multi-project mode, only global configuration is used.
