@@ -36,11 +36,11 @@
         "vitest": "^4.0.16",
       },
       "optionalDependencies": {
-        "@kodaikabasawa/ccmanager-darwin-arm64": "3.4.0",
-        "@kodaikabasawa/ccmanager-darwin-x64": "3.4.0",
-        "@kodaikabasawa/ccmanager-linux-arm64": "3.4.0",
-        "@kodaikabasawa/ccmanager-linux-x64": "3.4.0",
-        "@kodaikabasawa/ccmanager-win32-x64": "3.4.0",
+        "@kodaikabasawa/ccmanager-darwin-arm64": "3.5.0",
+        "@kodaikabasawa/ccmanager-darwin-x64": "3.5.0",
+        "@kodaikabasawa/ccmanager-linux-arm64": "3.5.0",
+        "@kodaikabasawa/ccmanager-linux-x64": "3.5.0",
+        "@kodaikabasawa/ccmanager-win32-x64": "3.5.0",
       },
     },
   },
@@ -127,15 +127,15 @@
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
-    "@kodaikabasawa/ccmanager-darwin-arm64": ["@kodaikabasawa/ccmanager-darwin-arm64@3.4.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-SYAGwJcVX+0CIcCwh1HS+h5Toycsa6JEk3Xj4dxcr4TQchczkMvQkUICcQ0q9kqywHKP6dr9raKSuuFrwbf7nA=="],
+    "@kodaikabasawa/ccmanager-darwin-arm64": ["@kodaikabasawa/ccmanager-darwin-arm64@3.5.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-C09sdjsz3RD0sKx6q9NPd4JmcgnttgbAcB4UybE/6gcbmhTQKvIM7+aCDq2VRTKPTpFwNQNkv3wRKp28FodM0Q=="],
 
-    "@kodaikabasawa/ccmanager-darwin-x64": ["@kodaikabasawa/ccmanager-darwin-x64@3.4.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-cgDdNy4lh+UeZPtxd3/j4X7TJdttCg1NN+q4slL5IN1O0wu6sgVQ1KLOYQbttvsbmVXhqkOaOGb8gBcZF8WGog=="],
+    "@kodaikabasawa/ccmanager-darwin-x64": ["@kodaikabasawa/ccmanager-darwin-x64@3.5.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-TtU80n8P6xxGRMLvqi2BloMtbipyxpx3UJgHis+ubyRFSJwOWbypkTAq2mSgSWqY5kP9lba4U/t/XAASOOw5yg=="],
 
-    "@kodaikabasawa/ccmanager-linux-arm64": ["@kodaikabasawa/ccmanager-linux-arm64@3.4.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-dv0OmcJt7mKrKh5AB4l0jIbrqAzBrdvfwbVVaock+Ef3E6CBBoys/2Z4GMMpMu4QcZKcTAvZWEzFWNnBJoRO5Q=="],
+    "@kodaikabasawa/ccmanager-linux-arm64": ["@kodaikabasawa/ccmanager-linux-arm64@3.5.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-921XZrGQLz+jLlino2PJEsQ2CsJbSFKXMxBV4/W7MCRc31VcwSkm3oJadOAT7+V/P5ulxPKF2FmxkflcDdquHA=="],
 
-    "@kodaikabasawa/ccmanager-linux-x64": ["@kodaikabasawa/ccmanager-linux-x64@3.4.0", "", { "os": "linux", "cpu": "x64" }, "sha512-LLN/3UsXmWKzTAtayOHvGDX66FFVOkcA2cfqkS/0fyJWirEws/RQOIRq1ilOOwR9+iGzKmVyM4UTmY9HnqlH2w=="],
+    "@kodaikabasawa/ccmanager-linux-x64": ["@kodaikabasawa/ccmanager-linux-x64@3.5.0", "", { "os": "linux", "cpu": "x64" }, "sha512-2EZXrI2Rh7IFepbII95uXgq6ta9+REgOUMQNjoCVgBSbytHPUvo8MtPlBS7n/YJ1JBHdOV+zvFa2jDkOCTLyeg=="],
 
-    "@kodaikabasawa/ccmanager-win32-x64": ["@kodaikabasawa/ccmanager-win32-x64@3.4.0", "", { "os": "win32", "cpu": "x64" }, "sha512-3G4GuADqnDNRuGY1P6RB/lr1tu+pkOI7DNw87mBc0sXRET0IaMmBVD3PERH9muWUU/kg5xnCH27NPF+34PIDgQ=="],
+    "@kodaikabasawa/ccmanager-win32-x64": ["@kodaikabasawa/ccmanager-win32-x64@3.5.0", "", { "os": "win32", "cpu": "x64" }, "sha512-QFLbwzaNOJRdQnyRIkZWy8Cr8czhAjTjhv5I/atCnFq3I71wsWBel/Hv4lG9QkND/F4beWS7xvqKgEcvmCG9rQ=="],
 
     "@pkgr/core": ["@pkgr/core@0.2.9", "", {}, "sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA=="],
 
