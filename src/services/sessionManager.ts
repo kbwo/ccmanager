@@ -24,7 +24,7 @@ import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
-import {STATUS_TAGS} from '../constants/statusIcons.js';
+import {getBackgroundTaskTag} from '../constants/statusIcons.js';
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
@@ -79,7 +79,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return detectedState;
 	}
 
-	detectBackgroundTask(session: Session): boolean {
+	detectBackgroundTask(session: Session): number {
 		return session.stateDetector.detectBackgroundTask(session.terminal);
 	}
 
@@ -563,12 +563,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				this.handleAutoApproval(session);
 			}
 
-			// Detect and update background task flag
-			const hasBackgroundTask = this.detectBackgroundTask(session);
-			if (currentStateData.hasBackgroundTask !== hasBackgroundTask) {
+			// Detect and update background task count
+			const backgroundTaskCount = this.detectBackgroundTask(session);
+			if (currentStateData.backgroundTaskCount !== backgroundTaskCount) {
 				void session.stateMutex.update(data => ({
 					...data,
-					hasBackgroundTask,
+					backgroundTaskCount,
 				}));
 			}
 		}, STATE_CHECK_INTERVAL_MS);
@@ -883,9 +883,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					counts.pending_auto_approval++;
 					break;
 			}
-			if (stateData.hasBackgroundTask) {
-				counts.backgroundTasks++;
-			}
+			counts.backgroundTasks += stateData.backgroundTaskCount;
 		});
 
 		return counts;
@@ -911,8 +909,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			return '';
 		}
 
-		const bgTag =
-			counts.backgroundTasks > 0 ? ` ${STATUS_TAGS.BACKGROUND_TASK}` : '';
-		return ` (${parts.join(' / ')}${bgTag})`;
+		const bgTag = getBackgroundTaskTag(counts.backgroundTasks);
+		const bgSuffix = bgTag ? ` ${bgTag}` : '';
+		return ` (${parts.join(' / ')}${bgSuffix})`;
 	}
 }

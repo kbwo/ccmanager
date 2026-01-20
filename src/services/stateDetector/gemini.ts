@@ -39,7 +39,7 @@ export class GeminiStateDetector extends BaseStateDetector {
 		return 'idle';
 	}
 
-	detectBackgroundTask(_terminal: Terminal): boolean {
-		return false;
+	detectBackgroundTask(_terminal: Terminal): number {
+		return 0;
 	}
 }
