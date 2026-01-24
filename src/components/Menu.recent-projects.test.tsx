@@ -138,6 +138,7 @@ describe('Menu - Recent Projects', () => {
 				worktreeService={mockWorktreeService}
 				onSelectWorktree={vi.fn()}
 				multiProject={false}
+				version="test"
 			/>,
 		);
 
@@ -170,6 +171,7 @@ describe('Menu - Recent Projects', () => {
 				onSelectWorktree={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="test"
 			/>,
 		);
 
@@ -192,6 +194,7 @@ describe('Menu - Recent Projects', () => {
 				onSelectWorktree={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="test"
 			/>,
 		);
 
@@ -225,6 +228,7 @@ describe('Menu - Recent Projects', () => {
 				onSelectWorktree={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="test"
 			/>,
 		);
 
@@ -258,6 +262,7 @@ describe('Menu - Recent Projects', () => {
 				onSelectWorktree={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="test"
 			/>,
 		);
 
@@ -269,6 +274,7 @@ describe('Menu - Recent Projects', () => {
 				onSelectWorktree={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="test"
 			/>,
 		);
 
@@ -303,6 +309,7 @@ describe('Menu - Recent Projects', () => {
 				onSelectWorktree={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
+				version="test"
 			/>,
 		);
 
