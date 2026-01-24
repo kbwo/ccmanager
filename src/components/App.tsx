@@ -51,7 +51,11 @@ interface AppProps {
 	version?: string;
 }
 
-const App: React.FC<AppProps> = ({devcontainerConfig, multiProject, version}) => {
+const App: React.FC<AppProps> = ({
+	devcontainerConfig,
+	multiProject,
+	version,
+}) => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>(
 		multiProject ? 'project-list' : 'menu',
