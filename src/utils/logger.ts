@@ -16,15 +16,17 @@ interface LoggerConfig {
 }
 
 /**
- * Log level enum for structured logging
+ * Log level constants for structured logging
  */
-enum LogLevel {
-	DEBUG = 'DEBUG',
-	INFO = 'INFO',
-	WARN = 'WARN',
-	ERROR = 'ERROR',
-	LOG = 'LOG',
-}
+const LogLevel = {
+	DEBUG: 'DEBUG',
+	INFO: 'INFO',
+	WARN: 'WARN',
+	ERROR: 'ERROR',
+	LOG: 'LOG',
+} as const;
+
+type LogLevel = (typeof LogLevel)[keyof typeof LogLevel];
 
 /**
  * CLI-optimized logger with size management and rotation
