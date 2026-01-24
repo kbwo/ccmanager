@@ -33,6 +33,7 @@ interface MenuProps {
 	onDismissError?: () => void;
 	projectName?: string;
 	multiProject?: boolean;
+	version?: string;
 }
 
 interface CommonItem {
@@ -87,6 +88,7 @@ const Menu: React.FC<MenuProps> = ({
 	onDismissError,
 	projectName,
 	multiProject = false,
+	version,
 }) => {
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
@@ -582,7 +584,7 @@ const Menu: React.FC<MenuProps> = ({
 		<Box flexDirection="column">
 			<Box marginBottom={1} flexDirection="column">
 				<Text bold color="green">
-					CCManager - Claude Code Worktree Manager
+					CCManager - Claude Code Worktree Manager{version ? ` v${version}` : ''}
 				</Text>
 				{projectName && (
 					<Text bold color="green">
