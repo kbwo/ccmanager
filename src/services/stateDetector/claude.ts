@@ -36,12 +36,22 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		return 'idle';
 	}
 
-	detectBackgroundTask(terminal: Terminal): boolean {
+	detectBackgroundTask(terminal: Terminal): number {
 		const lines = this.getTerminalLines(terminal, 3);
 		const content = lines.join('\n').toLowerCase();
-		// Detect background task patterns:
-		// - "N background task(s)" in status bar
-		// - "(running)" in status bar for active background commands
-		return content.includes('background task') || content.includes('(running)');
+
+		// Check for "N background task(s)" pattern first (content already lowercased)
+		const countMatch = content.match(/(\d+)\s+background\s+task/);
+		if (countMatch?.[1]) {
+			return parseInt(countMatch[1], 10);
+		}
+
+		// Check for "(running)" pattern - indicates at least 1 background task
+		if (content.includes('(running)')) {
+			return 1;
+		}
+
+		// No background task detected
+		return 0;
 	}
 }

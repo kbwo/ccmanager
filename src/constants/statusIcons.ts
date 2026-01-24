@@ -17,6 +17,17 @@ export const STATUS_TAGS = {
 	BACKGROUND_TASK: '\x1b[2m[BG]\x1b[0m',
 } as const;
 
+export const getBackgroundTaskTag = (count: number): string => {
+	if (count <= 0) {
+		return '';
+	}
+	if (count === 1) {
+		return STATUS_TAGS.BACKGROUND_TASK;
+	}
+	// count >= 2: show [BG:N]
+	return `\x1b[2m[BG:${count}]\x1b[0m`;
+};
+
 export const MENU_ICONS = {
 	NEW_WORKTREE: '⊕',
 	MERGE_WORKTREE: '⇄',
@@ -40,10 +51,9 @@ const getBaseStatusDisplay = (status: SessionState): string => {
 
 export const getStatusDisplay = (
 	status: SessionState,
-	hasBackgroundTask: boolean = false,
+	backgroundTaskCount: number = 0,
 ): string => {
 	const display = getBaseStatusDisplay(status);
-	return hasBackgroundTask
-		? `${display} ${STATUS_TAGS.BACKGROUND_TASK}`
-		: display;
+	const bgTag = getBackgroundTaskTag(backgroundTaskCount);
+	return bgTag ? `${display} ${bgTag}` : display;
 };

@@ -48,9 +48,14 @@ type View =
 interface AppProps {
 	devcontainerConfig?: DevcontainerConfig;
 	multiProject?: boolean;
+	version: string;
 }
 
-const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
+const App: React.FC<AppProps> = ({
+	devcontainerConfig,
+	multiProject,
+	version,
+}) => {
 	const {exit} = useApp();
 	const [view, setView] = useState<View>(
 		multiProject ? 'project-list' : 'menu',
@@ -592,6 +597,7 @@ const App: React.FC<AppProps> = ({devcontainerConfig, multiProject}) => {
 				onDismissError={() => setError(null)}
 				projectName={selectedProject?.name}
 				multiProject={multiProject}
+				version={version}
 			/>
 		);
 	}

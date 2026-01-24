@@ -90,6 +90,7 @@ const devcontainerConfig =
 const appProps = {
 	...(devcontainerConfig ? {devcontainerConfig} : {}),
 	multiProject: cli.flags.multiProject,
+	version,
 };
 
 const app = render(<App {...appProps} />);
