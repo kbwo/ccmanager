@@ -75,6 +75,7 @@
 		"ink-text-input": "^6.0.0",
 		"meow": "^14.0.0",
 		"react": "^19.2.3",
+		"react-devtools-core": "^6.1.2",
 		"react-dom": "^19.2.3",
 		"strip-ansi": "^7.1.0"
 	}
