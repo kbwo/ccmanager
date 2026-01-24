@@ -52,7 +52,7 @@ async function buildBinary(target: (typeof TARGETS)[number]) {
 	mkdirSync(outputDir, { recursive: true });
 
 	try {
-		await $`bun build ${ENTRY_POINT} --compile --target=${target.bunTarget} --outfile=${outputPath} --define CCMANAGER_VERSION='"${VERSION}"'`;
+		await $`bun build ${ENTRY_POINT} --compile --target=${target.bunTarget} --outfile=${outputPath} --define CCMANAGER_VERSION='"${VERSION}"' --no-compile-autoload-dotenv --no-compile-autoload-bunfig`;
 		console.log(`  -> Created ${outputPath}`);
 		return true;
 	} catch (error) {
