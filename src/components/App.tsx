@@ -48,7 +48,7 @@ type View =
 interface AppProps {
 	devcontainerConfig?: DevcontainerConfig;
 	multiProject?: boolean;
-	version?: string;
+	version: string;
 }
 
 const App: React.FC<AppProps> = ({

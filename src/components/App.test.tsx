@@ -247,7 +247,7 @@ afterEach(() => {
 
 describe('App component view state', () => {
 	it('renders the menu view by default', async () => {
-		const {lastFrame, unmount} = render(<App />);
+		const {lastFrame, unmount} = render(<App version="test" />);
 		await flush(40);
 
 		expect(lastFrame()).toContain('Menu View');
@@ -259,7 +259,7 @@ describe('App component view state', () => {
 		const original = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 		process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/tmp/projects';
 
-		const {lastFrame, unmount} = render(<App multiProject />);
+		const {lastFrame, unmount} = render(<App multiProject version="test" />);
 		await flush();
 
 		expect(lastFrame()).toContain('Project List View');
@@ -286,7 +286,7 @@ describe('App component loading state machine', () => {
 			}),
 		);
 
-		const {lastFrame, unmount} = render(<App />);
+		const {lastFrame, unmount} = render(<App version="test" />);
 		await waitForCondition(() => Boolean(menuProps));
 
 		const menu = menuProps!;
@@ -333,7 +333,7 @@ describe('App component loading state machine', () => {
 			}),
 		);
 
-		const {lastFrame, unmount} = render(<App />);
+		const {lastFrame, unmount} = render(<App version="test" />);
 		await waitForCondition(() => Boolean(menuProps));
 
 		const menu = menuProps!;
@@ -370,6 +370,7 @@ describe('App component loading state machine', () => {
 
 		const {lastFrame, unmount} = render(
 			<App
+				version="test"
 				devcontainerConfig={
 					{
 						upCommand: 'podman up',
