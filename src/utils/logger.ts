@@ -26,7 +26,7 @@ const LogLevel = {
 	LOG: 'LOG',
 } as const;
 
-type LogLevel = (typeof LogLevel)[keyof typeof LogLevel];
+type LogLevelValue = (typeof LogLevel)[keyof typeof LogLevel];
 
 /**
  * CLI-optimized logger with size management and rotation
@@ -176,7 +176,7 @@ class Logger {
 	/**
 	 * Write log entry with level and formatted message
 	 */
-	private writeLog(level: LogLevel, args: unknown[]): void {
+	private writeLog(level: LogLevelValue, args: unknown[]): void {
 		this.queueWrite(() => {
 			try {
 				this.rotateLogIfNeeded();
