@@ -51,7 +51,7 @@
 		"@eslint/js": "^9.28.0",
 		"@sindresorhus/tsconfig": "^3.0.1",
 		"@types/bun": "latest",
-		"@types/react": "^18.0.32",
+		"@types/react": "^19.2.9",
 		"@typescript-eslint/eslint-plugin": "^8.33.1",
 		"@typescript-eslint/parser": "^8.33.1",
 		"@vdemedes/prettier-config": "^2.0.1",
@@ -70,12 +70,12 @@
 	"dependencies": {
 		"@xterm/headless": "^6.0.0",
 		"effect": "^3.18.2",
-		"ink": "5.2.1",
+		"ink": "^6.6.0",
 		"ink-select-input": "^6.0.0",
 		"ink-text-input": "^6.0.0",
 		"meow": "^14.0.0",
-		"react": "18.3.1",
-		"react-dom": "18.3.1",
+		"react": "^19.2.3",
+		"react-dom": "^19.2.3",
 		"strip-ansi": "^7.1.0"
 	}
 }
