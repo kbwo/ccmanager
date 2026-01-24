@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {Box, Text, useInput} from 'ink';
+import {Box, Text, useInput, useStdout} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
 import {Worktree, Session, GitProject} from '../types/index.js';
@@ -97,16 +97,39 @@ const Menu: React.FC<MenuProps> = ({
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
-	const limit = 10;
+	const {stdout} = useStdout();
+	const fixedRows = 6;
+	const [terminalRows, setTerminalRows] = useState(stdout.rows);
 
-	// Get worktree configuration for sorting
-	const worktreeConfig = configReader.getWorktreeConfig();
+	// Update terminal rows on resize
+	useEffect(() => {
+		const handleResize = () => {
+			setTerminalRows(stdout.rows);
+		};
+
+		stdout.on('resize', handleResize);
+
+		return () => {
+			stdout.off('resize', handleResize);
+		};
+	}, [stdout]);
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
 		useSearchMode(items.length, {
 			isDisabled: !!error || !!loadError,
 		});
+
+	const limit = Math.max(
+		5,
+		terminalRows -
+			fixedRows -
+			(isSearchMode ? 1 : 0) -
+			(error || loadError ? 3 : 0),
+	);
+
+	// Get worktree configuration for sorting
+	const worktreeConfig = configReader.getWorktreeConfig();
 
 	useEffect(() => {
 		let cancelled = false;
