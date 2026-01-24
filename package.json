@@ -26,7 +26,7 @@
 		"build:binary:native": "bun run scripts/build-binaries.ts --target=native",
 		"build:binary:all": "bun run scripts/build-binaries.ts --target=all",
 		"dev": "bun run tsc --watch",
-		"start": "bun dist/cli.js",
+		"start": "bun --no-env-file dist/cli.js",
 		"test": "vitest --run",
 		"lint": "bun run eslint src",
 		"lint:fix": "bun run eslint src --fix",
