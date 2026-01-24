@@ -272,16 +272,18 @@ export interface RemoteBranchMatch {
 }
 
 export class AmbiguousBranchError extends Error {
-	constructor(
-		public branchName: string,
-		public matches: RemoteBranchMatch[],
-	) {
+	branchName: string;
+	matches: RemoteBranchMatch[];
+
+	constructor(branchName: string, matches: RemoteBranchMatch[]) {
 		super(
 			`Ambiguous branch '${branchName}' found in multiple remotes: ${matches
 				.map(m => m.fullRef)
 				.join(', ')}. Please specify which remote to use.`,
 		);
 		this.name = 'AmbiguousBranchError';
+		this.branchName = branchName;
+		this.matches = matches;
 	}
 }
 
