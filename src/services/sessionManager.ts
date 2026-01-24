@@ -395,6 +395,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			// Write data to virtual terminal
 			session.terminal.write(data);
 
+			// Check for screen clear escape sequence (e.g., from /clear command)
+			// When detected, clear the output history to prevent replaying old content on restore
+			if (data.includes('\x1B[2J')) {
+				session.outputHistory = [];
+			}
+
 			// Store in output history as Buffer
 			const buffer = Buffer.from(data, 'utf8');
 			session.outputHistory.push(buffer);
