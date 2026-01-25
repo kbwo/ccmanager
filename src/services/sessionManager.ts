@@ -83,6 +83,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return session.stateDetector.detectBackgroundTask(session.terminal);
 	}
 
+	private getTerminalContent(session: Session): string {
+		// Use the new screen capture utility that correctly handles
+		// both normal and alternate screen buffers
+		return getTerminalScreenContent(
+			session.terminal,
+			TERMINAL_CONTENT_MAX_LINES,
+		);
+	}
+
 	private handleAutoApproval(session: Session): void {
 		// Cancel any existing verification before starting a new one
 		this.cancelAutoApprovalVerification(
@@ -98,10 +107,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}));
 
 		// Get terminal content for verification
-		const terminalContent = getTerminalScreenContent(
-			session.terminal,
-			TERMINAL_CONTENT_MAX_LINES,
-		);
+		const terminalContent = this.getTerminalContent(session);
 
 		// Verify if permission is needed
 		void Effect.runPromise(
