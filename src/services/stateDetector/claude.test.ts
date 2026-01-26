@@ -276,6 +276,76 @@ describe('ClaudeStateDetector', () => {
 			// Assert
 			expect(state).toBe('waiting_input');
 		});
+
+		it('should detect idle when scrolled past old busy state (baseY > 0)', () => {
+			// Arrange - Simulate scrollback where "esc to interrupt" is in history
+			// but the current viewport (baseY=5, rows=3) shows idle content
+			// Buffer: [0]: "Old content", [1]: "esc to interrupt", [2]: "More busy output",
+			//         [3]: "...", [4]: "...", [5]: "Ready", [6]: "Prompt >", [7]: "idle"
+			// Viewport shows lines 5-7 (baseY=5, rows=3)
+			terminal = createMockTerminal(
+				[
+					'Old content',
+					'Previous output with esc to interrupt marker',
+					'More old busy output',
+					'Transition content',
+					'Processing done',
+					'Ready for input',
+					'Prompt >',
+					'idle state here',
+				],
+				{baseY: 5, rows: 3},
+			);
+
+			// Act
+			const state = detector.detectState(terminal, 'busy');
+
+			// Assert - Should detect idle because viewport shows lines 5-7
+			expect(state).toBe('idle');
+		});
+
+		it('should detect busy when scrolled to busy state (baseY shows busy content)', () => {
+			// Arrange - Viewport shows busy content
+			// Buffer has old idle content at top, busy content in viewport
+			terminal = createMockTerminal(
+				[
+					'Old idle content',
+					'Previous prompt',
+					'User input',
+					'Processing request...',
+					'Press esc to interrupt',
+					'Working...',
+				],
+				{baseY: 3, rows: 3},
+			);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert - Should detect busy because viewport shows lines 3-5
+			expect(state).toBe('busy');
+		});
+
+		it('should detect waiting_input when viewport shows prompt after scroll', () => {
+			// Arrange - Scrollback has busy markers, but viewport shows waiting prompt
+			terminal = createMockTerminal(
+				[
+					'Previous busy content',
+					'esc to interrupt was here',
+					'Old output',
+					'Do you want to continue?',
+					'❯ 1. Yes',
+					'  2. No',
+				],
+				{baseY: 3, rows: 3},
+			);
+
+			// Act
+			const state = detector.detectState(terminal, 'busy');
+
+			// Assert - Should detect waiting_input from viewport
+			expect(state).toBe('waiting_input');
+		});
 	});
 
 	describe('detectBackgroundTask', () => {
