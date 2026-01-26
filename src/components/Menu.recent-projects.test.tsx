@@ -164,7 +164,19 @@ describe('Menu - Recent Projects', () => {
 		});
 		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
 
-		const {lastFrame} = render(
+		const {lastFrame, rerender} = render(
+			<Menu
+				sessionManager={mockSessionManager}
+				worktreeService={mockWorktreeService}
+				onSelectWorktree={vi.fn()}
+				onSelectRecentProject={vi.fn()}
+				multiProject={true}
+				version="test"
+			/>,
+		);
+
+		// Force a rerender to ensure all effects have run
+		rerender(
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
