@@ -30,10 +30,14 @@ export function captureScreen(terminal: Terminal): ScreenState {
 	const buffer = terminal.buffer.active;
 	const lines: string[] = [];
 
-	// Capture only the visible screen area (terminal.rows lines)
-	// This works correctly for both normal and alternate screen buffers
+	// baseY is the offset of the viewport within the buffer
+	// For alternate buffer: baseY is always 0
+	// For normal buffer: baseY indicates how much has been scrolled
+	const baseY = buffer.baseY;
+
+	// Capture the visible viewport (not the beginning of scrollback)
 	for (let y = 0; y < terminal.rows; y++) {
-		const line = buffer.getLine(y);
+		const line = buffer.getLine(baseY + y);
 		lines.push(lineToString(line, terminal.cols));
 	}
 
