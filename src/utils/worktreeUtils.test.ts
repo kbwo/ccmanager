@@ -90,7 +90,8 @@ describe('generateWorktreeDirectory', () => {
 		});
 
 		it('should use git repository name when in main working directory', () => {
-			mockedExecSync.mockReturnValue('.git');
+			// --show-toplevel returns the working directory root
+			mockedExecSync.mockReturnValue('/home/user/src/main-repo');
 
 			expect(
 				generateWorktreeDirectory(
@@ -102,7 +103,8 @@ describe('generateWorktreeDirectory', () => {
 		});
 
 		it('should use git repository name when git command succeeds (worktree case)', () => {
-			mockedExecSync.mockReturnValue('/home/user/src/main-repo/.git');
+			// --show-toplevel returns the working directory root
+			mockedExecSync.mockReturnValue('/home/user/src/main-repo');
 
 			expect(
 				generateWorktreeDirectory(

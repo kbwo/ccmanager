@@ -39,20 +39,17 @@ export function truncateString(str: string, maxLength: number): string {
 	return str.substring(0, maxLength - 3) + '...';
 }
 
-function getGitRepositoryName(projectPath: string): string {
+export function getGitRepositoryName(projectPath: string): string {
 	try {
-		const gitCommonDir = execSync('git rev-parse --git-common-dir', {
+		// Use --show-toplevel to get the actual working directory root
+		// This works correctly for both regular repos and submodules
+		const topLevel = execSync('git rev-parse --show-toplevel', {
 			cwd: projectPath,
 			encoding: 'utf8',
+			stdio: ['pipe', 'pipe', 'pipe'],
 		}).trim();
 
-		const absoluteGitCommonDir = path.isAbsolute(gitCommonDir)
-			? gitCommonDir
-			: path.resolve(projectPath, gitCommonDir);
-
-		const mainWorkingDir = path.dirname(absoluteGitCommonDir);
-
-		return path.basename(mainWorkingDir);
+		return path.basename(topLevel);
 	} catch {
 		return path.basename(projectPath);
 	}

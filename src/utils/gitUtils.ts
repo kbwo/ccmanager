@@ -10,6 +10,7 @@ import {execSync} from 'child_process';
  */
 export function getGitRepositoryRoot(cwd: string): string | null {
 	try {
+		// First check if we're in a worktree using --git-common-dir
 		const gitCommonDir = execSync('git rev-parse --git-common-dir', {
 			cwd,
 			encoding: 'utf8',
@@ -27,8 +28,15 @@ export function getGitRepositoryRoot(cwd: string): string | null {
 			return path.dirname(gitPath);
 		}
 
-		// For regular .git directories, the parent is the repository root
-		return path.dirname(absoluteGitCommonDir);
+		// For regular repos and submodules, use --show-toplevel
+		// This correctly returns the working directory root
+		const topLevel = execSync('git rev-parse --show-toplevel', {
+			cwd,
+			encoding: 'utf8',
+			stdio: ['pipe', 'pipe', 'pipe'],
+		}).trim();
+
+		return topLevel;
 	} catch {
 		return null;
 	}

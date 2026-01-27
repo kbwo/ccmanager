@@ -72,6 +72,12 @@ describe('WorktreeService', () => {
 				) {
 					return '/absolute/repo/.git\n';
 				}
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --show-toplevel'
+				) {
+					return '/absolute/repo\n';
+				}
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
@@ -89,6 +95,12 @@ describe('WorktreeService', () => {
 					cmd === 'git rev-parse --git-common-dir'
 				) {
 					return '.git\n';
+				}
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --show-toplevel'
+				) {
+					return '/work/project\n';
 				}
 				throw new Error('Command not mocked: ' + cmd);
 			});
@@ -108,6 +120,12 @@ describe('WorktreeService', () => {
 					cmd === 'git rev-parse --git-common-dir'
 				) {
 					return '../.git\n';
+				}
+				if (
+					typeof cmd === 'string' &&
+					cmd === 'git rev-parse --show-toplevel'
+				) {
+					return '/work/project\n';
 				}
 				throw new Error('Command not mocked: ' + cmd);
 			});

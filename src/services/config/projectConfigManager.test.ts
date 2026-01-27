@@ -37,8 +37,16 @@ describe('ProjectConfigManager - git repository root', () => {
 			},
 		};
 
-		// Mock git rev-parse to return the .git directory
-		(execSync as ReturnType<typeof vi.fn>).mockReturnValue(`${gitRoot}/.git\n`);
+		// Mock git rev-parse to return appropriate values for each command
+		(execSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
+			if (cmd.includes('--git-common-dir')) {
+				return `${gitRoot}/.git\n`;
+			}
+			if (cmd.includes('--show-toplevel')) {
+				return `${gitRoot}\n`;
+			}
+			return '';
+		});
 
 		// Mock existsSync to return true for the git root config path
 		(existsSync as ReturnType<typeof vi.fn>).mockImplementation(
@@ -72,8 +80,16 @@ describe('ProjectConfigManager - git repository root', () => {
 		const cwd = '/path/to/repo/deep/nested/dir';
 		const gitRoot = '/path/to/repo';
 
-		// Mock git rev-parse
-		(execSync as ReturnType<typeof vi.fn>).mockReturnValue(`${gitRoot}/.git\n`);
+		// Mock git rev-parse to return appropriate values for each command
+		(execSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
+			if (cmd.includes('--git-common-dir')) {
+				return `${gitRoot}/.git\n`;
+			}
+			if (cmd.includes('--show-toplevel')) {
+				return `${gitRoot}\n`;
+			}
+			return '';
+		});
 
 		// No existing config
 		(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);

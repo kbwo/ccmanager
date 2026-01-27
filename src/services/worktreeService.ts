@@ -83,10 +83,11 @@ export class WorktreeService {
 
 	private getGitRepositoryRoot(): string {
 		try {
-			// Get the common git directory
+			// First check if we're in a worktree using --git-common-dir
 			const gitCommonDir = execSync('git rev-parse --git-common-dir', {
 				cwd: this.rootPath,
 				encoding: 'utf8',
+				stdio: ['pipe', 'pipe', 'pipe'],
 			}).trim();
 
 			// Make sure we have an absolute path
@@ -103,8 +104,15 @@ export class WorktreeService {
 				return path.dirname(gitPath);
 			}
 
-			// For regular .git directories, the parent is the repository root
-			return path.dirname(absoluteGitCommonDir);
+			// For regular repos and submodules, use --show-toplevel
+			// This correctly returns the working directory root
+			const topLevel = execSync('git rev-parse --show-toplevel', {
+				cwd: this.rootPath,
+				encoding: 'utf8',
+				stdio: ['pipe', 'pipe', 'pipe'],
+			}).trim();
+
+			return topLevel;
 		} catch {
 			// Fallback to current directory if command fails - ensure it's absolute
 			return path.resolve(this.rootPath);
@@ -722,8 +730,26 @@ export class WorktreeService {
 							return [null, startIndex];
 						}
 
+						let worktreePath = worktreeLine.substring(9);
+
+						// For submodules, git worktree list returns the gitdir path
+						// (e.g., .git/modules/submodule-name) instead of the working directory.
+						// In this case, use --show-toplevel to get the actual working directory.
+						if (worktreePath.includes('.git/modules/')) {
+							try {
+								worktreePath = execSync('git rev-parse --show-toplevel', {
+									cwd: self.rootPath,
+									encoding: 'utf8',
+									stdio: ['pipe', 'pipe', 'pipe'],
+								}).trim();
+							} catch {
+								// If --show-toplevel fails, fall back to rootPath
+								worktreePath = self.rootPath;
+							}
+						}
+
 						const worktree: Worktree = {
-							path: worktreeLine.substring(9),
+							path: worktreePath,
 							isMainWorktree: false,
 							hasSession: false,
 						};
