@@ -94,6 +94,16 @@ export class WorktreeService {
 				? gitCommonDir
 				: path.resolve(this.rootPath, gitCommonDir);
 
+			// Handle submodule paths: if path contains .git/modules, use --show-toplevel
+			// to get the submodule's actual working directory
+			if (absoluteGitCommonDir.includes('.git/modules')) {
+				const toplevel = execSync('git rev-parse --show-toplevel', {
+					cwd: this.rootPath,
+					encoding: 'utf8',
+				}).trim();
+				return toplevel;
+			}
+
 			// Handle worktree paths: if path contains .git/worktrees, we need to find the real .git parent
 			if (absoluteGitCommonDir.includes('.git/worktrees')) {
 				// Extract the path up to and including .git
@@ -761,6 +771,13 @@ export class WorktreeService {
 					// Mark the first worktree as main if none are marked
 					if (worktrees.length > 0 && !worktrees.some(w => w.isMainWorktree)) {
 						worktrees[0]!.isMainWorktree = true;
+					}
+
+					// Handle submodule paths: if the main worktree path contains .git/modules,
+					// replace it with the actual working directory (self.gitRootPath)
+					const mainWorktree = worktrees.find(w => w.isMainWorktree);
+					if (mainWorktree && mainWorktree.path.includes('.git/modules')) {
+						mainWorktree.path = self.gitRootPath;
 					}
 
 					// Sort worktrees by last session if requested
