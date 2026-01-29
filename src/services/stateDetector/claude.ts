@@ -41,7 +41,9 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		const content = lines.join('\n').toLowerCase();
 
 		// Check for "N background task(s)" pattern first (content already lowercased)
-		const countMatch = content.match(/(\d+)\s+background\s+task/);
+		const countMatch = content.match(
+			/(\d+)\s+(?:background\s+task|local\s+agent)/,
+		);
 		if (countMatch?.[1]) {
 			return parseInt(countMatch[1], 10);
 		}
