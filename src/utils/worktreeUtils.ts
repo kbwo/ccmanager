@@ -50,6 +50,16 @@ function getGitRepositoryName(projectPath: string): string {
 			? gitCommonDir
 			: path.resolve(projectPath, gitCommonDir);
 
+		// Handle submodule paths: if path contains .git/modules, use --show-toplevel
+		// to get the submodule's actual working directory
+		if (absoluteGitCommonDir.includes('.git/modules')) {
+			const toplevel = execSync('git rev-parse --show-toplevel', {
+				cwd: projectPath,
+				encoding: 'utf8',
+			}).trim();
+			return path.basename(toplevel);
+		}
+
 		const mainWorkingDir = path.dirname(absoluteGitCommonDir);
 
 		return path.basename(mainWorkingDir);

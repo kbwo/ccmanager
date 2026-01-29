@@ -4,6 +4,7 @@ import {execSync} from 'child_process';
 /**
  * Get the git repository root path from a given directory.
  * For worktrees, this returns the main repository root (parent of .git).
+ * For submodules, this returns the submodule's working directory.
  *
  * @param cwd - The directory to start searching from
  * @returns The absolute path to the git repository root, or null if not in a git repo
@@ -19,6 +20,17 @@ export function getGitRepositoryRoot(cwd: string): string | null {
 		const absoluteGitCommonDir = path.isAbsolute(gitCommonDir)
 			? gitCommonDir
 			: path.resolve(cwd, gitCommonDir);
+
+		// Handle submodule paths: if path contains .git/modules, use --show-toplevel
+		// to get the submodule's actual working directory
+		if (absoluteGitCommonDir.includes('.git/modules')) {
+			const toplevel = execSync('git rev-parse --show-toplevel', {
+				cwd,
+				encoding: 'utf8',
+				stdio: ['pipe', 'pipe', 'pipe'],
+			}).trim();
+			return toplevel;
+		}
 
 		// Handle worktree paths: if path contains .git/worktrees, find the real .git parent
 		if (absoluteGitCommonDir.includes('.git/worktrees')) {
