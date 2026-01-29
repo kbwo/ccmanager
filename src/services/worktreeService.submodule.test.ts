@@ -16,6 +16,9 @@ describe('WorktreeService with submodules', () => {
 	const submodule1Dir = path.join(rootProjectDir, 'modules', 'submodule-1');
 
 	beforeAll(() => {
+		// Allow file:// protocol for local submodule cloning (needed for CI)
+		execSync('git config --global protocol.file.allow always');
+
 		// Clean up if exists
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, {recursive: true, force: true});
