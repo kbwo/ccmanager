@@ -27,6 +27,9 @@ describe('getGitRepositoryRoot with submodules', () => {
 		const submodule1Source = path.join(testDir, 'submodule-1-source');
 		fs.mkdirSync(submodule1Source, {recursive: true});
 		execSync('git init', {cwd: submodule1Source});
+		// Set git user for CI environment
+		execSync('git config user.email "test@test.com"', {cwd: submodule1Source});
+		execSync('git config user.name "Test User"', {cwd: submodule1Source});
 		fs.writeFileSync(path.join(submodule1Source, 'README.md'), '# Submodule 1');
 		execSync('git add README.md', {cwd: submodule1Source});
 		execSync('git commit -m "Initial commit"', {cwd: submodule1Source});
@@ -34,6 +37,9 @@ describe('getGitRepositoryRoot with submodules', () => {
 		// Create root project
 		fs.mkdirSync(rootProjectDir, {recursive: true});
 		execSync('git init', {cwd: rootProjectDir});
+		// Set git user for CI environment
+		execSync('git config user.email "test@test.com"', {cwd: rootProjectDir});
+		execSync('git config user.name "Test User"', {cwd: rootProjectDir});
 		fs.writeFileSync(path.join(rootProjectDir, 'README.md'), '# Root Project');
 		execSync('git add README.md', {cwd: rootProjectDir});
 		execSync('git commit -m "Initial commit"', {cwd: rootProjectDir});
