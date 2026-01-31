@@ -491,6 +491,61 @@ describe('ClaudeStateDetector', () => {
 			expect(count).toBe(1);
 		});
 
+		it('should return count 3 when "3 local agents" is in status bar', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some output',
+				'More output',
+				'bypass permissions on - 3 local agents',
+			]);
+
+			// Act
+			const count = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(count).toBe(3);
+		});
+
+		it('should return count 1 when "1 local agent" is in status bar', () => {
+			// Arrange
+			terminal = createMockTerminal(['Some output', '1 local agent']);
+
+			// Act
+			const count = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(count).toBe(1);
+		});
+
+		it('should detect local agent count case-insensitively', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Output line 1',
+				'Output line 2',
+				'2 LOCAL AGENTS running',
+			]);
+
+			// Act
+			const count = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(count).toBe(2);
+		});
+
+		it('should prioritize explicit count from "N local agents" over "(running)"', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Some output',
+				'3 local agents | task1 (running)',
+			]);
+
+			// Act
+			const count = detector.detectBackgroundTask(terminal);
+
+			// Assert
+			expect(count).toBe(3);
+		});
+
 		it('should prioritize count from "N background task" over "(running)"', () => {
 			// Arrange - both patterns present, count should be from explicit pattern
 			terminal = createMockTerminal([
