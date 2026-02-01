@@ -36,11 +36,11 @@
         "vitest": "^4.0.16",
       },
       "optionalDependencies": {
-        "@kodaikabasawa/ccmanager-darwin-arm64": "3.6.5",
-        "@kodaikabasawa/ccmanager-darwin-x64": "3.6.5",
-        "@kodaikabasawa/ccmanager-linux-arm64": "3.6.5",
-        "@kodaikabasawa/ccmanager-linux-x64": "3.6.5",
-        "@kodaikabasawa/ccmanager-win32-x64": "3.6.5",
+        "@kodaikabasawa/ccmanager-darwin-arm64": "3.6.6",
+        "@kodaikabasawa/ccmanager-darwin-x64": "3.6.6",
+        "@kodaikabasawa/ccmanager-linux-arm64": "3.6.6",
+        "@kodaikabasawa/ccmanager-linux-x64": "3.6.6",
+        "@kodaikabasawa/ccmanager-win32-x64": "3.6.6",
       },
     },
   },
@@ -126,16 +126,6 @@
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
-
-    "@kodaikabasawa/ccmanager-darwin-arm64": ["@kodaikabasawa/ccmanager-darwin-arm64@3.6.5", "", { "os": "darwin", "cpu": "arm64" }, "sha512-Q3bWQrVDIDKDjQ5Wngg8fzD5x4ThjcSgHMg+2Q47/AH0ESoz4leNosjIsyFYnr/Z+LetsqMK2Z/lR1MQzri0Lg=="],
-
-    "@kodaikabasawa/ccmanager-darwin-x64": ["@kodaikabasawa/ccmanager-darwin-x64@3.6.5", "", { "os": "darwin", "cpu": "x64" }, "sha512-7wFbCmZwbUH+CN2M4ij2EDzt6/Pwhf4+tm0CZ+1+B6BGwhNzLsOLzkcVsqL5UTEacM8I9y4ige0zcTRoL6VngA=="],
-
-    "@kodaikabasawa/ccmanager-linux-arm64": ["@kodaikabasawa/ccmanager-linux-arm64@3.6.5", "", { "os": "linux", "cpu": "arm64" }, "sha512-XVeZA+nH9HXaGUYjBk7/qAVwP/kR7lX9JJUM4GwcGQ5TrOrFTpg/HnVgndFqqy5Bo+bf4Kpab7/blEpYTzODTw=="],
-
-    "@kodaikabasawa/ccmanager-linux-x64": ["@kodaikabasawa/ccmanager-linux-x64@3.6.5", "", { "os": "linux", "cpu": "x64" }, "sha512-go7/DL52/hHiOV81m+smZqiU/dPXdQmls68eAPWYKDvDiEHNo5fc4O0JnaS5YT4RzuUBZ1kaCZPHe5FY4Si/vw=="],
-
-    "@kodaikabasawa/ccmanager-win32-x64": ["@kodaikabasawa/ccmanager-win32-x64@3.6.5", "", { "os": "win32", "cpu": "x64" }, "sha512-sCmOK8/CF3l/n90/89YDkjk8cNweJgJD2HShLwpfvJ7FqD496zzBsRgCxie7wON79WD88vAOuaY7/upvZTZ5Ew=="],
 
     "@pkgr/core": ["@pkgr/core@0.2.9", "", {}, "sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA=="],
 
