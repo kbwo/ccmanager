@@ -72,32 +72,27 @@ const Session: React.FC<SessionProps> = ({
 		// Clear screen when entering session
 		stdout.write('\x1B[2J\x1B[H');
 
-		// Handle session restoration
+		// Handle session restoration by writing all buffered output at once.
+		// This is faster than chunk-by-chunk replay and preserves scrollback.
 		const handleSessionRestore = (restoredSession: ISession) => {
 			if (restoredSession.id === session.id) {
-				// Replay all buffered output, but skip the initial clear if present
-				for (let i = 0; i < restoredSession.outputHistory.length; i++) {
-					const buffer = restoredSession.outputHistory[i];
-					if (!buffer) continue;
+				if (restoredSession.outputHistory.length === 0) return;
 
-					const str = normalizeLineEndings(
-						sanitizeReplayBuffer(buffer.toString('utf8')),
-					);
+				// Concatenate all history buffers and write at once for better performance
+				const allHistory = Buffer.concat(restoredSession.outputHistory);
+				const historyStr = allHistory.toString('utf8');
 
-					// Skip clear screen sequences at the beginning
-					if (i === 0 && (str.includes('\x1B[2J') || str.includes('\x1B[H'))) {
-						// Skip this buffer or remove the clear sequence
-						const cleaned = str
-							.replace(/\x1B\[2J/g, '')
-							.replace(/\x1B\[H/g, '');
-						if (cleaned.length > 0) {
-							stdout.write(normalizeLineEndings(cleaned));
-						}
-					} else {
-						if (str.length > 0) {
-							stdout.write(str);
-						}
-					}
+				// Sanitize and normalize the output
+				const sanitized = sanitizeReplayBuffer(historyStr);
+				const normalized = normalizeLineEndings(sanitized);
+
+				// Remove leading clear screen sequences to avoid double-clear
+				const cleaned = normalized
+					.replace(/^\x1B\[2J/g, '')
+					.replace(/^\x1B\[H/g, '');
+
+				if (cleaned.length > 0) {
+					stdout.write(cleaned);
 				}
 			}
 		};
