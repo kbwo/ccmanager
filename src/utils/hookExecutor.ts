@@ -111,6 +111,39 @@ export function executeHook(
 }
 
 /**
+ * Execute a worktree pre-creation hook using Effect
+ * Errors propagate to abort worktree creation - this is intentional
+ *
+ * @param {string} command - Shell command to execute
+ * @param {string} worktreePath - Path where the worktree will be created (doesn't exist yet)
+ * @param {string} branch - Branch name for the new worktree
+ * @param {string} gitRoot - Git repository root (working directory for the hook)
+ * @param {string} baseBranch - Optional base branch the worktree is created from
+ * @returns {Effect.Effect<void, ProcessError>} Effect that succeeds on hook completion or fails with ProcessError
+ */
+export function executeWorktreePreCreationHook(
+	command: string,
+	worktreePath: string,
+	branch: string,
+	gitRoot: string,
+	baseBranch?: string,
+): Effect.Effect<void, ProcessError> {
+	const environment: HookEnvironment = {
+		CCMANAGER_WORKTREE_PATH: worktreePath,
+		CCMANAGER_WORKTREE_BRANCH: branch,
+		CCMANAGER_GIT_ROOT: gitRoot,
+	};
+
+	if (baseBranch) {
+		environment.CCMANAGER_BASE_BRANCH = baseBranch;
+	}
+
+	// Execute in git root (worktree doesn't exist yet)
+	// NO Effect.catchAll - errors must propagate to abort creation
+	return executeHook(command, gitRoot, environment);
+}
+
+/**
  * Execute a worktree post-creation hook using Effect
  * Errors are caught and logged but do not break the main flow
  */

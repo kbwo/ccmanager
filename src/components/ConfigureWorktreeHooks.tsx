@@ -29,6 +29,9 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 		useState<WorktreeHookConfig>(initialWorktreeHooks);
 	const [currentCommand, setCurrentCommand] = useState('');
 	const [currentEnabled, setCurrentEnabled] = useState(false);
+	const [currentHookType, setCurrentHookType] = useState<
+		'pre_creation' | 'post_creation'
+	>('post_creation');
 	const [showSaveMessage, setShowSaveMessage] = useState(false);
 
 	// Show if inheriting from global (for project scope)
@@ -51,6 +54,14 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 		const items: MenuItem[] = [];
 
 		// Add worktree hook items
+		const preCreationHook = worktreeHooks.pre_creation;
+		const preCreationEnabled = preCreationHook?.enabled ? '✓' : '✗';
+		const preCreationCommand = preCreationHook?.command || '(not set)';
+		items.push({
+			label: `Pre Creation: ${preCreationEnabled} ${preCreationCommand}`,
+			value: 'worktree:pre_creation',
+		});
+
 		const postCreationHook = worktreeHooks.post_creation;
 		const postCreationEnabled = postCreationHook?.enabled ? '✓' : '✗';
 		const postCreationCommand = postCreationHook?.command || '(not set)';
@@ -86,13 +97,17 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 			}, 1000);
 		} else if (item.value === 'cancel') {
 			onComplete();
-		} else if (
-			!item.value.includes('separator') &&
-			item.value === 'worktree:post_creation'
-		) {
+		} else if (item.value === 'worktree:pre_creation') {
+			const hook = worktreeHooks.pre_creation;
+			setCurrentCommand(hook?.command || '');
+			setCurrentEnabled(hook?.enabled ?? true);
+			setCurrentHookType('pre_creation');
+			setView('edit');
+		} else if (item.value === 'worktree:post_creation') {
 			const hook = worktreeHooks.post_creation;
 			setCurrentCommand(hook?.command || '');
 			setCurrentEnabled(hook?.enabled ?? true);
+			setCurrentHookType('post_creation');
 			setView('edit');
 		}
 	};
@@ -100,7 +115,7 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 	const handleCommandSubmit = (value: string) => {
 		setWorktreeHooks(prev => ({
 			...prev,
-			post_creation: {
+			[currentHookType]: {
 				command: value,
 				enabled: currentEnabled,
 			},
@@ -121,17 +136,30 @@ const ConfigureWorktreeHooks: React.FC<ConfigureWorktreeHooksProps> = ({
 	}
 
 	if (view === 'edit') {
+		const isPreCreation = currentHookType === 'pre_creation';
+		const hookTypeLabel = isPreCreation ? 'Pre' : 'Post';
+		const timingLabel = isPreCreation ? 'before' : 'after';
+
 		return (
 			<Box flexDirection="column">
 				<Box marginBottom={1}>
 					<Text bold color="green">
-						Configure Post Worktree Creation Hook
+						Configure {hookTypeLabel} Worktree Creation Hook
 					</Text>
 				</Box>
 
 				<Box marginBottom={1}>
-					<Text>Command to execute after creating a new worktree:</Text>
+					<Text>Command to execute {timingLabel} creating a new worktree:</Text>
 				</Box>
+
+				{isPreCreation && (
+					<Box marginBottom={1}>
+						<Text color="yellow">
+							Note: Runs in git root directory. Failures abort worktree
+							creation.
+						</Text>
+					</Box>
+				)}
 
 				<Box marginBottom={1}>
 					<TextInputWrapper

@@ -2,6 +2,7 @@ import {describe, it, expect, vi} from 'vitest';
 import {Effect} from 'effect';
 import {
 	executeHook,
+	executeWorktreePreCreationHook,
 	executeWorktreePostCreationHook,
 	executeStatusHook,
 } from './hookExecutor.js';
@@ -333,6 +334,189 @@ describe('hookExecutor Integration Tests', () => {
 
 				// Assert - the file should contain the expected content
 				expect(output.trim()).toBe('completed');
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+	});
+
+	describe('executeWorktreePreCreationHook (real execution)', () => {
+		it('should execute successfully when command succeeds', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'pre-hook-test-'));
+			const worktreePath = join(tmpDir, 'new-worktree');
+			const gitRoot = tmpDir;
+			const branch = 'feature-branch';
+
+			try {
+				// Act & Assert - should not throw
+				await expect(
+					Effect.runPromise(
+						executeWorktreePreCreationHook(
+							'echo "Pre-creation hook executed"',
+							worktreePath,
+							branch,
+							gitRoot,
+							'main',
+						),
+					),
+				).resolves.toBeUndefined();
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+
+		it('should propagate ProcessError when command fails (not caught)', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'pre-hook-test-'));
+			const worktreePath = join(tmpDir, 'new-worktree');
+			const gitRoot = tmpDir;
+			const branch = 'feature-branch';
+
+			try {
+				// Act & Assert - should throw (unlike post-creation hook)
+				await expect(
+					Effect.runPromise(
+						executeWorktreePreCreationHook(
+							'exit 1',
+							worktreePath,
+							branch,
+							gitRoot,
+							'main',
+						),
+					),
+				).rejects.toThrow();
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+
+		it('should execute in git root directory (not worktree path)', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'pre-hook-cwd-test-'));
+			const worktreePath = join(tmpDir, 'new-worktree', 'does-not-exist');
+			const gitRoot = tmpDir;
+			const branch = 'feature-branch';
+			const outputFile = join(tmpDir, 'cwd.txt');
+
+			try {
+				// Act - write current directory to file
+				await Effect.runPromise(
+					executeWorktreePreCreationHook(
+						`pwd > "${outputFile}"`,
+						worktreePath,
+						branch,
+						gitRoot,
+						'main',
+					),
+				);
+
+				// Read the output
+				const output = await readFile(outputFile, 'utf-8');
+
+				// Assert - should be executed in git root, not worktree path
+				const expectedPath = await realpath(gitRoot);
+				const actualPath = await realpath(output.trim());
+				expect(actualPath).toBe(expectedPath);
+
+				// Also verify it's not the worktree path
+				expect(output.trim()).not.toBe(worktreePath);
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+
+		it('should pass environment variables correctly', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'pre-hook-env-test-'));
+			const worktreePath = join(tmpDir, 'new-worktree');
+			const gitRoot = tmpDir;
+			const branch = 'feature-branch';
+			const baseBranch = 'main';
+			const outputFile = join(tmpDir, 'env.txt');
+
+			try {
+				// Act - write environment variables to file
+				await Effect.runPromise(
+					executeWorktreePreCreationHook(
+						`echo "PATH:$CCMANAGER_WORKTREE_PATH|BRANCH:$CCMANAGER_WORKTREE_BRANCH|ROOT:$CCMANAGER_GIT_ROOT|BASE:$CCMANAGER_BASE_BRANCH" > "${outputFile}"`,
+						worktreePath,
+						branch,
+						gitRoot,
+						baseBranch,
+					),
+				);
+
+				// Read the output
+				const output = await readFile(outputFile, 'utf-8');
+
+				// Assert - environment variables should be set correctly
+				expect(output.trim()).toBe(
+					`PATH:${worktreePath}|BRANCH:${branch}|ROOT:${gitRoot}|BASE:${baseBranch}`,
+				);
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+
+		it('should include stderr in error message on failure', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'pre-hook-stderr-test-'));
+			const worktreePath = join(tmpDir, 'new-worktree');
+			const gitRoot = tmpDir;
+			const branch = 'feature-branch';
+
+			try {
+				// Act & Assert - should include stderr in error
+				await expect(
+					Effect.runPromise(
+						executeWorktreePreCreationHook(
+							'>&2 echo "Pre-creation validation failed"; exit 1',
+							worktreePath,
+							branch,
+							gitRoot,
+							'main',
+						),
+					),
+				).rejects.toThrow(
+					'Hook exited with code 1\nStderr: Pre-creation validation failed\n',
+				);
+			} finally {
+				// Cleanup
+				await rm(tmpDir, {recursive: true});
+			}
+		});
+
+		it('should work without baseBranch parameter', async () => {
+			// Arrange
+			const tmpDir = await mkdtemp(join(tmpdir(), 'pre-hook-no-base-test-'));
+			const worktreePath = join(tmpDir, 'new-worktree');
+			const gitRoot = tmpDir;
+			const branch = 'feature-branch';
+			const outputFile = join(tmpDir, 'env.txt');
+
+			try {
+				// Act - write environment variables to file (without baseBranch)
+				await Effect.runPromise(
+					executeWorktreePreCreationHook(
+						`echo "BASE:$CCMANAGER_BASE_BRANCH" > "${outputFile}"`,
+						worktreePath,
+						branch,
+						gitRoot,
+						// No baseBranch
+					),
+				);
+
+				// Read the output
+				const output = await readFile(outputFile, 'utf-8');
+
+				// Assert - base branch should be empty
+				expect(output.trim()).toBe('BASE:');
 			} finally {
 				// Cleanup
 				await rm(tmpDir, {recursive: true});

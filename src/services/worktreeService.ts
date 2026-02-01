@@ -7,13 +7,16 @@ import {
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
-import {GitError, FileSystemError} from '../types/errors.js';
+import {GitError, FileSystemError, ProcessError} from '../types/errors.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
 import {
 	getClaudeProjectsDir,
 	pathToClaudeProjectName,
 } from '../utils/claudeDir.js';
-import {executeWorktreePostCreationHook} from '../utils/hookExecutor.js';
+import {
+	executeWorktreePostCreationHook,
+	executeWorktreePreCreationHook,
+} from '../utils/hookExecutor.js';
 import {configReader} from './config/configReader.js';
 
 const CLAUDE_DIR = '.claude';
@@ -873,7 +876,7 @@ export class WorktreeService {
 		baseBranch: string,
 		copySessionData = false,
 		copyClaudeDirectory = false,
-	): Effect.Effect<Worktree, GitError | FileSystemError, never> {
+	): Effect.Effect<Worktree, GitError | FileSystemError | ProcessError, never> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
 		const self = this;
 
@@ -908,6 +911,21 @@ export class WorktreeService {
 				}),
 				() => Effect.succeed(false),
 			);
+
+			// Execute pre-creation hook if configured (BEFORE git worktree add)
+			const worktreeHooksConfig = configReader.getWorktreeHooks();
+			if (
+				worktreeHooksConfig.pre_creation?.enabled &&
+				worktreeHooksConfig.pre_creation?.command
+			) {
+				yield* executeWorktreePreCreationHook(
+					worktreeHooksConfig.pre_creation.command,
+					resolvedPath,
+					branch,
+					absoluteGitRoot,
+					baseBranch,
+				);
+			}
 
 			// Create the worktree command
 			let command: string;

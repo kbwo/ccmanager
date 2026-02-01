@@ -104,6 +104,7 @@ export interface WorktreeHook {
 }
 
 export interface WorktreeHookConfig {
+	pre_creation?: WorktreeHook;
 	post_creation?: WorktreeHook;
 }
 
@@ -305,7 +306,8 @@ export interface IWorktreeService {
 	): import('effect').Effect.Effect<
 		Worktree,
 		| import('../types/errors.js').GitError
-		| import('../types/errors.js').FileSystemError,
+		| import('../types/errors.js').FileSystemError
+		| import('../types/errors.js').ProcessError,
 		never
 	>;
 	deleteWorktreeEffect(
