@@ -12,7 +12,7 @@
         "ink-text-input": "^6.0.0",
         "meow": "^14.0.0",
         "react": "^19.2.3",
-        "react-devtools-core": "^6.1.2",
+        "react-devtools-core": "^7.0.1",
         "react-dom": "^19.2.3",
         "strip-ansi": "^7.1.0",
       },
@@ -36,11 +36,11 @@
         "vitest": "^4.0.16",
       },
       "optionalDependencies": {
-        "@kodaikabasawa/ccmanager-darwin-arm64": "3.6.4",
-        "@kodaikabasawa/ccmanager-darwin-x64": "3.6.4",
-        "@kodaikabasawa/ccmanager-linux-arm64": "3.6.4",
-        "@kodaikabasawa/ccmanager-linux-x64": "3.6.4",
-        "@kodaikabasawa/ccmanager-win32-x64": "3.6.4",
+        "@kodaikabasawa/ccmanager-darwin-arm64": "3.6.5",
+        "@kodaikabasawa/ccmanager-darwin-x64": "3.6.5",
+        "@kodaikabasawa/ccmanager-linux-arm64": "3.6.5",
+        "@kodaikabasawa/ccmanager-linux-x64": "3.6.5",
+        "@kodaikabasawa/ccmanager-win32-x64": "3.6.5",
       },
     },
   },
@@ -127,15 +127,15 @@
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
-    "@kodaikabasawa/ccmanager-darwin-arm64": ["@kodaikabasawa/ccmanager-darwin-arm64@3.6.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-JeJhwIx47m8JRRHM1atvAInLVJ4Cv5A3LljWigOH7CO/l7eOoj5gz1gJUVFhlkRODvBFNLDrvnyLZm/BWeamCA=="],
+    "@kodaikabasawa/ccmanager-darwin-arm64": ["@kodaikabasawa/ccmanager-darwin-arm64@3.6.5", "", { "os": "darwin", "cpu": "arm64" }, "sha512-Q3bWQrVDIDKDjQ5Wngg8fzD5x4ThjcSgHMg+2Q47/AH0ESoz4leNosjIsyFYnr/Z+LetsqMK2Z/lR1MQzri0Lg=="],
 
-    "@kodaikabasawa/ccmanager-darwin-x64": ["@kodaikabasawa/ccmanager-darwin-x64@3.6.4", "", { "os": "darwin", "cpu": "x64" }, "sha512-A3/SLJydR6huzbOnrGzS0AaIXFRw8Dx4ucW/viV26d05x0NmaQ0aSZRm36M8yPL+7QIWBirL8cW0QtfoP/vU1g=="],
+    "@kodaikabasawa/ccmanager-darwin-x64": ["@kodaikabasawa/ccmanager-darwin-x64@3.6.5", "", { "os": "darwin", "cpu": "x64" }, "sha512-7wFbCmZwbUH+CN2M4ij2EDzt6/Pwhf4+tm0CZ+1+B6BGwhNzLsOLzkcVsqL5UTEacM8I9y4ige0zcTRoL6VngA=="],
 
-    "@kodaikabasawa/ccmanager-linux-arm64": ["@kodaikabasawa/ccmanager-linux-arm64@3.6.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-xz6iseMlXmesADeU8jsr96VeM0V9OA5X2F7AHfO7jyTuEhduXOCA3rC8RuZlb5w0VNs7LqGdjdYzp7hGVyDNnw=="],
+    "@kodaikabasawa/ccmanager-linux-arm64": ["@kodaikabasawa/ccmanager-linux-arm64@3.6.5", "", { "os": "linux", "cpu": "arm64" }, "sha512-XVeZA+nH9HXaGUYjBk7/qAVwP/kR7lX9JJUM4GwcGQ5TrOrFTpg/HnVgndFqqy5Bo+bf4Kpab7/blEpYTzODTw=="],
 
-    "@kodaikabasawa/ccmanager-linux-x64": ["@kodaikabasawa/ccmanager-linux-x64@3.6.4", "", { "os": "linux", "cpu": "x64" }, "sha512-+jHvp0aCEIKWAU9UdsqbukFf9mOg0TPe29RhkxkTBOZkvMpFWJ6Ki9TRf5t4dx06UzUhZjOdIYhOA9rdSAiSXg=="],
+    "@kodaikabasawa/ccmanager-linux-x64": ["@kodaikabasawa/ccmanager-linux-x64@3.6.5", "", { "os": "linux", "cpu": "x64" }, "sha512-go7/DL52/hHiOV81m+smZqiU/dPXdQmls68eAPWYKDvDiEHNo5fc4O0JnaS5YT4RzuUBZ1kaCZPHe5FY4Si/vw=="],
 
-    "@kodaikabasawa/ccmanager-win32-x64": ["@kodaikabasawa/ccmanager-win32-x64@3.6.4", "", { "os": "win32", "cpu": "x64" }, "sha512-1al46sFncAibobos62aIYEcXiog1FLsGC0xVmO8Kui0mplmCXY9FhNDpRdzsBs91z/3MXdUrIh+8Kvs4+y4lYw=="],
+    "@kodaikabasawa/ccmanager-win32-x64": ["@kodaikabasawa/ccmanager-win32-x64@3.6.5", "", { "os": "win32", "cpu": "x64" }, "sha512-sCmOK8/CF3l/n90/89YDkjk8cNweJgJD2HShLwpfvJ7FqD496zzBsRgCxie7wON79WD88vAOuaY7/upvZTZ5Ew=="],
 
     "@pkgr/core": ["@pkgr/core@0.2.9", "", {}, "sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA=="],
 
@@ -629,7 +629,7 @@
 
     "react": ["react@19.2.3", "", {}, "sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA=="],
 
-    "react-devtools-core": ["react-devtools-core@6.1.5", "", { "dependencies": { "shell-quote": "^1.6.1", "ws": "^7" } }, "sha512-ePrwPfxAnB+7hgnEr8vpKxL9cmnp7F322t8oqcPshbIQQhDKgFDW4tjhF2wjVbdXF9O/nyuy3sQWd9JGpiLPvA=="],
+    "react-devtools-core": ["react-devtools-core@7.0.1", "", { "dependencies": { "shell-quote": "^1.6.1", "ws": "^7" } }, "sha512-C3yNvRHaizlpiASzy7b9vbnBGLrhvdhl1CbdU6EnZgxPNbai60szdLtl+VL76UNOt5bOoVTOz5rNWZxgGt+Gsw=="],
 
     "react-dom": ["react-dom@19.2.3", "", { "dependencies": { "scheduler": "^0.27.0" }, "peerDependencies": { "react": "^19.2.3" } }, "sha512-yELu4WmLPw5Mr/lmeEpox5rw3RETacE++JgHqQzd2dg+YbJuat3jH4ingc+WPZhxaoFzdv9y33G+F7Nl5O0GBg=="],
 
