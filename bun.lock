@@ -12,7 +12,7 @@
         "ink-text-input": "^6.0.0",
         "meow": "^14.0.0",
         "react": "^19.2.3",
-        "react-devtools-core": "^7.0.1",
+        "react-devtools-core": "^6.1.2",
         "react-dom": "^19.2.3",
         "strip-ansi": "^7.1.0",
       },
@@ -36,11 +36,11 @@
         "vitest": "^4.0.16",
       },
       "optionalDependencies": {
-        "@kodaikabasawa/ccmanager-darwin-arm64": "3.6.6",
-        "@kodaikabasawa/ccmanager-darwin-x64": "3.6.6",
-        "@kodaikabasawa/ccmanager-linux-arm64": "3.6.6",
-        "@kodaikabasawa/ccmanager-linux-x64": "3.6.6",
-        "@kodaikabasawa/ccmanager-win32-x64": "3.6.6",
+        "@kodaikabasawa/ccmanager-darwin-arm64": "3.6.7",
+        "@kodaikabasawa/ccmanager-darwin-x64": "3.6.7",
+        "@kodaikabasawa/ccmanager-linux-arm64": "3.6.7",
+        "@kodaikabasawa/ccmanager-linux-x64": "3.6.7",
+        "@kodaikabasawa/ccmanager-win32-x64": "3.6.7",
       },
     },
   },
@@ -126,6 +126,16 @@
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
+
+    "@kodaikabasawa/ccmanager-darwin-arm64": ["@kodaikabasawa/ccmanager-darwin-arm64@3.6.7", "", { "os": "darwin", "cpu": "arm64" }, "sha512-2ERHpzaCkT/9COhJcfelNkkweGNxCl0XE6oO5ltNhBMqW9oSfEiarw9PiIeUzNIgPUTmNu1jqm3UcKlWTZTSDQ=="],
+
+    "@kodaikabasawa/ccmanager-darwin-x64": ["@kodaikabasawa/ccmanager-darwin-x64@3.6.7", "", { "os": "darwin", "cpu": "x64" }, "sha512-ITp3UkUbSC4i1u2qAc3efNoYE716GH+XjhKSrA3lVcZxfCowmd3+TVOpXTXy/j16Wfhr0CAOg3DhI54jiY0yRg=="],
+
+    "@kodaikabasawa/ccmanager-linux-arm64": ["@kodaikabasawa/ccmanager-linux-arm64@3.6.7", "", { "os": "linux", "cpu": "arm64" }, "sha512-3f56zzqbQrdjfaiqLy1hmNh5oK8ZeefPPholZ0nq+SOCrhPXOVI9NdAjTnHru2IE6Fob2qTcJaqiJiJ/i39OSQ=="],
+
+    "@kodaikabasawa/ccmanager-linux-x64": ["@kodaikabasawa/ccmanager-linux-x64@3.6.7", "", { "os": "linux", "cpu": "x64" }, "sha512-OBTEZJTfdtaVtfY8A6SXS4q9L1hY6sZcLbcdoGd+bhJiehoiV2PPpHMK3AKjxMuGj0QmPAMD8LHfmnQGd26QCg=="],
+
+    "@kodaikabasawa/ccmanager-win32-x64": ["@kodaikabasawa/ccmanager-win32-x64@3.6.7", "", { "os": "win32", "cpu": "x64" }, "sha512-oA5buFco0kY1ROhKedzhon5ZpiU/JBttVoh2YaQqRN0aiXnzBQnsVH/M582jEjNhbyQE/xe8KbyPJicY43biYA=="],
 
     "@pkgr/core": ["@pkgr/core@0.2.9", "", {}, "sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA=="],
 
@@ -619,7 +629,7 @@
 
     "react": ["react@19.2.3", "", {}, "sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA=="],
 
-    "react-devtools-core": ["react-devtools-core@7.0.1", "", { "dependencies": { "shell-quote": "^1.6.1", "ws": "^7" } }, "sha512-C3yNvRHaizlpiASzy7b9vbnBGLrhvdhl1CbdU6EnZgxPNbai60szdLtl+VL76UNOt5bOoVTOz5rNWZxgGt+Gsw=="],
+    "react-devtools-core": ["react-devtools-core@6.1.5", "", { "dependencies": { "shell-quote": "^1.6.1", "ws": "^7" } }, "sha512-ePrwPfxAnB+7hgnEr8vpKxL9cmnp7F322t8oqcPshbIQQhDKgFDW4tjhF2wjVbdXF9O/nyuy3sQWd9JGpiLPvA=="],
 
     "react-dom": ["react-dom@19.2.3", "", { "dependencies": { "scheduler": "^0.27.0" }, "peerDependencies": { "react": "^19.2.3" } }, "sha512-yELu4WmLPw5Mr/lmeEpox5rw3RETacE++JgHqQzd2dg+YbJuat3jH4ingc+WPZhxaoFzdv9y33G+F7Nl5O0GBg=="],
 

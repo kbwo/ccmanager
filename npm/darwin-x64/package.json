@@ -1,6 +1,6 @@
 {
 	"name": "@kodaikabasawa/ccmanager-darwin-x64",
-	"version": "3.6.7",
+	"version": "3.6.9",
 	"description": "ccmanager binary for macOS x64 (Intel)",
 	"license": "MIT",
 	"author": "Kodai Kabasawa",
