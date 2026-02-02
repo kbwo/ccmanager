@@ -346,6 +346,39 @@ describe('ClaudeStateDetector', () => {
 			// Assert - Should detect waiting_input from viewport
 			expect(state).toBe('waiting_input');
 		});
+
+		it('should detect idle when "⌕ Search…" is present', () => {
+			// Arrange - Search prompt should always be idle
+			terminal = createMockTerminal(['⌕ Search…', 'Some content']);
+
+			// Act
+			const state = detector.detectState(terminal, 'busy');
+
+			// Assert
+			expect(state).toBe('idle');
+		});
+
+		it('should detect idle when "⌕ Search…" is present even with "esc to cancel"', () => {
+			// Arrange
+			terminal = createMockTerminal(['⌕ Search…', 'esc to cancel']);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert - Should be idle because search prompt takes precedence
+			expect(state).toBe('idle');
+		});
+
+		it('should detect idle when "⌕ Search…" is present even with "esc to interrupt"', () => {
+			// Arrange
+			terminal = createMockTerminal(['⌕ Search…', 'Press esc to interrupt']);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert - Should be idle because search prompt takes precedence
+			expect(state).toBe('idle');
+		});
 	});
 
 	describe('detectBackgroundTask', () => {
