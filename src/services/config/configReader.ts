@@ -21,43 +21,61 @@ import {projectConfigManager} from './projectConfigManager.js';
  * Uses the singleton projectConfigManager (cwd-based) for project config.
  */
 export class ConfigReader implements IConfigReader {
-	// Shortcuts - returns merged value (project > global)
+	// Shortcuts - returns merged value (project fields override global fields)
 	getShortcuts(): ShortcutConfig {
-		return (
-			projectConfigManager.getShortcuts() || globalConfigManager.getShortcuts()
-		);
+		const globalConfig = globalConfigManager.getShortcuts();
+		const projectConfig = projectConfigManager.getShortcuts();
+
+		return {
+			...globalConfig,
+			...(projectConfig || {}),
+		};
 	}
 
-	// Status Hooks - returns merged value (project > global)
+	// Status Hooks - returns merged value (project fields override global fields)
 	getStatusHooks(): StatusHookConfig {
-		return (
-			projectConfigManager.getStatusHooks() ||
-			globalConfigManager.getStatusHooks()
-		);
+		const globalConfig = globalConfigManager.getStatusHooks();
+		const projectConfig = projectConfigManager.getStatusHooks();
+
+		return {
+			...globalConfig,
+			...(projectConfig || {}),
+		};
 	}
 
-	// Worktree Hooks - returns merged value (project > global)
+	// Worktree Hooks - returns merged value (project fields override global fields)
 	getWorktreeHooks(): WorktreeHookConfig {
-		return (
-			projectConfigManager.getWorktreeHooks() ||
-			globalConfigManager.getWorktreeHooks()
-		);
+		const globalConfig = globalConfigManager.getWorktreeHooks();
+		const projectConfig = projectConfigManager.getWorktreeHooks();
+
+		return {
+			...globalConfig,
+			...(projectConfig || {}),
+		};
 	}
 
-	// Worktree Config - returns merged value (project > global)
+	// Worktree Config - returns merged value (project fields override global fields)
 	getWorktreeConfig(): WorktreeConfig {
-		return (
-			projectConfigManager.getWorktreeConfig() ||
-			globalConfigManager.getWorktreeConfig()
-		);
+		const globalConfig = globalConfigManager.getWorktreeConfig();
+		const projectConfig = projectConfigManager.getWorktreeConfig();
+
+		// Merge: global config is the base, project config fields override
+		// This ensures explicit false values in project config take priority
+		return {
+			...globalConfig,
+			...(projectConfig || {}),
+		};
 	}
 
-	// Command Presets - returns merged value (project > global)
+	// Command Presets - returns merged value (project fields override global fields)
 	getCommandPresets(): CommandPresetsConfig {
-		return (
-			projectConfigManager.getCommandPresets() ||
-			globalConfigManager.getCommandPresets()
-		);
+		const globalConfig = globalConfigManager.getCommandPresets();
+		const projectConfig = projectConfigManager.getCommandPresets();
+
+		return {
+			...globalConfig,
+			...(projectConfig || {}),
+		};
 	}
 
 	// Get full merged configuration
@@ -72,16 +90,21 @@ export class ConfigReader implements IConfigReader {
 		};
 	}
 
-	// Auto Approval Config - returns merged value (project > global)
+	// Auto Approval Config - returns merged value (project fields override global fields)
 	getAutoApprovalConfig(): NonNullable<ConfigurationData['autoApproval']> {
+		const globalConfig = globalConfigManager.getAutoApprovalConfig();
 		const projectConfig = projectConfigManager.getAutoApprovalConfig();
-		if (projectConfig) {
-			return {
-				...projectConfig,
-				timeout: projectConfig.timeout ?? 30,
-			};
-		}
-		return globalConfigManager.getAutoApprovalConfig();
+
+		const merged = {
+			...globalConfig,
+			...(projectConfig || {}),
+		};
+
+		// Ensure timeout has a default value
+		return {
+			...merged,
+			timeout: merged.timeout ?? 30,
+		};
 	}
 
 	// Check if auto-approval is enabled

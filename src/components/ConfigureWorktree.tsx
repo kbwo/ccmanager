@@ -35,6 +35,9 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	const [sortByLastSession, setSortByLastSession] = useState(
 		worktreeConfig.sortByLastSession ?? false,
 	);
+	const [autoUseDefaultBranch, setAutoUseDefaultBranch] = useState(
+		worktreeConfig.autoUseDefaultBranch ?? false,
+	);
 	const [editMode, setEditMode] = useState<EditMode>('menu');
 	const [tempPattern, setTempPattern] = useState(pattern);
 
@@ -73,6 +76,10 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			value: 'toggleSort',
 		},
 		{
+			label: `Auto Use Default Branch: ${autoUseDefaultBranch ? '✅ Enabled' : '❌ Disabled'}`,
+			value: 'toggleAutoUseDefault',
+		},
+		{
 			label: '💾 Save Changes',
 			value: 'save',
 		},
@@ -97,6 +104,9 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			case 'toggleSort':
 				setSortByLastSession(!sortByLastSession);
 				break;
+			case 'toggleAutoUseDefault':
+				setAutoUseDefaultBranch(!autoUseDefaultBranch);
+				break;
 			case 'save':
 				// Save the configuration
 				configEditor.setWorktreeConfig({
@@ -104,6 +114,7 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 					autoDirectoryPattern: pattern,
 					copySessionData,
 					sortByLastSession,
+					autoUseDefaultBranch,
 				});
 				onComplete();
 				break;

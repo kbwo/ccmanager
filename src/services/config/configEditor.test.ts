@@ -303,4 +303,37 @@ describe('ConfigEditor (global scope) - Command Presets', () => {
 			expect(presets.defaultPresetId).toBe('1');
 		});
 	});
+
+	describe('getWorktreeConfig - field-level merging', () => {
+		it('should return default worktree config values', () => {
+			resetSavedConfig();
+			configEditor.reload();
+
+			const worktreeConfig = configEditor.getWorktreeConfig()!;
+
+			expect(worktreeConfig.autoDirectory).toBe(false);
+			expect(worktreeConfig.copySessionData).toBe(true);
+			expect(worktreeConfig.sortByLastSession).toBe(false);
+			expect(worktreeConfig.autoUseDefaultBranch).toBe(false);
+		});
+
+		it('should merge worktree config from global when not overridden', () => {
+			mockConfigData.worktree = {
+				autoDirectory: true,
+				autoUseDefaultBranch: true,
+				copySessionData: false,
+				sortByLastSession: true,
+			};
+
+			resetSavedConfig();
+			configEditor.reload();
+
+			const worktreeConfig = configEditor.getWorktreeConfig()!;
+
+			expect(worktreeConfig.autoDirectory).toBe(true);
+			expect(worktreeConfig.autoUseDefaultBranch).toBe(true);
+			expect(worktreeConfig.copySessionData).toBe(false);
+			expect(worktreeConfig.sortByLastSession).toBe(true);
+		});
+	});
 });

@@ -113,6 +113,7 @@ export interface WorktreeConfig {
 	autoDirectoryPattern?: string; // Optional pattern for directory generation
 	copySessionData?: boolean; // Whether to copy Claude session data by default
 	sortByLastSession?: boolean; // Whether to sort worktrees by last opened session
+	autoUseDefaultBranch?: boolean; // Whether to automatically use default branch as base branch
 }
 
 export interface CommandPreset {

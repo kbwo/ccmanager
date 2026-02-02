@@ -42,12 +42,22 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 }) => {
 	const worktreeConfig = configReader.getWorktreeConfig();
 	const isAutoDirectory = worktreeConfig.autoDirectory;
+	const isAutoUseDefaultBranch = worktreeConfig.autoUseDefaultBranch ?? false;
 	const limit = 10;
 
-	// Adjust initial step based on auto directory mode
-	const [step, setStep] = useState<Step>(
-		isAutoDirectory ? 'base-branch' : 'path',
-	);
+	// Determine initial step based on config options
+	// If autoUseDefaultBranch is enabled, we start at a temporary 'loading' state
+	// and will transition to 'branch-strategy' after branches are loaded
+	const getInitialStep = (): Step => {
+		if (isAutoDirectory) {
+			// With autoDirectory, skip path input
+			// If autoUseDefaultBranch is also enabled, we'll skip base-branch after loading
+			return 'base-branch';
+		}
+		return 'path';
+	};
+
+	const [step, setStep] = useState<Step>(getInitialStep());
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
 	const [baseBranch, setBaseBranch] = useState('');
@@ -96,6 +106,17 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					setBranches(result.branches);
 					setDefaultBranch(result.defaultBranch);
 					setIsLoadingBranches(false);
+
+					// If autoUseDefaultBranch is enabled, auto-set the base branch
+					// and skip to branch-strategy step
+					if (isAutoUseDefaultBranch && result.defaultBranch) {
+						setBaseBranch(result.defaultBranch);
+						// Skip base-branch step, go directly to branch-strategy
+						// (if we're at base-branch step, which happens with autoDirectory)
+						setStep(currentStep =>
+							currentStep === 'base-branch' ? 'branch-strategy' : currentStep,
+						);
+					}
 				}
 			}
 		};
@@ -110,7 +131,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [projectPath]);
+	}, [projectPath, isAutoUseDefaultBranch]);
 
 	// Create branch items with default branch first (memoized)
 	const allBranchItems: BranchItem[] = useMemo(
@@ -153,7 +174,14 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const handlePathSubmit = (value: string) => {
 		if (value.trim()) {
 			setPath(value.trim());
-			setStep('base-branch');
+			// If autoUseDefaultBranch is enabled and we have the default branch,
+			// skip base-branch selection and go directly to branch-strategy
+			if (isAutoUseDefaultBranch && defaultBranch) {
+				setBaseBranch(defaultBranch);
+				setStep('branch-strategy');
+			} else {
+				setStep('base-branch');
+			}
 		}
 	};
 

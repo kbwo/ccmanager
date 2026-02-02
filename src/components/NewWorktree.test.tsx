@@ -344,4 +344,90 @@ describe('NewWorktree component Effect integration', () => {
 		// Verify Effect was executed (Effect.match pattern)
 		expect(effectExecuted).toBe(true);
 	});
+
+	it('should skip base branch selection when autoUseDefaultBranch is enabled with autoDirectory', async () => {
+		const {Effect} = await import('effect');
+		const {WorktreeService} = await import('../services/worktreeService.js');
+		const {configReader} = await import('../services/config/configReader.js');
+
+		// Mock config with both autoDirectory and autoUseDefaultBranch enabled
+		vi.spyOn(configReader, 'getWorktreeConfig').mockReturnValue({
+			autoDirectory: true,
+			autoDirectoryPattern: '../{project}-{branch}',
+			copySessionData: true,
+			autoUseDefaultBranch: true,
+		});
+
+		const mockBranches = ['main', 'feature-1', 'develop'];
+		const mockDefaultBranch = 'main';
+
+		// Mock WorktreeService to succeed
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.succeed(mockBranches)),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed(mockDefaultBranch)),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
+
+		const onComplete = vi.fn();
+		const onCancel = vi.fn();
+
+		const {lastFrame} = render(
+			<NewWorktree onComplete={onComplete} onCancel={onCancel} />,
+		);
+
+		// Wait for Effect to execute and state to update
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Should skip base-branch step and show branch-strategy step
+		// which displays "Base branch:" and "Choose branch creation strategy"
+		expect(output).toContain('Create New Worktree');
+		expect(output).toContain('Base branch:');
+		expect(output).toContain('main');
+		expect(output).toContain('Choose branch creation strategy');
+	});
+
+	it('should show base branch selection when autoUseDefaultBranch is disabled', async () => {
+		const {Effect} = await import('effect');
+		const {WorktreeService} = await import('../services/worktreeService.js');
+		const {configReader} = await import('../services/config/configReader.js');
+
+		// Mock config with autoDirectory enabled but autoUseDefaultBranch disabled
+		vi.spyOn(configReader, 'getWorktreeConfig').mockReturnValue({
+			autoDirectory: true,
+			autoDirectoryPattern: '../{project}-{branch}',
+			copySessionData: true,
+			autoUseDefaultBranch: false,
+		});
+
+		const mockBranches = ['main', 'feature-1', 'develop'];
+		const mockDefaultBranch = 'main';
+
+		// Mock WorktreeService to succeed
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.succeed(mockBranches)),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed(mockDefaultBranch)),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
+
+		const onComplete = vi.fn();
+		const onCancel = vi.fn();
+
+		const {lastFrame} = render(
+			<NewWorktree onComplete={onComplete} onCancel={onCancel} />,
+		);
+
+		// Wait for Effect to execute
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+
+		// Should show base-branch selection step (not branch-strategy)
+		expect(output).toContain('Create New Worktree');
+		expect(output).toContain('Select base branch');
+		expect(output).toContain('main (default)');
+	});
 });
