@@ -44,7 +44,7 @@
 		"@kodaikabasawa/ccmanager-darwin-arm64": "3.6.7",
 		"@kodaikabasawa/ccmanager-darwin-x64": "3.6.7",
 		"@kodaikabasawa/ccmanager-linux-arm64": "3.6.7",
-		"@kodaikabasawa/ccmanager-linux-x64": "3.6.7",
+		"@kodaikabasawa/ccmanager-linux-x64": "3.6.8",
 		"@kodaikabasawa/ccmanager-win32-x64": "3.6.7"
 	},
 	"devDependencies": {
