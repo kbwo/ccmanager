@@ -36,9 +36,13 @@ export class ConfigEditor implements IConfigEditor {
 	// IConfigEditor implementation - delegates to configEditor with fallback to global
 
 	getShortcuts(): ShortcutConfig | undefined {
-		return (
-			this.configEditor.getShortcuts() ?? globalConfigManager.getShortcuts()
-		);
+		const globalConfig = globalConfigManager.getShortcuts();
+		const scopedConfig = this.configEditor.getShortcuts();
+
+		return {
+			...globalConfig,
+			...(scopedConfig || {}),
+		};
 	}
 
 	setShortcuts(value: ShortcutConfig): void {
@@ -46,9 +50,13 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getStatusHooks(): StatusHookConfig | undefined {
-		return (
-			this.configEditor.getStatusHooks() ?? globalConfigManager.getStatusHooks()
-		);
+		const globalConfig = globalConfigManager.getStatusHooks();
+		const scopedConfig = this.configEditor.getStatusHooks();
+
+		return {
+			...globalConfig,
+			...(scopedConfig || {}),
+		};
 	}
 
 	setStatusHooks(value: StatusHookConfig): void {
@@ -56,10 +64,13 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getWorktreeHooks(): WorktreeHookConfig | undefined {
-		return (
-			this.configEditor.getWorktreeHooks() ??
-			globalConfigManager.getWorktreeHooks()
-		);
+		const globalConfig = globalConfigManager.getWorktreeHooks();
+		const scopedConfig = this.configEditor.getWorktreeHooks();
+
+		return {
+			...globalConfig,
+			...(scopedConfig || {}),
+		};
 	}
 
 	setWorktreeHooks(value: WorktreeHookConfig): void {
@@ -67,10 +78,15 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getWorktreeConfig(): WorktreeConfig | undefined {
-		return (
-			this.configEditor.getWorktreeConfig() ??
-			globalConfigManager.getWorktreeConfig()
-		);
+		const globalConfig = globalConfigManager.getWorktreeConfig();
+		const scopedConfig = this.configEditor.getWorktreeConfig();
+
+		// Merge: global config is the base, scoped config fields override
+		// This ensures explicit false values in project config take priority
+		return {
+			...globalConfig,
+			...(scopedConfig || {}),
+		};
 	}
 
 	setWorktreeConfig(value: WorktreeConfig): void {
@@ -78,10 +94,13 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getCommandPresets(): CommandPresetsConfig | undefined {
-		return (
-			this.configEditor.getCommandPresets() ??
-			globalConfigManager.getCommandPresets()
-		);
+		const globalConfig = globalConfigManager.getCommandPresets();
+		const scopedConfig = this.configEditor.getCommandPresets();
+
+		return {
+			...globalConfig,
+			...(scopedConfig || {}),
+		};
 	}
 
 	setCommandPresets(value: CommandPresetsConfig): void {
@@ -89,10 +108,13 @@ export class ConfigEditor implements IConfigEditor {
 	}
 
 	getAutoApprovalConfig(): AutoApprovalConfig | undefined {
-		return (
-			this.configEditor.getAutoApprovalConfig() ??
-			globalConfigManager.getAutoApprovalConfig()
-		);
+		const globalConfig = globalConfigManager.getAutoApprovalConfig();
+		const scopedConfig = this.configEditor.getAutoApprovalConfig();
+
+		return {
+			...globalConfig,
+			...(scopedConfig || {}),
+		};
 	}
 
 	setAutoApprovalConfig(value: AutoApprovalConfig): void {

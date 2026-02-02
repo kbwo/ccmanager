@@ -80,6 +80,7 @@ class GlobalConfigManager implements IConfigEditor {
 				autoDirectory: false,
 				copySessionData: true,
 				sortByLastSession: false,
+				autoUseDefaultBranch: false,
 			};
 		}
 		if (

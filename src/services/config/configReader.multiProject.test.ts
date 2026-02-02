@@ -166,3 +166,124 @@ describe('ConfigReader in multi-project mode', () => {
 		expect(worktreeConfig.copySessionData).toBe(true);
 	});
 });
+
+describe('ConfigReader - worktree config field-level merging', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.resetModules();
+
+		// Ensure multi-project mode is NOT set
+		delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+
+		(mkdirSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
+		(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.resetAllMocks();
+	});
+
+	it('should allow project config to override global autoUseDefaultBranch with false', async () => {
+		// Global config has autoUseDefaultBranch: true
+		const globalConfig: ConfigurationData = {
+			worktree: {
+				autoDirectory: true,
+				autoUseDefaultBranch: true,
+				copySessionData: true,
+				sortByLastSession: false,
+			},
+		};
+
+		// Project config explicitly sets autoUseDefaultBranch: false
+		const projectConfig: ProjectConfigurationData = {
+			worktree: {
+				autoDirectory: true,
+				autoUseDefaultBranch: false,
+			},
+		};
+
+		(existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(path: string) => {
+				return path.includes('.ccmanager.json') || path.includes('config.json');
+			},
+		);
+
+		(readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(path: string) => {
+				if (path.includes('.ccmanager.json')) {
+					return JSON.stringify(projectConfig);
+				}
+				if (path.includes('config.json')) {
+					return JSON.stringify(globalConfig);
+				}
+				return '{}';
+			},
+		);
+
+		const {ConfigReader} = await import('./configReader.js');
+		const reader = new ConfigReader();
+		reader.reload();
+
+		const worktreeConfig = reader.getWorktreeConfig();
+
+		// Project's explicit false should override global's true
+		expect(worktreeConfig.autoUseDefaultBranch).toBe(false);
+		// Other fields should be merged
+		expect(worktreeConfig.autoDirectory).toBe(true);
+		// Fields only in global should be inherited
+		expect(worktreeConfig.copySessionData).toBe(true);
+		expect(worktreeConfig.sortByLastSession).toBe(false);
+	});
+
+	it('should inherit global values for fields not set in project config', async () => {
+		// Global config has various settings
+		const globalConfig: ConfigurationData = {
+			worktree: {
+				autoDirectory: false,
+				autoUseDefaultBranch: true,
+				copySessionData: false,
+				sortByLastSession: true,
+				autoDirectoryPattern: '../{branch}',
+			},
+		};
+
+		// Project config only overrides autoDirectory
+		const projectConfig: ProjectConfigurationData = {
+			worktree: {
+				autoDirectory: true,
+			},
+		};
+
+		(existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(path: string) => {
+				return path.includes('.ccmanager.json') || path.includes('config.json');
+			},
+		);
+
+		(readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(path: string) => {
+				if (path.includes('.ccmanager.json')) {
+					return JSON.stringify(projectConfig);
+				}
+				if (path.includes('config.json')) {
+					return JSON.stringify(globalConfig);
+				}
+				return '{}';
+			},
+		);
+
+		const {ConfigReader} = await import('./configReader.js');
+		const reader = new ConfigReader();
+		reader.reload();
+
+		const worktreeConfig = reader.getWorktreeConfig();
+
+		// Project override
+		expect(worktreeConfig.autoDirectory).toBe(true);
+		// Inherited from global
+		expect(worktreeConfig.autoUseDefaultBranch).toBe(true);
+		expect(worktreeConfig.copySessionData).toBe(false);
+		expect(worktreeConfig.sortByLastSession).toBe(true);
+		expect(worktreeConfig.autoDirectoryPattern).toBe('../{branch}');
+	});
+});
