@@ -34,6 +34,7 @@ vi.mock('./config/configReader.js', () => ({
 		getWorktreeLastOpened: vi.fn(() => ({})),
 		isAutoApprovalEnabled: vi.fn(() => false),
 		setAutoApprovalEnabled: vi.fn(),
+		isClearHistoryOnClearEnabled: vi.fn(() => false),
 	},
 }));
 
@@ -1058,6 +1059,126 @@ describe('SessionManager', () => {
 			// Verify session process was replaced
 			expect(session.process).toBe(secondMockPty);
 			expect(session.isPrimaryCommand).toBe(false);
+		});
+	});
+
+	describe('clearHistoryOnClear', () => {
+		it('should clear output history when screen clear escape sequence is detected and setting is enabled', async () => {
+			// Setup
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(configReader.isClearHistoryOnClearEnabled).mockReturnValue(
+				true,
+			);
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+
+			// Simulate some data output
+			mockPty.emit('data', 'Hello World');
+			mockPty.emit('data', 'More data');
+
+			// Verify output history has data
+			expect(session.outputHistory.length).toBe(2);
+
+			// Simulate screen clear escape sequence
+			mockPty.emit('data', '\x1B[2J');
+
+			// Verify output history was cleared and only contains the clear sequence
+			expect(session.outputHistory.length).toBe(1);
+			expect(session.outputHistory[0]?.toString()).toBe('\x1B[2J');
+		});
+
+		it('should not clear output history when screen clear escape sequence is detected but setting is disabled', async () => {
+			// Setup
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(configReader.isClearHistoryOnClearEnabled).mockReturnValue(
+				false,
+			);
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+
+			// Simulate some data output
+			mockPty.emit('data', 'Hello World');
+			mockPty.emit('data', 'More data');
+
+			// Verify output history has data
+			expect(session.outputHistory.length).toBe(2);
+
+			// Simulate screen clear escape sequence
+			mockPty.emit('data', '\x1B[2J');
+
+			// Verify output history was NOT cleared
+			expect(session.outputHistory.length).toBe(3);
+		});
+
+		it('should not clear output history for normal data when setting is enabled', async () => {
+			// Setup
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(configReader.isClearHistoryOnClearEnabled).mockReturnValue(
+				true,
+			);
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+
+			// Simulate normal data output without screen clear
+			mockPty.emit('data', 'Hello World');
+			mockPty.emit('data', 'More data');
+			mockPty.emit('data', 'Even more data');
+
+			// Verify output history contains all data
+			expect(session.outputHistory.length).toBe(3);
+		});
+
+		it('should clear history when screen clear is part of larger data chunk', async () => {
+			// Setup
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(configReader.isClearHistoryOnClearEnabled).mockReturnValue(
+				true,
+			);
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			// Create session
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+
+			// Simulate some data output
+			mockPty.emit('data', 'Hello World');
+			mockPty.emit('data', 'More data');
+
+			// Simulate screen clear as part of larger data chunk (e.g., from /clear command)
+			mockPty.emit('data', 'prefix\x1B[2Jsuffix');
+
+			// Verify output history was cleared and only contains the new chunk
+			expect(session.outputHistory.length).toBe(1);
+			expect(session.outputHistory[0]?.toString()).toBe('prefix\x1B[2Jsuffix');
 		});
 	});
 

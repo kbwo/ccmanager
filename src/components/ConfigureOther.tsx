@@ -34,6 +34,9 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	const [customCommandDraft, setCustomCommandDraft] = useState(customCommand);
 	const [timeout, setTimeout] = useState(autoApprovalConfig.timeout ?? 30);
 	const [timeoutDraft, setTimeoutDraft] = useState(timeout);
+	const [clearHistoryOnClear, setClearHistoryOnClear] = useState(
+		autoApprovalConfig.clearHistoryOnClear ?? false,
+	);
 
 	// Show if inheriting from global (for project scope)
 	const isInheriting =
@@ -69,6 +72,10 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 			value: 'timeout',
 		},
 		{
+			label: `Clear History on Screen Clear: ${clearHistoryOnClear ? '✅ Enabled' : '❌ Disabled'}`,
+			value: 'toggleClearHistory',
+		},
+		{
 			label: '💾 Save Changes',
 			value: 'save',
 		},
@@ -91,11 +98,15 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 				setTimeoutDraft(timeout);
 				setView('timeout');
 				break;
+			case 'toggleClearHistory':
+				setClearHistoryOnClear(!clearHistoryOnClear);
+				break;
 			case 'save':
 				configEditor.setAutoApprovalConfig({
 					enabled: autoApprovalEnabled,
 					customCommand: customCommand.trim() || undefined,
 					timeout,
+					clearHistoryOnClear,
 				});
 				onComplete();
 				break;
@@ -167,6 +178,16 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 			</Box>
 
 			<CustomCommandSummary command={customCommand} />
+
+			{clearHistoryOnClear && (
+				<Box marginBottom={1}>
+					<Text dimColor>
+						Clear History: When enabled, session output history is cleared when
+						a screen clear escape sequence is detected (e.g., /clear command).
+						This prevents excessive scrolling during session restoration.
+					</Text>
+				</Box>
+			)}
 
 			<SelectInput items={menuItems} onSelect={handleSelect} isFocused />
 

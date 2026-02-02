@@ -146,6 +146,7 @@ export interface ConfigurationData {
 		enabled: boolean; // Whether auto-approval is enabled
 		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse
 		timeout?: number; // Timeout in seconds for auto-approval verification (default: 30)
+		clearHistoryOnClear?: boolean; // Clear output history when screen clear escape sequence is detected
 	};
 }
 
@@ -156,6 +157,7 @@ export interface AutoApprovalConfig {
 	enabled: boolean;
 	customCommand?: string;
 	timeout?: number;
+	clearHistoryOnClear?: boolean; // Clear output history when screen clear escape sequence is detected
 }
 
 export interface ProjectConfigurationData {

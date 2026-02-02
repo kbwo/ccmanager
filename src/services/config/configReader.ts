@@ -112,6 +112,11 @@ export class ConfigReader implements IConfigReader {
 		return this.getAutoApprovalConfig().enabled;
 	}
 
+	// Check if clear history on clear is enabled
+	isClearHistoryOnClearEnabled(): boolean {
+		return this.getAutoApprovalConfig().clearHistoryOnClear ?? false;
+	}
+
 	// Command Preset methods - delegate to global config for modifications
 	getDefaultPreset(): CommandPreset {
 		const presets = this.getCommandPresets();

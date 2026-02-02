@@ -47,6 +47,7 @@ vi.mock('./config/configReader.js', () => ({
 		getWorktreeLastOpened: vi.fn(() => ({})),
 		isAutoApprovalEnabled: vi.fn(() => false),
 		setAutoApprovalEnabled: vi.fn(),
+		isClearHistoryOnClearEnabled: vi.fn(() => false),
 	},
 }));
 
