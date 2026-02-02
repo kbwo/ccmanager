@@ -11,6 +11,11 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return currentState;
 		}
 
+		// Check for search prompt (⌕ Search…) - always idle
+		if (content.includes('⌕ Search…')) {
+			return 'idle';
+		}
+
 		// Check for "Do you want" or "Would you like" pattern with options
 		// Handles both simple ("Do you want...\nYes") and complex (numbered options) formats
 		if (
