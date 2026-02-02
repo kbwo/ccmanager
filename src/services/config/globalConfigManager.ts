@@ -103,6 +103,7 @@ class GlobalConfigManager implements IConfigEditor {
 			this.config.autoApproval = {
 				enabled: false,
 				timeout: 30,
+				clearHistoryOnClear: false,
 			};
 		} else {
 			if (
@@ -120,6 +121,14 @@ class GlobalConfigManager implements IConfigEditor {
 				)
 			) {
 				this.config.autoApproval.timeout = 30;
+			}
+			if (
+				!Object.prototype.hasOwnProperty.call(
+					this.config.autoApproval,
+					'clearHistoryOnClear',
+				)
+			) {
+				this.config.autoApproval.clearHistoryOnClear = false;
 			}
 		}
 
