@@ -3,17 +3,19 @@ import {BaseStateDetector} from './base.js';
 
 export class ClaudeStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
-		const content = this.getTerminalContent(terminal);
+		// Check for search prompt (⌕ Search…) within 200 lines - always idle
+		const extendedContent = this.getTerminalContent(terminal, 200);
+		if (extendedContent.includes('⌕ Search…')) {
+			return 'idle';
+		}
+
+		// Existing logic with 30 lines
+		const content = this.getTerminalContent(terminal, 30);
 		const lowerContent = content.toLowerCase();
 
 		// Check for ctrl+r toggle prompt - maintain current state
 		if (lowerContent.includes('ctrl+r to toggle')) {
 			return currentState;
-		}
-
-		// Check for search prompt (⌕ Search…) - always idle
-		if (content.includes('⌕ Search…')) {
-			return 'idle';
 		}
 
 		// Check for "Do you want" or "Would you like" pattern with options

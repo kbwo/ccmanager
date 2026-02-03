@@ -4,7 +4,7 @@ import {BaseStateDetector} from './base.js';
 // https://github.com/google-gemini/gemini-cli/blob/main/packages/cli/src/ui/components/messages/ToolConfirmationMessage.tsx
 export class GeminiStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
-		const content = this.getTerminalContent(terminal);
+		const content = this.getTerminalContent(terminal, 30);
 		const lowerContent = content.toLowerCase();
 
 		// Check for explicit user confirmation message - highest priority
