@@ -3,7 +3,7 @@ import {BaseStateDetector} from './base.js';
 
 export class OpenCodeStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
-		const content = this.getTerminalContent(terminal);
+		const content = this.getTerminalContent(terminal, 30);
 
 		// Check for waiting input state - permission required prompt
 		// The triangle symbol (△) indicates permission is required

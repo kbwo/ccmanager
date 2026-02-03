@@ -4,7 +4,7 @@ import {BaseStateDetector} from './base.js';
 // https://github.com/cline/cline/blob/580db36476b6b52def03c8aeda325aae1c817cde/cli/pkg/cli/task/input_handler.go
 export class ClineStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
-		const content = this.getTerminalContent(terminal);
+		const content = this.getTerminalContent(terminal, 30);
 		const lowerContent = content.toLowerCase();
 
 		// Check for waiting prompts with tool permission - Priority 1

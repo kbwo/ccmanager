@@ -3,7 +3,7 @@ import {BaseStateDetector} from './base.js';
 
 export class CodexStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
-		const content = this.getTerminalContent(terminal);
+		const content = this.getTerminalContent(terminal, 30);
 		const lowerContent = content.toLowerCase();
 
 		// Check for confirmation prompt patterns - highest priority
