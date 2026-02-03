@@ -99,20 +99,6 @@ const Menu: React.FC<MenuProps> = ({
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 	const {stdout} = useStdout();
 	const fixedRows = 6;
-	const [terminalRows, setTerminalRows] = useState(stdout.rows);
-
-	// Update terminal rows on resize
-	useEffect(() => {
-		const handleResize = () => {
-			setTerminalRows(stdout.rows);
-		};
-
-		stdout.on('resize', handleResize);
-
-		return () => {
-			stdout.off('resize', handleResize);
-		};
-	}, [stdout]);
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -122,7 +108,7 @@ const Menu: React.FC<MenuProps> = ({
 
 	const limit = Math.max(
 		5,
-		terminalRows -
+		stdout.rows -
 			fixedRows -
 			(isSearchMode ? 1 : 0) -
 			(error || loadError ? 3 : 0),
