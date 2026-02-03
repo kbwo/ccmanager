@@ -31,6 +31,7 @@ const createStrategyItems = (): {
 		},
 		cline: {label: 'Cline', value: 'cline'},
 		opencode: {label: 'OpenCode', value: 'opencode'},
+		kimi: {label: 'Kimi', value: 'kimi'},
 	};
 
 	return Object.values(strategies);
@@ -48,6 +49,7 @@ const DEFAULT_COMMANDS: Record<StateDetectionStrategy, string> = {
 	'github-copilot': 'copilot',
 	cline: 'cline',
 	opencode: 'opencode',
+	kimi: 'kimi',
 };
 
 interface ConfigureCommandProps {
@@ -77,6 +79,8 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 			return 'Cline';
 		case 'opencode':
 			return 'OpenCode';
+		case 'kimi':
+			return 'Kimi';
 		default:
 			return 'Claude';
 	}
