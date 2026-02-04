@@ -313,7 +313,7 @@ describe('App component loading state machine', () => {
 		resolveWorktree?.();
 		await createPromise;
 		await selectPromise;
-		await flush(20);
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
 
 		expect(lastFrame()).toContain('Menu View');
 
@@ -358,7 +358,7 @@ describe('App component loading state machine', () => {
 		resolveDelete?.();
 		await deletePromise;
 		await selectPromise;
-		await flush(20);
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
 
 		expect(lastFrame()).toContain('Menu View');
 
