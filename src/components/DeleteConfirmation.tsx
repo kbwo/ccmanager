@@ -1,8 +1,9 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
 import Confirmation from './Confirmation.js';
+import {hasUncommittedChanges} from '../utils/gitUtils.js';
 
 interface DeleteConfirmationProps {
 	worktrees: Array<{path: string; branch?: string}>;
@@ -19,12 +20,35 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	const hasAnyBranches = worktrees.some(wt => wt.branch);
 
 	const [deleteBranch, setDeleteBranch] = useState(true);
-	const [view, setView] = useState<'options' | 'confirm'>(
-		hasAnyBranches ? 'options' : 'confirm',
-	);
+	const [view, setView] = useState<
+		'checking-uncommitted' | 'uncommitted-warning' | 'options' | 'confirm'
+	>('checking-uncommitted');
 	const [focusedOption, setFocusedOption] = useState<
 		'deleteBranch' | 'keepBranch'
 	>(deleteBranch ? 'deleteBranch' : 'keepBranch');
+	const [worktreesWithChanges, setWorktreesWithChanges] = useState<
+		Array<{path: string; branch?: string}>
+	>([]);
+
+	// Check for uncommitted changes on mount
+	useEffect(() => {
+		const checkUncommittedChanges = () => {
+			const withChanges = worktrees.filter(wt =>
+				hasUncommittedChanges(wt.path),
+			);
+			setWorktreesWithChanges(withChanges);
+
+			if (withChanges.length > 0) {
+				setView('uncommitted-warning');
+			} else if (hasAnyBranches) {
+				setView('options');
+			} else {
+				setView('confirm');
+			}
+		};
+
+		checkUncommittedChanges();
+	}, [worktrees, hasAnyBranches]);
 
 	// Menu items for branch options
 	const branchOptions = [
@@ -73,7 +97,11 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	};
 
 	useInput((input, key) => {
-		if (hasAnyBranches && view === 'options') {
+		if (view === 'uncommitted-warning') {
+			if (shortcutManager.matchesShortcut('cancel', input, key)) {
+				onCancel();
+			}
+		} else if (hasAnyBranches && view === 'options') {
 			if (handleBranchOptionsInput(input, key)) {
 				return;
 			}
@@ -116,6 +144,90 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 			)}
 		</Box>
 	);
+
+	// Loading state while checking uncommitted changes
+	if (view === 'checking-uncommitted') {
+		return (
+			<Box flexDirection="column">
+				<Text color="cyan">Checking for uncommitted changes...</Text>
+			</Box>
+		);
+	}
+
+	// Uncommitted changes warning view
+	if (view === 'uncommitted-warning') {
+		const warningTitle = (
+			<Text bold color="yellow">
+				⚠️ Warning: Uncommitted Changes
+			</Text>
+		);
+
+		const warningMessage = (
+			<Box flexDirection="column">
+				<Text>
+					The following worktrees have uncommitted changes that will be lost:
+				</Text>
+				{worktreesWithChanges.length <= 10 ? (
+					worktreesWithChanges.map(wt => (
+						<Text key={wt.path} color="yellow">
+							• {wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'}{' '}
+							({wt.path})
+						</Text>
+					))
+				) : (
+					<>
+						{worktreesWithChanges.slice(0, 8).map(wt => (
+							<Text key={wt.path} color="yellow">
+								•{' '}
+								{wt.branch ? wt.branch.replace('refs/heads/', '') : 'detached'}{' '}
+								({wt.path})
+							</Text>
+						))}
+						<Text color="yellow" dimColor>
+							... and {worktreesWithChanges.length - 8} more worktrees
+						</Text>
+					</>
+				)}
+				<Box marginTop={1}>
+					<Text>Do you want to continue?</Text>
+				</Box>
+			</Box>
+		);
+
+		const warningHint = (
+			<Text dimColor>
+				Use ↑↓/j/k to navigate, Enter to select,{' '}
+				{shortcutManager.getShortcutDisplay('cancel')} to cancel
+			</Text>
+		);
+
+		const handleWarningSelect = (value: string) => {
+			if (value === 'yes') {
+				if (hasAnyBranches) {
+					setView('options');
+				} else {
+					setView('confirm');
+				}
+			} else {
+				onCancel();
+			}
+		};
+
+		return (
+			<Confirmation
+				title={warningTitle}
+				message={warningMessage}
+				options={[
+					{label: 'Yes', value: 'yes', color: 'green'},
+					{label: 'No', value: 'no', color: 'red'},
+				]}
+				onSelect={handleWarningSelect}
+				initialIndex={1} // Default to No for safety
+				hint={warningHint}
+				onCancel={onCancel}
+			/>
+		);
+	}
 
 	if (hasAnyBranches && view === 'options') {
 		return (

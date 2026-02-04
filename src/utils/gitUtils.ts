@@ -2,6 +2,27 @@ import path from 'path';
 import {execSync} from 'child_process';
 
 /**
+ * Check if a worktree or repository has uncommitted changes.
+ * This includes unstaged changes, staged changes, and untracked files.
+ *
+ * @param worktreePath - The path to the worktree or repository
+ * @returns true if there are uncommitted changes, false if clean
+ */
+export function hasUncommittedChanges(worktreePath: string): boolean {
+	try {
+		const output = execSync('git status --porcelain', {
+			cwd: worktreePath,
+			encoding: 'utf8',
+			stdio: ['pipe', 'pipe', 'pipe'],
+		}).trim();
+		return output.length > 0;
+	} catch {
+		// Conservative default on error - treat as having changes
+		return true;
+	}
+}
+
+/**
  * Get the git repository root path from a given directory.
  * For worktrees, this returns the main repository root (parent of .git).
  * For submodules, this returns the submodule's working directory.
