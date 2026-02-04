@@ -8,18 +8,12 @@ export abstract class BaseStateDetector implements StateDetector {
 		currentState: SessionState,
 	): SessionState;
 
-	protected getTerminalLines(
-		terminal: Terminal,
-		maxLines: number,
-	): string[] {
+	protected getTerminalLines(terminal: Terminal, maxLines: number): string[] {
 		const content = getTerminalScreenContent(terminal, maxLines);
 		return content.split('\n');
 	}
 
-	protected getTerminalContent(
-		terminal: Terminal,
-		maxLines: number,
-	): string {
+	protected getTerminalContent(terminal: Terminal, maxLines: number): string {
 		return getTerminalScreenContent(terminal, maxLines);
 	}
 
