@@ -10,7 +10,7 @@ export abstract class BaseStateDetector implements StateDetector {
 
 	protected getTerminalLines(
 		terminal: Terminal,
-		maxLines: number = 30,
+		maxLines: number,
 	): string[] {
 		const content = getTerminalScreenContent(terminal, maxLines);
 		return content.split('\n');
@@ -18,7 +18,7 @@ export abstract class BaseStateDetector implements StateDetector {
 
 	protected getTerminalContent(
 		terminal: Terminal,
-		maxLines: number = 30,
+		maxLines: number,
 	): string {
 		return getTerminalScreenContent(terminal, maxLines);
 	}

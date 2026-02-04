@@ -9,7 +9,7 @@ import {BaseStateDetector} from './base.js';
  */
 export class KimiStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, _currentState: SessionState): SessionState {
-		const content = this.getTerminalContent(terminal);
+		const content = this.getTerminalContent(terminal, 30);
 		const lowerContent = content.toLowerCase();
 
 		// Check for permission/confirmation prompts - waiting_input state
