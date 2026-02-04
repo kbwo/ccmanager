@@ -2,7 +2,7 @@
 
 [![Mentioned in Awesome Gemini CLI](https://awesome.re/mentioned-badge.svg)](https://github.com/Piebald-AI/awesome-gemini-cli)
 
-CCManager is a CLI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI, Codex CLI) across Git worktrees and projects.
+CCManager is a CLI application for managing multiple AI coding assistant sessions (Claude Code, Gemini CLI, Codex CLI, Cursor Agent, Copilot CLI, Cline CLI, OpenCode, Kimi CLI) across Git worktrees and projects.
 
 https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 
@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 
 - Run multiple AI assistant sessions in parallel across different Git worktrees
 - **Multi-project support**: Manage multiple git repositories from a single interface
-- Support for multiple AI coding assistants (Claude Code, Gemini CLI)
+- Support for multiple AI coding assistants (Claude Code, Gemini CLI, Codex CLI, Cursor Agent, Copilot CLI, Cline CLI, OpenCode, Kimi CLI)
 - Switch between sessions seamlessly
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
@@ -129,6 +129,7 @@ CCManager supports multiple AI coding assistants with tailored state detection f
 | Copilot CLI | `copilot` | [github.com/github/copilot-cli](https://github.com/github/copilot-cli) |
 | Cline CLI | `cline` | [github.com/cline/cline](https://github.com/cline/cline) |
 | OpenCode | `opencode` | [opencode.ai/docs](https://opencode.ai/docs) |
+| Kimi CLI | `kimi` | [kimi-cli.com](https://www.kimi-cli.com/en/) |
 
 Each assistant has its own state detection strategy to properly track:
 - **Idle**: Ready for new input
