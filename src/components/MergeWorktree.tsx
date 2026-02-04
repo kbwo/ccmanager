@@ -6,6 +6,7 @@ import {WorktreeService} from '../services/worktreeService.js';
 import Confirmation, {SimpleConfirmation} from './Confirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {GitError} from '../types/errors.js';
+import {hasUncommittedChanges} from '../utils/gitUtils.js';
 
 interface MergeWorktreeProps {
 	onComplete: () => void;
@@ -19,6 +20,8 @@ type Step =
 	| 'confirm-merge'
 	| 'executing-merge'
 	| 'merge-error'
+	| 'check-uncommitted'
+	| 'uncommitted-warning'
 	| 'delete-confirm';
 
 interface BranchItem {
@@ -130,8 +133,8 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 					),
 				);
 
-				// Merge successful, ask about deleting source branch
-				setStep('delete-confirm');
+				// Merge successful, check for uncommitted changes before asking about deletion
+				setStep('check-uncommitted');
 			} catch (err) {
 				// Merge failed, show error
 				const errorMessage =
@@ -147,6 +150,35 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 
 		performMerge();
 	}, [step, sourceBranch, targetBranch, useRebase, worktreeService]);
+
+	// Check for uncommitted changes in source worktree when entering check-uncommitted step
+	useEffect(() => {
+		if (step !== 'check-uncommitted') return;
+
+		const checkUncommitted = async () => {
+			try {
+				// Find the worktree path for the source branch
+				const worktrees = await Effect.runPromise(
+					worktreeService.getWorktreesEffect(),
+				);
+				const sourceWorktree = worktrees.find(
+					wt =>
+						wt.branch && wt.branch.replace('refs/heads/', '') === sourceBranch,
+				);
+
+				if (sourceWorktree && hasUncommittedChanges(sourceWorktree.path)) {
+					setStep('uncommitted-warning');
+				} else {
+					setStep('delete-confirm');
+				}
+			} catch {
+				// On error, proceed to delete-confirm
+				setStep('delete-confirm');
+			}
+		};
+
+		checkUncommitted();
+	}, [step, sourceBranch, worktreeService]);
 
 	if (isLoading) {
 		return (
@@ -328,6 +360,65 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 					<Text dimColor>Press any key to return to menu</Text>
 				</Box>
 			</Box>
+		);
+	}
+
+	if (step === 'check-uncommitted') {
+		return (
+			<Box flexDirection="column">
+				<Text color="cyan">Checking for uncommitted changes...</Text>
+			</Box>
+		);
+	}
+
+	if (step === 'uncommitted-warning') {
+		const warningTitle = (
+			<Text bold color="yellow">
+				Warning: Uncommitted Changes
+			</Text>
+		);
+
+		const warningMessage = (
+			<Box flexDirection="column">
+				<Text>
+					The source branch <Text color="yellow">{sourceBranch}</Text> has
+					uncommitted changes that will be lost if you delete it.
+				</Text>
+				<Box marginTop={1}>
+					<Text>Do you still want to delete it?</Text>
+				</Box>
+			</Box>
+		);
+
+		const warningHint = (
+			<Text dimColor>
+				Use ↑↓/j/k to navigate, Enter to select,{' '}
+				{shortcutManager.getShortcutDisplay('cancel')} to cancel
+			</Text>
+		);
+
+		const handleWarningSelect = (value: string) => {
+			if (value === 'yes') {
+				setStep('delete-confirm');
+			} else {
+				// User chose not to delete, complete without deletion
+				onComplete();
+			}
+		};
+
+		return (
+			<Confirmation
+				title={warningTitle}
+				message={warningMessage}
+				options={[
+					{label: 'Yes', value: 'yes', color: 'green'},
+					{label: 'No', value: 'no', color: 'red'},
+				]}
+				onSelect={handleWarningSelect}
+				initialIndex={1} // Default to No for safety
+				hint={warningHint}
+				onCancel={onCancel}
+			/>
 		);
 	}
 
