@@ -103,6 +103,8 @@ describe('Menu - Recent Projects', () => {
 			createSessionWithPreset: vi.fn(),
 			createSessionWithDevcontainer: vi.fn(),
 			destroy: vi.fn(),
+			isAutoApprovalDisabledForWorktree: vi.fn().mockReturnValue(false),
+			toggleAutoApprovalForWorktree: vi.fn().mockReturnValue(false),
 		} as unknown as SessionManager;
 
 		mockWorktreeService = {
