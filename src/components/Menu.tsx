@@ -665,6 +665,12 @@ const Menu: React.FC<MenuProps> = ({
 					Status: {STATUS_ICONS.BUSY} {STATUS_LABELS.BUSY}{' '}
 					{STATUS_ICONS.WAITING} {STATUS_LABELS.WAITING} {STATUS_ICONS.IDLE}{' '}
 					{STATUS_LABELS.IDLE}
+					{configReader.isAutoApprovalEnabled() && (
+						<>
+							{' | '}
+							<Text color="green">Auto Approval Enabled</Text>
+						</>
+					)}
 				</Text>
 				<Text dimColor>
 					{isSearchMode
