@@ -43,6 +43,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
+	private autoApprovalDisabledWorktrees: Set<string> = new Set();
 
 	private async spawn(
 		command: string,
@@ -71,7 +72,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (
 			detectedState === 'waiting_input' &&
 			configReader.isAutoApprovalEnabled() &&
-			!stateData.autoApprovalFailed
+			!stateData.autoApprovalFailed &&
+			!this.autoApprovalDisabledWorktrees.has(session.worktreePath)
 		) {
 			return 'pending_auto_approval';
 		}
@@ -660,6 +662,24 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				pendingStateStart: undefined,
 			}));
 		}
+	}
+
+	toggleAutoApprovalForWorktree(worktreePath: string): boolean {
+		if (this.autoApprovalDisabledWorktrees.has(worktreePath)) {
+			this.autoApprovalDisabledWorktrees.delete(worktreePath);
+			return false;
+		} else {
+			this.autoApprovalDisabledWorktrees.add(worktreePath);
+			this.cancelAutoApproval(
+				worktreePath,
+				'Auto-approval disabled for worktree',
+			);
+			return true;
+		}
+	}
+
+	isAutoApprovalDisabledForWorktree(worktreePath: string): boolean {
+		return this.autoApprovalDisabledWorktrees.has(worktreePath);
 	}
 
 	destroySession(worktreePath: string): void {

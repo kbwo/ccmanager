@@ -97,6 +97,10 @@ const Menu: React.FC<MenuProps> = ({
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<
+		string | null
+	>(null);
+	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
 	const {stdout} = useStdout();
 	const fixedRows = 6;
 
@@ -227,7 +231,11 @@ const Menu: React.FC<MenuProps> = ({
 		// Build menu items with proper alignment
 		const menuItems: MenuItem[] = filteredItems.map(
 			(item, index): WorktreeItem => {
-				const label = assembleWorktreeLabel(item, columnPositions);
+				const baseLabel = assembleWorktreeLabel(item, columnPositions);
+				const aaDisabled =
+					configReader.isAutoApprovalEnabled() &&
+					sessionManager.isAutoApprovalDisabledForWorktree(item.worktree.path);
+				const label = baseLabel + (aaDisabled ? ' [Auto Approval Off]' : '');
 
 				// Only show numbers for worktrees (0-9) when not in search mode
 				const numberPrefix = !isSearchMode && index < 10 ? `${index} ❯ ` : '❯ ';
@@ -357,6 +365,19 @@ const Menu: React.FC<MenuProps> = ({
 			}
 		}
 		setItems(menuItems);
+
+		// Ensure highlighted worktree path is valid for hotkey support
+		// (e.g., on initial render or when returning from a session view)
+		setHighlightedWorktreePath(prev => {
+			if (
+				prev &&
+				menuItems.some(item => item.type === 'worktree' && item.value === prev)
+			) {
+				return prev;
+			}
+			const first = menuItems.find(item => item.type === 'worktree');
+			return first && first.type === 'worktree' ? first.worktree.path : null;
+		});
 	}, [
 		worktrees,
 		sessions,
@@ -366,6 +387,8 @@ const Menu: React.FC<MenuProps> = ({
 		recentProjects,
 		searchQuery,
 		isSearchMode,
+		autoApprovalToggleCounter,
+		sessionManager,
 	]);
 
 	// Handle hotkeys
@@ -422,6 +445,13 @@ const Menu: React.FC<MenuProps> = ({
 		}
 
 		switch (keyPressed) {
+			case 'a':
+				// Toggle auto-approval for the currently highlighted worktree
+				if (configReader.isAutoApprovalEnabled() && highlightedWorktreePath) {
+					sessionManager.toggleAutoApprovalForWorktree(highlightedWorktreePath);
+					setAutoApprovalToggleCounter(c => c + 1);
+				}
+				break;
 			case 'n':
 				// Trigger new worktree action
 				onSelectWorktree({
@@ -641,6 +671,12 @@ const Menu: React.FC<MenuProps> = ({
 				<SelectInput
 					items={items}
 					onSelect={item => handleSelect(item as MenuItem)}
+					onHighlight={item => {
+						const menuItem = item as MenuItem;
+						if (menuItem.type === 'worktree') {
+							setHighlightedWorktreePath(menuItem.worktree.path);
+						}
+					}}
 					isFocused={!error}
 					initialIndex={selectedIndex}
 					limit={limit}
@@ -665,15 +701,25 @@ const Menu: React.FC<MenuProps> = ({
 					Status: {STATUS_ICONS.BUSY} {STATUS_LABELS.BUSY}{' '}
 					{STATUS_ICONS.WAITING} {STATUS_LABELS.WAITING} {STATUS_ICONS.IDLE}{' '}
 					{STATUS_LABELS.IDLE}
+					{configReader.isAutoApprovalEnabled() && (
+						<>
+							{' | '}
+							<Text color="green">Auto Approval Enabled</Text>
+						</>
+					)}
 				</Text>
 				<Text dimColor>
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
 							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete ${
+									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
+								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
 							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete ${
+									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
+								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`}
 				</Text>
