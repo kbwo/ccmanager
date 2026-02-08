@@ -97,7 +97,9 @@ const Menu: React.FC<MenuProps> = ({
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
-	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<string | null>(null);
+	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<
+		string | null
+	>(null);
 	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
 	const {stdout} = useStdout();
 	const fixedRows = 6;
@@ -367,7 +369,10 @@ const Menu: React.FC<MenuProps> = ({
 		// Ensure highlighted worktree path is valid for hotkey support
 		// (e.g., on initial render or when returning from a session view)
 		setHighlightedWorktreePath(prev => {
-			if (prev && menuItems.some(item => item.type === 'worktree' && item.value === prev)) {
+			if (
+				prev &&
+				menuItems.some(item => item.type === 'worktree' && item.value === prev)
+			) {
 				return prev;
 			}
 			const first = menuItems.find(item => item.type === 'worktree');
@@ -383,6 +388,7 @@ const Menu: React.FC<MenuProps> = ({
 		searchQuery,
 		isSearchMode,
 		autoApprovalToggleCounter,
+		sessionManager,
 	]);
 
 	// Handle hotkeys

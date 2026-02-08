@@ -670,7 +670,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			return false;
 		} else {
 			this.autoApprovalDisabledWorktrees.add(worktreePath);
-			this.cancelAutoApproval(worktreePath, 'Auto-approval disabled for worktree');
+			this.cancelAutoApproval(
+				worktreePath,
+				'Auto-approval disabled for worktree',
+			);
 			return true;
 		}
 	}
