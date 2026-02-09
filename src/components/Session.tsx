@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef} from 'react';
 import {useStdout} from 'ink';
 import {Session as ISession} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
@@ -16,7 +16,7 @@ const Session: React.FC<SessionProps> = ({
 	onReturnToMenu,
 }) => {
 	const {stdout} = useStdout();
-	const [isExiting, setIsExiting] = useState(false);
+	const isExitingRef = useRef(false);
 
 	const stripOscColorSequences = (input: string): string => {
 		// Remove default foreground/background color OSC sequences that Codex emits
@@ -123,14 +123,14 @@ const Session: React.FC<SessionProps> = ({
 		// Listen for session data events
 		const handleSessionData = (activeSession: ISession, data: string) => {
 			// Only handle data for our session
-			if (activeSession.id === session.id && !isExiting) {
+			if (activeSession.id === session.id && !isExitingRef.current) {
 				stdout.write(normalizeLineEndings(data));
 			}
 		};
 
 		const handleSessionExit = (exitedSession: ISession) => {
 			if (exitedSession.id === session.id) {
-				setIsExiting(true);
+				isExitingRef.current = true;
 				// Don't call onReturnToMenu here - App component handles it
 			}
 		};
@@ -154,17 +154,15 @@ const Session: React.FC<SessionProps> = ({
 		// Set up raw input handling
 		const stdin = process.stdin;
 
-		// Store original stdin state
-		const originalIsRaw = stdin.isRaw;
-		const originalIsPaused = stdin.isPaused();
-
 		// Configure stdin for PTY passthrough
-		stdin.setRawMode(true);
-		stdin.resume();
+		if (stdin.isTTY) {
+			stdin.setRawMode(true);
+			stdin.resume();
+		}
 		stdin.setEncoding('utf8');
 
 		const handleStdinData = (data: string) => {
-			if (isExiting) return;
+			if (isExitingRef.current) return;
 
 			// Check for return to menu shortcut
 			if (shortcutManager.matchesRawInput('returnToMenu', data)) {
@@ -172,10 +170,8 @@ const Session: React.FC<SessionProps> = ({
 				if (stdout) {
 					resetTerminalInputModes();
 				}
-				// Restore stdin state before returning to menu
+				// Remove our listener — Ink will reconfigure stdin when Menu mounts
 				stdin.removeListener('data', handleStdinData);
-				stdin.setRawMode(false);
-				stdin.pause();
 				onReturnToMenu();
 				return;
 			}
@@ -194,22 +190,12 @@ const Session: React.FC<SessionProps> = ({
 		stdin.on('data', handleStdinData);
 
 		return () => {
-			// Remove listener first to prevent any race conditions
+			// Remove our stdin listener
 			stdin.removeListener('data', handleStdinData);
 
-			// Disable focus reporting mode that might have been enabled by the PTY
+			// Disable extended input modes that might have been enabled by the PTY
 			if (stdout) {
 				resetTerminalInputModes();
-			}
-
-			// Restore stdin to its original state
-			if (stdin.isTTY) {
-				stdin.setRawMode(originalIsRaw || false);
-				if (originalIsPaused) {
-					stdin.pause();
-				} else {
-					stdin.resume();
-				}
 			}
 
 			// Mark session as inactive
@@ -221,7 +207,7 @@ const Session: React.FC<SessionProps> = ({
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);
 		};
-	}, [session, sessionManager, stdout, onReturnToMenu, isExiting]);
+	}, [session, sessionManager, stdout, onReturnToMenu]);
 
 	return null;
 };

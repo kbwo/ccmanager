@@ -184,8 +184,7 @@ const App: React.FC<AppProps> = ({
 
 					navigateWithClear(targetView, () => {
 						setMenuKey(prev => prev + 1);
-						process.stdin.resume();
-						process.stdin.setEncoding('utf8');
+						// Ink's useInput in Menu will reconfigure stdin automatically
 					});
 				}
 				return current;
@@ -393,15 +392,7 @@ const App: React.FC<AppProps> = ({
 
 		navigateWithClear(targetView, () => {
 			setMenuKey(prev => prev + 1); // Force menu refresh
-
-			// Ensure stdin is in a clean state for Ink components
-			if (process.stdin.isTTY) {
-				// Flush any pending input to prevent escape sequences from leaking
-				process.stdin.read();
-				process.stdin.setRawMode(false);
-				process.stdin.resume();
-				process.stdin.setEncoding('utf8');
-			}
+			// Ink's useInput in Menu will reconfigure stdin automatically
 		});
 	};
 
