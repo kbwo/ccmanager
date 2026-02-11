@@ -124,13 +124,17 @@ describe('SessionManager', () => {
 			);
 
 			// Verify spawn was called with preset config
-			expect(spawn).toHaveBeenCalledWith('claude', ['--preset-arg'], {
-				name: 'xterm-256color',
-				cols: expect.any(Number),
-				rows: expect.any(Number),
-				cwd: '/test/worktree',
-				env: process.env,
-			});
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--preset-arg', '--teammate-mode', 'in-process'],
+				{
+					name: 'xterm-256color',
+					cols: expect.any(Number),
+					rows: expect.any(Number),
+					cwd: '/test/worktree',
+					env: process.env,
+				},
+			);
 		});
 
 		it('should use specific preset when ID provided', async () => {
@@ -157,13 +161,17 @@ describe('SessionManager', () => {
 			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 
 			// Verify spawn was called with preset config
-			expect(spawn).toHaveBeenCalledWith('claude', ['--resume', '--dev'], {
-				name: 'xterm-256color',
-				cols: expect.any(Number),
-				rows: expect.any(Number),
-				cwd: '/test/worktree',
-				env: process.env,
-			});
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--resume', '--dev', '--teammate-mode', 'in-process'],
+				{
+					name: 'xterm-256color',
+					cols: expect.any(Number),
+					rows: expect.any(Number),
+					cwd: '/test/worktree',
+					env: process.env,
+				},
+			);
 		});
 
 		it('should fall back to default preset if specified preset not found', async () => {
@@ -196,7 +204,11 @@ describe('SessionManager', () => {
 
 			// Verify fallback to default preset
 			expect(configReader.getDefaultPreset).toHaveBeenCalled();
-			expect(spawn).toHaveBeenCalledWith('claude', [], expect.any(Object));
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				['--teammate-mode', 'in-process'],
+				expect.any(Object),
+			);
 		});
 
 		it('should throw error when spawn fails with preset', async () => {
@@ -225,7 +237,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--bad-flag'],
+				['--bad-flag', '--teammate-mode', 'in-process'],
 				expect.any(Object),
 			);
 		});
@@ -305,7 +317,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--invalid-flag'],
+				['--invalid-flag', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -320,7 +332,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
-				[],
+				['--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -354,7 +366,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--resume'],
+				['--resume', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 		});
@@ -387,7 +399,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--invalid-flag'],
+				['--invalid-flag', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -397,12 +409,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called with empty args
+			// Verify fallback spawn was called with teammate-mode args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
-				[], // Empty args
+				['--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -573,7 +585,16 @@ describe('SessionManager', () => {
 			// Verify spawn was called with devcontainer exec
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--resume'],
+				[
+					'exec',
+					'--workspace-folder',
+					'.',
+					'--',
+					'claude',
+					'--resume',
+					'--teammate-mode',
+					'in-process',
+				],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 		});
@@ -610,7 +631,15 @@ describe('SessionManager', () => {
 			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--', 'claude', '--resume', '--dev'],
+				[
+					'exec',
+					'--',
+					'claude',
+					'--resume',
+					'--dev',
+					'--teammate-mode',
+					'in-process',
+				],
 				expect.any(Object),
 			);
 		});
@@ -715,6 +744,8 @@ describe('SessionManager', () => {
 					'claude',
 					'--model',
 					'opus',
+					'--teammate-mode',
+					'in-process',
 				],
 				expect.any(Object),
 			);
@@ -764,7 +795,15 @@ describe('SessionManager', () => {
 			// Should spawn with devcontainer exec command
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude'],
+				[
+					'exec',
+					'--workspace-folder',
+					'.',
+					'--',
+					'claude',
+					'--teammate-mode',
+					'in-process',
+				],
 				expect.objectContaining({
 					cwd: '/test/worktree2',
 				}),
@@ -854,6 +893,8 @@ describe('SessionManager', () => {
 					'vscode',
 					'--',
 					'claude',
+					'--teammate-mode',
+					'in-process',
 				],
 				expect.any(Object),
 			);
@@ -909,6 +950,8 @@ describe('SessionManager', () => {
 					'claude',
 					'-m',
 					'claude-3-opus',
+					'--teammate-mode',
+					'in-process',
 				],
 				expect.any(Object),
 			);
@@ -964,7 +1007,16 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--invalid-flag'],
+				[
+					'exec',
+					'--workspace-folder',
+					'.',
+					'--',
+					'claude',
+					'--invalid-flag',
+					'--teammate-mode',
+					'in-process',
+				],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -974,12 +1026,20 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called with empty args
+			// Verify fallback spawn was called with teammate-mode args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude'], // No args after claude
+				[
+					'exec',
+					'--workspace-folder',
+					'.',
+					'--',
+					'claude',
+					'--teammate-mode',
+					'in-process',
+				],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -1037,7 +1097,16 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--bad-flag'],
+				[
+					'exec',
+					'--workspace-folder',
+					'.',
+					'--',
+					'claude',
+					'--bad-flag',
+					'--teammate-mode',
+					'in-process',
+				],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -1047,12 +1116,20 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called (with no args since commandConfig was removed)
+			// Verify fallback spawn was called with teammate-mode args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude'],
+				[
+					'exec',
+					'--workspace-folder',
+					'.',
+					'--',
+					'claude',
+					'--teammate-mode',
+					'in-process',
+				],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -1189,10 +1266,11 @@ describe('SessionManager', () => {
 				id: string,
 				state: 'idle' | 'busy' | 'waiting_input' | 'pending_auto_approval',
 				backgroundTaskCount: number = 0,
+				teamMemberCount: number = 0,
 			): Partial<Session> => ({
 				id,
 				stateMutex: {
-					getSnapshot: () => ({state, backgroundTaskCount}),
+					getSnapshot: () => ({state, backgroundTaskCount, teamMemberCount}),
 				} as Session['stateMutex'],
 			});
 
@@ -1249,6 +1327,18 @@ describe('SessionManager', () => {
 
 				expect(counts.backgroundTasks).toBe(6);
 			});
+
+			it('should sum team member counts across sessions', () => {
+				const sessions = [
+					createMockSession('1', 'idle', 0, 0),
+					createMockSession('2', 'busy', 0, 4),
+					createMockSession('3', 'busy', 0, 2),
+				];
+
+				const counts = SessionManager.getSessionCounts(sessions as Session[]);
+
+				expect(counts.teamMembers).toBe(6);
+			});
 		});
 
 		describe('formatSessionCounts', () => {
@@ -1260,6 +1350,7 @@ describe('SessionManager', () => {
 					pending_auto_approval: 0,
 					total: 4,
 					backgroundTasks: 0,
+					teamMembers: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1275,6 +1366,7 @@ describe('SessionManager', () => {
 					pending_auto_approval: 0,
 					total: 3,
 					backgroundTasks: 0,
+					teamMembers: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1290,6 +1382,7 @@ describe('SessionManager', () => {
 					pending_auto_approval: 0,
 					total: 3,
 					backgroundTasks: 0,
+					teamMembers: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1305,6 +1398,7 @@ describe('SessionManager', () => {
 					pending_auto_approval: 0,
 					total: 0,
 					backgroundTasks: 0,
+					teamMembers: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1320,6 +1414,7 @@ describe('SessionManager', () => {
 					pending_auto_approval: 0,
 					total: 2,
 					backgroundTasks: 1,
+					teamMembers: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1336,6 +1431,7 @@ describe('SessionManager', () => {
 					pending_auto_approval: 0,
 					total: 2,
 					backgroundTasks: 5,
+					teamMembers: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
@@ -1352,12 +1448,50 @@ describe('SessionManager', () => {
 					pending_auto_approval: 0,
 					total: 2,
 					backgroundTasks: 0,
+					teamMembers: 0,
 				};
 
 				const formatted = SessionManager.formatSessionCounts(counts);
 
 				expect(formatted).not.toContain('[BG');
 				expect(formatted).toBe(' (1 Idle / 1 Busy)');
+			});
+
+			it('should append [Team:N] tag when teamMembers > 0', () => {
+				const counts = {
+					idle: 1,
+					busy: 1,
+					waiting_input: 0,
+					pending_auto_approval: 0,
+					total: 2,
+					backgroundTasks: 0,
+					teamMembers: 4,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toContain('[Team:4]');
+				expect(formatted).toBe(' (1 Idle / 1 Busy \x1b[2m[Team:4]\x1b[0m)');
+			});
+
+			it('should append both [BG] and [Team:N] tags', () => {
+				const counts = {
+					idle: 1,
+					busy: 1,
+					waiting_input: 0,
+					pending_auto_approval: 0,
+					total: 2,
+					backgroundTasks: 1,
+					teamMembers: 4,
+				};
+
+				const formatted = SessionManager.formatSessionCounts(counts);
+
+				expect(formatted).toContain('[BG]');
+				expect(formatted).toContain('[Team:4]');
+				expect(formatted).toBe(
+					' (1 Idle / 1 Busy \x1b[2m[BG]\x1b[0m \x1b[2m[Team:4]\x1b[0m)',
+				);
 			});
 		});
 	});

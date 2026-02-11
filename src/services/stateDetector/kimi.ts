@@ -55,4 +55,8 @@ export class KimiStateDetector extends BaseStateDetector {
 		// Kimi CLI does not currently support background tasks
 		return 0;
 	}
+
+	detectTeamMembers(_terminal: Terminal): number {
+		return 0;
+	}
 }

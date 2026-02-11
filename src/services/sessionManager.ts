@@ -24,8 +24,12 @@ import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
-import {getBackgroundTaskTag} from '../constants/statusIcons.js';
+import {
+	getBackgroundTaskTag,
+	getTeamMemberTag,
+} from '../constants/statusIcons.js';
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
+import {injectTeammateMode} from '../utils/commandArgs.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const TERMINAL_CONTENT_MAX_LINES = 300;
@@ -37,6 +41,7 @@ export interface SessionCounts {
 	pending_auto_approval: number;
 	total: number;
 	backgroundTasks: number;
+	teamMembers: number;
 }
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -83,6 +88,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	detectBackgroundTask(session: Session): number {
 		return session.stateDetector.detectBackgroundTask(session.terminal);
+	}
+
+	detectTeamMembers(session: Session): number {
+		return session.stateDetector.detectTeamMembers(session.terminal);
 	}
 
 	private getTerminalContent(session: Session): string {
@@ -361,7 +370,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 
 				const command = preset.command;
-				const args = preset.args || [];
+				const args = injectTeammateMode(
+					preset.command,
+					preset.args || [],
+					preset.detectionStrategy,
+				);
 
 				// Spawn the process - fallback will be handled by setupExitHandler
 				const ptyProcess = await this.spawn(command, args, worktreePath);
@@ -456,7 +469,17 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						const execArgs = execParts.slice(1);
 
 						// Build fallback command for devcontainer
-						const fallbackFullArgs = [...execArgs, '--', 'claude'];
+						const fallbackClaudeArgs = injectTeammateMode(
+							'claude',
+							[],
+							session.detectionStrategy,
+						);
+						const fallbackFullArgs = [
+							...execArgs,
+							'--',
+							'claude',
+							...fallbackClaudeArgs,
+						];
 
 						fallbackProcess = await this.spawn(
 							devcontainerCmd,
@@ -465,9 +488,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						);
 					} else {
 						// Regular fallback without devcontainer
-						fallbackProcess = await this.spawn(
+						const fallbackArgs = injectTeammateMode(
 							'claude',
 							[],
+							session.detectionStrategy,
+						);
+						fallbackProcess = await this.spawn(
+							'claude',
+							fallbackArgs,
 							session.worktreePath,
 						);
 					}
@@ -581,6 +609,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				void session.stateMutex.update(data => ({
 					...data,
 					backgroundTaskCount,
+				}));
+			}
+
+			// Detect and update team member count
+			const teamMemberCount = this.detectTeamMembers(session);
+			if (currentStateData.teamMemberCount !== teamMemberCount) {
+				void session.stateMutex.update(data => ({
+					...data,
+					teamMemberCount,
 				}));
 			}
 		}, STATE_CHECK_INTERVAL_MS);
@@ -842,12 +879,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				const execArgs = execParts.slice(1);
 
 				// Build the full command: devcontainer exec [args] -- [preset command] [preset args]
-				const fullArgs = [
-					...execArgs,
-					'--',
+				const presetArgs = injectTeammateMode(
 					preset.command,
-					...(preset.args || []),
-				];
+					preset.args || [],
+					preset.detectionStrategy,
+				);
+				const fullArgs = [...execArgs, '--', preset.command, ...presetArgs];
 
 				// Spawn the process within devcontainer
 				const ptyProcess = await this.spawn(
@@ -895,6 +932,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			pending_auto_approval: 0,
 			total: sessions.length,
 			backgroundTasks: 0,
+			teamMembers: 0,
 		};
 
 		sessions.forEach(session => {
@@ -914,6 +952,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					break;
 			}
 			counts.backgroundTasks += stateData.backgroundTaskCount;
+			counts.teamMembers += stateData.teamMemberCount;
 		});
 
 		return counts;
@@ -941,6 +980,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		const bgTag = getBackgroundTaskTag(counts.backgroundTasks);
 		const bgSuffix = bgTag ? ` ${bgTag}` : '';
-		return ` (${parts.join(' / ')}${bgSuffix})`;
+		const teamTag = getTeamMemberTag(counts.teamMembers);
+		const teamSuffix = teamTag ? ` ${teamTag}` : '';
+		return ` (${parts.join(' / ')}${bgSuffix}${teamSuffix})`;
 	}
 }

@@ -28,6 +28,11 @@ export const getBackgroundTaskTag = (count: number): string => {
 	return `\x1b[2m[BG:${count}]\x1b[0m`;
 };
 
+export const getTeamMemberTag = (count: number): string => {
+	if (count <= 0) return '';
+	return `\x1b[2m[Team:${count}]\x1b[0m`;
+};
+
 export const MENU_ICONS = {
 	NEW_WORKTREE: '⊕',
 	MERGE_WORKTREE: '⇄',
@@ -52,8 +57,11 @@ const getBaseStatusDisplay = (status: SessionState): string => {
 export const getStatusDisplay = (
 	status: SessionState,
 	backgroundTaskCount: number = 0,
+	teamMemberCount: number = 0,
 ): string => {
 	const display = getBaseStatusDisplay(status);
 	const bgTag = getBackgroundTaskTag(backgroundTaskCount);
-	return bgTag ? `${display} ${bgTag}` : display;
+	const teamTag = getTeamMemberTag(teamMemberCount);
+	const suffix = [bgTag, teamTag].filter(Boolean).join(' ');
+	return suffix ? `${display} ${suffix}` : display;
 };

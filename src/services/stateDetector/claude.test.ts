@@ -593,4 +593,95 @@ describe('ClaudeStateDetector', () => {
 			expect(count).toBe(3);
 		});
 	});
+
+	describe('detectTeamMembers', () => {
+		it('should return 2 when two @name members are present with shift+↑ to expand', () => {
+			terminal = createMockTerminal([
+				'Some output',
+				'@main @architect · shift+↑ to expand',
+			]);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(2);
+		});
+
+		it('should return 4 when four @name members are present', () => {
+			terminal = createMockTerminal([
+				'Some output',
+				'@main @architect @devils-advocate @ux-specialist · shift+↑ to expand',
+			]);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(4);
+		});
+
+		it('should return 0 when no team line is present', () => {
+			terminal = createMockTerminal([
+				'Command completed successfully',
+				'Ready for next command',
+				'> ',
+			]);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(0);
+		});
+
+		it('should return 0 when shift+↑ to expand is not present', () => {
+			terminal = createMockTerminal([
+				'Some output with @mention',
+				'Normal text',
+			]);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(0);
+		});
+
+		it('should not match other shift+ shortcuts', () => {
+			terminal = createMockTerminal([
+				'@main @architect · shift+tab to auto-approve',
+			]);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(0);
+		});
+
+		it('should return 0 for empty terminal', () => {
+			terminal = createMockTerminal([]);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(0);
+		});
+
+		it('should handle shift+up to expand variant', () => {
+			terminal = createMockTerminal(['@main @architect · shift+up to expand']);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(2);
+		});
+
+		it('should handle case-insensitive shift+↑ to expand', () => {
+			terminal = createMockTerminal(['@main @architect · SHIFT+↑ TO EXPAND']);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(2);
+		});
+
+		it('should handle @name patterns with hyphens', () => {
+			terminal = createMockTerminal([
+				'@team-lead @code-reviewer · shift+↑ to expand',
+			]);
+
+			const count = detector.detectTeamMembers(terminal);
+
+			expect(count).toBe(2);
+		});
+	});
 });
