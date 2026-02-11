@@ -124,7 +124,7 @@ describe('SessionManager', () => {
 			);
 
 			// Verify spawn was called with preset config
-			expect(spawn).toHaveBeenCalledWith('claude', ['--preset-arg'], {
+			expect(spawn).toHaveBeenCalledWith('claude', ['--preset-arg', '--teammate-mode', 'in-process'], {
 				name: 'xterm-256color',
 				cols: expect.any(Number),
 				rows: expect.any(Number),
@@ -157,7 +157,7 @@ describe('SessionManager', () => {
 			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 
 			// Verify spawn was called with preset config
-			expect(spawn).toHaveBeenCalledWith('claude', ['--resume', '--dev'], {
+			expect(spawn).toHaveBeenCalledWith('claude', ['--resume', '--dev', '--teammate-mode', 'in-process'], {
 				name: 'xterm-256color',
 				cols: expect.any(Number),
 				rows: expect.any(Number),
@@ -196,7 +196,7 @@ describe('SessionManager', () => {
 
 			// Verify fallback to default preset
 			expect(configReader.getDefaultPreset).toHaveBeenCalled();
-			expect(spawn).toHaveBeenCalledWith('claude', [], expect.any(Object));
+			expect(spawn).toHaveBeenCalledWith('claude', ['--teammate-mode', 'in-process'], expect.any(Object));
 		});
 
 		it('should throw error when spawn fails with preset', async () => {
@@ -225,7 +225,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--bad-flag'],
+				['--bad-flag', '--teammate-mode', 'in-process'],
 				expect.any(Object),
 			);
 		});
@@ -305,7 +305,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--invalid-flag'],
+				['--invalid-flag', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -320,7 +320,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
-				[],
+				['--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -354,7 +354,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--resume'],
+				['--resume', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 		});
@@ -387,7 +387,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				['--invalid-flag'],
+				['--invalid-flag', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -397,12 +397,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called with empty args
+			// Verify fallback spawn was called with teammate-mode args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
-				[], // Empty args
+				['--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -573,7 +573,7 @@ describe('SessionManager', () => {
 			// Verify spawn was called with devcontainer exec
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--resume'],
+				['exec', '--workspace-folder', '.', '--', 'claude', '--resume', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 		});
@@ -610,7 +610,7 @@ describe('SessionManager', () => {
 			expect(configReader.getPresetByIdEffect).toHaveBeenCalledWith('2');
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--', 'claude', '--resume', '--dev'],
+				['exec', '--', 'claude', '--resume', '--dev', '--teammate-mode', 'in-process'],
 				expect.any(Object),
 			);
 		});
@@ -715,6 +715,8 @@ describe('SessionManager', () => {
 					'claude',
 					'--model',
 					'opus',
+					'--teammate-mode',
+					'in-process',
 				],
 				expect.any(Object),
 			);
@@ -764,7 +766,7 @@ describe('SessionManager', () => {
 			// Should spawn with devcontainer exec command
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude'],
+				['exec', '--workspace-folder', '.', '--', 'claude', '--teammate-mode', 'in-process'],
 				expect.objectContaining({
 					cwd: '/test/worktree2',
 				}),
@@ -854,6 +856,8 @@ describe('SessionManager', () => {
 					'vscode',
 					'--',
 					'claude',
+					'--teammate-mode',
+					'in-process',
 				],
 				expect.any(Object),
 			);
@@ -909,6 +913,8 @@ describe('SessionManager', () => {
 					'claude',
 					'-m',
 					'claude-3-opus',
+					'--teammate-mode',
+					'in-process',
 				],
 				expect.any(Object),
 			);
@@ -964,7 +970,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--invalid-flag'],
+				['exec', '--workspace-folder', '.', '--', 'claude', '--invalid-flag', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -974,12 +980,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called with empty args
+			// Verify fallback spawn was called with teammate-mode args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude'], // No args after claude
+				['exec', '--workspace-folder', '.', '--', 'claude', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -1037,7 +1043,7 @@ describe('SessionManager', () => {
 			expect(spawn).toHaveBeenCalledTimes(1);
 			expect(spawn).toHaveBeenCalledWith(
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude', '--bad-flag'],
+				['exec', '--workspace-folder', '.', '--', 'claude', '--bad-flag', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
@@ -1047,12 +1053,12 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called (with no args since commandConfig was removed)
+			// Verify fallback spawn was called with teammate-mode args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'devcontainer',
-				['exec', '--workspace-folder', '.', '--', 'claude'],
+				['exec', '--workspace-folder', '.', '--', 'claude', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 

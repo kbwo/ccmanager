@@ -26,6 +26,7 @@ import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
 import {getBackgroundTaskTag} from '../constants/statusIcons.js';
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
+import {injectTeammateMode} from '../utils/commandArgs.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const TERMINAL_CONTENT_MAX_LINES = 300;
@@ -361,7 +362,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 
 				const command = preset.command;
-				const args = preset.args || [];
+				const args = injectTeammateMode(
+					preset.command,
+					preset.args || [],
+					preset.detectionStrategy,
+				);
 
 				// Spawn the process - fallback will be handled by setupExitHandler
 				const ptyProcess = await this.spawn(command, args, worktreePath);
@@ -456,7 +461,17 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						const execArgs = execParts.slice(1);
 
 						// Build fallback command for devcontainer
-						const fallbackFullArgs = [...execArgs, '--', 'claude'];
+						const fallbackClaudeArgs = injectTeammateMode(
+							'claude',
+							[],
+							session.detectionStrategy,
+						);
+						const fallbackFullArgs = [
+							...execArgs,
+							'--',
+							'claude',
+							...fallbackClaudeArgs,
+						];
 
 						fallbackProcess = await this.spawn(
 							devcontainerCmd,
@@ -465,9 +480,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						);
 					} else {
 						// Regular fallback without devcontainer
-						fallbackProcess = await this.spawn(
+						const fallbackArgs = injectTeammateMode(
 							'claude',
 							[],
+							session.detectionStrategy,
+						);
+						fallbackProcess = await this.spawn(
+							'claude',
+							fallbackArgs,
 							session.worktreePath,
 						);
 					}
@@ -842,12 +862,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				const execArgs = execParts.slice(1);
 
 				// Build the full command: devcontainer exec [args] -- [preset command] [preset args]
-				const fullArgs = [
-					...execArgs,
-					'--',
+				const presetArgs = injectTeammateMode(
 					preset.command,
-					...(preset.args || []),
-				];
+					preset.args || [],
+					preset.detectionStrategy,
+				);
+				const fullArgs = [...execArgs, '--', preset.command, ...presetArgs];
 
 				// Spawn the process within devcontainer
 				const ptyProcess = await this.spawn(

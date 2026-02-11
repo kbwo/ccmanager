@@ -162,6 +162,16 @@ CCManager supports configuring the command and arguments used to run Claude Code
 
 For detailed configuration options and examples, see [docs/command-config.md](docs/command-config.md).
 
+## Claude Code Teammate Mode
+
+When running the `claude` command with the default (`claude`) detection strategy, CCManager automatically appends `--teammate-mode in-process` to the CLI arguments. This prevents conflicts between Claude Code's agent teams feature and ccmanager's PTY-based session management.
+
+- **Automatic**: No configuration needed. CCManager injects the flag for all `claude` command sessions.
+- **Override**: If you explicitly specify `--teammate-mode` in your preset args, your value takes priority.
+- **Non-claude commands**: Other AI assistants (Gemini, Codex, etc.) are not affected.
+
+Setting `"teammateMode": "in-process"` in Claude Code's `settings.json` alone is not sufficient when running inside a tmux-like environment, which is why CCManager controls this via the CLI argument.
+
 
 ## Session Data Copying
 
