@@ -31,6 +31,7 @@ vi.mock('./stateDetector/index.js', () => ({
 	createStateDetector: () => ({
 		detectState: detectStateMock,
 		detectBackgroundTask: () => false,
+		detectTeamMembers: () => 0,
 	}),
 }));
 

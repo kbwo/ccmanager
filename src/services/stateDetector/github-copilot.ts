@@ -28,4 +28,8 @@ export class GitHubCopilotStateDetector extends BaseStateDetector {
 	detectBackgroundTask(_terminal: Terminal): number {
 		return 0;
 	}
+
+	detectTeamMembers(_terminal: Terminal): number {
+		return 0;
+	}
 }

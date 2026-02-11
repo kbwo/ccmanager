@@ -163,6 +163,7 @@ describe('Menu - Recent Projects', () => {
 			pending_auto_approval: 0,
 			total: 0,
 			backgroundTasks: 0,
+			teamMembers: 0,
 		});
 		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
 
@@ -232,6 +233,7 @@ describe('Menu - Recent Projects', () => {
 			pending_auto_approval: 0,
 			total: 0,
 			backgroundTasks: 0,
+			teamMembers: 0,
 		});
 		vi.spyOn(SessionManager, 'formatSessionCounts').mockReturnValue('');
 

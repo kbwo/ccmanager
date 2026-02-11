@@ -24,7 +24,10 @@ import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
 import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
-import {getBackgroundTaskTag} from '../constants/statusIcons.js';
+import {
+	getBackgroundTaskTag,
+	getTeamMemberTag,
+} from '../constants/statusIcons.js';
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
 import {injectTeammateMode} from '../utils/commandArgs.js';
 const {Terminal} = pkg;
@@ -38,6 +41,7 @@ export interface SessionCounts {
 	pending_auto_approval: number;
 	total: number;
 	backgroundTasks: number;
+	teamMembers: number;
 }
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -84,6 +88,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	detectBackgroundTask(session: Session): number {
 		return session.stateDetector.detectBackgroundTask(session.terminal);
+	}
+
+	detectTeamMembers(session: Session): number {
+		return session.stateDetector.detectTeamMembers(session.terminal);
 	}
 
 	private getTerminalContent(session: Session): string {
@@ -603,6 +611,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					backgroundTaskCount,
 				}));
 			}
+
+			// Detect and update team member count
+			const teamMemberCount = this.detectTeamMembers(session);
+			if (currentStateData.teamMemberCount !== teamMemberCount) {
+				void session.stateMutex.update(data => ({
+					...data,
+					teamMemberCount,
+				}));
+			}
 		}, STATE_CHECK_INTERVAL_MS);
 
 		// Setup exit handler
@@ -915,6 +932,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			pending_auto_approval: 0,
 			total: sessions.length,
 			backgroundTasks: 0,
+			teamMembers: 0,
 		};
 
 		sessions.forEach(session => {
@@ -934,6 +952,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					break;
 			}
 			counts.backgroundTasks += stateData.backgroundTaskCount;
+			counts.teamMembers += stateData.teamMemberCount;
 		});
 
 		return counts;
@@ -961,6 +980,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		const bgTag = getBackgroundTaskTag(counts.backgroundTasks);
 		const bgSuffix = bgTag ? ` ${bgTag}` : '';
-		return ` (${parts.join(' / ')}${bgSuffix})`;
+		const teamTag = getTeamMemberTag(counts.teamMembers);
+		const teamSuffix = teamTag ? ` ${teamTag}` : '';
+		return ` (${parts.join(' / ')}${bgSuffix}${teamSuffix})`;
 	}
 }

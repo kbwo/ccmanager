@@ -2,6 +2,7 @@ import {describe, it, expect} from 'vitest';
 import {
 	getStatusDisplay,
 	getBackgroundTaskTag,
+	getTeamMemberTag,
 	STATUS_ICONS,
 	STATUS_LABELS,
 	STATUS_TAGS,
@@ -104,5 +105,49 @@ describe('getBackgroundTaskTag', () => {
 	it('should return [BG:10] when count is 10', () => {
 		const result = getBackgroundTaskTag(10);
 		expect(result).toBe('\x1b[2m[BG:10]\x1b[0m');
+	});
+});
+
+describe('getTeamMemberTag', () => {
+	it('should return empty string when count is 0', () => {
+		expect(getTeamMemberTag(0)).toBe('');
+	});
+
+	it('should return empty string when count is negative', () => {
+		expect(getTeamMemberTag(-1)).toBe('');
+		expect(getTeamMemberTag(-100)).toBe('');
+	});
+
+	it('should return [Team:1] when count is 1', () => {
+		expect(getTeamMemberTag(1)).toBe('\x1b[2m[Team:1]\x1b[0m');
+	});
+
+	it('should return [Team:4] when count is 4', () => {
+		expect(getTeamMemberTag(4)).toBe('\x1b[2m[Team:4]\x1b[0m');
+	});
+
+	it('should return [Team:10] when count is 10', () => {
+		expect(getTeamMemberTag(10)).toBe('\x1b[2m[Team:10]\x1b[0m');
+	});
+});
+
+describe('getStatusDisplay with team members', () => {
+	it('should append [Team:4] badge when teamMemberCount is 4', () => {
+		const result = getStatusDisplay('busy', 0, 4);
+		expect(result).toBe(
+			`${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY} \x1b[2m[Team:4]\x1b[0m`,
+		);
+	});
+
+	it('should append both [BG] and [Team:4] badges', () => {
+		const result = getStatusDisplay('busy', 1, 4);
+		expect(result).toBe(
+			`${STATUS_ICONS.BUSY} ${STATUS_LABELS.BUSY} ${STATUS_TAGS.BACKGROUND_TASK} \x1b[2m[Team:4]\x1b[0m`,
+		);
+	});
+
+	it('should not append [Team] badge when teamMemberCount is 0', () => {
+		const result = getStatusDisplay('idle', 0, 0);
+		expect(result).toBe(`${STATUS_ICONS.IDLE} ${STATUS_LABELS.IDLE}`);
 	});
 });

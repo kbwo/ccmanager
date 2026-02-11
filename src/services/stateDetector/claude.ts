@@ -63,4 +63,22 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		// No background task detected
 		return 0;
 	}
+
+	detectTeamMembers(terminal: Terminal): number {
+		const lines = this.getTerminalLines(terminal, 3);
+
+		// Look for the team member line containing "shift+↑ to expand"
+		const teamLine = lines.find(line => {
+			const lower = line.toLowerCase();
+			return (
+				lower.includes('shift+↑ to expand') ||
+				lower.includes('shift+up to expand')
+			);
+		});
+		if (!teamLine) return 0;
+
+		// Extract @name patterns
+		const members = teamLine.match(/@[\w-]+/g);
+		return members ? members.length : 0;
+	}
 }

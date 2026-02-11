@@ -90,6 +90,7 @@ export interface SessionStateData {
 	autoApprovalReason: string | undefined;
 	autoApprovalAbortController: AbortController | undefined;
 	backgroundTaskCount: number;
+	teamMemberCount: number;
 }
 
 /**
@@ -104,5 +105,6 @@ export function createInitialSessionStateData(): SessionStateData {
 		autoApprovalReason: undefined,
 		autoApprovalAbortController: undefined,
 		backgroundTaskCount: 0,
+		teamMemberCount: 0,
 	};
 }

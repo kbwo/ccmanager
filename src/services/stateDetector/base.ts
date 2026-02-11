@@ -18,4 +18,6 @@ export abstract class BaseStateDetector implements StateDetector {
 	}
 
 	abstract detectBackgroundTask(terminal: Terminal): number;
+
+	abstract detectTeamMembers(terminal: Terminal): number;
 }
