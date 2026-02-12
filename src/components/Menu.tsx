@@ -672,6 +672,11 @@ const Menu: React.FC<MenuProps> = ({
 					items={items}
 					onSelect={item => handleSelect(item as MenuItem)}
 					onHighlight={item => {
+						// ink-select-input may call onHighlight with undefined when items are empty
+						// (e.g., during menu re-mount after returning from a session), so guard it.
+						if (!item) {
+							return;
+						}
 						const menuItem = item as MenuItem;
 						if (menuItem.type === 'worktree') {
 							setHighlightedWorktreePath(menuItem.worktree.path);
