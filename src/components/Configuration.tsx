@@ -6,6 +6,7 @@ import ConfigureStatusHooks from './ConfigureStatusHooks.js';
 import ConfigureWorktreeHooks from './ConfigureWorktreeHooks.js';
 import ConfigureWorktree from './ConfigureWorktree.js';
 import ConfigureCommand from './ConfigureCommand.js';
+import ConfigureMerge from './ConfigureMerge.js';
 import ConfigureOther from './ConfigureOther.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {ConfigScope} from '../types/index.js';
@@ -23,6 +24,7 @@ type ConfigView =
 	| 'worktreeHooks'
 	| 'worktree'
 	| 'presets'
+	| 'mergeConfig'
 	| 'other';
 
 interface MenuItem {
@@ -61,6 +63,10 @@ const ConfigurationContent: React.FC<{
 			value: 'presets',
 		},
 		{
+			label: 'M 🔀  Configure Merge/Rebase',
+			value: 'mergeConfig',
+		},
+		{
 			label: 'O 🧪  Other & Experimental',
 			value: 'other',
 		},
@@ -83,6 +89,8 @@ const ConfigurationContent: React.FC<{
 			setView('worktree');
 		} else if (item.value === 'presets') {
 			setView('presets');
+		} else if (item.value === 'mergeConfig') {
+			setView('mergeConfig');
 		} else if (item.value === 'other') {
 			setView('other');
 		}
@@ -113,6 +121,9 @@ const ConfigurationContent: React.FC<{
 				break;
 			case 'c':
 				setView('presets');
+				break;
+			case 'm':
+				setView('mergeConfig');
 				break;
 			case 'o':
 				setView('other');
@@ -146,6 +157,10 @@ const ConfigurationContent: React.FC<{
 
 	if (view === 'presets') {
 		return <ConfigureCommand onComplete={handleSubMenuComplete} />;
+	}
+
+	if (view === 'mergeConfig') {
+		return <ConfigureMerge onComplete={handleSubMenuComplete} />;
 	}
 
 	if (view === 'other') {

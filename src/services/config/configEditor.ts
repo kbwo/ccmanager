@@ -6,6 +6,7 @@ import {
 	WorktreeHookConfig,
 	WorktreeConfig,
 	CommandPresetsConfig,
+	MergeConfig,
 	IConfigEditor,
 	AutoApprovalConfig,
 } from '../../types/index.js';
@@ -105,6 +106,22 @@ export class ConfigEditor implements IConfigEditor {
 
 	setCommandPresets(value: CommandPresetsConfig): void {
 		this.configEditor.setCommandPresets(value);
+	}
+
+	getMergeConfig(): MergeConfig | undefined {
+		const globalConfig = globalConfigManager.getMergeConfig();
+		const scopedConfig = this.configEditor.getMergeConfig();
+
+		if (!globalConfig && !scopedConfig) return undefined;
+
+		return {
+			...(globalConfig || {}),
+			...(scopedConfig || {}),
+		};
+	}
+
+	setMergeConfig(value: MergeConfig): void {
+		this.configEditor.setMergeConfig(value);
 	}
 
 	getAutoApprovalConfig(): AutoApprovalConfig | undefined {

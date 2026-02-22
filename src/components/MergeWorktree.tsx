@@ -3,9 +3,11 @@ import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
 import {WorktreeService} from '../services/worktreeService.js';
+import {configReader} from '../services/config/configReader.js';
 import Confirmation, {SimpleConfirmation} from './Confirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
 import {GitError} from '../types/errors.js';
+import {MergeConfig} from '../types/index.js';
 import {hasUncommittedChanges} from '../utils/gitUtils.js';
 
 interface MergeWorktreeProps {
@@ -40,9 +42,12 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	const [originalBranchItems, setOriginalBranchItems] = useState<BranchItem[]>(
 		[],
 	);
-	const [useRebase, setUseRebase] = useState(false);
+	const [operation, setOperation] = useState<'merge' | 'rebase'>('merge');
 	const [mergeError, setMergeError] = useState<string | null>(null);
 	const [worktreeService] = useState(() => new WorktreeService());
+	const [mergeConfig] = useState<MergeConfig | undefined>(() =>
+		configReader.getMergeConfig(),
+	);
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -129,7 +134,8 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 					worktreeService.mergeWorktreeEffect(
 						sourceBranch,
 						targetBranch,
-						useRebase,
+						operation,
+						mergeConfig,
 					),
 				);
 
@@ -149,7 +155,14 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		};
 
 		performMerge();
-	}, [step, sourceBranch, targetBranch, useRebase, worktreeService]);
+	}, [
+		step,
+		sourceBranch,
+		targetBranch,
+		operation,
+		mergeConfig,
+		worktreeService,
+	]);
 
 	// Check for uncommitted changes in source worktree when entering check-uncommitted step
 	useEffect(() => {
@@ -289,7 +302,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		);
 
 		const handleOperationSelect = (value: string) => {
-			setUseRebase(value === 'rebase');
+			setOperation(value as 'merge' | 'rebase');
 			setStep('confirm-merge');
 		};
 
@@ -309,19 +322,20 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	}
 
 	if (step === 'confirm-merge') {
+		const operationLabel = operation === 'rebase' ? 'Rebase' : 'Merge';
+		const preposition = operation === 'rebase' ? 'onto' : 'into';
+
 		const confirmMessage = (
 			<Box flexDirection="column">
 				<Box marginBottom={1}>
 					<Text bold color="green">
-						Confirm {useRebase ? 'Rebase' : 'Merge'}
+						Confirm {operationLabel}
 					</Text>
 				</Box>
 
 				<Text>
-					{useRebase ? 'Rebase' : 'Merge'}{' '}
-					<Text color="yellow">{sourceBranch}</Text>{' '}
-					{useRebase ? 'onto' : 'into'}{' '}
-					<Text color="yellow">{targetBranch}</Text>?
+					{operationLabel} <Text color="yellow">{sourceBranch}</Text>{' '}
+					{preposition} <Text color="yellow">{targetBranch}</Text>?
 				</Text>
 			</Box>
 		);
@@ -336,21 +350,21 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	}
 
 	if (step === 'executing-merge') {
+		const executingLabel = operation === 'rebase' ? 'Rebasing' : 'Merging';
 		return (
 			<Box flexDirection="column">
-				<Text color="green">
-					{useRebase ? 'Rebasing' : 'Merging'} branches...
-				</Text>
+				<Text color="green">{executingLabel} branches...</Text>
 			</Box>
 		);
 	}
 
 	if (step === 'merge-error') {
+		const errorLabel = operation === 'rebase' ? 'Rebase' : 'Merge';
 		return (
 			<Box flexDirection="column">
 				<Box marginBottom={1}>
 					<Text bold color="red">
-						{useRebase ? 'Rebase' : 'Merge'} Failed
+						{errorLabel} Failed
 					</Text>
 				</Box>
 				<Box marginBottom={1}>

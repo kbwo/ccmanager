@@ -13,6 +13,7 @@ import {
 	ShortcutConfig,
 	WorktreeConfig,
 	CommandPresetsConfig,
+	MergeConfig,
 	DEFAULT_SHORTCUTS,
 	IConfigEditor,
 } from '../../types/index.js';
@@ -251,6 +252,15 @@ class GlobalConfigManager implements IConfigEditor {
 
 	setCommandPresets(presets: CommandPresetsConfig): void {
 		this.config.commandPresets = presets;
+		this.saveConfig();
+	}
+
+	getMergeConfig(): MergeConfig | undefined {
+		return this.config.mergeConfig;
+	}
+
+	setMergeConfig(mergeConfig: MergeConfig): void {
+		this.config.mergeConfig = mergeConfig;
 		this.saveConfig();
 	}
 

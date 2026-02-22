@@ -969,7 +969,7 @@ branch refs/heads/feature
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
-			const effect = service.mergeWorktreeEffect('feature', 'main', false);
+			const effect = service.mergeWorktreeEffect('feature', 'main', 'merge');
 			await Effect.runPromise(effect);
 
 			expect(execSync).toHaveBeenCalledWith(
@@ -997,7 +997,7 @@ branch refs/heads/main
 			const effect = service.mergeWorktreeEffect(
 				'feature',
 				'nonexistent',
-				false,
+				'merge',
 			);
 			const result = await Effect.runPromise(Effect.either(effect));
 
@@ -1009,6 +1009,182 @@ branch refs/heads/main
 			} else {
 				expect.fail('Should have returned Left with GitError');
 			}
+		});
+
+		it('should use custom merge args from MergeConfig', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git merge')) {
+						return 'Merge successful';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect('feature', 'main', 'merge', {
+				mergeArgs: ['--squash'],
+			});
+			await Effect.runPromise(effect);
+
+			expect(execSync).toHaveBeenCalledWith(
+				'git merge --squash "feature"',
+				expect.any(Object),
+			);
+		});
+
+		it('should use default --no-ff when mergeArgs not specified in MergeConfig', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git merge')) {
+						return 'Merge successful';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect('feature', 'main', 'merge', {
+				rebaseArgs: ['--autosquash'],
+			});
+			await Effect.runPromise(effect);
+
+			expect(execSync).toHaveBeenCalledWith(
+				'git merge --no-ff "feature"',
+				expect.any(Object),
+			);
+		});
+
+		it('should use custom rebase args from MergeConfig', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git rebase')) {
+						return 'Rebase successful';
+					}
+					if (cmd.includes('git merge --ff-only')) {
+						return 'Fast-forward merge successful';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect('feature', 'main', 'rebase', {
+				rebaseArgs: ['--autosquash', '--interactive'],
+			});
+			await Effect.runPromise(effect);
+
+			expect(execSync).toHaveBeenCalledWith(
+				'git rebase --autosquash --interactive "main"',
+				expect.any(Object),
+			);
+		});
+
+		it('should use empty rebase args by default when MergeConfig has no rebaseArgs', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git rebase')) {
+						return 'Rebase successful';
+					}
+					if (cmd.includes('git merge --ff-only')) {
+						return 'Fast-forward merge successful';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect('feature', 'main', 'rebase', {
+				mergeArgs: ['--squash'],
+			});
+			await Effect.runPromise(effect);
+
+			expect(execSync).toHaveBeenCalledWith(
+				'git rebase "main"',
+				expect.any(Object),
+			);
+		});
+
+		it('should use multiple merge args from MergeConfig', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+					if (cmd.includes('git merge')) {
+						return 'Merge successful';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.mergeWorktreeEffect('feature', 'main', 'merge', {
+				mergeArgs: ['--no-ff', '--no-edit'],
+			});
+			await Effect.runPromise(effect);
+
+			expect(execSync).toHaveBeenCalledWith(
+				'git merge --no-ff --no-edit "feature"',
+				expect.any(Object),
+			);
 		});
 
 		it('should return Effect that fails with GitError on merge conflict', async () => {
@@ -1037,7 +1213,7 @@ branch refs/heads/feature
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
-			const effect = service.mergeWorktreeEffect('feature', 'main', false);
+			const effect = service.mergeWorktreeEffect('feature', 'main', 'merge');
 			const result = await Effect.runPromise(Effect.either(effect));
 
 			if (result._tag === 'Left') {

@@ -12,6 +12,7 @@ import {
 	WorktreeHookConfig,
 	WorktreeConfig,
 	CommandPresetsConfig,
+	MergeConfig,
 	IConfigEditor,
 	AutoApprovalConfig,
 } from '../../types/index.js';
@@ -134,6 +135,16 @@ class ProjectConfigManager implements IConfigEditor {
 	setCommandPresets(value: CommandPresetsConfig): void {
 		const config = this.ensureProjectConfig();
 		config.commandPresets = value;
+		this.saveProjectConfig();
+	}
+
+	getMergeConfig(): MergeConfig | undefined {
+		return this.projectConfig?.mergeConfig;
+	}
+
+	setMergeConfig(value: MergeConfig): void {
+		const config = this.ensureProjectConfig();
+		config.mergeConfig = value;
 		this.saveProjectConfig();
 	}
 
