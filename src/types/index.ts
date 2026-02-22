@@ -117,6 +117,11 @@ export interface WorktreeConfig {
 	autoUseDefaultBranch?: boolean; // Whether to automatically use default branch as base branch
 }
 
+export interface MergeConfig {
+	mergeArgs?: string[]; // Args for git merge (default: ['--no-ff'])
+	rebaseArgs?: string[]; // Args for git rebase (default: [])
+}
+
 export interface CommandPreset {
 	id: string; // Unique identifier for the preset
 	name: string; // User-friendly name for the preset
@@ -143,6 +148,7 @@ export interface ConfigurationData {
 	worktreeHooks?: WorktreeHookConfig;
 	worktree?: WorktreeConfig;
 	commandPresets?: CommandPresetsConfig;
+	mergeConfig?: MergeConfig;
 	autoApproval?: {
 		enabled: boolean; // Whether auto-approval is enabled
 		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse
@@ -167,6 +173,7 @@ export interface ProjectConfigurationData {
 	worktreeHooks?: WorktreeHookConfig;
 	worktree?: WorktreeConfig;
 	commandPresets?: CommandPresetsConfig;
+	mergeConfig?: MergeConfig;
 	autoApproval?: AutoApprovalConfig;
 }
 
@@ -190,6 +197,9 @@ export interface IConfigReader {
 
 	// Command Presets
 	getCommandPresets(): CommandPresetsConfig | undefined;
+
+	// Merge Config
+	getMergeConfig(): MergeConfig | undefined;
 
 	// Auto Approval
 	getAutoApprovalConfig(): AutoApprovalConfig | undefined;
@@ -218,6 +228,9 @@ export interface IConfigEditor extends IConfigReader {
 
 	// Command Presets
 	setCommandPresets(value: CommandPresetsConfig): void;
+
+	// Merge Config
+	setMergeConfig(value: MergeConfig): void;
 
 	// Auto Approval
 	setAutoApprovalConfig(value: AutoApprovalConfig): void;
@@ -325,7 +338,8 @@ export interface IWorktreeService {
 	mergeWorktreeEffect(
 		sourceBranch: string,
 		targetBranch: string,
-		useRebase?: boolean,
+		operation?: 'merge' | 'rebase',
+		mergeConfig?: MergeConfig,
 	): import('effect').Effect.Effect<
 		void,
 		import('../types/errors.js').GitError,

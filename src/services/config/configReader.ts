@@ -5,6 +5,7 @@ import {
 	WorktreeHookConfig,
 	WorktreeConfig,
 	CommandPresetsConfig,
+	MergeConfig,
 	CommandPreset,
 	ConfigurationData,
 	IConfigReader,
@@ -78,6 +79,19 @@ export class ConfigReader implements IConfigReader {
 		};
 	}
 
+	// Merge Config - returns merged value (project fields override global fields)
+	getMergeConfig(): MergeConfig | undefined {
+		const globalConfig = globalConfigManager.getMergeConfig();
+		const projectConfig = projectConfigManager.getMergeConfig();
+
+		if (!globalConfig && !projectConfig) return undefined;
+
+		return {
+			...(globalConfig || {}),
+			...(projectConfig || {}),
+		};
+	}
+
 	// Get full merged configuration
 	getConfiguration(): ConfigurationData {
 		return {
@@ -86,6 +100,7 @@ export class ConfigReader implements IConfigReader {
 			worktreeHooks: this.getWorktreeHooks(),
 			worktree: this.getWorktreeConfig(),
 			commandPresets: this.getCommandPresets(),
+			mergeConfig: this.getMergeConfig(),
 			autoApproval: this.getAutoApprovalConfig(),
 		};
 	}

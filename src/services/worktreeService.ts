@@ -6,6 +6,7 @@ import {
 	Worktree,
 	AmbiguousBranchError,
 	RemoteBranchMatch,
+	MergeConfig,
 } from '../types/index.js';
 import {GitError, FileSystemError, ProcessError} from '../types/errors.js';
 import {setWorktreeParentBranch} from '../utils/worktreeConfig.js';
@@ -1157,38 +1158,17 @@ export class WorktreeService {
 	 *
 	 * @param {string} sourceBranch - Branch to merge from
 	 * @param {string} targetBranch - Branch to merge into
-	 * @param {boolean} useRebase - Whether to use rebase instead of merge (default: false)
+	 * @param {'merge' | 'rebase'} operation - The merge operation to perform (default: 'merge')
+	 * @param {MergeConfig} mergeConfig - Optional configuration for merge/rebase arguments
 	 * @returns {Effect.Effect<void, GitError, never>} Effect that completes successfully or fails with GitError
-	 *
-	 * @example
-	 * ```typescript
-	 * // Merge with Effect.all for parallel operations
-	 * await Effect.runPromise(
-	 *   Effect.all([
-	 *     effect1,
-	 *     effect2
-	 *   ], {concurrency: 1}) // Sequential to avoid conflicts
-	 * );
-	 *
-	 * // Or use Effect.catchAll for fallback behavior
-	 * const result = await Effect.runPromise(
-	 *   Effect.catchAll(
-	 *     effect,
-	 *     (error: GitError) => {
-	 *       console.error(`Merge failed: ${error.stderr}`);
-	 *       // Return alternative Effect or rethrow
-	 *       return Effect.fail(error);
-	 *     }
-	 *   )
-	 * );
-	 * ```
 	 *
 	 * @throws {GitError} When git merge/rebase command fails or worktrees not found
 	 */
 	mergeWorktreeEffect(
 		sourceBranch: string,
 		targetBranch: string,
-		useRebase = false,
+		operation: 'merge' | 'rebase' = 'merge',
+		mergeConfig?: MergeConfig,
 	): Effect.Effect<void, GitError, never> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
 		const self = this;
@@ -1204,15 +1184,15 @@ export class WorktreeService {
 			if (!targetWorktree) {
 				return yield* Effect.fail(
 					new GitError({
-						command: useRebase ? 'git rebase' : 'git merge',
+						command: operation === 'rebase' ? 'git rebase' : 'git merge',
 						exitCode: 1,
 						stderr: 'Target branch worktree not found',
 					}),
 				);
 			}
 
-			// Perform the merge or rebase in the target worktree
-			if (useRebase) {
+			if (operation === 'rebase') {
+				const rebaseArgs = mergeConfig?.rebaseArgs ?? [];
 				// For rebase, we need to checkout source branch and rebase it onto target
 				const sourceWorktree = worktrees.find(
 					wt =>
@@ -1230,9 +1210,12 @@ export class WorktreeService {
 				}
 
 				// Rebase source branch onto target branch
+				const rebaseCmd = `git rebase ${rebaseArgs.join(' ')} "${targetBranch}"`
+					.replace(/\s+/g, ' ')
+					.trim();
 				yield* Effect.try({
 					try: () => {
-						execSync(`git rebase "${targetBranch}"`, {
+						execSync(rebaseCmd, {
 							cwd: sourceWorktree.path,
 							encoding: 'utf8',
 						});
@@ -1244,7 +1227,7 @@ export class WorktreeService {
 							stdout?: string;
 						};
 						return new GitError({
-							command: `git rebase "${targetBranch}"`,
+							command: rebaseCmd,
 							exitCode: execError.status || 1,
 							stderr: execError.stderr || String(error),
 							stdout: execError.stdout,
@@ -1276,9 +1259,11 @@ export class WorktreeService {
 				});
 			} else {
 				// Regular merge
+				const mergeArgs = mergeConfig?.mergeArgs ?? ['--no-ff'];
+				const mergeCmd = `git merge ${mergeArgs.join(' ')} "${sourceBranch}"`;
 				yield* Effect.try({
 					try: () => {
-						execSync(`git merge --no-ff "${sourceBranch}"`, {
+						execSync(mergeCmd, {
 							cwd: targetWorktree.path,
 							encoding: 'utf8',
 						});
@@ -1290,7 +1275,7 @@ export class WorktreeService {
 							stdout?: string;
 						};
 						return new GitError({
-							command: `git merge --no-ff "${sourceBranch}"`,
+							command: mergeCmd,
 							exitCode: execError.status || 1,
 							stderr: execError.stderr || String(error),
 							stdout: execError.stdout,
