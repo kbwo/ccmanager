@@ -135,6 +135,8 @@ vi.mock('../services/globalSessionOrchestrator.js', () => ({
 	globalSessionOrchestrator: {
 		getManagerForProject: getManagerForProjectMock,
 		destroyAllSessions: vi.fn(),
+		getProjectPaths: vi.fn(() => []),
+		getProjectSessions: vi.fn(() => []),
 	},
 }));
 
@@ -162,8 +164,8 @@ vi.mock(
 	createInkMock<MenuMockProps>('Menu View', props => (menuProps = props)),
 );
 vi.mock(
-	'./ProjectList.js',
-	createInkMock('Project List View', () => {}),
+	'./Dashboard.js',
+	createInkMock('Dashboard View', () => {}),
 );
 vi.mock(
 	'./NewWorktree.js',
@@ -262,7 +264,7 @@ describe('App component view state', () => {
 		const {lastFrame, unmount} = render(<App multiProject version="test" />);
 		await flush();
 
-		expect(lastFrame()).toContain('Project List View');
+		expect(lastFrame()).toContain('Dashboard View');
 
 		unmount();
 

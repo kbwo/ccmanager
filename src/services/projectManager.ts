@@ -237,12 +237,15 @@ export class ProjectManager implements IProjectManager {
 						// Quick check if this is a git repository
 						const hasGitDir = await this.hasGitDirectory(fullPath);
 						if (hasGitDir) {
-							// Found a git repository - add to tasks and skip subdirectories
-							if (!seen.has(fullPath)) {
+							// Only add main repositories (.git is a directory),
+							// not worktrees (.git is a file pointing to the main repo)
+							const isMain = await this.isMainGitRepository(fullPath);
+							if (isMain && !seen.has(fullPath)) {
 								seen.add(fullPath);
 								tasks.push({path: fullPath, relativePath});
 							}
-							return; // Early termination - don't walk subdirectories
+							// Early termination for any git-related dir
+							return;
 						}
 
 						// Not a git repo, continue walking subdirectories
@@ -262,13 +265,28 @@ export class ProjectManager implements IProjectManager {
 	}
 
 	/**
-	 * Quick check for .git directory without running git commands
+	 * Quick check for .git presence (directory or file) without running git commands.
+	 * Returns true for both main repositories and worktrees.
 	 */
 	private async hasGitDirectory(dirPath: string): Promise<boolean> {
 		try {
 			const gitPath = path.join(dirPath, '.git');
 			const stats = await fs.stat(gitPath);
-			return stats.isDirectory() || stats.isFile(); // File for worktrees
+			return stats.isDirectory() || stats.isFile();
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * Check if a directory is a main git repository (not a worktree).
+	 * Main repositories have .git as a directory; worktrees have .git as a file.
+	 */
+	private async isMainGitRepository(dirPath: string): Promise<boolean> {
+		try {
+			const gitPath = path.join(dirPath, '.git');
+			const stats = await fs.stat(gitPath);
+			return stats.isDirectory();
 		} catch {
 			return false;
 		}
@@ -327,11 +345,9 @@ export class ProjectManager implements IProjectManager {
 		};
 
 		try {
-			// Check if directory has .git (already validated in discoverDirectories)
-			// Double-check here to ensure it's still valid
-			const hasGit = await this.hasGitDirectory(task.path);
-			if (!hasGit) {
-				// Not a git repo, return null to filter it out
+			// Double-check here to ensure it's still a valid main repository
+			const isMain = await this.isMainGitRepository(task.path);
+			if (!isMain) {
 				return null;
 			}
 		} catch (error) {
