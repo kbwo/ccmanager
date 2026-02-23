@@ -2,7 +2,7 @@ import React, {useState, useEffect, useCallback} from 'react';
 import {useApp, Box, Text} from 'ink';
 import {Effect} from 'effect';
 import Menu from './Menu.js';
-import ProjectList from './ProjectList.js';
+import Dashboard from './Dashboard.js';
 import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
@@ -544,6 +544,20 @@ const App: React.FC<AppProps> = ({
 		navigateWithClear('menu');
 	};
 
+	const handleSelectSessionFromDashboard = (
+		session: ISession,
+		project: GitProject,
+	) => {
+		// Set the correct session manager for this project
+		const projectSessionManager =
+			globalSessionOrchestrator.getManagerForProject(project.path);
+		setSessionManager(projectSessionManager);
+		setWorktreeService(new WorktreeService(project.path));
+		// Don't set selectedProject so session exit returns to Dashboard
+		setActiveSession(session);
+		navigateWithClear('session');
+	};
+
 	const handleBackToProjectList = () => {
 		// Sessions persist in their project-specific managers
 		setSelectedProject(null);
@@ -567,11 +581,13 @@ const App: React.FC<AppProps> = ({
 		}
 
 		return (
-			<ProjectList
+			<Dashboard
 				projectsDir={projectsDir}
+				onSelectSession={handleSelectSessionFromDashboard}
 				onSelectProject={handleSelectProject}
 				error={error}
 				onDismissError={() => setError(null)}
+				version={version}
 			/>
 		);
 	}

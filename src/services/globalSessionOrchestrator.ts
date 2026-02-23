@@ -68,6 +68,10 @@ class GlobalSessionOrchestrator {
 		}
 	}
 
+	getProjectPaths(): string[] {
+		return Array.from(this.projectManagers.keys());
+	}
+
 	getProjectSessions(projectPath: string): Session[] {
 		const manager = this.projectManagers.get(projectPath);
 		if (manager) {

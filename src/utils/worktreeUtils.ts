@@ -16,7 +16,7 @@ const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 /**
  * Worktree item with formatted content for display.
  */
-interface WorktreeItem {
+export interface WorktreeItem {
 	worktree: Worktree;
 	session?: Session;
 	baseLabel: string;
