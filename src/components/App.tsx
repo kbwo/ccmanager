@@ -79,6 +79,9 @@ const App: React.FC<AppProps> = ({
 		null,
 	); // Store selected project in multi-project mode
 	const [configScope, setConfigScope] = useState<ConfigScope>('global'); // Store config scope for configuration view
+	const [pendingPromptSessions, setPendingPromptSessions] = useState<
+		Record<string, {presetId: string; initialPrompt: string}>
+	>({});
 
 	// State for remote branch disambiguation
 	const [pendingWorktreeCreation, setPendingWorktreeCreation] = useState<{
@@ -259,24 +262,14 @@ const App: React.FC<AppProps> = ({
 	) => {
 		if (result.success) {
 			if (creationData.presetId && creationData.initialPrompt) {
-				void (async () => {
-					setLoadingContext({isPromptFlow: true});
-					setView('creating-session-preset');
-
-					const sessionResult = await createSessionWithEffect(
-						creationData.path,
-						creationData.presetId,
-						creationData.initialPrompt,
-					);
-
-					if (!sessionResult.success) {
-						setError(sessionResult.errorMessage!);
-						setView('new-worktree');
-						return;
-					}
-
-					handleReturnToMenu();
-				})();
+				setPendingPromptSessions(current => ({
+					...current,
+					[creationData.path]: {
+						presetId: creationData.presetId!,
+						initialPrompt: creationData.initialPrompt!,
+					},
+				}));
+				handleReturnToMenu();
 				return;
 			}
 
@@ -356,28 +349,56 @@ const App: React.FC<AppProps> = ({
 
 		// Get or create session for this worktree
 		let session = sessionManager.getSession(worktree.path);
+		const pendingPromptSession = pendingPromptSessions[worktree.path];
 
 		if (!session) {
+			if (pendingPromptSession) {
+				setLoadingContext({isPromptFlow: true});
+				setView('creating-session-preset');
+
+				const result = await createSessionWithEffect(
+					worktree.path,
+					pendingPromptSession.presetId,
+					pendingPromptSession.initialPrompt,
+				);
+
+				if (!result.success) {
+					setError(result.errorMessage!);
+					navigateWithClear('menu');
+					return;
+				}
+
+				setPendingPromptSessions(current => {
+					const next = {...current};
+					delete next[worktree.path];
+					return next;
+				});
+
+				session = result.session!;
+			}
+
 			// Check if we should show preset selector
-			if (configReader.getSelectPresetOnStart()) {
+			if (!session && configReader.getSelectPresetOnStart()) {
 				setSelectedWorktree(worktree);
 				navigateWithClear('preset-selector');
 				return;
 			}
 
-			// Set loading state before async operation
-			setView('creating-session');
+			if (!session) {
+				// Set loading state before async operation
+				setView('creating-session');
 
-			// Use Effect-based session creation with default preset
-			const result = await createSessionWithEffect(worktree.path);
+				// Use Effect-based session creation with default preset
+				const result = await createSessionWithEffect(worktree.path);
 
-			if (!result.success) {
-				setError(result.errorMessage!);
-				navigateWithClear('menu');
-				return;
+				if (!result.success) {
+					setError(result.errorMessage!);
+					navigateWithClear('menu');
+					return;
+				}
+
+				session = result.session!;
 			}
-
-			session = result.session!;
 		}
 
 		setActiveSession(session);
