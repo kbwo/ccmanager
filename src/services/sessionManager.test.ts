@@ -174,6 +174,91 @@ describe('SessionManager', () => {
 			);
 		});
 
+		it('passes the initial prompt as the final argument for claude-compatible presets', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+				args: ['--resume'],
+				detectionStrategy: 'claude',
+			});
+
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect(
+					'/test/worktree',
+					undefined,
+					'implement prompt flow',
+				),
+			);
+
+			expect(spawn).toHaveBeenCalledWith(
+				'claude',
+				[
+					'--resume',
+					'--teammate-mode',
+					'in-process',
+					'implement prompt flow',
+				],
+				expect.any(Object),
+			);
+			expect(mockPty.write).not.toHaveBeenCalled();
+		});
+
+		it('passes the initial prompt with --prompt for opencode presets', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'OpenCode',
+				command: 'opencode',
+				args: ['run'],
+				detectionStrategy: 'opencode',
+			});
+
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect(
+					'/test/worktree',
+					undefined,
+					'implement prompt flow',
+				),
+			);
+
+			expect(spawn).toHaveBeenCalledWith(
+				'opencode',
+				['run', '--prompt', 'implement prompt flow'],
+				expect.any(Object),
+			);
+			expect(mockPty.write).not.toHaveBeenCalled();
+		});
+
+		it('writes the initial prompt to stdin for unknown commands', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Custom',
+				command: 'custom-agent',
+				args: ['--interactive'],
+			});
+
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect(
+					'/test/worktree',
+					undefined,
+					'implement prompt flow',
+				),
+			);
+
+			expect(spawn).toHaveBeenCalledWith(
+				'custom-agent',
+				['--interactive'],
+				expect.any(Object),
+			);
+			expect(mockPty.write).toHaveBeenCalledWith('implement prompt flow\r');
+		});
+
 		it('should fall back to default preset if specified preset not found', async () => {
 			// Setup mocks
 			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
