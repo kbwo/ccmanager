@@ -13,12 +13,7 @@ describe('presetPrompt', () => {
 				'fix the tests',
 			),
 		).toEqual({
-			args: [
-				'--resume',
-				'--teammate-mode',
-				'in-process',
-				'fix the tests',
-			],
+			args: ['--resume', '--teammate-mode', 'in-process', 'fix the tests'],
 			method: 'final-arg',
 		});
 	});

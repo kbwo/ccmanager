@@ -20,10 +20,7 @@ export const getPromptInjectionMethod = (
 ): PromptInjectionMethod => {
 	const commandName = getCommandName(preset.command);
 
-	if (
-		preset.detectionStrategy === 'opencode' ||
-		commandName === 'opencode'
-	) {
+	if (preset.detectionStrategy === 'opencode' || commandName === 'opencode') {
 		return 'flag';
 	}
 

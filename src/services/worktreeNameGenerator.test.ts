@@ -42,30 +42,26 @@ describe('WorktreeNameGenerator output parsing', () => {
 
 describe('deduplicateBranchName', () => {
 	it('returns the name unchanged when no conflict exists', () => {
-		expect(
-			deduplicateBranchName('feature/new', ['main', 'develop']),
-		).toBe('feature/new');
+		expect(deduplicateBranchName('feature/new', ['main', 'develop'])).toBe(
+			'feature/new',
+		);
 	});
 
 	it('appends -2 suffix when the name already exists', () => {
-		expect(
-			deduplicateBranchName('feature/new', ['feature/new', 'main']),
-		).toBe('feature/new-2');
+		expect(deduplicateBranchName('feature/new', ['feature/new', 'main'])).toBe(
+			'feature/new-2',
+		);
 	});
 
 	it('increments the suffix when multiple conflicts exist', () => {
 		expect(
-			deduplicateBranchName('fix/bug', [
-				'fix/bug',
-				'fix/bug-2',
-				'fix/bug-3',
-			]),
+			deduplicateBranchName('fix/bug', ['fix/bug', 'fix/bug-2', 'fix/bug-3']),
 		).toBe('fix/bug-4');
 	});
 
 	it('compares branch names case-insensitively', () => {
-		expect(
-			deduplicateBranchName('Feature/New', ['feature/new']),
-		).toBe('Feature/New-2');
+		expect(deduplicateBranchName('Feature/New', ['feature/new'])).toBe(
+			'Feature/New-2',
+		);
 	});
 });

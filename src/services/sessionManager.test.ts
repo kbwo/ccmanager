@@ -195,12 +195,7 @@ describe('SessionManager', () => {
 
 			expect(spawn).toHaveBeenCalledWith(
 				'claude',
-				[
-					'--resume',
-					'--teammate-mode',
-					'in-process',
-					'implement prompt flow',
-				],
+				['--resume', '--teammate-mode', 'in-process', 'implement prompt flow'],
 				expect.any(Object),
 			);
 			expect(mockPty.write).not.toHaveBeenCalled();

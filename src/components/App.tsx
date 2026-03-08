@@ -209,7 +209,9 @@ const App: React.FC<AppProps> = ({
 					return;
 				}
 
-				setView(options?.presetId ? 'creating-session-preset' : 'creating-session');
+				setView(
+					options?.presetId ? 'creating-session-preset' : 'creating-session',
+				);
 
 				const result = await createSessionWithEffect(
 					worktree.path,
@@ -476,9 +478,7 @@ const App: React.FC<AppProps> = ({
 		});
 	};
 
-	const handleCreateWorktree = async (
-		request: NewWorktreeRequest,
-	) => {
+	const handleCreateWorktree = async (request: NewWorktreeRequest) => {
 		setError(null);
 
 		let branch = request.creationMode === 'manual' ? request.branch : '';

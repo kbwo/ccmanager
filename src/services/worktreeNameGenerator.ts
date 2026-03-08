@@ -14,7 +14,10 @@ const JSON_SCHEMA = JSON.stringify({
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-const buildPrompt = (userPrompt: string, baseBranch: string): string => `You generate concise git branch names.
+const buildPrompt = (
+	userPrompt: string,
+	baseBranch: string,
+): string => `You generate concise git branch names.
 
 Base branch: ${baseBranch}
 Task prompt:
@@ -178,13 +181,7 @@ export class WorktreeNameGenerator {
 
 					child = execFile(
 						'claude',
-						[
-							'-p',
-							'--output-format',
-							'json',
-							'--json-schema',
-							JSON_SCHEMA,
-						],
+						['-p', '--output-format', 'json', '--json-schema', JSON_SCHEMA],
 						{
 							encoding: 'utf8',
 							maxBuffer: 1024 * 1024,

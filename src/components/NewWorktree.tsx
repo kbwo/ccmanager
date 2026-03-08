@@ -612,7 +612,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					</Box>
 					<Box marginTop={1}>
 						<Text dimColor>
-							Prompt delivery mode for this preset: <Text color="green">{promptMethod}</Text>
+							Prompt delivery mode for this preset:{' '}
+							<Text color="green">{promptMethod}</Text>
 						</Text>
 					</Box>
 				</Box>

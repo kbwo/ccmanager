@@ -386,8 +386,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					worktreePath,
 					ptyProcess,
 					{
-					isPrimaryCommand: true,
-					detectionStrategy: preset.detectionStrategy,
+						isPrimaryCommand: true,
+						detectionStrategy: preset.detectionStrategy,
 					},
 				);
 
@@ -888,9 +888,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					worktreePath,
 					ptyProcess,
 					{
-					isPrimaryCommand: true,
-					detectionStrategy: preset.detectionStrategy,
-					devcontainerConfig,
+						isPrimaryCommand: true,
+						detectionStrategy: preset.detectionStrategy,
+						devcontainerConfig,
 					},
 				);
 

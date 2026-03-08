@@ -113,7 +113,9 @@ const projectManagerMock = {
 };
 
 const worktreeNameGeneratorMock = {
-	generateBranchNameEffect: vi.fn(() => Effect.succeed('fix/trim-worktree-name')),
+	generateBranchNameEffect: vi.fn(() =>
+		Effect.succeed('fix/trim-worktree-name'),
+	),
 };
 
 function createInkMock<TProps>(
@@ -395,7 +397,9 @@ describe('App component loading state machine', () => {
 			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
 			200,
 		);
-		await waitForCondition(() => lastFrame()?.includes('Session View') ?? false);
+		await waitForCondition(
+			() => lastFrame()?.includes('Session View') ?? false,
+		);
 
 		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
 			createdPath,
