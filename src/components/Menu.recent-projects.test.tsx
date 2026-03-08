@@ -190,13 +190,12 @@ describe('Menu - Recent Projects', () => {
 			/>,
 		);
 
-		// Wait for Effect to execute
-		await new Promise(resolve => setTimeout(resolve, 100));
-
-		const output = lastFrame();
-		expect(output).toContain('─ Recent ─');
-		expect(output).toContain('Project 1');
-		expect(output).toContain('Project 2');
+		await vi.waitFor(() => {
+			const output = lastFrame();
+			expect(output).toContain('─ Recent ─');
+			expect(output).toContain('Project 1');
+			expect(output).toContain('Project 2');
+		});
 	});
 
 	it('should not show recent projects section when no recent projects', () => {
@@ -248,13 +247,12 @@ describe('Menu - Recent Projects', () => {
 			/>,
 		);
 
-		// Wait for Effect to execute
-		await new Promise(resolve => setTimeout(resolve, 100));
-
-		const output = lastFrame();
-		expect(output).toContain('─ Recent ─');
-		expect(output).toContain('Project 0');
-		expect(output).toContain('Project 4');
+		await vi.waitFor(() => {
+			const output = lastFrame();
+			expect(output).toContain('─ Recent ─');
+			expect(output).toContain('Project 0');
+			expect(output).toContain('Project 4');
+		});
 	});
 
 	it('should filter out current project from recent projects', async () => {
@@ -294,14 +292,13 @@ describe('Menu - Recent Projects', () => {
 			/>,
 		);
 
-		// Wait for the state to update and component to re-render
-		await new Promise(resolve => setTimeout(resolve, 50));
-
-		const output = lastFrame();
-		expect(output).toContain('─ Recent ─');
-		expect(output).not.toContain('Current Project');
-		expect(output).toContain('Project 1');
-		expect(output).toContain('Project 2');
+		await vi.waitFor(() => {
+			const output = lastFrame();
+			expect(output).toContain('─ Recent ─');
+			expect(output).not.toContain('Current Project');
+			expect(output).toContain('Project 1');
+			expect(output).toContain('Project 2');
+		});
 	});
 
 	it('should hide recent projects section when all projects are filtered out', () => {

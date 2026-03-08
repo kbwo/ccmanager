@@ -115,27 +115,163 @@ describe('presetPrompt', () => {
 		});
 	});
 
-	it('describes the configured prompt injection method', () => {
-		expect(
-			describePromptInjection({command: 'codex', detectionStrategy: 'codex'}),
-		).toContain('final command argument');
-		expect(
-			describePromptInjection({
-				command: 'opencode',
-				detectionStrategy: 'opencode',
-			}),
-		).toContain('--prompt');
-		expect(
-			describePromptInjection({
-				command: 'gemini',
-				detectionStrategy: 'gemini',
-			}),
-		).toContain('-i');
-		expect(getPromptInjectionMethod({command: 'custom-agent'})).toBe('stdin');
+	describe('describePromptInjection', () => {
+		it('describes final-arg for claude', () => {
+			expect(
+				describePromptInjection({
+					command: 'claude',
+					detectionStrategy: 'claude',
+				}),
+			).toContain('final command argument');
+		});
+
+		it('describes final-arg for codex', () => {
+			expect(
+				describePromptInjection({
+					command: 'codex',
+					detectionStrategy: 'codex',
+				}),
+			).toContain('final command argument');
+		});
+
+		it('describes final-arg for cursor', () => {
+			expect(
+				describePromptInjection({
+					command: 'agent',
+					detectionStrategy: 'cursor',
+				}),
+			).toContain('final command argument');
+		});
+
+		it('describes final-arg for cline', () => {
+			expect(
+				describePromptInjection({
+					command: 'cline',
+					detectionStrategy: 'cline',
+				}),
+			).toContain('final command argument');
+		});
+
+		it('describes --prompt flag for opencode', () => {
+			expect(
+				describePromptInjection({
+					command: 'opencode',
+					detectionStrategy: 'opencode',
+				}),
+			).toContain('--prompt');
+		});
+
+		it('describes -i flag for gemini', () => {
+			expect(
+				describePromptInjection({
+					command: 'gemini',
+					detectionStrategy: 'gemini',
+				}),
+			).toContain('-i');
+		});
+
+		it('describes -i flag for github-copilot', () => {
+			expect(
+				describePromptInjection({
+					command: 'copilot',
+					detectionStrategy: 'github-copilot',
+				}),
+			).toContain('-i');
+		});
+
+		it('describes -p flag for kimi', () => {
+			expect(
+				describePromptInjection({
+					command: 'kimi',
+					detectionStrategy: 'kimi',
+				}),
+			).toContain('-p');
+		});
+
+		it('describes stdin for unknown strategy', () => {
+			expect(describePromptInjection({command: 'custom-agent'})).toContain(
+				'standard input',
+			);
+		});
 	});
 
-	it('uses stdin when detectionStrategy is not set even for known command names', () => {
-		expect(getPromptInjectionMethod({command: 'claude'})).toBe('stdin');
-		expect(getPromptInjectionMethod({command: 'opencode'})).toBe('stdin');
+	describe('getPromptInjectionMethod', () => {
+		it('returns final-arg for claude', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'claude',
+					detectionStrategy: 'claude',
+				}),
+			).toBe('final-arg');
+		});
+
+		it('returns final-arg for codex', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'codex',
+					detectionStrategy: 'codex',
+				}),
+			).toBe('final-arg');
+		});
+
+		it('returns final-arg for cursor', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'agent',
+					detectionStrategy: 'cursor',
+				}),
+			).toBe('final-arg');
+		});
+
+		it('returns final-arg for cline', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'cline',
+					detectionStrategy: 'cline',
+				}),
+			).toBe('final-arg');
+		});
+
+		it('returns flag for opencode', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'opencode',
+					detectionStrategy: 'opencode',
+				}),
+			).toBe('flag');
+		});
+
+		it('returns flag for gemini', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'gemini',
+					detectionStrategy: 'gemini',
+				}),
+			).toBe('flag');
+		});
+
+		it('returns flag for github-copilot', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'copilot',
+					detectionStrategy: 'github-copilot',
+				}),
+			).toBe('flag');
+		});
+
+		it('returns flag for kimi', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'kimi',
+					detectionStrategy: 'kimi',
+				}),
+			).toBe('flag');
+		});
+
+		it('returns stdin when detectionStrategy is not set', () => {
+			expect(getPromptInjectionMethod({command: 'claude'})).toBe('stdin');
+			expect(getPromptInjectionMethod({command: 'opencode'})).toBe('stdin');
+			expect(getPromptInjectionMethod({command: 'custom-agent'})).toBe('stdin');
+		});
 	});
 });
