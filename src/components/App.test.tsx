@@ -166,6 +166,7 @@ vi.mock('../services/worktreeService.js', () => ({
 				createWorktreeEffectMock(...args),
 			deleteWorktreeEffect: (...args: Parameters<DeleteWorktreeEffect>) =>
 				deleteWorktreeEffectMock(...args),
+			getAllBranchesEffect: () => Effect.succeed([] as string[]),
 		};
 	}),
 }));

@@ -126,10 +126,28 @@ export const extractBranchNameFromOutput = (stdout: string): string => {
 	return normalizeBranchName(trimmed);
 };
 
+export const deduplicateBranchName = (
+	name: string,
+	existingBranches: string[],
+): string => {
+	const lowerSet = new Set(existingBranches.map(b => b.toLowerCase()));
+	if (!lowerSet.has(name.toLowerCase())) {
+		return name;
+	}
+
+	for (let i = 2; ; i++) {
+		const candidate = `${name}-${i}`;
+		if (!lowerSet.has(candidate.toLowerCase())) {
+			return candidate;
+		}
+	}
+};
+
 export class WorktreeNameGenerator {
 	generateBranchNameEffect(
 		userPrompt: string,
 		baseBranch: string,
+		existingBranches?: string[],
 	): Effect.Effect<string, ProcessError, never> {
 		return Effect.tryPromise({
 			try: () =>
@@ -178,7 +196,12 @@ export class WorktreeNameGenerator {
 									return;
 								}
 
-								resolve(extractBranchNameFromOutput(stdout));
+								const branchName = extractBranchNameFromOutput(stdout);
+								resolve(
+									existingBranches
+										? deduplicateBranchName(branchName, existingBranches)
+										: branchName,
+								);
 							});
 						},
 					);

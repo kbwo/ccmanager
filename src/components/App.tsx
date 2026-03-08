@@ -491,11 +491,18 @@ const App: React.FC<AppProps> = ({
 			});
 			setView('creating-worktree');
 
+			const allBranches = await Effect.runPromise(
+				Effect.either(worktreeService.getAllBranchesEffect()),
+			);
+			const existingBranches =
+				allBranches._tag === 'Right' ? allBranches.right : [];
+
 			const generatedBranch = await Effect.runPromise(
 				Effect.either(
 					worktreeNameGenerator.generateBranchNameEffect(
 						request.initialPrompt,
 						request.baseBranch,
+						existingBranches,
 					),
 				),
 			);
