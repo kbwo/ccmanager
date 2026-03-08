@@ -102,16 +102,15 @@ describe('presetPrompt', () => {
 		});
 	});
 
-	it('falls back to stdin for unknown commands', () => {
+	it('falls back to final-arg (claude default) for unknown commands', () => {
 		expect(
 			preparePresetLaunch(
 				{command: 'custom-agent', args: ['--interactive']},
 				'hello',
 			),
 		).toEqual({
-			args: ['--interactive'],
-			method: 'stdin',
-			stdinPayload: 'hello\r',
+			args: ['--interactive', 'hello'],
+			method: 'final-arg',
 		});
 	});
 
@@ -188,9 +187,9 @@ describe('presetPrompt', () => {
 			).toContain('-p');
 		});
 
-		it('describes stdin for unknown strategy', () => {
+		it('describes final-arg for unknown command (defaults to claude strategy)', () => {
 			expect(describePromptInjection({command: 'custom-agent'})).toContain(
-				'standard input',
+				'final command argument',
 			);
 		});
 	});
@@ -268,10 +267,11 @@ describe('presetPrompt', () => {
 			).toBe('flag');
 		});
 
-		it('returns stdin when detectionStrategy is not set', () => {
-			expect(getPromptInjectionMethod({command: 'claude'})).toBe('stdin');
-			expect(getPromptInjectionMethod({command: 'opencode'})).toBe('stdin');
-			expect(getPromptInjectionMethod({command: 'custom-agent'})).toBe('stdin');
+		it('falls back to claude strategy when detectionStrategy is not set', () => {
+			expect(getPromptInjectionMethod({command: 'claude'})).toBe('final-arg');
+			expect(getPromptInjectionMethod({command: 'custom-agent'})).toBe(
+				'final-arg',
+			);
 		});
 	});
 });
