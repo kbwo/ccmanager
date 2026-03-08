@@ -27,13 +27,18 @@ type MenuMockProps = {
 };
 
 type NewWorktreeMockProps = {
-	onComplete: (
-		path: string,
-		branch: string,
-		baseBranch: string,
-		copySessionData: boolean,
-		copyClaudeDirectory: boolean,
-	) => void | Promise<void>;
+	onComplete: (request: {
+		creationMode: 'manual' | 'prompt';
+		path: string;
+		branch?: string;
+		baseBranch: string;
+		copySessionData: boolean;
+		copyClaudeDirectory: boolean;
+		presetId?: string;
+		initialPrompt?: string;
+		projectPath?: string;
+		autoDirectoryPattern?: string;
+	}) => void | Promise<void>;
 	onCancel: () => void | Promise<void>;
 };
 
@@ -57,7 +62,7 @@ type CreateWorktreeEffect = (
 	baseBranch: string,
 	copySessionData: boolean,
 	copyClaudeDirectory: boolean,
-) => EffectType.Effect<void, unknown, never>;
+) => EffectType.Effect<Worktree, unknown, never>;
 
 type DeleteWorktreeEffect = (
 	worktreePath: string,
@@ -107,6 +112,12 @@ const projectManagerMock = {
 	addRecentProject: vi.fn(),
 };
 
+const worktreeNameGeneratorMock = {
+	generateBranchNameEffect: vi.fn(() =>
+		Effect.succeed('fix/trim-worktree-name'),
+	),
+};
+
 function createInkMock<TProps>(
 	label: string,
 	onRender?: (props: TProps) => void,
@@ -148,6 +159,10 @@ vi.mock('../services/config/configReader.js', () => ({
 	configReader: configReaderMock,
 }));
 
+vi.mock('../services/worktreeNameGenerator.js', () => ({
+	worktreeNameGenerator: worktreeNameGeneratorMock,
+}));
+
 vi.mock('../services/worktreeService.js', () => ({
 	WorktreeService: vi.fn(function () {
 		return {
@@ -155,6 +170,7 @@ vi.mock('../services/worktreeService.js', () => ({
 				createWorktreeEffectMock(...args),
 			deleteWorktreeEffect: (...args: Parameters<DeleteWorktreeEffect>) =>
 				deleteWorktreeEffectMock(...args),
+			getAllBranchesEffect: () => Effect.succeed([] as string[]),
 		};
 	}),
 }));
@@ -234,13 +250,24 @@ beforeEach(() => {
 	sessionProps = undefined;
 	createWorktreeEffectMock.mockReset();
 	deleteWorktreeEffectMock.mockReset();
-	createWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
+	createWorktreeEffectMock.mockImplementation((path, branch) =>
+		Effect.succeed({
+			path,
+			branch,
+			isMainWorktree: false,
+			hasSession: false,
+		} as Worktree),
+	);
 	deleteWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
 	sessionManagers.length = 0;
 	getManagerForProjectMock.mockClear();
 	configReaderMock.getSelectPresetOnStart.mockReset();
 	configReaderMock.getSelectPresetOnStart.mockReturnValue(false);
 	projectManagerMock.addRecentProject.mockReset();
+	worktreeNameGeneratorMock.generateBranchNameEffect.mockReset();
+	worktreeNameGeneratorMock.generateBranchNameEffect.mockImplementation(() =>
+		Effect.succeed('fix/trim-worktree-name'),
+	);
 });
 
 afterEach(() => {
@@ -281,8 +308,14 @@ describe('App component loading state machine', () => {
 		createWorktreeEffectMock.mockImplementation(() =>
 			Effect.tryPromise({
 				try: () =>
-					new Promise<void>(resolve => {
-						resolveWorktree = resolve;
+					new Promise<Worktree>(resolve => {
+						resolveWorktree = () =>
+							resolve({
+								path: '/tmp/test',
+								branch: 'feature',
+								isMainWorktree: false,
+								hasSession: false,
+							} as Worktree);
 					}),
 				catch: (error: unknown) => error as never,
 			}),
@@ -304,7 +337,14 @@ describe('App component loading state machine', () => {
 
 		const newWorktree = newWorktreeProps!;
 		const createPromise = Promise.resolve(
-			newWorktree.onComplete('/tmp/test', 'feature', 'main', true, false),
+			newWorktree.onComplete({
+				creationMode: 'manual',
+				path: '/tmp/test',
+				branch: 'feature',
+				baseBranch: 'main',
+				copySessionData: true,
+				copyClaudeDirectory: false,
+			}),
 		);
 		await flush();
 
@@ -318,6 +358,109 @@ describe('App component loading state machine', () => {
 		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
 
 		expect(lastFrame()).toContain('Menu View');
+
+		unmount();
+	});
+
+	it('auto-starts the prompt-first session with the created worktree path', async () => {
+		const {lastFrame, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+		expect(sessionManagers).toHaveLength(1);
+
+		const sessionManager = sessionManagers[0]!;
+		const menu = menuProps!;
+		await Promise.resolve(
+			menu.onSelectWorktree({
+				path: '',
+				branch: '',
+				isMainWorktree: false,
+				hasSession: false,
+			}),
+		);
+		await waitForCondition(() => Boolean(newWorktreeProps));
+
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'prompt',
+				path: '/tmp/project',
+				projectPath: '/tmp/project',
+				autoDirectoryPattern: '../{branch}',
+				baseBranch: 'main',
+				presetId: 'claude',
+				initialPrompt: 'trim worktree name output',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			}),
+		);
+
+		const createdPath = createWorktreeEffectMock.mock.calls[0]?.[0] as string;
+
+		await waitForCondition(
+			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
+			200,
+		);
+		await waitForCondition(
+			() => lastFrame()?.includes('Session View') ?? false,
+		);
+
+		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+			createdPath,
+			'claude',
+			'trim worktree name output',
+		);
+		expect(sessionProps?.session).toEqual(mockSession);
+
+		unmount();
+	});
+
+	it('uses the created worktree path when auto-starting a prompt-first session', async () => {
+		createWorktreeEffectMock.mockImplementation((_path, branch) =>
+			Effect.succeed({
+				path: '/tmp/resolved-worktree',
+				branch,
+				isMainWorktree: false,
+				hasSession: false,
+			} as Worktree),
+		);
+
+		const {unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+		const sessionManager = sessionManagers[0]!;
+
+		await Promise.resolve(
+			menuProps!.onSelectWorktree({
+				path: '',
+				branch: '',
+				isMainWorktree: false,
+				hasSession: false,
+			}),
+		);
+		await waitForCondition(() => Boolean(newWorktreeProps));
+
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'prompt',
+				path: '../relative-worktree',
+				projectPath: '/tmp/project',
+				autoDirectoryPattern: '../{branch}',
+				baseBranch: 'main',
+				presetId: 'claude',
+				initialPrompt: 'trim worktree name output',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			}),
+		);
+
+		await waitForCondition(
+			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
+			200,
+		);
+
+		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+			'/tmp/resolved-worktree',
+			'claude',
+			'trim worktree name output',
+		);
 
 		unmount();
 	});

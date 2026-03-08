@@ -9,24 +9,47 @@ import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {Effect} from 'effect';
 import type {AppError} from '../types/errors.js';
+import {
+	describePromptInjection,
+	getPromptInjectionMethod,
+} from '../utils/presetPrompt.js';
 
 interface NewWorktreeProps {
 	projectPath?: string;
-	onComplete: (
-		path: string,
-		branch: string,
-		baseBranch: string,
-		copySessionData: boolean,
-		copyClaudeDirectory: boolean,
-	) => void;
+	onComplete: (request: NewWorktreeRequest) => void;
 	onCancel: () => void;
 }
+
+export type NewWorktreeRequest =
+	| {
+			creationMode: 'manual';
+			path: string;
+			branch: string;
+			baseBranch: string;
+			copySessionData: boolean;
+			copyClaudeDirectory: boolean;
+	  }
+	| {
+			creationMode: 'prompt';
+			path: string;
+			projectPath: string;
+			autoDirectoryPattern?: string;
+			baseBranch: string;
+			presetId: string;
+			initialPrompt: string;
+			copySessionData: boolean;
+			copyClaudeDirectory: boolean;
+			branch?: never;
+	  };
 
 type Step =
 	| 'path'
 	| 'base-branch'
+	| 'creation-mode'
 	| 'branch-strategy'
 	| 'branch'
+	| 'auto-preset'
+	| 'auto-prompt'
 	| 'copy-settings'
 	| 'copy-session';
 
@@ -41,19 +64,16 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	onCancel,
 }) => {
 	const worktreeConfig = configReader.getWorktreeConfig();
+	const presetsConfig = configReader.getCommandPresets();
 	const isAutoDirectory = worktreeConfig.autoDirectory;
 	const isAutoUseDefaultBranch = worktreeConfig.autoUseDefaultBranch ?? false;
 	const limit = 10;
 
-	// Determine initial step based on config options
-	// If autoUseDefaultBranch is enabled, we start at a temporary 'loading' state
-	// and will transition to 'branch-strategy' after branches are loaded
 	const getInitialStep = (): Step => {
 		if (isAutoDirectory) {
-			// With autoDirectory, skip path input
-			// If autoUseDefaultBranch is also enabled, we'll skip base-branch after loading
 			return 'base-branch';
 		}
+
 		return 'path';
 	};
 
@@ -65,20 +85,21 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const [copySessionData, setCopySessionData] = useState(
 		worktreeConfig.copySessionData ?? true,
 	);
+	const [selectedPresetId, setSelectedPresetId] = useState(
+		presetsConfig.defaultPresetId,
+	);
+	const [initialPrompt, setInitialPrompt] = useState('');
 
-	// Loading and error states for branch data
 	const [isLoadingBranches, setIsLoadingBranches] = useState(true);
 	const [branchLoadError, setBranchLoadError] = useState<string | null>(null);
 	const [branches, setBranches] = useState<string[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string>('main');
 
-	// Initialize worktree service and load branches using Effect
 	useEffect(() => {
 		let cancelled = false;
 		const service = new WorktreeService(projectPath);
 
 		const loadBranches = async () => {
-			// Use Effect.all to load branches and defaultBranch in parallel
 			const workflow = Effect.all(
 				[service.getAllBranchesEffect(), service.getDefaultBranchEffect()],
 				{concurrency: 2},
@@ -107,14 +128,10 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					setDefaultBranch(result.defaultBranch);
 					setIsLoadingBranches(false);
 
-					// If autoUseDefaultBranch is enabled, auto-set the base branch
-					// and skip to branch-strategy step
 					if (isAutoUseDefaultBranch && result.defaultBranch) {
 						setBaseBranch(result.defaultBranch);
-						// Skip base-branch step, go directly to branch-strategy
-						// (if we're at base-branch step, which happens with autoDirectory)
 						setStep(currentStep =>
-							currentStep === 'base-branch' ? 'branch-strategy' : currentStep,
+							currentStep === 'base-branch' ? 'creation-mode' : currentStep,
 						);
 					}
 				}
@@ -133,7 +150,6 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		};
 	}, [projectPath, isAutoUseDefaultBranch]);
 
-	// Create branch items with default branch first (memoized)
 	const allBranchItems: BranchItem[] = useMemo(
 		() => [
 			{label: `${defaultBranch} (default)`, value: defaultBranch},
@@ -144,13 +160,11 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		[branches, defaultBranch],
 	);
 
-	// Use search mode for base branch selection
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
 		useSearchMode(allBranchItems.length, {
 			isDisabled: step !== 'base-branch',
 		});
 
-	// Filter branch items based on search query
 	const branchItems = useMemo(() => {
 		if (!searchQuery) return allBranchItems;
 		return allBranchItems.filter(item =>
@@ -158,55 +172,89 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		);
 	}, [allBranchItems, searchQuery]);
 
+	const presetItems = useMemo(
+		() =>
+			presetsConfig.presets.map(preset => ({
+				label: `${preset.name}${
+					preset.id === presetsConfig.defaultPresetId ? ' (default)' : ''
+				}\n    Command: ${preset.command}${
+					preset.args?.length ? ` ${preset.args.join(' ')}` : ''
+				}`,
+				value: preset.id,
+			})),
+		[presetsConfig.defaultPresetId, presetsConfig.presets],
+	);
+
+	const selectedPreset = useMemo(
+		() =>
+			presetsConfig.presets.find(preset => preset.id === selectedPresetId) ||
+			presetsConfig.presets[0],
+		[selectedPresetId, presetsConfig.presets],
+	);
+
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
 		}
 
-		// Handle arrow key navigation in search mode for base branch selection
 		if (step === 'base-branch' && isSearchMode) {
-			// Don't handle any keys here - let useSearchMode handle them
-			// The hook will handle arrow keys for navigation and Enter to exit search mode
 			return;
 		}
 	});
 
 	const handlePathSubmit = (value: string) => {
-		if (value.trim()) {
-			setPath(value.trim());
-			// If autoUseDefaultBranch is enabled and we have the default branch,
-			// skip base-branch selection and go directly to branch-strategy
-			if (isAutoUseDefaultBranch && defaultBranch) {
-				setBaseBranch(defaultBranch);
-				setStep('branch-strategy');
-			} else {
-				setStep('base-branch');
-			}
-		}
-	};
+		if (!value.trim()) return;
 
-	const handleBranchSubmit = (value: string) => {
-		if (value.trim()) {
-			setBranch(value.trim());
-			setStep('copy-settings');
+		setPath(value.trim());
+		if (isAutoUseDefaultBranch && defaultBranch) {
+			setBaseBranch(defaultBranch);
+			setStep('creation-mode');
+		} else {
+			setStep('base-branch');
 		}
 	};
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
 		setBaseBranch(item.value);
-		setStep('branch-strategy');
+		setStep('creation-mode');
+	};
+
+	const handleCreationModeSelect = (item: {label: string; value: string}) => {
+		if (item.value === 'manual') {
+			setStep('branch-strategy');
+			return;
+		}
+
+		setStep('auto-preset');
 	};
 
 	const handleBranchStrategySelect = (item: {label: string; value: string}) => {
 		const useExisting = item.value === 'existing';
 		if (useExisting) {
-			// Use the base branch as the branch name for existing branch
 			setBranch(baseBranch);
 			setStep('copy-settings');
 		} else {
-			// Need to input new branch name
 			setStep('branch');
 		}
+	};
+
+	const handleBranchSubmit = (value: string) => {
+		if (!value.trim()) return;
+
+		setBranch(value.trim());
+		setStep('copy-settings');
+	};
+
+	const handlePresetSelect = (item: {label: string; value: string}) => {
+		setSelectedPresetId(item.value);
+		setStep('auto-prompt');
+	};
+
+	const handlePromptSubmit = (value: string) => {
+		if (!value.trim()) return;
+
+		setInitialPrompt(value.trim());
+		setStep('copy-settings');
 	};
 
 	const handleCopySettingsSelect = (item: {label: string; value: boolean}) => {
@@ -214,40 +262,82 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		setStep('copy-session');
 	};
 
-	const handleCopySessionSelect = (item: {label: string; value: string}) => {
-		const shouldCopy = item.value === 'yes';
-		setCopySessionData(shouldCopy);
-
-		if (isAutoDirectory) {
-			// Generate path from branch name
-			const autoPath = generateWorktreeDirectory(
-				projectPath || process.cwd(),
-				branch,
-				worktreeConfig.autoDirectoryPattern,
-			);
-			onComplete(autoPath, branch, baseBranch, shouldCopy, copyClaudeDirectory);
-		} else {
-			onComplete(path, branch, baseBranch, shouldCopy, copyClaudeDirectory);
+	const getResolvedPath = (): string => {
+		if (!isAutoDirectory) {
+			return path;
 		}
+
+		const branchForPath =
+			step === 'copy-session' && branch ? branch : 'generated-from-prompt';
+
+		return generateWorktreeDirectory(
+			projectPath || process.cwd(),
+			branchForPath,
+			worktreeConfig.autoDirectoryPattern,
+		);
 	};
 
-	// Calculate generated path for preview (memoized to avoid expensive recalculations)
+	const handleCopySessionSelect = (item: {label: string; value: string}) => {
+		const shouldCopy = item.value === 'yes';
+		const resolvedPath = getResolvedPath();
+
+		setCopySessionData(shouldCopy);
+
+		if (step !== 'copy-session') {
+			return;
+		}
+
+		if (initialPrompt && selectedPresetId) {
+			onComplete({
+				creationMode: 'prompt',
+				path: isAutoDirectory ? projectPath || process.cwd() : resolvedPath,
+				projectPath: projectPath || process.cwd(),
+				autoDirectoryPattern: isAutoDirectory
+					? worktreeConfig.autoDirectoryPattern
+					: undefined,
+				baseBranch,
+				presetId: selectedPresetId,
+				initialPrompt,
+				copySessionData: shouldCopy,
+				copyClaudeDirectory,
+			});
+			return;
+		}
+
+		onComplete({
+			creationMode: 'manual',
+			path: resolvedPath,
+			branch,
+			baseBranch,
+			copySessionData: shouldCopy,
+			copyClaudeDirectory,
+		});
+	};
+
 	const generatedPath = useMemo(() => {
-		return isAutoDirectory && branch
-			? generateWorktreeDirectory(
-					projectPath || process.cwd(),
-					branch,
-					worktreeConfig.autoDirectoryPattern,
-				)
-			: '';
+		if (!isAutoDirectory) {
+			return '';
+		}
+
+		const branchForPath =
+			branch || (initialPrompt ? 'generated-from-prompt' : '');
+		if (!branchForPath) {
+			return '';
+		}
+
+		return generateWorktreeDirectory(
+			projectPath || process.cwd(),
+			branchForPath,
+			worktreeConfig.autoDirectoryPattern,
+		);
 	}, [
 		isAutoDirectory,
 		branch,
+		initialPrompt,
 		worktreeConfig.autoDirectoryPattern,
 		projectPath,
 	]);
 
-	// Format errors using TaggedError discrimination
 	const formatError = (error: AppError): string => {
 		switch (error._tag) {
 			case 'GitError':
@@ -263,7 +353,6 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		}
 	};
 
-	// Show loading indicator while branches load
 	if (isLoadingBranches) {
 		return (
 			<Box flexDirection="column">
@@ -284,7 +373,6 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		);
 	}
 
-	// Show error message if branch loading failed
 	if (branchLoadError) {
 		return (
 			<Box flexDirection="column">
@@ -307,6 +395,13 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 			</Box>
 		);
 	}
+
+	const promptHandlingText = selectedPreset
+		? describePromptInjection(selectedPreset)
+		: '';
+	const promptMethod = selectedPreset
+		? getPromptInjectionMethod(selectedPreset)
+		: 'stdin';
 
 	return (
 		<Box flexDirection="column">
@@ -354,7 +449,6 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 							<Text color="yellow">No branches match your search</Text>
 						</Box>
 					) : isSearchMode ? (
-						// In search mode, show the items as a list without SelectInput
 						<Box flexDirection="column">
 							{branchItems.slice(0, limit).map((item, index) => (
 								<Text
@@ -380,6 +474,34 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 							<Text dimColor>Press / to search</Text>
 						</Box>
 					)}
+				</Box>
+			)}
+
+			{step === 'creation-mode' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>
+							Base branch: <Text color="cyan">{baseBranch}</Text>
+						</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text>How do you want to create the new worktree?</Text>
+					</Box>
+					<SelectInput
+						items={[
+							{
+								label: '1. Choose the branch name yourself',
+								value: 'manual',
+							},
+							{
+								label:
+									'2. Enter a prompt first and let Claude decide the branch name',
+								value: 'prompt',
+							},
+						]}
+						onSelect={handleCreationModeSelect}
+						initialIndex={0}
+					/>
 				</Box>
 			)}
 
@@ -438,6 +560,65 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 				</Box>
 			)}
 
+			{step === 'auto-preset' && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>Select the preset to use for the first session:</Text>
+					</Box>
+					<SelectInput
+						items={presetItems}
+						onSelect={handlePresetSelect}
+						initialIndex={Math.max(
+							0,
+							presetItems.findIndex(item => item.value === selectedPresetId),
+						)}
+					/>
+				</Box>
+			)}
+
+			{step === 'auto-prompt' && selectedPreset && (
+				<Box flexDirection="column">
+					<Box marginBottom={1}>
+						<Text>
+							Preset: <Text color="cyan">{selectedPreset.name}</Text>
+						</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text>Enter the prompt for the new session:</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text dimColor>{promptHandlingText}</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text dimColor>
+							Examples: Claude/Codex use the final argument, OpenCode uses
+							`--prompt`, and other commands may receive the prompt over stdin.
+						</Text>
+					</Box>
+					<Box marginBottom={1}>
+						<Text color="yellow">
+							Automatic branch naming requires the `claude` command in your
+							PATH.
+						</Text>
+					</Box>
+					<Box>
+						<Text color="cyan">{'> '}</Text>
+						<TextInputWrapper
+							value={initialPrompt}
+							onChange={setInitialPrompt}
+							onSubmit={handlePromptSubmit}
+							placeholder="Describe what you want the agent to do"
+						/>
+					</Box>
+					<Box marginTop={1}>
+						<Text dimColor>
+							Prompt delivery mode for this preset:{' '}
+							<Text color="green">{promptMethod}</Text>
+						</Text>
+					</Box>
+				</Box>
+			)}
+
 			{step === 'copy-settings' && (
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
@@ -446,6 +627,14 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 							<Text color="cyan">{baseBranch}</Text>)?
 						</Text>
 					</Box>
+					{initialPrompt ? (
+						<Box marginBottom={1}>
+							<Text dimColor>
+								The branch name will be generated automatically right before the
+								worktree is created.
+							</Text>
+						</Box>
+					) : null}
 					<SelectInput
 						items={[
 							{
@@ -468,9 +657,17 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					<Box marginBottom={1}>
 						<Text dimColor>
 							This will copy conversation history and context from the current
-							worktree
+							worktree.
 						</Text>
 					</Box>
+					{isAutoDirectory && generatedPath ? (
+						<Box marginBottom={1}>
+							<Text dimColor>
+								Worktree path preview:{' '}
+								<Text color="green">{generatedPath}</Text>
+							</Text>
+						</Box>
+					) : null}
 					<SelectInput
 						items={[
 							{label: '✅ Yes, copy session data', value: 'yes'},

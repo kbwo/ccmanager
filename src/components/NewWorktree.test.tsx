@@ -64,6 +64,18 @@ vi.mock('../services/config/configReader.js', () => ({
 			autoDirectoryPattern: '../{project}-{branch}',
 			copySessionData: true,
 		}),
+		getCommandPresets: () => ({
+			presets: [
+				{
+					id: 'claude',
+					name: 'Claude',
+					command: 'claude',
+					args: ['--resume'],
+					detectionStrategy: 'claude',
+				},
+			],
+			defaultPresetId: 'claude',
+		}),
 	},
 }));
 
@@ -345,7 +357,7 @@ describe('NewWorktree component Effect integration', () => {
 		expect(effectExecuted).toBe(true);
 	});
 
-	it('should skip base branch selection when autoUseDefaultBranch is enabled with autoDirectory', async () => {
+	it('should skip base branch selection and show creation mode when autoUseDefaultBranch is enabled with autoDirectory', async () => {
 		const {Effect} = await import('effect');
 		const {WorktreeService} = await import('../services/worktreeService.js');
 		const {configReader} = await import('../services/config/configReader.js');
@@ -381,12 +393,13 @@ describe('NewWorktree component Effect integration', () => {
 
 		const output = lastFrame();
 
-		// Should skip base-branch step and show branch-strategy step
-		// which displays "Base branch:" and "Choose branch creation strategy"
+		// Should skip base-branch step and show the manual/prompt creation mode choice
 		expect(output).toContain('Create New Worktree');
 		expect(output).toContain('Base branch:');
 		expect(output).toContain('main');
-		expect(output).toContain('Choose branch creation strategy');
+		expect(output).toContain('How do you want to create the new worktree?');
+		expect(output).toContain('Choose the branch name yourself');
+		expect(output).toContain('Enter a prompt first');
 	});
 
 	it('should show base branch selection when autoUseDefaultBranch is disabled', async () => {

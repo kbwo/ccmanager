@@ -11,9 +11,11 @@ import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
 import RemoteBranchSelector from './RemoteBranchSelector.js';
 import LoadingSpinner from './LoadingSpinner.js';
+import type {NewWorktreeRequest} from './NewWorktree.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {worktreeNameGenerator} from '../services/worktreeNameGenerator.js';
 import {
 	Worktree,
 	Session as ISession,
@@ -28,6 +30,7 @@ import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
 import {projectManager} from '../services/projectManager.js';
+import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 
 type View =
 	| 'menu'
@@ -76,6 +79,11 @@ const App: React.FC<AppProps> = ({
 		null,
 	); // Store selected project in multi-project mode
 	const [configScope, setConfigScope] = useState<ConfigScope>('global'); // Store config scope for configuration view
+	const [pendingMenuSessionLaunch, setPendingMenuSessionLaunch] = useState<{
+		worktree: Worktree;
+		presetId: string;
+		initialPrompt: string;
+	} | null>(null);
 
 	// State for remote branch disambiguation
 	const [pendingWorktreeCreation, setPendingWorktreeCreation] = useState<{
@@ -84,6 +92,8 @@ const App: React.FC<AppProps> = ({
 		baseBranch: string;
 		copySessionData: boolean;
 		copyClaudeDirectory: boolean;
+		presetId?: string;
+		initialPrompt?: string;
 		ambiguousError: AmbiguousBranchError;
 	} | null>(null);
 
@@ -91,6 +101,8 @@ const App: React.FC<AppProps> = ({
 	const [loadingContext, setLoadingContext] = useState<{
 		copySessionData?: boolean;
 		deleteBranch?: boolean;
+		isPromptFlow?: boolean;
+		stage?: 'naming' | 'creating';
 	}>({});
 
 	// Helper function to format error messages based on error type using _tag discrimination
@@ -113,6 +125,7 @@ const App: React.FC<AppProps> = ({
 	const createSessionWithEffect = async (
 		worktreePath: string,
 		presetId?: string,
+		initialPrompt?: string,
 	): Promise<{
 		success: boolean;
 		session?: ISession;
@@ -123,8 +136,13 @@ const App: React.FC<AppProps> = ({
 					worktreePath,
 					devcontainerConfig,
 					presetId,
+					initialPrompt,
 				)
-			: sessionManager.createSessionWithPresetEffect(worktreePath, presetId);
+			: sessionManager.createSessionWithPresetEffect(
+					worktreePath,
+					presetId,
+					initialPrompt,
+				);
 
 		// Execute the Effect and handle both success and failure cases
 		const result = await Effect.runPromise(Effect.either(sessionEffect));
@@ -165,6 +183,56 @@ const App: React.FC<AppProps> = ({
 		[],
 	);
 
+	const navigateToSession = useCallback((session: ISession) => {
+		clearScreen();
+		setView('clearing');
+		setTimeout(() => {
+			setActiveSession(session);
+			setView('session');
+		}, 10);
+	}, []);
+
+	const startSessionForWorktree = useCallback(
+		async (
+			worktree: Worktree,
+			options?: {
+				presetId?: string;
+				initialPrompt?: string;
+			},
+		) => {
+			let session = sessionManager.getSession(worktree.path);
+
+			if (!session) {
+				if (!options?.presetId && configReader.getSelectPresetOnStart()) {
+					setSelectedWorktree(worktree);
+					navigateWithClear('preset-selector');
+					return;
+				}
+
+				setView(
+					options?.presetId ? 'creating-session-preset' : 'creating-session',
+				);
+
+				const result = await createSessionWithEffect(
+					worktree.path,
+					options?.presetId,
+					options?.initialPrompt,
+				);
+
+				if (!result.success) {
+					setError(result.errorMessage!);
+					navigateWithClear('menu');
+					return;
+				}
+
+				session = result.session!;
+			}
+
+			navigateToSession(session);
+		},
+		[sessionManager, navigateWithClear, navigateToSession],
+	);
+
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
 		const handleSessionExit = (session: ISession) => {
@@ -199,6 +267,31 @@ const App: React.FC<AppProps> = ({
 			// Don't destroy sessions on unmount - they persist in memory
 		};
 	}, [sessionManager, multiProject, selectedProject, navigateWithClear]);
+
+	useEffect(() => {
+		if (view !== 'menu' || !pendingMenuSessionLaunch) {
+			return;
+		}
+
+		let cancelled = false;
+
+		void (async () => {
+			if (cancelled) {
+				return;
+			}
+
+			const launchRequest = pendingMenuSessionLaunch;
+			setPendingMenuSessionLaunch(null);
+			await startSessionForWorktree(launchRequest.worktree, {
+				presetId: launchRequest.presetId,
+				initialPrompt: launchRequest.initialPrompt,
+			});
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [view, pendingMenuSessionLaunch, startSessionForWorktree]);
 
 	// Helper function to parse ambiguous branch error and create AmbiguousBranchError
 	const parseAmbiguousBranchError = (
@@ -240,9 +333,26 @@ const App: React.FC<AppProps> = ({
 			baseBranch: string;
 			copySessionData: boolean;
 			copyClaudeDirectory: boolean;
+			presetId?: string;
+			initialPrompt?: string;
 		},
 	) => {
 		if (result.success) {
+			if (creationData.presetId && creationData.initialPrompt) {
+				setPendingMenuSessionLaunch({
+					worktree: {
+						path: creationData.path,
+						branch: creationData.branch,
+						isMainWorktree: false,
+						hasSession: false,
+					},
+					presetId: creationData.presetId,
+					initialPrompt: creationData.initialPrompt,
+				});
+				handleReturnToMenu();
+				return;
+			}
+
 			handleReturnToMenu();
 			return;
 		}
@@ -317,34 +427,7 @@ const App: React.FC<AppProps> = ({
 			return;
 		}
 
-		// Get or create session for this worktree
-		let session = sessionManager.getSession(worktree.path);
-
-		if (!session) {
-			// Check if we should show preset selector
-			if (configReader.getSelectPresetOnStart()) {
-				setSelectedWorktree(worktree);
-				navigateWithClear('preset-selector');
-				return;
-			}
-
-			// Set loading state before async operation
-			setView('creating-session');
-
-			// Use Effect-based session creation with default preset
-			const result = await createSessionWithEffect(worktree.path);
-
-			if (!result.success) {
-				setError(result.errorMessage!);
-				navigateWithClear('menu');
-				return;
-			}
-
-			session = result.session!;
-		}
-
-		setActiveSession(session);
-		navigateWithClear('session');
+		await startSessionForWorktree(worktree);
 	};
 
 	const handlePresetSelected = async (presetId: string) => {
@@ -367,8 +450,7 @@ const App: React.FC<AppProps> = ({
 		}
 
 		// Success case
-		setActiveSession(result.session!);
-		navigateWithClear('session');
+		navigateToSession(result.session!);
 		setSelectedWorktree(null);
 	};
 
@@ -396,27 +478,68 @@ const App: React.FC<AppProps> = ({
 		});
 	};
 
-	const handleCreateWorktree = async (
-		path: string,
-		branch: string,
-		baseBranch: string,
-		copySessionData: boolean,
-		copyClaudeDirectory: boolean,
-	) => {
-		// Set loading context before showing loading view
-		setLoadingContext({copySessionData});
-		setView('creating-worktree');
+	const handleCreateWorktree = async (request: NewWorktreeRequest) => {
 		setError(null);
+
+		let branch = request.creationMode === 'manual' ? request.branch : '';
+		let targetPath = request.path;
+		if (request.creationMode === 'prompt') {
+			setLoadingContext({
+				copySessionData: request.copySessionData,
+				isPromptFlow: true,
+				stage: 'naming',
+			});
+			setView('creating-worktree');
+
+			const allBranches = await Effect.runPromise(
+				Effect.either(worktreeService.getAllBranchesEffect()),
+			);
+			const existingBranches =
+				allBranches._tag === 'Right' ? allBranches.right : [];
+
+			const generatedBranch = await Effect.runPromise(
+				Effect.either(
+					worktreeNameGenerator.generateBranchNameEffect(
+						request.initialPrompt,
+						request.baseBranch,
+						existingBranches,
+					),
+				),
+			);
+
+			if (generatedBranch._tag === 'Left') {
+				setError(formatErrorMessage(generatedBranch.left));
+				setView('new-worktree');
+				return;
+			}
+
+			branch = generatedBranch.right;
+			if (request.autoDirectoryPattern) {
+				targetPath = generateWorktreeDirectory(
+					request.projectPath,
+					branch,
+					request.autoDirectoryPattern,
+				);
+			}
+		}
+
+		// Set loading context before showing loading view
+		setLoadingContext({
+			copySessionData: request.copySessionData,
+			isPromptFlow: request.creationMode === 'prompt',
+			stage: 'creating',
+		});
+		setView('creating-worktree');
 
 		// Create the worktree using Effect
 		const result = await Effect.runPromise(
 			Effect.either(
 				worktreeService.createWorktreeEffect(
-					path,
+					targetPath,
 					branch,
-					baseBranch,
-					copySessionData,
-					copyClaudeDirectory,
+					request.baseBranch,
+					request.copySessionData,
+					request.copyClaudeDirectory,
 				),
 			),
 		);
@@ -427,13 +550,38 @@ const App: React.FC<AppProps> = ({
 			const errorMessage = formatErrorMessage(result.left);
 			handleWorktreeCreationResult(
 				{success: false, error: errorMessage},
-				{path, branch, baseBranch, copySessionData, copyClaudeDirectory},
+				{
+					path: targetPath,
+					branch,
+					baseBranch: request.baseBranch,
+					copySessionData: request.copySessionData,
+					copyClaudeDirectory: request.copyClaudeDirectory,
+					presetId:
+						request.creationMode === 'prompt' ? request.presetId : undefined,
+					initialPrompt:
+						request.creationMode === 'prompt'
+							? request.initialPrompt
+							: undefined,
+				},
 			);
 		} else {
 			// Success case
+			const createdWorktree = result.right;
 			handleWorktreeCreationResult(
 				{success: true},
-				{path, branch, baseBranch, copySessionData, copyClaudeDirectory},
+				{
+					path: createdWorktree.path,
+					branch: createdWorktree.branch || branch,
+					baseBranch: request.baseBranch,
+					copySessionData: request.copySessionData,
+					copyClaudeDirectory: request.copyClaudeDirectory,
+					presetId:
+						request.creationMode === 'prompt' ? request.presetId : undefined,
+					initialPrompt:
+						request.creationMode === 'prompt'
+							? request.initialPrompt
+							: undefined,
+				},
 			);
 		}
 	};
@@ -451,7 +599,13 @@ const App: React.FC<AppProps> = ({
 
 		// Retry worktree creation with the resolved base branch
 		// Set loading context before showing loading view
-		setLoadingContext({copySessionData: creationData.copySessionData});
+		setLoadingContext({
+			copySessionData: creationData.copySessionData,
+			isPromptFlow: Boolean(
+				creationData.presetId && creationData.initialPrompt,
+			),
+			stage: 'creating',
+		});
 		setView('creating-worktree');
 		setError(null);
 
@@ -473,8 +627,18 @@ const App: React.FC<AppProps> = ({
 			setError(errorMessage);
 			setView('new-worktree');
 		} else {
-			// Success - return to menu
-			handleReturnToMenu();
+			handleWorktreeCreationResult(
+				{success: true},
+				{
+					path: creationData.path,
+					branch: creationData.branch,
+					baseBranch: selectedRemoteRef,
+					copySessionData: creationData.copySessionData,
+					copyClaudeDirectory: creationData.copyClaudeDirectory,
+					presetId: creationData.presetId,
+					initialPrompt: creationData.initialPrompt,
+				},
+			);
 		}
 	};
 
@@ -641,9 +805,13 @@ const App: React.FC<AppProps> = ({
 
 	if (view === 'creating-worktree') {
 		// Compose message based on loading context
-		const message = loadingContext.copySessionData
-			? 'Creating worktree and copying session data...'
-			: 'Creating worktree...';
+		const message = loadingContext.isPromptFlow
+			? loadingContext.stage === 'naming'
+				? 'Generating branch name with Claude...'
+				: 'Creating worktree from generated branch name...'
+			: loadingContext.copySessionData
+				? 'Creating worktree and copying session data...'
+				: 'Creating worktree...';
 
 		return (
 			<Box flexDirection="column">
@@ -745,9 +913,11 @@ const App: React.FC<AppProps> = ({
 	if (view === 'creating-session-preset') {
 		// Always display preset-specific message
 		// Devcontainer operations take >5 seconds, so indicate extended duration
-		const message = devcontainerConfig
-			? 'Creating session with preset (this may take a moment)...'
-			: 'Creating session with preset...';
+		const message = loadingContext.isPromptFlow
+			? 'Creating session with preset and prompt...'
+			: devcontainerConfig
+				? 'Creating session with preset (this may take a moment)...'
+				: 'Creating session with preset...';
 
 		// Use yellow color for devcontainer, cyan for standard
 		const color = devcontainerConfig ? 'yellow' : 'cyan';

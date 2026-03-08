@@ -30,6 +30,7 @@ import {
 } from '../constants/statusIcons.js';
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
 import {injectTeammateMode} from '../utils/commandArgs.js';
+import {preparePresetLaunch} from '../utils/presetPrompt.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const TERMINAL_CONTENT_MAX_LINES = 300;
@@ -64,6 +65,31 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		};
 
 		return spawn(command, args, spawnOptions);
+	}
+
+	private resolvePreset(presetId?: string): CommandPreset {
+		let preset: CommandPreset | null = presetId
+			? Either.getOrElse(
+					configReader.getPresetByIdEffect(presetId),
+					(): CommandPreset | null => null,
+				)
+			: null;
+
+		if (!preset) {
+			preset = configReader.getDefaultPreset();
+		}
+
+		if (!preset) {
+			throw new ConfigError({
+				configPath: 'configuration',
+				reason: 'validation',
+				details: presetId
+					? `Preset with ID '${presetId}' not found and no default preset available`
+					: 'No default preset available',
+			});
+		}
+
+		return preset;
 	}
 
 	detectTerminalState(session: Session): SessionState {
@@ -338,6 +364,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	createSessionWithPresetEffect(
 		worktreePath: string,
 		presetId?: string,
+		initialPrompt?: string,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -347,42 +374,28 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					return existing;
 				}
 
-				// Get preset configuration using Either-based lookup
-				let preset: CommandPreset | null = presetId
-					? Either.getOrElse(
-							configReader.getPresetByIdEffect(presetId),
-							(): CommandPreset | null => null,
-						)
-					: null;
-				if (!preset) {
-					preset = configReader.getDefaultPreset();
-				}
-
-				// Validate preset exists
-				if (!preset) {
-					throw new ConfigError({
-						configPath: 'configuration',
-						reason: 'validation',
-						details: presetId
-							? `Preset with ID '${presetId}' not found and no default preset available`
-							: 'No default preset available',
-					});
-				}
-
+				const preset = this.resolvePreset(presetId);
 				const command = preset.command;
-				const args = injectTeammateMode(
-					preset.command,
-					preset.args || [],
-					preset.detectionStrategy,
-				);
+				const launch = preparePresetLaunch(preset, initialPrompt);
+				const args = launch.args;
 
 				// Spawn the process - fallback will be handled by setupExitHandler
 				const ptyProcess = await this.spawn(command, args, worktreePath);
 
-				return this.createSessionInternal(worktreePath, ptyProcess, {
-					isPrimaryCommand: true,
-					detectionStrategy: preset.detectionStrategy,
-				});
+				const session = await this.createSessionInternal(
+					worktreePath,
+					ptyProcess,
+					{
+						isPrimaryCommand: true,
+						detectionStrategy: preset.detectionStrategy,
+					},
+				);
+
+				if (launch.stdinPayload) {
+					session.process.write(launch.stdinPayload);
+				}
+
+				return session;
 			},
 			catch: (error: unknown) => {
 				// If it's already a ConfigError, return it
@@ -832,6 +845,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		worktreePath: string,
 		devcontainerConfig: DevcontainerConfig,
 		presetId?: string,
+		initialPrompt?: string,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -851,27 +865,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					});
 				}
 
-				// Get preset configuration using Either-based lookup
-				let preset: CommandPreset | null = presetId
-					? Either.getOrElse(
-							configReader.getPresetByIdEffect(presetId),
-							(): CommandPreset | null => null,
-						)
-					: null;
-				if (!preset) {
-					preset = configReader.getDefaultPreset();
-				}
-
-				// Validate preset exists
-				if (!preset) {
-					throw new ConfigError({
-						configPath: 'configuration',
-						reason: 'validation',
-						details: presetId
-							? `Preset with ID '${presetId}' not found and no default preset available`
-							: 'No default preset available',
-					});
-				}
+				const preset = this.resolvePreset(presetId);
 
 				// Parse the exec command to extract arguments
 				const execParts = devcontainerConfig.execCommand.split(/\s+/);
@@ -879,11 +873,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				const execArgs = execParts.slice(1);
 
 				// Build the full command: devcontainer exec [args] -- [preset command] [preset args]
-				const presetArgs = injectTeammateMode(
-					preset.command,
-					preset.args || [],
-					preset.detectionStrategy,
-				);
+				const launch = preparePresetLaunch(preset, initialPrompt);
+				const presetArgs = launch.args;
 				const fullArgs = [...execArgs, '--', preset.command, ...presetArgs];
 
 				// Spawn the process within devcontainer
@@ -893,11 +884,21 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					worktreePath,
 				);
 
-				return this.createSessionInternal(worktreePath, ptyProcess, {
-					isPrimaryCommand: true,
-					detectionStrategy: preset.detectionStrategy,
-					devcontainerConfig,
-				});
+				const session = await this.createSessionInternal(
+					worktreePath,
+					ptyProcess,
+					{
+						isPrimaryCommand: true,
+						detectionStrategy: preset.detectionStrategy,
+						devcontainerConfig,
+					},
+				);
+
+				if (launch.stdinPayload) {
+					session.process.write(launch.stdinPayload);
+				}
+
+				return session;
 			},
 			catch: (error: unknown) => {
 				// If it's already a ConfigError or ProcessError, return it
