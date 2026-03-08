@@ -181,7 +181,7 @@ export class WorktreeNameGenerator {
 
 					child = execFile(
 						'claude',
-						['-p', '--output-format', 'json', '--json-schema', JSON_SCHEMA],
+						['-p', '--model', 'haiku', '--output-format', 'json', '--json-schema', JSON_SCHEMA],
 						{
 							encoding: 'utf8',
 							maxBuffer: 1024 * 1024,
