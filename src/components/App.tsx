@@ -122,46 +122,47 @@ const App: React.FC<AppProps> = ({
 	};
 
 	// Helper function to create session with Effect-based error handling
-	const createSessionWithEffect = async (
-		worktreePath: string,
-		presetId?: string,
-		initialPrompt?: string,
-	): Promise<{
-		success: boolean;
-		session?: ISession;
-		errorMessage?: string;
-	}> => {
-		const sessionEffect = devcontainerConfig
-			? sessionManager.createSessionWithDevcontainerEffect(
-					worktreePath,
-					devcontainerConfig,
-					presetId,
-					initialPrompt,
-				)
-			: sessionManager.createSessionWithPresetEffect(
-					worktreePath,
-					presetId,
-					initialPrompt,
-				);
+	const createSessionWithEffect = useCallback(
+		async (
+			worktreePath: string,
+			presetId?: string,
+			initialPrompt?: string,
+		): Promise<{
+			success: boolean;
+			session?: ISession;
+			errorMessage?: string;
+		}> => {
+			const sessionEffect = devcontainerConfig
+				? sessionManager.createSessionWithDevcontainerEffect(
+						worktreePath,
+						devcontainerConfig,
+						presetId,
+						initialPrompt,
+					)
+				: sessionManager.createSessionWithPresetEffect(
+						worktreePath,
+						presetId,
+						initialPrompt,
+					);
 
-		// Execute the Effect and handle both success and failure cases
-		const result = await Effect.runPromise(Effect.either(sessionEffect));
+			// Execute the Effect and handle both success and failure cases
+			const result = await Effect.runPromise(Effect.either(sessionEffect));
 
-		if (result._tag === 'Left') {
-			// Handle error using pattern matching on _tag
-			const errorMessage = formatErrorMessage(result.left);
+			if (result._tag === 'Left') {
+				const errorMessage = formatErrorMessage(result.left);
+				return {
+					success: false,
+					errorMessage: `Failed to create session: ${errorMessage}`,
+				};
+			}
+
 			return {
-				success: false,
-				errorMessage: `Failed to create session: ${errorMessage}`,
+				success: true,
+				session: result.right,
 			};
-		}
-
-		// Success case - extract session from Right
-		return {
-			success: true,
-			session: result.right,
-		};
-	};
+		},
+		[sessionManager, devcontainerConfig],
+	);
 
 	// Helper function to clear terminal screen
 	const clearScreen = () => {
@@ -230,7 +231,12 @@ const App: React.FC<AppProps> = ({
 
 			navigateToSession(session);
 		},
-		[sessionManager, navigateWithClear, navigateToSession],
+		[
+			sessionManager,
+			navigateWithClear,
+			navigateToSession,
+			createSessionWithEffect,
+		],
 	);
 
 	useEffect(() => {

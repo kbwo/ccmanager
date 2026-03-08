@@ -26,18 +26,24 @@ const PROMPT_FLAG: Partial<
 	kimi: '-p',
 };
 
+const DEFAULT_DETECTION_STRATEGY: NonNullable<
+	CommandPreset['detectionStrategy']
+> = 'claude';
+
 export const getPromptInjectionMethod = (
 	preset: Pick<CommandPreset, 'command' | 'detectionStrategy'>,
 ): PromptInjectionMethod => {
-	if (preset.detectionStrategy && PROMPT_FLAG[preset.detectionStrategy]) {
+	const strategy = preset.detectionStrategy ?? DEFAULT_DETECTION_STRATEGY;
+
+	if (PROMPT_FLAG[strategy]) {
 		return 'flag';
 	}
 
 	if (
-		preset.detectionStrategy === 'claude' ||
-		preset.detectionStrategy === 'codex' ||
-		preset.detectionStrategy === 'cursor' ||
-		preset.detectionStrategy === 'cline'
+		strategy === 'claude' ||
+		strategy === 'codex' ||
+		strategy === 'cursor' ||
+		strategy === 'cline'
 	) {
 		return 'final-arg';
 	}
