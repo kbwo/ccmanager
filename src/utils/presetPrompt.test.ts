@@ -174,7 +174,6 @@ describe('presetPrompt', () => {
 				}),
 			).toContain('-p');
 		});
-
 	});
 
 	describe('getPromptInjectionMethod', () => {
