@@ -62,7 +62,7 @@ type CreateWorktreeEffect = (
 	baseBranch: string,
 	copySessionData: boolean,
 	copyClaudeDirectory: boolean,
-) => EffectType.Effect<void, unknown, never>;
+) => EffectType.Effect<Worktree, unknown, never>;
 
 type DeleteWorktreeEffect = (
 	worktreePath: string,
@@ -245,7 +245,14 @@ beforeEach(() => {
 	sessionProps = undefined;
 	createWorktreeEffectMock.mockReset();
 	deleteWorktreeEffectMock.mockReset();
-	createWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
+	createWorktreeEffectMock.mockImplementation((path, branch) =>
+		Effect.succeed({
+			path,
+			branch,
+			isMainWorktree: false,
+			hasSession: false,
+		} as Worktree),
+	);
 	deleteWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
 	sessionManagers.length = 0;
 	getManagerForProjectMock.mockClear();
@@ -296,8 +303,14 @@ describe('App component loading state machine', () => {
 		createWorktreeEffectMock.mockImplementation(() =>
 			Effect.tryPromise({
 				try: () =>
-					new Promise<void>(resolve => {
-						resolveWorktree = resolve;
+					new Promise<Worktree>(resolve => {
+						resolveWorktree = () =>
+							resolve({
+								path: '/tmp/test',
+								branch: 'feature',
+								isMainWorktree: false,
+								hasSession: false,
+							} as Worktree);
 					}),
 				catch: (error: unknown) => error as never,
 			}),
@@ -344,7 +357,7 @@ describe('App component loading state machine', () => {
 		unmount();
 	});
 
-	it('defers prompt-first session creation until the new worktree is opened', async () => {
+	it('auto-starts the prompt-first session with the created worktree path', async () => {
 		const {lastFrame, unmount} = render(<App version="test" />);
 		await waitForCondition(() => Boolean(menuProps));
 		expect(sessionManagers).toHaveLength(1);
@@ -375,16 +388,59 @@ describe('App component loading state machine', () => {
 			}),
 		);
 
-		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
-		expect(sessionManager.createSessionWithPresetEffect).not.toHaveBeenCalled();
 		const createdPath = createWorktreeEffectMock.mock.calls[0]?.[0] as string;
+
+		await waitForCondition(
+			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
+			200,
+		);
+		await waitForCondition(() => lastFrame()?.includes('Session View') ?? false);
+
+		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+			createdPath,
+			'claude',
+			'trim worktree name output',
+		);
+		expect(sessionProps?.session).toEqual(mockSession);
+
+		unmount();
+	});
+
+	it('uses the created worktree path when auto-starting a prompt-first session', async () => {
+		createWorktreeEffectMock.mockImplementation((_path, branch) =>
+			Effect.succeed({
+				path: '/tmp/resolved-worktree',
+				branch,
+				isMainWorktree: false,
+				hasSession: false,
+			} as Worktree),
+		);
+
+		const {unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+		const sessionManager = sessionManagers[0]!;
 
 		await Promise.resolve(
 			menuProps!.onSelectWorktree({
-				path: createdPath,
-				branch: 'fix/trim-worktree-name',
+				path: '',
+				branch: '',
 				isMainWorktree: false,
 				hasSession: false,
+			}),
+		);
+		await waitForCondition(() => Boolean(newWorktreeProps));
+
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'prompt',
+				path: '../relative-worktree',
+				projectPath: '/tmp/project',
+				autoDirectoryPattern: '../{branch}',
+				baseBranch: 'main',
+				presetId: 'claude',
+				initialPrompt: 'trim worktree name output',
+				copySessionData: false,
+				copyClaudeDirectory: false,
 			}),
 		);
 
@@ -392,10 +448,9 @@ describe('App component loading state machine', () => {
 			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
 			200,
 		);
-		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
 
 		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
-			createdPath,
+			'/tmp/resolved-worktree',
 			'claude',
 			'trim worktree name output',
 		);
