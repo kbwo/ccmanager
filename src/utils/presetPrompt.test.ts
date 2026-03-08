@@ -53,6 +53,17 @@ describe('presetPrompt', () => {
 				detectionStrategy: 'opencode',
 			}),
 		).toContain('--prompt');
-		expect(getPromptInjectionMethod({command: 'custom'})).toBe('stdin');
+		expect(
+			getPromptInjectionMethod({command: 'custom-agent'}),
+		).toBe('stdin');
+	});
+
+	it('uses stdin when detectionStrategy is not set even for known command names', () => {
+		expect(
+			getPromptInjectionMethod({command: 'claude'}),
+		).toBe('stdin');
+		expect(
+			getPromptInjectionMethod({command: 'opencode'}),
+		).toBe('stdin');
 	});
 });

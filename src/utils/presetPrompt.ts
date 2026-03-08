@@ -9,26 +9,16 @@ export interface PreparedPresetLaunch {
 	method: PromptInjectionMethod;
 }
 
-const getCommandName = (command: string): string => {
-	const normalized = command.trim().toLowerCase();
-	const parts = normalized.split(/[\\/]/);
-	return parts[parts.length - 1] || normalized;
-};
-
 export const getPromptInjectionMethod = (
 	preset: Pick<CommandPreset, 'command' | 'detectionStrategy'>,
 ): PromptInjectionMethod => {
-	const commandName = getCommandName(preset.command);
-
-	if (preset.detectionStrategy === 'opencode' || commandName === 'opencode') {
+	if (preset.detectionStrategy === 'opencode') {
 		return 'flag';
 	}
 
 	if (
 		preset.detectionStrategy === 'claude' ||
-		preset.detectionStrategy === 'codex' ||
-		commandName === 'claude' ||
-		commandName === 'codex'
+		preset.detectionStrategy === 'codex'
 	) {
 		return 'final-arg';
 	}
