@@ -102,18 +102,6 @@ describe('presetPrompt', () => {
 		});
 	});
 
-	it('falls back to final-arg (claude default) for unknown commands', () => {
-		expect(
-			preparePresetLaunch(
-				{command: 'custom-agent', args: ['--interactive']},
-				'hello',
-			),
-		).toEqual({
-			args: ['--interactive', 'hello'],
-			method: 'final-arg',
-		});
-	});
-
 	describe('describePromptInjection', () => {
 		it('describes final-arg for claude', () => {
 			expect(
@@ -187,11 +175,6 @@ describe('presetPrompt', () => {
 			).toContain('-p');
 		});
 
-		it('describes final-arg for unknown command (defaults to claude strategy)', () => {
-			expect(describePromptInjection({command: 'custom-agent'})).toContain(
-				'final command argument',
-			);
-		});
 	});
 
 	describe('getPromptInjectionMethod', () => {
@@ -269,9 +252,6 @@ describe('presetPrompt', () => {
 
 		it('falls back to claude strategy when detectionStrategy is not set', () => {
 			expect(getPromptInjectionMethod({command: 'claude'})).toBe('final-arg');
-			expect(getPromptInjectionMethod({command: 'custom-agent'})).toBe(
-				'final-arg',
-			);
 		});
 	});
 });

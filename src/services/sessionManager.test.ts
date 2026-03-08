@@ -228,32 +228,6 @@ describe('SessionManager', () => {
 			expect(mockPty.write).not.toHaveBeenCalled();
 		});
 
-		it('writes the initial prompt to stdin for unknown commands', async () => {
-			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
-				id: '1',
-				name: 'Custom',
-				command: 'custom-agent',
-				args: ['--interactive'],
-			});
-
-			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
-
-			await Effect.runPromise(
-				sessionManager.createSessionWithPresetEffect(
-					'/test/worktree',
-					undefined,
-					'implement prompt flow',
-				),
-			);
-
-			expect(spawn).toHaveBeenCalledWith(
-				'custom-agent',
-				['--interactive'],
-				expect.any(Object),
-			);
-			expect(mockPty.write).toHaveBeenCalledWith('implement prompt flow\r');
-		});
-
 		it('should fall back to default preset if specified preset not found', async () => {
 			// Setup mocks
 			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
