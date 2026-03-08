@@ -18,6 +18,42 @@ describe('presetPrompt', () => {
 		});
 	});
 
+	it('uses the final argument for codex presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'codex', args: [], detectionStrategy: 'codex'},
+				'refactor utils',
+			),
+		).toEqual({
+			args: ['refactor utils'],
+			method: 'final-arg',
+		});
+	});
+
+	it('uses the final argument for cursor presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'agent', args: [], detectionStrategy: 'cursor'},
+				'review code',
+			),
+		).toEqual({
+			args: ['review code'],
+			method: 'final-arg',
+		});
+	});
+
+	it('uses the final argument for cline presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'cline', args: [], detectionStrategy: 'cline'},
+				'fix bug',
+			),
+		).toEqual({
+			args: ['fix bug'],
+			method: 'final-arg',
+		});
+	});
+
 	it('uses --prompt for opencode presets', () => {
 		expect(
 			preparePresetLaunch(
@@ -26,6 +62,42 @@ describe('presetPrompt', () => {
 			),
 		).toEqual({
 			args: ['run', '--prompt', 'implement feature'],
+			method: 'flag',
+		});
+	});
+
+	it('uses -i for gemini presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'gemini', args: [], detectionStrategy: 'gemini'},
+				'explain code',
+			),
+		).toEqual({
+			args: ['-i', 'explain code'],
+			method: 'flag',
+		});
+	});
+
+	it('uses -i for github-copilot presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'copilot', args: [], detectionStrategy: 'github-copilot'},
+				'create readme',
+			),
+		).toEqual({
+			args: ['-i', 'create readme'],
+			method: 'flag',
+		});
+	});
+
+	it('uses -p for kimi presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'kimi', args: [], detectionStrategy: 'kimi'},
+				'summarize',
+			),
+		).toEqual({
+			args: ['-p', 'summarize'],
 			method: 'flag',
 		});
 	});
@@ -54,16 +126,16 @@ describe('presetPrompt', () => {
 			}),
 		).toContain('--prompt');
 		expect(
-			getPromptInjectionMethod({command: 'custom-agent'}),
-		).toBe('stdin');
+			describePromptInjection({
+				command: 'gemini',
+				detectionStrategy: 'gemini',
+			}),
+		).toContain('-i');
+		expect(getPromptInjectionMethod({command: 'custom-agent'})).toBe('stdin');
 	});
 
 	it('uses stdin when detectionStrategy is not set even for known command names', () => {
-		expect(
-			getPromptInjectionMethod({command: 'claude'}),
-		).toBe('stdin');
-		expect(
-			getPromptInjectionMethod({command: 'opencode'}),
-		).toBe('stdin');
+		expect(getPromptInjectionMethod({command: 'claude'})).toBe('stdin');
+		expect(getPromptInjectionMethod({command: 'opencode'})).toBe('stdin');
 	});
 });
