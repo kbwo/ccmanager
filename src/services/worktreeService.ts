@@ -1105,6 +1105,22 @@ export class WorktreeService {
 				);
 			}
 
+			// Prevent deleting the worktree that contains the current working directory
+			const resolvedWorktreePath = path.resolve(worktreePath);
+			const resolvedCwd = path.resolve(process.cwd());
+			if (
+				resolvedCwd === resolvedWorktreePath ||
+				resolvedCwd.startsWith(resolvedWorktreePath + path.sep)
+			) {
+				return yield* Effect.fail(
+					new GitError({
+						command: 'git worktree remove',
+						exitCode: 1,
+						stderr: `Cannot delete the worktree at "${worktreePath}" because it is the current working directory`,
+					}),
+				);
+			}
+
 			// Remove the worktree
 			yield* Effect.try({
 				try: () => {
