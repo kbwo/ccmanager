@@ -1,3 +1,4 @@
+import {randomBytes} from 'crypto';
 import {Effect} from 'effect';
 import {execFile, type ChildProcess} from 'child_process';
 import {ProcessError} from '../types/errors.js';
@@ -144,6 +145,18 @@ export const deduplicateBranchName = (
 			return candidate;
 		}
 	}
+};
+
+export const generateFallbackBranchName = (
+	existingBranches?: string[],
+): string => {
+	const date = new Date();
+	const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+	const randomSuffix = randomBytes(3).toString('hex');
+	const name = `${dateStr}-${randomSuffix}`;
+	return existingBranches
+		? deduplicateBranchName(name, existingBranches)
+		: name;
 };
 
 export class WorktreeNameGenerator {

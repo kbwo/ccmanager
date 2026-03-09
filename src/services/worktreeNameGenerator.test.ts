@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {
 	deduplicateBranchName,
 	extractBranchNameFromOutput,
+	generateFallbackBranchName,
 	worktreeNameGenerator as generator,
 } from './worktreeNameGenerator.js';
 
@@ -63,5 +64,19 @@ describe('deduplicateBranchName', () => {
 		expect(deduplicateBranchName('Feature/New', ['feature/new'])).toBe(
 			'Feature/New-2',
 		);
+	});
+});
+
+describe('generateFallbackBranchName', () => {
+	it('returns a name matching YYYYMMDD-hex pattern', () => {
+		const name = generateFallbackBranchName();
+		expect(name).toMatch(/^\d{8}-[0-9a-f]{6}$/);
+	});
+
+	it('deduplicates against existing branches', () => {
+		const first = generateFallbackBranchName();
+		const name = generateFallbackBranchName([first]);
+		// Either it's different (random collision unlikely) or it has a -2 suffix
+		expect(name).not.toBe(first);
 	});
 });
