@@ -102,19 +102,6 @@ describe('presetPrompt', () => {
 		});
 	});
 
-	it('falls back to stdin for unknown commands', () => {
-		expect(
-			preparePresetLaunch(
-				{command: 'custom-agent', args: ['--interactive']},
-				'hello',
-			),
-		).toEqual({
-			args: ['--interactive'],
-			method: 'stdin',
-			stdinPayload: 'hello\r',
-		});
-	});
-
 	describe('describePromptInjection', () => {
 		it('describes final-arg for claude', () => {
 			expect(
@@ -186,12 +173,6 @@ describe('presetPrompt', () => {
 					detectionStrategy: 'kimi',
 				}),
 			).toContain('-p');
-		});
-
-		it('describes stdin for unknown strategy', () => {
-			expect(describePromptInjection({command: 'custom-agent'})).toContain(
-				'standard input',
-			);
 		});
 	});
 
@@ -268,10 +249,8 @@ describe('presetPrompt', () => {
 			).toBe('flag');
 		});
 
-		it('returns stdin when detectionStrategy is not set', () => {
-			expect(getPromptInjectionMethod({command: 'claude'})).toBe('stdin');
-			expect(getPromptInjectionMethod({command: 'opencode'})).toBe('stdin');
-			expect(getPromptInjectionMethod({command: 'custom-agent'})).toBe('stdin');
+		it('falls back to claude strategy when detectionStrategy is not set', () => {
+			expect(getPromptInjectionMethod({command: 'claude'})).toBe('final-arg');
 		});
 	});
 });

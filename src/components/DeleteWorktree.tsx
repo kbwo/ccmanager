@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import path from 'path';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
@@ -39,10 +40,19 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				);
 
 				if (!cancelled) {
-					// Filter out main worktree - we shouldn't delete it
-					const deletableWorktrees = allWorktrees.filter(
-						wt => !wt.isMainWorktree,
-					);
+					// Filter out main worktree and current working directory worktree
+					const resolvedCwd = path.resolve(process.cwd());
+					const deletableWorktrees = allWorktrees.filter(wt => {
+						if (wt.isMainWorktree) return false;
+						const resolvedPath = path.resolve(wt.path);
+						if (
+							resolvedCwd === resolvedPath ||
+							resolvedCwd.startsWith(resolvedPath + path.sep)
+						) {
+							return false;
+						}
+						return true;
+					});
 					setWorktrees(deletableWorktrees);
 					setIsLoading(false);
 				}

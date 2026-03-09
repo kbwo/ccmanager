@@ -943,6 +943,39 @@ branch refs/heads/main
 				expect.fail('Should have returned Left with GitError');
 			}
 		});
+		it('should return Effect that fails with GitError when trying to delete worktree matching cwd', async () => {
+			const cwdPath = process.cwd();
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree ${cwdPath}
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.deleteWorktreeEffect(cwdPath);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(GitError);
+				expect(result.left.stderr).toContain(
+					'because it is the current working directory',
+				);
+			} else {
+				expect.fail('Should have returned Left with GitError');
+			}
+		});
 	});
 
 	describe('Effect-based mergeWorktree', () => {

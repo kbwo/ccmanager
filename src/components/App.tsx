@@ -15,7 +15,11 @@ import type {NewWorktreeRequest} from './NewWorktree.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {worktreeNameGenerator} from '../services/worktreeNameGenerator.js';
+import {
+	worktreeNameGenerator,
+	generateFallbackBranchName,
+} from '../services/worktreeNameGenerator.js';
+import {logger} from '../utils/logger.js';
 import {
 	Worktree,
 	Session as ISession,
@@ -149,7 +153,6 @@ const App: React.FC<AppProps> = ({
 			const result = await Effect.runPromise(Effect.either(sessionEffect));
 
 			if (result._tag === 'Left') {
-				// Handle error using pattern matching on _tag
 				const errorMessage = formatErrorMessage(result.left);
 				return {
 					success: false,
@@ -157,7 +160,6 @@ const App: React.FC<AppProps> = ({
 				};
 			}
 
-			// Success case - extract session from Right
 			return {
 				success: true,
 				session: result.right,
@@ -516,12 +518,13 @@ const App: React.FC<AppProps> = ({
 			);
 
 			if (generatedBranch._tag === 'Left') {
-				setError(formatErrorMessage(generatedBranch.left));
-				setView('new-worktree');
-				return;
+				logger.warn(
+					`Branch name generation failed, using fallback: ${formatErrorMessage(generatedBranch.left)}`,
+				);
+				branch = generateFallbackBranchName(existingBranches);
+			} else {
+				branch = generatedBranch.right;
 			}
-
-			branch = generatedBranch.right;
 			if (request.autoDirectoryPattern) {
 				targetPath = generateWorktreeDirectory(
 					request.projectPath,
