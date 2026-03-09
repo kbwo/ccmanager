@@ -27,6 +27,7 @@ import {
 	truncateString,
 	calculateColumnPositions,
 	assembleWorktreeLabel,
+	formatRelativeDate,
 } from '../utils/worktreeUtils.js';
 import {
 	formatGitFileChanges,
@@ -390,12 +391,18 @@ const Dashboard: React.FC<DashboardProps> = ({
 					fileChanges,
 					aheadBehind,
 					parentBranch,
+					lastCommitDate: wt.lastCommitDate
+						? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
+						: '',
 					error: itemError,
 					lengths: {
 						base: stripAnsi(baseLabel).length,
 						fileChanges: stripAnsi(fileChanges).length,
 						aheadBehind: stripAnsi(aheadBehind).length,
 						parentBranch: stripAnsi(parentBranch).length,
+						lastCommitDate: wt.lastCommitDate
+							? formatRelativeDate(wt.lastCommitDate).length
+							: 0,
 					},
 				};
 			});
