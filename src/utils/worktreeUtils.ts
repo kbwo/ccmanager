@@ -35,8 +35,11 @@ export interface WorktreeItem {
 	};
 }
 
+const RELATIVE_DATE_WIDTH = 8; // max width: "12mo ago"
+
 /**
- * Format a date as a relative time string (e.g., "2h ago", "3d ago").
+ * Format a date as a fixed-width relative time string (e.g., "  2h ago", "  3d ago").
+ * Padded to RELATIVE_DATE_WIDTH characters to prevent flickering on scroll.
  */
 export function formatRelativeDate(date: Date): string {
 	const now = Date.now();
@@ -49,13 +52,16 @@ export function formatRelativeDate(date: Date): string {
 	const diffMonth = Math.floor(diffDay / 30);
 	const diffYear = Math.floor(diffDay / 365);
 
-	if (diffYear > 0) return `${diffYear}y ago`;
-	if (diffMonth > 0) return `${diffMonth}mo ago`;
-	if (diffWeek > 0) return `${diffWeek}w ago`;
-	if (diffDay > 0) return `${diffDay}d ago`;
-	if (diffHour > 0) return `${diffHour}h ago`;
-	if (diffMin > 0) return `${diffMin}m ago`;
-	return 'just now';
+	let result: string;
+	if (diffYear > 0) result = `${diffYear}y ago`;
+	else if (diffMonth > 0) result = `${diffMonth}mo ago`;
+	else if (diffWeek > 0) result = `${diffWeek}w ago`;
+	else if (diffDay > 0) result = `${diffDay}d ago`;
+	else if (diffHour > 0) result = `${diffHour}h ago`;
+	else if (diffMin > 0) result = `${diffMin}m ago`;
+	else result = 'just now';
+
+	return result.padStart(RELATIVE_DATE_WIDTH);
 }
 
 // Utility function to truncate strings with ellipsis
