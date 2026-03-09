@@ -784,6 +784,21 @@ export class WorktreeService {
 						mainWorktree.path = self.gitRootPath;
 					}
 
+					// Fetch last commit date for each worktree
+					for (const wt of worktrees) {
+						try {
+							const dateStr = execSync('git log -1 --format=%aI', {
+								cwd: wt.path,
+								encoding: 'utf8',
+							}).trim();
+							if (dateStr) {
+								wt.lastCommitDate = new Date(dateStr);
+							}
+						} catch {
+							// Ignore errors (e.g., empty repo)
+						}
+					}
+
 					// Sort worktrees by last session if requested
 					if (sortByLastSession) {
 						worktrees.sort((a, b) => {

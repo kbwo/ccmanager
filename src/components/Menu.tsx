@@ -238,7 +238,9 @@ const Menu: React.FC<MenuProps> = ({
 				const label = baseLabel + (aaDisabled ? ' [Auto Approval Off]' : '');
 
 				// Only show numbers for worktrees (0-9) when not in search mode
-				const numberPrefix = !isSearchMode && index < 10 ? `${index} ❯ ` : '❯ ';
+				// Use fixed-width prefix to prevent flicker at scroll boundary
+				const numberPrefix =
+					!isSearchMode && index < 10 ? `${index} ❯ ` : '  ❯ ';
 
 				return {
 					type: 'worktree',

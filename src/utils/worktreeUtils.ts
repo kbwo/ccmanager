@@ -23,6 +23,7 @@ export interface WorktreeItem {
 	fileChanges: string;
 	aheadBehind: string;
 	parentBranch: string;
+	lastCommitDate: string;
 	error?: string;
 	// Visible lengths (without ANSI codes) for alignment calculation
 	lengths: {
@@ -30,7 +31,31 @@ export interface WorktreeItem {
 		fileChanges: number;
 		aheadBehind: number;
 		parentBranch: number;
+		lastCommitDate: number;
 	};
+}
+
+/**
+ * Format a date as a relative time string (e.g., "2h ago", "3d ago").
+ */
+export function formatRelativeDate(date: Date): string {
+	const now = Date.now();
+	const diffMs = now - date.getTime();
+	const diffSec = Math.floor(diffMs / 1000);
+	const diffMin = Math.floor(diffSec / 60);
+	const diffHour = Math.floor(diffMin / 60);
+	const diffDay = Math.floor(diffHour / 24);
+	const diffWeek = Math.floor(diffDay / 7);
+	const diffMonth = Math.floor(diffDay / 30);
+	const diffYear = Math.floor(diffDay / 365);
+
+	if (diffYear > 0) return `${diffYear}y ago`;
+	if (diffMonth > 0) return `${diffMonth}mo ago`;
+	if (diffWeek > 0) return `${diffWeek}w ago`;
+	if (diffDay > 0) return `${diffDay}d ago`;
+	if (diffHour > 0) return `${diffHour}h ago`;
+	if (diffMin > 0) return `${diffMin}m ago`;
+	return 'just now';
 }
 
 // Utility function to truncate strings with ellipsis
@@ -158,6 +183,11 @@ export function prepareWorktreeItems(
 			fileChanges = '\x1b[90m[fetching...]\x1b[0m';
 		}
 
+		// Format last commit date as dim relative time
+		const lastCommitDate = wt.lastCommitDate
+			? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
+			: '';
+
 		return {
 			worktree: wt,
 			session,
@@ -165,12 +195,14 @@ export function prepareWorktreeItems(
 			fileChanges,
 			aheadBehind,
 			parentBranch,
+			lastCommitDate,
 			error,
 			lengths: {
 				base: stripAnsi(baseLabel).length,
 				fileChanges: stripAnsi(fileChanges).length,
 				aheadBehind: stripAnsi(aheadBehind).length,
 				parentBranch: stripAnsi(parentBranch).length,
+				lastCommitDate: stripAnsi(lastCommitDate).length,
 			},
 		};
 	});
@@ -184,6 +216,7 @@ export function calculateColumnPositions(items: WorktreeItem[]) {
 	let maxBranchLength = 0;
 	let maxFileChangesLength = 0;
 	let maxAheadBehindLength = 0;
+	let maxParentBranchLength = 0;
 
 	items.forEach(item => {
 		// Skip items with errors for alignment calculation
@@ -198,6 +231,10 @@ export function calculateColumnPositions(items: WorktreeItem[]) {
 			maxAheadBehindLength,
 			item.lengths.aheadBehind,
 		);
+		maxParentBranchLength = Math.max(
+			maxParentBranchLength,
+			item.lengths.parentBranch,
+		);
 	});
 
 	// Simple column positioning
@@ -206,11 +243,14 @@ export function calculateColumnPositions(items: WorktreeItem[]) {
 		fileChangesColumn + maxFileChangesLength + MIN_COLUMN_PADDING + 2;
 	const parentBranchColumn =
 		aheadBehindColumn + maxAheadBehindLength + MIN_COLUMN_PADDING + 2;
+	const lastCommitDateColumn =
+		parentBranchColumn + maxParentBranchLength + MIN_COLUMN_PADDING + 2;
 
 	return {
 		fileChanges: fileChangesColumn,
 		aheadBehind: aheadBehindColumn,
 		parentBranch: parentBranchColumn,
+		lastCommitDate: lastCommitDateColumn,
 	};
 }
 
@@ -245,6 +285,11 @@ export function assembleWorktreeLabel(
 	if (item.parentBranch) {
 		label =
 			padTo(label, currentLength, columns.parentBranch) + item.parentBranch;
+		currentLength = columns.parentBranch + item.lengths.parentBranch;
+	}
+	if (item.lastCommitDate) {
+		label =
+			padTo(label, currentLength, columns.lastCommitDate) + item.lastCommitDate;
 	}
 
 	return label;
