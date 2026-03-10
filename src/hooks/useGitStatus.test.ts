@@ -5,16 +5,24 @@ import {Text} from 'ink';
 import {Effect, Exit} from 'effect';
 import {useGitStatus} from './useGitStatus.js';
 import type {Worktree} from '../types/index.js';
-import {getGitStatusLimited, type GitStatus} from '../utils/gitStatus.js';
+import {
+	getGitStatusLimited,
+	getLastCommitDateLimited,
+	type GitStatus,
+} from '../utils/gitStatus.js';
 import {GitError} from '../types/errors.js';
 
 // Mock the gitStatus module
 vi.mock('../utils/gitStatus.js', () => ({
 	getGitStatusLimited: vi.fn(),
+	getLastCommitDateLimited: vi.fn(),
 }));
 
 describe('useGitStatus', () => {
 	const mockGetGitStatus = getGitStatusLimited as ReturnType<typeof vi.fn>;
+	const mockGetLastCommitDate = getLastCommitDateLimited as ReturnType<
+		typeof vi.fn
+	>;
 
 	const createWorktree = (path: string): Worktree => ({
 		path,
@@ -34,6 +42,11 @@ describe('useGitStatus', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		mockGetGitStatus.mockClear();
+		mockGetLastCommitDate.mockClear();
+		// Default: return a date for all worktrees
+		mockGetLastCommitDate.mockReturnValue(
+			Effect.succeed(new Date('2025-01-01T00:00:00Z')),
+		);
 	});
 
 	afterEach(() => {
@@ -160,6 +173,15 @@ describe('useGitStatus', () => {
 			});
 		});
 
+		// Also make commit date async so Promise.all waits for both
+		let resolveDateEffect: ((exit: Exit.Exit<Date, GitError>) => void) | null =
+			null;
+		mockGetLastCommitDate.mockImplementation(() => {
+			return Effect.async<Date, GitError>(resume => {
+				resolveDateEffect = resume;
+			});
+		});
+
 		const TestComponent = () => {
 			useGitStatus(worktrees, 'main', 100);
 			return React.createElement(Text, null, 'test');
@@ -178,8 +200,9 @@ describe('useGitStatus', () => {
 		// Should not have started a second fetch yet
 		expect(mockGetGitStatus).toHaveBeenCalledTimes(1);
 
-		// Complete the first fetch
+		// Complete the first fetch (both status and date)
 		resolveEffect!(Exit.succeed(createGitStatus(1, 0)));
+		resolveDateEffect!(Exit.succeed(new Date('2025-01-01T00:00:00Z')));
 
 		// Wait for the promise to resolve
 		await vi.waitFor(() => {
@@ -208,6 +231,13 @@ describe('useGitStatus', () => {
 					activeRequests--;
 					interruptedPaths.push(path);
 				});
+			});
+		});
+
+		// Also make commit date async so it doesn't resolve before status
+		mockGetLastCommitDate.mockImplementation(() => {
+			return Effect.async<Date, GitError>(_resume => {
+				return Effect.sync(() => {});
 			});
 		});
 
