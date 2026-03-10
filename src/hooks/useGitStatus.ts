@@ -1,19 +1,25 @@
 import {useEffect, useState, type Dispatch, type SetStateAction} from 'react';
 import {Effect, Exit, Cause, Option} from 'effect';
 import {Worktree} from '../types/index.js';
-import {getGitStatusLimited, type GitStatus} from '../utils/gitStatus.js';
+import {
+	getGitStatusLimited,
+	getLastCommitDateLimited,
+	type GitStatus,
+} from '../utils/gitStatus.js';
 import type {GitError} from '../types/errors.js';
 
 /**
- * Custom hook for polling git status of worktrees with Effect-based execution
+ * Custom hook for polling git status and commit dates of worktrees with Effect-based execution
  *
- * Fetches git status for each worktree at regular intervals using Effect.runPromiseExit
- * and updates worktree state with results. Handles cancellation via AbortController.
+ * Fetches git status and last commit date for each worktree at regular intervals
+ * using Effect.runPromiseExit and updates worktree state with results.
+ * Both are fetched together so they appear at the same time.
+ * Handles cancellation via AbortController.
  *
  * @param worktrees - Array of worktrees to monitor
  * @param defaultBranch - Default branch for comparisons (null disables polling)
  * @param updateInterval - Polling interval in milliseconds (default: 5000)
- * @returns Array of worktrees with updated gitStatus and gitStatusError fields
+ * @returns Array of worktrees with updated gitStatus, gitStatusError, and lastCommitDate fields
  */
 export function useGitStatus(
 	worktrees: Worktree[],
@@ -35,16 +41,23 @@ export function useGitStatus(
 			worktree: Worktree,
 			abortController: AbortController,
 		) => {
-			// Execute the Effect to get git status with cancellation support
-			const exit = await Effect.runPromiseExit(
-				getGitStatusLimited(worktree.path),
-				{
+			// Fetch git status and last commit date in parallel
+			const [statusExit, dateExit] = await Promise.all([
+				Effect.runPromiseExit(getGitStatusLimited(worktree.path), {
 					signal: abortController.signal,
-				},
-			);
+				}),
+				Effect.runPromiseExit(getLastCommitDateLimited(worktree.path), {
+					signal: abortController.signal,
+				}),
+			]);
 
-			// Update worktree state based on exit result
-			handleStatusExit(exit, worktree.path, setWorktreesWithStatus);
+			// Update worktree state with both results at once
+			handleStatusExit(
+				statusExit,
+				dateExit,
+				worktree.path,
+				setWorktreesWithStatus,
+			);
 		};
 
 		const scheduleUpdate = (worktree: Worktree) => {
@@ -88,46 +101,51 @@ export function useGitStatus(
 }
 
 /**
- * Handle the Exit result from Effect.runPromiseExit and update worktree state
+ * Handle the Exit results from Effect.runPromiseExit and update worktree state
  *
- * Uses pattern matching on Exit to distinguish between success, failure, and interruption.
- * Success updates gitStatus, failure updates gitStatusError, interruption is ignored.
+ * Updates both gitStatus and lastCommitDate in a single state update so they
+ * appear at the same time in the UI.
  *
- * @param exit - Exit result from Effect execution
+ * @param statusExit - Exit result from git status Effect
+ * @param dateExit - Exit result from commit date Effect
  * @param worktreePath - Path of the worktree being updated
  * @param setWorktreesWithStatus - State setter function
  */
 function handleStatusExit(
-	exit: Exit.Exit<GitStatus, GitError>,
+	statusExit: Exit.Exit<GitStatus, GitError>,
+	dateExit: Exit.Exit<Date, GitError>,
 	worktreePath: string,
 	setWorktreesWithStatus: Dispatch<SetStateAction<Worktree[]>>,
 ): void {
-	if (Exit.isSuccess(exit)) {
-		// Success: update gitStatus and clear error
-		const gitStatus = exit.value;
-		setWorktreesWithStatus(prev =>
-			prev.map(wt =>
-				wt.path === worktreePath
-					? {...wt, gitStatus, gitStatusError: undefined}
-					: wt,
-			),
-		);
-	} else if (Exit.isFailure(exit)) {
-		// Failure: extract error and update gitStatusError
-		const failure = Cause.failureOption(exit.cause);
+	// Build the update object from both results
+	const update: Partial<Worktree> = {};
+	let hasUpdate = false;
+
+	if (Exit.isSuccess(statusExit)) {
+		update.gitStatus = statusExit.value;
+		update.gitStatusError = undefined;
+		hasUpdate = true;
+	} else if (Exit.isFailure(statusExit)) {
+		const failure = Cause.failureOption(statusExit.cause);
 		if (Option.isSome(failure)) {
 			const gitError = failure.value as GitError;
-			const errorMessage = formatGitError(gitError);
-			setWorktreesWithStatus(prev =>
-				prev.map(wt =>
-					wt.path === worktreePath
-						? {...wt, gitStatus: undefined, gitStatusError: errorMessage}
-						: wt,
-				),
-			);
+			update.gitStatus = undefined;
+			update.gitStatusError = formatGitError(gitError);
+			hasUpdate = true;
 		}
 	}
-	// Interruption: no state update - the request was cancelled
+
+	if (Exit.isSuccess(dateExit)) {
+		update.lastCommitDate = dateExit.value;
+		hasUpdate = true;
+	}
+	// Silently ignore commit date errors (e.g., empty repo)
+
+	if (hasUpdate) {
+		setWorktreesWithStatus(prev =>
+			prev.map(wt => (wt.path === worktreePath ? {...wt, ...update} : wt)),
+		);
+	}
 }
 
 /**

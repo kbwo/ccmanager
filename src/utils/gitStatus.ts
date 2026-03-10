@@ -101,6 +101,37 @@ export const getGitStatusLimited = createEffectConcurrencyLimited(
 	10,
 );
 
+/**
+ * Get the last commit date for a worktree
+ *
+ * @param worktreePath - Absolute path to the worktree directory
+ * @returns Effect containing the commit date or GitError
+ */
+export const getLastCommitDate = (
+	worktreePath: string,
+): Effect.Effect<Date, GitError> =>
+	Effect.flatMap(
+		runGit(['log', '-1', '--format=%aI'], worktreePath),
+		result => {
+			const dateStr = result.stdout.trim();
+			if (dateStr) {
+				return Effect.succeed(new Date(dateStr));
+			}
+			return Effect.fail(
+				new GitError({
+					command: 'git log -1 --format=%aI',
+					exitCode: 0,
+					stderr: 'No commits found',
+				}),
+			);
+		},
+	);
+
+export const getLastCommitDateLimited = createEffectConcurrencyLimited(
+	(worktreePath: string) => getLastCommitDate(worktreePath),
+	10,
+);
+
 export function formatGitFileChanges(status: GitStatus): string {
 	const parts: string[] = [];
 
