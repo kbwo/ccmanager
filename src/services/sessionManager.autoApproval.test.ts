@@ -2,8 +2,8 @@ import {describe, it, expect, beforeEach, afterEach, vi, Mock} from 'vitest';
 import {EventEmitter} from 'events';
 import {spawn, type IPty} from './bunTerminal.js';
 import {
-	STATE_CHECK_INTERVAL_MS,
 	STATE_PERSISTENCE_DURATION_MS,
+	STATE_MINIMUM_DURATION_MS,
 } from '../constants/statePersistence.js';
 import {Effect, Either} from 'effect';
 
@@ -143,25 +143,8 @@ describe('SessionManager - Auto Approval Recovery', () => {
 			},
 		);
 
-		// Detection sequence: first prompt (no auto-approval), back to busy, second prompt (should auto-approve)
-		const detectionStates = [
-			'waiting_input',
-			'waiting_input',
-			'waiting_input',
-			'busy',
-			'busy',
-			'busy',
-			'waiting_input',
-			'waiting_input',
-			'waiting_input',
-		] as const;
-		let callIndex = 0;
-		detectStateMock.mockImplementation(() => {
-			const state =
-				detectionStates[Math.min(callIndex, detectionStates.length - 1)];
-			callIndex++;
-			return state;
-		});
+		// Start with waiting_input; tests will change the mock return value between phases
+		detectStateMock.mockReturnValue('waiting_input');
 
 		const sessionManagerModule = await import('./sessionManager.js');
 		SessionManager = sessionManagerModule.SessionManager;
@@ -185,19 +168,26 @@ describe('SessionManager - Auto Approval Recovery', () => {
 			autoApprovalFailed: true,
 		}));
 
-		// First waiting_input cycle (auto-approval suppressed) (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 3);
+		// Phase 1: waiting_input (auto-approval suppressed due to prior failure)
+		detectStateMock.mockReturnValue('waiting_input');
+		await vi.advanceTimersByTimeAsync(
+			STATE_MINIMUM_DURATION_MS + STATE_PERSISTENCE_DURATION_MS,
+		);
 		expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
 		expect(session.stateMutex.getSnapshot().autoApprovalFailed).toBe(true);
 
-		// Transition back to busy should reset the failure flag (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 3);
+		// Phase 2: busy - should reset the failure flag
+		detectStateMock.mockReturnValue('busy');
+		await vi.advanceTimersByTimeAsync(
+			STATE_MINIMUM_DURATION_MS + STATE_PERSISTENCE_DURATION_MS,
+		);
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 		expect(session.stateMutex.getSnapshot().autoApprovalFailed).toBe(false);
 
-		// Next waiting_input should trigger pending_auto_approval (use async to process mutex updates)
+		// Phase 3: waiting_input again - should trigger pending_auto_approval
+		detectStateMock.mockReturnValue('waiting_input');
 		await vi.advanceTimersByTimeAsync(
-			STATE_CHECK_INTERVAL_MS * 3 + STATE_PERSISTENCE_DURATION_MS,
+			STATE_MINIMUM_DURATION_MS + STATE_PERSISTENCE_DURATION_MS,
 		);
 		// State should now be pending_auto_approval (waiting for verification)
 		expect(session.stateMutex.getSnapshot().state).toBe(
@@ -261,9 +251,10 @@ describe('SessionManager - Auto Approval Recovery', () => {
 		const handler = vi.fn();
 		sessionManager.on('sessionStateChanged', handler);
 
-		// Advance to pending_auto_approval state (use async to process mutex updates)
+		// Phase 1: waiting_input → pending_auto_approval
+		detectStateMock.mockReturnValue('waiting_input');
 		await vi.advanceTimersByTimeAsync(
-			STATE_CHECK_INTERVAL_MS * 3 + STATE_PERSISTENCE_DURATION_MS,
+			STATE_MINIMUM_DURATION_MS + STATE_PERSISTENCE_DURATION_MS,
 		);
 		// State should be pending_auto_approval (waiting for verification)
 		expect(session.stateMutex.getSnapshot().state).toBe(
