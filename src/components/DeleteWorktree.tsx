@@ -7,6 +7,10 @@ import {Worktree} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import DeleteConfirmation from './DeleteConfirmation.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {useSearchMode} from '../hooks/useSearchMode.js';
+import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
+import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
+import SearchableList from './SearchableList.js';
 
 interface DeleteWorktreeProps {
 	projectPath?: string;
@@ -27,6 +31,21 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	const [focusedIndex, setFocusedIndex] = useState(0);
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+
+	const [menuItems, setMenuItems] = useState<{label: string; value: string}[]>(
+		[],
+	);
+
+	// Use the search mode hook
+	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
+		useSearchMode(menuItems.length, {
+			isDisabled: confirmMode,
+		});
+
+	const limit = useDynamicLimit({
+		isSearchMode,
+		hasError: !!error,
+	});
 
 	useEffect(() => {
 		let cancelled = false;
@@ -71,17 +90,24 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		};
 	}, [projectPath]);
 
-	// Create menu items from worktrees
-	const menuItems = worktrees.map((worktree, index) => {
-		const branchName = worktree.branch
-			? worktree.branch.replace('refs/heads/', '')
-			: 'detached';
-		const isSelected = selectedIndices.has(index);
-		return {
-			label: `${isSelected ? '[✓]' : '[ ]'} ${branchName} (${worktree.path})`,
-			value: index.toString(),
-		};
-	});
+	// Build menu items from worktrees, filtering by search query
+	useEffect(() => {
+		const filteredWorktrees = filterWorktreesByQuery(worktrees, searchQuery);
+
+		const items = filteredWorktrees.map(worktree => {
+			const originalIndex = worktrees.indexOf(worktree);
+			const branchName = worktree.branch
+				? worktree.branch.replace('refs/heads/', '')
+				: 'detached';
+			const isSelected = selectedIndices.has(originalIndex);
+			return {
+				label: `${isSelected ? '[✓]' : '[ ]'} ${branchName} (${worktree.path})`,
+				value: originalIndex.toString(),
+			};
+		});
+
+		setMenuItems(items);
+	}, [worktrees, searchQuery, selectedIndices]);
 
 	const handleSelect = (item: {value: string}) => {
 		// Don't toggle on Enter - this will be used to confirm
@@ -93,6 +119,11 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	useInput((input, key) => {
 		if (confirmMode) {
 			// Confirmation component handles input
+			return;
+		}
+
+		// Don't process other keys if in search mode (handled by useSearchMode)
+		if (isSearchMode) {
 			return;
 		}
 
@@ -184,38 +215,49 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				</Text>
 			</Box>
 
-			<SelectInput
+			<SearchableList
+				isSearchMode={isSearchMode}
+				searchQuery={searchQuery}
+				onSearchQueryChange={setSearchQuery}
+				selectedIndex={selectedIndex}
 				items={menuItems}
-				onSelect={handleSelect}
-				onHighlight={(item: {value: string}) => {
-					const index = parseInt(item.value, 10);
-					setFocusedIndex(index);
-				}}
-				limit={10}
-				indicatorComponent={({isSelected}) => (
-					<Text color={isSelected ? 'green' : undefined}>
-						{isSelected ? '>' : ' '}
-					</Text>
-				)}
-				itemComponent={({isSelected, label}) => {
-					// Check if this item is actually selected (checkbox checked)
-					const hasCheckmark = label.includes('[✓]');
-					return (
-						<Text
-							color={isSelected ? 'green' : undefined}
-							inverse={isSelected}
-							dimColor={!isSelected && !hasCheckmark}
-						>
-							{label}
+				limit={limit}
+				placeholder="Type to filter worktrees..."
+				noMatchMessage="No worktrees match your search"
+			>
+				<SelectInput
+					items={menuItems}
+					onSelect={handleSelect}
+					onHighlight={(item: {value: string}) => {
+						const index = parseInt(item.value, 10);
+						setFocusedIndex(index);
+					}}
+					limit={limit}
+					indicatorComponent={({isSelected}) => (
+						<Text color={isSelected ? 'green' : undefined}>
+							{isSelected ? '>' : ' '}
 						</Text>
-					);
-				}}
-			/>
+					)}
+					itemComponent={({isSelected, label}) => {
+						const hasCheckmark = label.includes('[✓]');
+						return (
+							<Text
+								color={isSelected ? 'green' : undefined}
+								inverse={isSelected}
+								dimColor={!isSelected && !hasCheckmark}
+							>
+								{label}
+							</Text>
+						);
+					}}
+				/>
+			</SearchableList>
 
 			<Box marginTop={1} flexDirection="column">
 				<Text dimColor>
-					Controls: ↑↓/j/k Navigate, Space Select, Enter Confirm,{' '}
-					{shortcutManager.getShortcutDisplay('cancel')} Cancel
+					{isSearchMode
+						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
+						: `Controls: ↑↓/j/k Navigate, Space Select, Enter Confirm, /-Search, ${shortcutManager.getShortcutDisplay('cancel')} Cancel`}
 				</Text>
 				{selectedIndices.size > 0 && (
 					<Text color="yellow">

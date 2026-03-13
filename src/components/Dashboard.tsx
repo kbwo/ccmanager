@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useMemo} from 'react';
-import {Box, Text, useInput, useStdout} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import {Effect} from 'effect';
 import SelectInput from 'ink-select-input';
 import stripAnsi from 'strip-ansi';
@@ -21,6 +21,7 @@ import {
 	getStatusDisplay,
 } from '../constants/statusIcons.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import {useGitStatus} from '../hooks/useGitStatus.js';
 import {
 	type WorktreeItem,
@@ -34,7 +35,7 @@ import {
 	formatGitAheadBehind,
 	formatParentBranch,
 } from '../utils/gitStatus.js';
-import TextInputWrapper from './TextInputWrapper.js';
+import SearchableList from './SearchableList.js';
 
 const MAX_BRANCH_NAME_LENGTH = 70;
 
@@ -162,9 +163,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 	);
 	const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
 
-	const {stdout} = useStdout();
-	const fixedRows = 6;
-
 	const displayError = error || loadError;
 
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -173,10 +171,10 @@ const Dashboard: React.FC<DashboardProps> = ({
 			skipInTest: false,
 		});
 
-	const limit = Math.max(
-		5,
-		stdout.rows - fixedRows - (isSearchMode ? 1 : 0) - (displayError ? 3 : 0),
-	);
+	const limit = useDynamicLimit({
+		isSearchMode,
+		hasError: !!displayError,
+	});
 
 	// Git status polling for session worktrees
 	const enrichedWorktrees = useGitStatus(
@@ -635,18 +633,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 				</Text>
 			</Box>
 
-			{isSearchMode && (
-				<Box marginBottom={1}>
-					<Text>Search: </Text>
-					<TextInputWrapper
-						value={searchQuery}
-						onChange={setSearchQuery}
-						focus={true}
-						placeholder="Type to filter..."
-					/>
-				</Box>
-			)}
-
 			{loading ? (
 				<Box>
 					<Text color="yellow">Discovering projects...</Text>
@@ -655,30 +641,25 @@ const Dashboard: React.FC<DashboardProps> = ({
 				<Box>
 					<Text color="yellow">No git repositories found in {projectsDir}</Text>
 				</Box>
-			) : isSearchMode && items.length === 0 ? (
-				<Box>
-					<Text color="yellow">No matches found</Text>
-				</Box>
-			) : isSearchMode ? (
-				<Box flexDirection="column">
-					{items.slice(0, limit).map((item, index) => (
-						<Text
-							key={item.value}
-							color={index === selectedIndex ? 'green' : undefined}
-						>
-							{index === selectedIndex ? '❯ ' : '  '}
-							{item.label}
-						</Text>
-					))}
-				</Box>
 			) : (
-				<SelectInput
+				<SearchableList
+					isSearchMode={isSearchMode}
+					searchQuery={searchQuery}
+					onSearchQueryChange={setSearchQuery}
+					selectedIndex={selectedIndex}
 					items={items}
-					onSelect={item => handleSelect(item as DashboardItem)}
-					isFocused={!displayError}
 					limit={limit}
-					initialIndex={selectedIndex}
-				/>
+					placeholder="Type to filter..."
+					noMatchMessage="No matches found"
+				>
+					<SelectInput
+						items={items}
+						onSelect={item => handleSelect(item as DashboardItem)}
+						isFocused={!displayError}
+						limit={limit}
+						initialIndex={selectedIndex}
+					/>
+				</SearchableList>
 			)}
 
 			{displayError && (
