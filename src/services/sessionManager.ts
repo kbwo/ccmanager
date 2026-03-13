@@ -605,10 +605,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 			} else {
 				// Detected state matches current state, clear any pending state
+				// and update stateConfirmedAt so the minimum duration guard
+				// tracks "last time current state was seen" rather than "first confirmed"
 				void session.stateMutex.update(data => ({
 					...data,
 					pendingState: undefined,
 					pendingStateStart: undefined,
+					stateConfirmedAt: now,
 				}));
 			}
 

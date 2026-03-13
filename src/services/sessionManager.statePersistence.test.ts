@@ -336,6 +336,52 @@ describe('SessionManager - State Persistence', () => {
 		expect(stateChangeHandler).toHaveBeenCalledWith(session);
 	});
 
+	it('should not transition during brief screen redraw even after long time in current state', async () => {
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
+		const eventEmitter = eventEmitters.get('/test/path')!;
+
+		const stateChangeHandler = vi.fn();
+		sessionManager.on('sessionStateChanged', stateChangeHandler);
+
+		// Initial state should be busy
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+
+		// Keep busy state active for a long time (simulating normal operation)
+		// Each check re-detects "busy" and updates stateConfirmedAt
+		eventEmitter.emit('data', 'ESC to interrupt');
+		await vi.advanceTimersByTimeAsync(2000); // 2 seconds of confirmed busy
+
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+
+		// Now simulate a brief screen redraw: busy indicators disappear temporarily
+		eventEmitter.emit('data', '\x1b[2J\x1b[H'); // Clear screen
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS); // 100ms
+
+		// Pending state should be set to idle
+		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
+
+		// Advance past persistence duration (200ms) but NOT past minimum duration (500ms)
+		// Since stateConfirmedAt was updated at ~2000ms, and now is ~2200ms,
+		// timeInCurrentState = ~200ms which is < 500ms
+		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS);
+
+		// State should still be busy because minimum duration since last busy detection hasn't elapsed
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+		expect(stateChangeHandler).not.toHaveBeenCalled();
+
+		// Simulate busy indicators coming back (screen redraw complete)
+		eventEmitter.emit('data', 'ESC to interrupt');
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
+
+		// State should still be busy and pending should be cleared
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+		expect(session.stateMutex.getSnapshot().pendingState).toBeUndefined();
+		expect(stateChangeHandler).not.toHaveBeenCalled();
+	});
+
 	it('should handle multiple sessions with independent state persistence', async () => {
 		const {Effect} = await import('effect');
 		const session1 = await Effect.runPromise(
