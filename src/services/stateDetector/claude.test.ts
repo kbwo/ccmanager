@@ -380,7 +380,38 @@ describe('ClaudeStateDetector', () => {
 		});
 
 		it('should detect busy with various spinner characters', () => {
-			const spinnerChars = ['✱', '✲', '✳', '✴', '✵', '✶', '✷', '✸', '✹', '✺', '✻', '✼', '✽', '✾', '✿', '❀', '❁', '❂', '❃', '❇', '❈', '❉', '❊', '❋', '✢', '✣', '✤', '✥', '✦', '✧'];
+			const spinnerChars = [
+				'✱',
+				'✲',
+				'✳',
+				'✴',
+				'✵',
+				'✶',
+				'✷',
+				'✸',
+				'✹',
+				'✺',
+				'✻',
+				'✼',
+				'✽',
+				'✾',
+				'✿',
+				'❀',
+				'❁',
+				'❂',
+				'❃',
+				'❇',
+				'❈',
+				'❉',
+				'❊',
+				'❋',
+				'✢',
+				'✣',
+				'✤',
+				'✥',
+				'✦',
+				'✧',
+			];
 
 			for (const char of spinnerChars) {
 				terminal = createMockTerminal([`${char} Kneading…`, '❯']);
@@ -391,10 +422,7 @@ describe('ClaudeStateDetector', () => {
 
 		it('should not detect busy for spinner-like line without ing… suffix', () => {
 			// Arrange - no "ing…" at end
-			terminal = createMockTerminal([
-				'✽ Some random text',
-				'❯',
-			]);
+			terminal = createMockTerminal(['✽ Some random text', '❯']);
 
 			// Act
 			const state = detector.detectState(terminal, 'idle');
