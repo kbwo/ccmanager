@@ -249,6 +249,39 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
+		it('should detect waiting_input when plan submit prompt with ❯ cursor is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Ready to submit your answers?',
+				'',
+				'❯ 1. Submit answers',
+				'  2. Cancel',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input for generic ❯ numbered selection prompt', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'Select an option:',
+				'',
+				'❯ 1. Option A',
+				'  2. Option B',
+				'  3. Option C',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
 		it('should detect waiting_input when "esc to cancel" is above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([
