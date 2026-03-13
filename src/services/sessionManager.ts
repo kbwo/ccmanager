@@ -18,6 +18,7 @@ import {createStateDetector} from './stateDetector/index.js';
 import {
 	STATE_PERSISTENCE_DURATION_MS,
 	STATE_CHECK_INTERVAL_MS,
+	STATE_MINIMUM_DURATION_MS,
 } from '../constants/statePersistence.js';
 import {Effect, Either} from 'effect';
 import {ProcessError, ConfigError} from '../types/errors.js';
@@ -272,6 +273,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			state: newState,
 			pendingState: undefined,
 			pendingStateStart: undefined,
+			stateConfirmedAt: Date.now(),
 			...additionalUpdates,
 		}));
 
@@ -559,8 +561,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					stateData.pendingStateStart !== undefined
 				) {
 					// Check if the pending state has persisted long enough
+					// and that the current state has been active for the minimum duration
 					const duration = now - stateData.pendingStateStart;
-					if (duration >= STATE_PERSISTENCE_DURATION_MS) {
+					const timeInCurrentState = now - stateData.stateConfirmedAt;
+					if (
+						duration >= STATE_PERSISTENCE_DURATION_MS &&
+						timeInCurrentState >= STATE_MINIMUM_DURATION_MS
+					) {
 						// Cancel auto-approval verification if state is changing away from pending_auto_approval
 						if (
 							stateData.autoApprovalAbortController &&
@@ -598,10 +605,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 			} else {
 				// Detected state matches current state, clear any pending state
+				// and update stateConfirmedAt so the minimum duration guard
+				// tracks "last time current state was seen" rather than "first confirmed"
 				void session.stateMutex.update(data => ({
 					...data,
 					pendingState: undefined,
 					pendingStateStart: undefined,
+					stateConfirmedAt: now,
 				}));
 			}
 

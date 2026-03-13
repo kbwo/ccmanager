@@ -1,7 +1,47 @@
 import {SessionState, Terminal} from '../../types/index.js';
 import {BaseStateDetector} from './base.js';
 
+// Spinner characters used by Claude Code during active processing
+const SPINNER_CHARS = '✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆';
+
+// Matches spinner activity labels like "✽ Tempering…" or "✳ Simplifying recompute_tangents…"
+const SPINNER_ACTIVITY_PATTERN = new RegExp(
+	`^[${SPINNER_CHARS}] \\S+ing.*\u2026`,
+	'm',
+);
+
 export class ClaudeStateDetector extends BaseStateDetector {
+	/**
+	 * Extract content above the prompt box.
+	 * The prompt box is delimited by ─ border lines:
+	 *   content above prompt box
+	 *   ─────────────── (top border)
+	 *   ❯              (prompt line)
+	 *   ─────────────── (bottom border)
+	 *
+	 * If no prompt box is found, returns all content as fallback.
+	 */
+	private getContentAbovePromptBox(
+		terminal: Terminal,
+		maxLines: number,
+	): string {
+		const lines = this.getTerminalLines(terminal, maxLines);
+
+		let borderCount = 0;
+		for (let i = lines.length - 1; i >= 0; i--) {
+			const trimmed = lines[i]!.trim();
+			if (trimmed.length > 0 && /^─+$/.test(trimmed)) {
+				borderCount++;
+				if (borderCount === 2) {
+					return lines.slice(0, i).join('\n');
+				}
+			}
+		}
+
+		// No prompt box found, return all content
+		return lines.join('\n');
+	}
+
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
 		// Check for search prompt (⌕ Search…) within 200 lines - always idle
 		const extendedContent = this.getTerminalContent(terminal, 200);
@@ -9,33 +49,44 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'idle';
 		}
 
-		// Existing logic with 30 lines
-		const content = this.getTerminalContent(terminal, 30);
-		const lowerContent = content.toLowerCase();
+		// Full content (including prompt box) for waiting_input detection
+		const fullContent = this.getTerminalContent(terminal, 30);
+		const fullLowerContent = fullContent.toLowerCase();
 
 		// Check for ctrl+r toggle prompt - maintain current state
-		if (lowerContent.includes('ctrl+r to toggle')) {
+		if (fullLowerContent.includes('ctrl+r to toggle')) {
 			return currentState;
 		}
 
 		// Check for "Do you want" or "Would you like" pattern with options
 		// Handles both simple ("Do you want...\nYes") and complex (numbered options) formats
 		if (
-			/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/.test(lowerContent)
+			/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/.test(
+				fullLowerContent,
+			)
 		) {
 			return 'waiting_input';
 		}
 
 		// Check for "esc to cancel" - indicates waiting for user input
-		if (lowerContent.includes('esc to cancel')) {
+		if (fullLowerContent.includes('esc to cancel')) {
 			return 'waiting_input';
 		}
 
+		// Content above the prompt box only for busy detection
+		const abovePromptBox = this.getContentAbovePromptBox(terminal, 30);
+		const aboveLowerContent = abovePromptBox.toLowerCase();
+
 		// Check for busy state
 		if (
-			lowerContent.includes('esc to interrupt') ||
-			lowerContent.includes('ctrl+c to interrupt')
+			aboveLowerContent.includes('esc to interrupt') ||
+			aboveLowerContent.includes('ctrl+c to interrupt')
 		) {
+			return 'busy';
+		}
+
+		// Check for spinner activity label (e.g., "✽ Tempering…", "✳ Simplifying…")
+		if (SPINNER_ACTIVITY_PATTERN.test(abovePromptBox)) {
 			return 'busy';
 		}
 
