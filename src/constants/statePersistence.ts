@@ -3,3 +3,6 @@ export const STATE_PERSISTENCE_DURATION_MS = 200;
 
 // Check interval for state detection in milliseconds
 export const STATE_CHECK_INTERVAL_MS = 100;
+
+// Minimum duration in current state before allowing transition to a new state
+export const STATE_MINIMUM_DURATION_MS = 500;

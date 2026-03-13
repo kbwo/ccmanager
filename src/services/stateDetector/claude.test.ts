@@ -12,11 +12,14 @@ describe('ClaudeStateDetector', () => {
 	});
 
 	describe('detectState', () => {
-		it('should detect busy when "ESC to interrupt" is present', () => {
+		it('should detect busy when "ESC to interrupt" is above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Processing...',
 				'Press ESC to interrupt',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
 			]);
 
 			// Act
@@ -26,8 +29,8 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
-		it('should detect busy when "esc to interrupt" is present (case insensitive)', () => {
-			// Arrange
+		it('should detect busy when "esc to interrupt" is present (no prompt box fallback)', () => {
+			// Arrange - no prompt box borders, falls back to all content
 			terminal = createMockTerminal([
 				'Running command...',
 				'press esc to interrupt the process',
@@ -40,11 +43,14 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
-		it('should detect busy when "ctrl+c to interrupt" is present (web search)', () => {
+		it('should detect busy when "ctrl+c to interrupt" is above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Googling. (ctrl+c to interrupt',
 				'Searching for relevant information...',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
 			]);
 
 			// Act
@@ -119,7 +125,7 @@ describe('ClaudeStateDetector', () => {
 			}
 		});
 
-		it('should detect waiting_input when "Do you want" with options prompt is present', () => {
+		it('should detect waiting_input when "Do you want" with options is above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Some previous output',
@@ -127,6 +133,9 @@ describe('ClaudeStateDetector', () => {
 				'❯ 1. Yes',
 				'2. Yes, allow all edits during this session (shift+tab)',
 				'3. No, and tell Claude what to do differently (esc)',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
 			]);
 
 			// Act
@@ -136,7 +145,7 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
-		it('should detect waiting_input when "Do you want" with options prompt is present (case insensitive)', () => {
+		it('should detect waiting_input when "Do you want" is present (no prompt box fallback)', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Some output',
@@ -159,6 +168,9 @@ describe('ClaudeStateDetector', () => {
 				'Do you want to continue?',
 				'❯ 1. Yes',
 				'2. No',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
 			]);
 
 			// Act
@@ -270,11 +282,14 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
-		it('should detect waiting_input when "esc to cancel" is present', () => {
+		it('should detect waiting_input when "esc to cancel" is above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Enter your message:',
 				'Press esc to cancel',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
 			]);
 
 			// Act
@@ -284,7 +299,7 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
-		it('should detect waiting_input when "esc to cancel" is present (case insensitive)', () => {
+		it('should detect waiting_input when "esc to cancel" is present (no prompt box fallback)', () => {
 			// Arrange
 			terminal = createMockTerminal(['Waiting for input', 'ESC TO CANCEL']);
 
@@ -295,12 +310,15 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
-		it('should prioritize "esc to cancel" over "esc to interrupt" when both present', () => {
+		it('should prioritize "esc to cancel" over "esc to interrupt" when both above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Press esc to interrupt',
 				'Some input prompt',
 				'Press esc to cancel',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
 			]);
 
 			// Act
@@ -380,6 +398,101 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
+		it('should detect busy when spinner activity label "✽ Tempering…" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'✽ Tempering…',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
+		it('should detect busy when spinner activity label "✳ Simplifying…" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'✳ Simplifying recompute_tangents… (2m 18s · ↓ 4.8k tokens)',
+				'  ⎿  ◻ task list items...',
+				'──────────────────────────────',
+				'❯',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
+		it('should detect busy with various spinner characters', () => {
+			const spinnerChars = [
+				'✱',
+				'✲',
+				'✳',
+				'✴',
+				'✵',
+				'✶',
+				'✷',
+				'✸',
+				'✹',
+				'✺',
+				'✻',
+				'✼',
+				'✽',
+				'✾',
+				'✿',
+				'❀',
+				'❁',
+				'❂',
+				'❃',
+				'❇',
+				'❈',
+				'❉',
+				'❊',
+				'❋',
+				'✢',
+				'✣',
+				'✤',
+				'✥',
+				'✦',
+				'✧',
+			];
+
+			for (const char of spinnerChars) {
+				terminal = createMockTerminal([`${char} Kneading…`, '❯']);
+				const state = detector.detectState(terminal, 'idle');
+				expect(state).toBe('busy');
+			}
+		});
+
+		it('should not detect busy for spinner-like line without ing… suffix', () => {
+			// Arrange - no "ing…" at end
+			terminal = createMockTerminal(['✽ Some random text', '❯']);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('idle');
+		});
+
+		it('should detect idle when "⌕ Search…" is present even with spinner activity', () => {
+			// Arrange
+			terminal = createMockTerminal(['⌕ Search…', '✽ Tempering…']);
+
+			// Act
+			const state = detector.detectState(terminal, 'busy');
+
+			// Assert - Search prompt takes precedence
+			expect(state).toBe('idle');
+		});
+
 		it('should detect idle when "⌕ Search…" is present', () => {
 			// Arrange - Search prompt should always be idle
 			terminal = createMockTerminal(['⌕ Search…', 'Some content']);
@@ -410,6 +523,70 @@ describe('ClaudeStateDetector', () => {
 			const state = detector.detectState(terminal, 'idle');
 
 			// Assert - Should be idle because search prompt takes precedence
+			expect(state).toBe('idle');
+		});
+		it('should ignore "esc to interrupt" inside prompt box', () => {
+			// Arrange - "esc to interrupt" is inside the prompt box, not above it
+			terminal = createMockTerminal([
+				'Some idle output',
+				'──────────────────────────────',
+				'esc to interrupt',
+				'──────────────────────────────',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert - should be idle because "esc to interrupt" is inside prompt box
+			expect(state).toBe('idle');
+		});
+
+		it('should detect "esc to cancel" inside prompt box as waiting_input', () => {
+			// Arrange - waiting_input detection uses full content including prompt box
+			terminal = createMockTerminal([
+				'Some idle output',
+				'──────────────────────────────',
+				'esc to cancel',
+				'──────────────────────────────',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert - waiting_input is not restricted to above prompt box
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect "Do you want" inside prompt box as waiting_input', () => {
+			// Arrange - waiting_input detection uses full content including prompt box
+			terminal = createMockTerminal([
+				'Some idle output',
+				'──────────────────────────────',
+				'Do you want to proceed?',
+				'❯ 1. Yes',
+				'──────────────────────────────',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert - waiting_input is not restricted to above prompt box
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should ignore spinner activity label inside prompt box', () => {
+			// Arrange - spinner label is inside the prompt box
+			terminal = createMockTerminal([
+				'Some idle output',
+				'──────────────────────────────',
+				'✽ Tempering…',
+				'──────────────────────────────',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert - should be idle because spinner is inside prompt box
 			expect(state).toBe('idle');
 		});
 	});

@@ -86,6 +86,7 @@ export interface SessionStateData {
 	state: import('../types/index.js').SessionState;
 	pendingState: import('../types/index.js').SessionState | undefined;
 	pendingStateStart: number | undefined;
+	stateConfirmedAt: number;
 	autoApprovalFailed: boolean;
 	autoApprovalReason: string | undefined;
 	autoApprovalAbortController: AbortController | undefined;
@@ -101,6 +102,7 @@ export function createInitialSessionStateData(): SessionStateData {
 		state: 'busy',
 		pendingState: undefined,
 		pendingStateStart: undefined,
+		stateConfirmedAt: Date.now(),
 		autoApprovalFailed: false,
 		autoApprovalReason: undefined,
 		autoApprovalAbortController: undefined,
