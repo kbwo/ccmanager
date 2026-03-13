@@ -14,6 +14,11 @@ export class CodexStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		// Check for plan/question prompts
+		if (lowerContent.includes('| enter to submit answer')) {
+			return 'waiting_input';
+		}
+
 		// Check for waiting prompts
 		if (
 			lowerContent.includes('allow command?') ||
