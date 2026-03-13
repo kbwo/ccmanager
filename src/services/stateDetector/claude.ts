@@ -11,6 +11,37 @@ const SPINNER_ACTIVITY_PATTERN = new RegExp(
 );
 
 export class ClaudeStateDetector extends BaseStateDetector {
+	/**
+	 * Extract content above the prompt box.
+	 * The prompt box is delimited by ─ border lines:
+	 *   content above prompt box
+	 *   ─────────────── (top border)
+	 *   ❯              (prompt line)
+	 *   ─────────────── (bottom border)
+	 *
+	 * If no prompt box is found, returns all content as fallback.
+	 */
+	private getContentAbovePromptBox(
+		terminal: Terminal,
+		maxLines: number,
+	): string {
+		const lines = this.getTerminalLines(terminal, maxLines);
+
+		let borderCount = 0;
+		for (let i = lines.length - 1; i >= 0; i--) {
+			const trimmed = lines[i]!.trim();
+			if (trimmed.length > 0 && /^─+$/.test(trimmed)) {
+				borderCount++;
+				if (borderCount === 2) {
+					return lines.slice(0, i).join('\n');
+				}
+			}
+		}
+
+		// No prompt box found, return all content
+		return lines.join('\n');
+	}
+
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
 		// Check for search prompt (⌕ Search…) within 200 lines - always idle
 		const extendedContent = this.getTerminalContent(terminal, 200);
@@ -18,8 +49,8 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'idle';
 		}
 
-		// Existing logic with 30 lines
-		const content = this.getTerminalContent(terminal, 30);
+		// Use content above the prompt box for all state detection
+		const content = this.getContentAbovePromptBox(terminal, 30);
 		const lowerContent = content.toLowerCase();
 
 		// Check for ctrl+r toggle prompt - maintain current state
