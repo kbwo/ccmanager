@@ -175,6 +175,40 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
+	it('should detect waiting_input state for plan question prompt with "| enter to submit answer"', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'  Question 1/3 (3 unanswered)',
+			'  › 1. 既知CLIのみ (Recommended)',
+			'    2. 全preset対応',
+			'    3. 既知CLI優先+未知は末尾引数',
+			'    4. None of the above',
+			'',
+			'  tab to add notes | enter to submit answer | ←/→ to navigate questions | esc to interrupt',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should prioritize plan question prompt over busy state with esc interrupt', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'  Question 1/3',
+			'  › 1. Option A',
+			'  tab to add notes | enter to submit answer | esc to interrupt',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
 	it('should prioritize "Confirm with ... Enter" over busy state', () => {
 		// Arrange
 		terminal = createMockTerminal(['Esc to interrupt', 'Confirm with Y Enter']);
