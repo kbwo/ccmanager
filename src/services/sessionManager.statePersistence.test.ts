@@ -6,6 +6,7 @@ import {EventEmitter} from 'events';
 import {
 	STATE_PERSISTENCE_DURATION_MS,
 	STATE_CHECK_INTERVAL_MS,
+	STATE_MINIMUM_DURATION_MS,
 } from '../constants/statePersistence.js';
 
 vi.mock('./bunTerminal.js', () => ({
@@ -129,7 +130,7 @@ describe('SessionManager - State Persistence', () => {
 		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 	});
 
-	it('should change state after persistence duration is met', async () => {
+	it('should change state after both persistence and minimum duration are met', async () => {
 		const {Effect} = await import('effect');
 		const session = await Effect.runPromise(
 			sessionManager.createSessionWithPresetEffect('/test/path'),
@@ -150,8 +151,8 @@ describe('SessionManager - State Persistence', () => {
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 		expect(stateChangeHandler).not.toHaveBeenCalled();
 
-		// Advance time to exceed persistence duration
-		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS);
+		// Advance time past both persistence and minimum duration
+		await vi.advanceTimersByTimeAsync(STATE_MINIMUM_DURATION_MS);
 
 		// State should now be changed
 		expect(session.stateMutex.getSnapshot().state).toBe('idle');
@@ -282,6 +283,59 @@ describe('SessionManager - State Persistence', () => {
 		expect(destroyedSession).toBeUndefined();
 	});
 
+	it('should not transition state before minimum duration in current state has elapsed', async () => {
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
+		const eventEmitter = eventEmitters.get('/test/path')!;
+
+		const stateChangeHandler = vi.fn();
+		sessionManager.on('sessionStateChanged', stateChangeHandler);
+
+		// Initial state should be busy
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+
+		// Simulate output that would trigger idle state
+		eventEmitter.emit('data', 'Some output without busy indicators');
+
+		// Advance time enough for persistence duration but less than minimum duration
+		// STATE_PERSISTENCE_DURATION_MS (200ms) < STATE_MINIMUM_DURATION_MS (500ms)
+		await vi.advanceTimersByTimeAsync(
+			STATE_PERSISTENCE_DURATION_MS + STATE_CHECK_INTERVAL_MS * 2,
+		);
+
+		// State should still be busy because minimum duration hasn't elapsed
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+		expect(stateChangeHandler).not.toHaveBeenCalled();
+	});
+
+	it('should transition state after both persistence and minimum duration are met', async () => {
+		const {Effect} = await import('effect');
+		const session = await Effect.runPromise(
+			sessionManager.createSessionWithPresetEffect('/test/path'),
+		);
+		const eventEmitter = eventEmitters.get('/test/path')!;
+
+		const stateChangeHandler = vi.fn();
+		sessionManager.on('sessionStateChanged', stateChangeHandler);
+
+		// Initial state should be busy
+		expect(session.stateMutex.getSnapshot().state).toBe('busy');
+
+		// Simulate output that would trigger idle state
+		eventEmitter.emit('data', 'Some output without busy indicators');
+
+		// Advance time past STATE_MINIMUM_DURATION_MS (which is longer than STATE_PERSISTENCE_DURATION_MS)
+		await vi.advanceTimersByTimeAsync(
+			STATE_MINIMUM_DURATION_MS + STATE_CHECK_INTERVAL_MS,
+		);
+
+		// State should now be idle since both durations are satisfied
+		expect(session.stateMutex.getSnapshot().state).toBe('idle');
+		expect(stateChangeHandler).toHaveBeenCalledWith(session);
+	});
+
 	it('should handle multiple sessions with independent state persistence', async () => {
 		const {Effect} = await import('effect');
 		const session1 = await Effect.runPromise(
@@ -315,8 +369,8 @@ describe('SessionManager - State Persistence', () => {
 			'waiting_input',
 		);
 
-		// Advance time to confirm both (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS);
+		// Advance time to confirm both - need to exceed STATE_MINIMUM_DURATION_MS (use async to process mutex updates)
+		await vi.advanceTimersByTimeAsync(STATE_MINIMUM_DURATION_MS);
 
 		// Both should now be in their new states
 		expect(session1.stateMutex.getSnapshot().state).toBe('idle');
