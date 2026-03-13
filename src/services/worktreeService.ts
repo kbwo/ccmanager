@@ -604,7 +604,7 @@ export class WorktreeService {
 						.trim()
 						.split('\n')
 						.filter(branch => branch.startsWith('origin/'))
-						.map(branch => branch.replace('origin/', ''));
+						.map(branch => branch.replace('origin/', '').trim());
 
 					// Merge and deduplicate
 					const allBranches = [...new Set([...branches, ...remoteBranches])];

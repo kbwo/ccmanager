@@ -236,6 +236,29 @@ origin/feature/test
 			expect(result).toEqual(['main', 'feature/test', 'feature/remote']);
 		});
 
+		it('should trim newlines from remote branch names', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('branch -a')) {
+						return `main\norigin/main\norigin/feature/remote-only\n`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getAllBranchesEffect();
+			const result = await Effect.runPromise(effect);
+
+			// Ensure no branch name has trailing whitespace/newlines
+			for (const branch of result) {
+				expect(branch).toBe(branch.trim());
+			}
+			expect(result).toEqual(['main', 'feature/remote-only']);
+		});
+
 		it('should return empty array on error', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (
