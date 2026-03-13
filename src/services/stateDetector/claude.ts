@@ -1,6 +1,16 @@
 import {SessionState, Terminal} from '../../types/index.js';
 import {BaseStateDetector} from './base.js';
 
+// Spinner characters used by Claude Code during active processing
+const SPINNER_CHARS =
+	'✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆';
+
+// Matches spinner activity labels like "✽ Tempering…" or "✳ Simplifying recompute_tangents…"
+const SPINNER_ACTIVITY_PATTERN = new RegExp(
+	`^[${SPINNER_CHARS}] \\S+ing.*\u2026`,
+	'm',
+);
+
 export class ClaudeStateDetector extends BaseStateDetector {
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
 		// Check for search prompt (⌕ Search…) within 200 lines - always idle
@@ -36,6 +46,11 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			lowerContent.includes('esc to interrupt') ||
 			lowerContent.includes('ctrl+c to interrupt')
 		) {
+			return 'busy';
+		}
+
+		// Check for spinner activity label (e.g., "✽ Tempering…", "✳ Simplifying…")
+		if (SPINNER_ACTIVITY_PATTERN.test(content)) {
 			return 'busy';
 		}
 

@@ -347,6 +347,73 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
+		it('should detect busy when spinner activity label "✽ Tempering…" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'✽ Tempering…',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
+		it('should detect busy when spinner activity label "✳ Simplifying…" is present', () => {
+			// Arrange
+			terminal = createMockTerminal([
+				'✳ Simplifying recompute_tangents… (2m 18s · ↓ 4.8k tokens)',
+				'  ⎿  ◻ task list items...',
+				'──────────────────────────────',
+				'❯',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('busy');
+		});
+
+		it('should detect busy with various spinner characters', () => {
+			const spinnerChars = ['✱', '✲', '✳', '✴', '✵', '✶', '✷', '✸', '✹', '✺', '✻', '✼', '✽', '✾', '✿', '❀', '❁', '❂', '❃', '❇', '❈', '❉', '❊', '❋', '✢', '✣', '✤', '✥', '✦', '✧'];
+
+			for (const char of spinnerChars) {
+				terminal = createMockTerminal([`${char} Kneading…`, '❯']);
+				const state = detector.detectState(terminal, 'idle');
+				expect(state).toBe('busy');
+			}
+		});
+
+		it('should not detect busy for spinner-like line without ing… suffix', () => {
+			// Arrange - no "ing…" at end
+			terminal = createMockTerminal([
+				'✽ Some random text',
+				'❯',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('idle');
+		});
+
+		it('should detect idle when "⌕ Search…" is present even with spinner activity', () => {
+			// Arrange
+			terminal = createMockTerminal(['⌕ Search…', '✽ Tempering…']);
+
+			// Act
+			const state = detector.detectState(terminal, 'busy');
+
+			// Assert - Search prompt takes precedence
+			expect(state).toBe('idle');
+		});
+
 		it('should detect idle when "⌕ Search…" is present', () => {
 			// Arrange - Search prompt should always be idle
 			terminal = createMockTerminal(['⌕ Search…', 'Some content']);
