@@ -508,8 +508,8 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('idle');
 		});
 
-		it('should ignore "esc to cancel" inside prompt box', () => {
-			// Arrange - "esc to cancel" is inside the prompt box, not above it
+		it('should detect "esc to cancel" inside prompt box as waiting_input', () => {
+			// Arrange - waiting_input detection uses full content including prompt box
 			terminal = createMockTerminal([
 				'Some idle output',
 				'──────────────────────────────',
@@ -520,12 +520,12 @@ describe('ClaudeStateDetector', () => {
 			// Act
 			const state = detector.detectState(terminal, 'idle');
 
-			// Assert - should be idle because "esc to cancel" is inside prompt box
-			expect(state).toBe('idle');
+			// Assert - waiting_input is not restricted to above prompt box
+			expect(state).toBe('waiting_input');
 		});
 
-		it('should ignore "Do you want" inside prompt box', () => {
-			// Arrange - permission dialog text is inside the prompt box
+		it('should detect "Do you want" inside prompt box as waiting_input', () => {
+			// Arrange - waiting_input detection uses full content including prompt box
 			terminal = createMockTerminal([
 				'Some idle output',
 				'──────────────────────────────',
@@ -537,8 +537,8 @@ describe('ClaudeStateDetector', () => {
 			// Act
 			const state = detector.detectState(terminal, 'idle');
 
-			// Assert - should be idle because it's inside prompt box
-			expect(state).toBe('idle');
+			// Assert - waiting_input is not restricted to above prompt box
+			expect(state).toBe('waiting_input');
 		});
 
 		it('should ignore spinner activity label inside prompt box', () => {

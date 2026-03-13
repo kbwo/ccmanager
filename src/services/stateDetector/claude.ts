@@ -49,38 +49,44 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'idle';
 		}
 
-		// Use content above the prompt box for all state detection
-		const content = this.getContentAbovePromptBox(terminal, 30);
-		const lowerContent = content.toLowerCase();
+		// Full content (including prompt box) for waiting_input detection
+		const fullContent = this.getTerminalContent(terminal, 30);
+		const fullLowerContent = fullContent.toLowerCase();
 
 		// Check for ctrl+r toggle prompt - maintain current state
-		if (lowerContent.includes('ctrl+r to toggle')) {
+		if (fullLowerContent.includes('ctrl+r to toggle')) {
 			return currentState;
 		}
 
 		// Check for "Do you want" or "Would you like" pattern with options
 		// Handles both simple ("Do you want...\nYes") and complex (numbered options) formats
 		if (
-			/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/.test(lowerContent)
+			/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/.test(
+				fullLowerContent,
+			)
 		) {
 			return 'waiting_input';
 		}
 
 		// Check for "esc to cancel" - indicates waiting for user input
-		if (lowerContent.includes('esc to cancel')) {
+		if (fullLowerContent.includes('esc to cancel')) {
 			return 'waiting_input';
 		}
 
+		// Content above the prompt box only for busy detection
+		const abovePromptBox = this.getContentAbovePromptBox(terminal, 30);
+		const aboveLowerContent = abovePromptBox.toLowerCase();
+
 		// Check for busy state
 		if (
-			lowerContent.includes('esc to interrupt') ||
-			lowerContent.includes('ctrl+c to interrupt')
+			aboveLowerContent.includes('esc to interrupt') ||
+			aboveLowerContent.includes('ctrl+c to interrupt')
 		) {
 			return 'busy';
 		}
 
 		// Check for spinner activity label (e.g., "✽ Tempering…", "✳ Simplifying…")
-		if (SPINNER_ACTIVITY_PATTERN.test(content)) {
+		if (SPINNER_ACTIVITY_PATTERN.test(abovePromptBox)) {
 			return 'busy';
 		}
 
