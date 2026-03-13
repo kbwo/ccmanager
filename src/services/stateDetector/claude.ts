@@ -26,6 +26,11 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		// Check for selection prompt with ❯ cursor indicator and numbered options
+		if (/❯\s+\d+\./.test(content)) {
+			return 'waiting_input';
+		}
+
 		// Check for "esc to cancel" - indicates waiting for user input
 		if (lowerContent.includes('esc to cancel')) {
 			return 'waiting_input';
