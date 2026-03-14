@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {Box, Text, useInput, useStdout} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
 import {Worktree, Session, GitProject} from '../types/index.js';
@@ -19,8 +19,10 @@ import {
 } from '../utils/worktreeUtils.js';
 import {projectManager} from '../services/projectManager.js';
 import {RecentProject} from '../types/index.js';
-import TextInputWrapper from './TextInputWrapper.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
+import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
+import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
 
@@ -101,8 +103,6 @@ const Menu: React.FC<MenuProps> = ({
 		string | null
 	>(null);
 	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
-	const {stdout} = useStdout();
-	const fixedRows = 6;
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -110,13 +110,10 @@ const Menu: React.FC<MenuProps> = ({
 			isDisabled: !!error || !!loadError,
 		});
 
-	const limit = Math.max(
-		5,
-		stdout.rows -
-			fixedRows -
-			(isSearchMode ? 1 : 0) -
-			(error || loadError ? 3 : 0),
-	);
+	const limit = useDynamicLimit({
+		isSearchMode,
+		hasError: !!(error || loadError),
+	});
 
 	// Get worktree configuration for sorting
 	const worktreeConfig = configReader.getWorktreeConfig();
@@ -217,16 +214,14 @@ const Menu: React.FC<MenuProps> = ({
 		const columnPositions = calculateColumnPositions(items);
 
 		// Filter worktrees based on search query
-		const filteredItems = searchQuery
-			? items.filter(item => {
-					const branchName = item.worktree.branch || '';
-					const searchLower = searchQuery.toLowerCase();
-					return (
-						branchName.toLowerCase().includes(searchLower) ||
-						item.worktree.path.toLowerCase().includes(searchLower)
-					);
-				})
-			: items;
+		const filteredWorktrees = filterWorktreesByQuery(
+			items.map(item => item.worktree),
+			searchQuery,
+		);
+		const filteredWorktreeSet = new Set(filteredWorktrees);
+		const filteredItems = items.filter(item =>
+			filteredWorktreeSet.has(item.worktree),
+		);
 
 		// Build menu items with proper alignment
 		const menuItems: MenuItem[] = filteredItems.map(
@@ -640,36 +635,16 @@ const Menu: React.FC<MenuProps> = ({
 				</Text>
 			</Box>
 
-			{isSearchMode && (
-				<Box marginBottom={1}>
-					<Text>Search: </Text>
-					<TextInputWrapper
-						value={searchQuery}
-						onChange={setSearchQuery}
-						focus={true}
-						placeholder="Type to filter worktrees..."
-					/>
-				</Box>
-			)}
-
-			{isSearchMode && items.length === 0 ? (
-				<Box>
-					<Text color="yellow">No worktrees match your search</Text>
-				</Box>
-			) : isSearchMode ? (
-				// In search mode, show the items as a list without SelectInput
-				<Box flexDirection="column">
-					{items.slice(0, limit).map((item, index) => (
-						<Text
-							key={item.value}
-							color={index === selectedIndex ? 'green' : undefined}
-						>
-							{index === selectedIndex ? '❯ ' : '  '}
-							{item.label}
-						</Text>
-					))}
-				</Box>
-			) : (
+			<SearchableList
+				isSearchMode={isSearchMode}
+				searchQuery={searchQuery}
+				onSearchQueryChange={setSearchQuery}
+				selectedIndex={selectedIndex}
+				items={items}
+				limit={limit}
+				placeholder="Type to filter worktrees..."
+				noMatchMessage="No worktrees match your search"
+			>
 				<SelectInput
 					items={items}
 					onSelect={item => handleSelect(item as MenuItem)}
@@ -688,7 +663,7 @@ const Menu: React.FC<MenuProps> = ({
 					initialIndex={selectedIndex}
 					limit={limit}
 				/>
-			)}
+			</SearchableList>
 
 			{(error || loadError) && (
 				<Box marginTop={1} paddingX={1} borderStyle="round" borderColor="red">

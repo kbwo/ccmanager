@@ -7,6 +7,7 @@ import {configReader} from '../services/config/configReader.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import SearchableList from './SearchableList.js';
 import {Effect} from 'effect';
 import type {AppError} from '../types/errors.js';
 import {
@@ -433,34 +434,16 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					<Box marginBottom={1}>
 						<Text>Select base branch for the worktree:</Text>
 					</Box>
-					{isSearchMode && (
-						<Box marginBottom={1}>
-							<Text>Search: </Text>
-							<TextInputWrapper
-								value={searchQuery}
-								onChange={setSearchQuery}
-								focus={true}
-								placeholder="Type to filter branches..."
-							/>
-						</Box>
-					)}
-					{isSearchMode && branchItems.length === 0 ? (
-						<Box>
-							<Text color="yellow">No branches match your search</Text>
-						</Box>
-					) : isSearchMode ? (
-						<Box flexDirection="column">
-							{branchItems.slice(0, limit).map((item, index) => (
-								<Text
-									key={item.value}
-									color={index === selectedIndex ? 'green' : undefined}
-								>
-									{index === selectedIndex ? '❯ ' : '  '}
-									{item.label}
-								</Text>
-							))}
-						</Box>
-					) : (
+					<SearchableList
+						isSearchMode={isSearchMode}
+						searchQuery={searchQuery}
+						onSearchQueryChange={setSearchQuery}
+						selectedIndex={selectedIndex}
+						items={branchItems}
+						limit={limit}
+						placeholder="Type to filter branches..."
+						noMatchMessage="No branches match your search"
+					>
 						<SelectInput
 							items={branchItems}
 							onSelect={handleBaseBranchSelect}
@@ -468,7 +451,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 							limit={limit}
 							isFocused={!isSearchMode}
 						/>
-					)}
+					</SearchableList>
 					{!isSearchMode && (
 						<Box marginTop={1}>
 							<Text dimColor>Press / to search</Text>
