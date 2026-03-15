@@ -16,11 +16,12 @@ const PresetSelector: React.FC<PresetSelectorProps> = ({
 	const [presets] = useState(presetsConfig.presets);
 	const defaultPresetId = presetsConfig.defaultPresetId;
 
-	const selectItems = presets.map(preset => {
+	const selectItems = presets.map((preset, index) => {
 		const isDefault = preset.id === defaultPresetId;
 		const args = preset.args?.join(' ') || '';
 		const fallback = preset.fallbackArgs?.join(' ') || '';
-		let label = preset.name;
+		const numberPrefix = index < 9 ? `[${index + 1}] ` : '';
+		let label = numberPrefix + preset.name;
 		if (isDefault) label += ' (default)';
 		label += `\n    Command: ${preset.command}`;
 		if (args) label += `\n    Args: ${args}`;
@@ -50,6 +51,16 @@ const PresetSelector: React.FC<PresetSelectorProps> = ({
 	useInput((input, key) => {
 		if (key.escape) {
 			onCancel();
+			return;
+		}
+
+		// Number keys 1-9: immediate launch
+		if (/^[1-9]$/.test(input)) {
+			const idx = parseInt(input) - 1;
+			if (idx < presets.length && presets[idx]) {
+				onSelect(presets[idx]!.id);
+			}
+			return;
 		}
 	});
 
@@ -73,7 +84,7 @@ const PresetSelector: React.FC<PresetSelectorProps> = ({
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					Press ↑↓ to navigate, Enter to select, ESC to cancel
+					↑↓ Navigate 1-9 Quick Select Enter Select ESC Cancel
 				</Text>
 			</Box>
 		</Box>
