@@ -426,12 +426,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			session.terminal.write(data);
 
 			// Check for screen clear escape sequence (e.g., from /clear command)
-			// When enabled and detected, clear the output history to prevent replaying old content on restore
+			// When detected, clear the output history to prevent replaying old content on restore
 			// This helps avoid excessive scrolling when restoring sessions with large output history
-			if (
-				configReader.isClearHistoryOnClearEnabled() &&
-				data.includes('\x1B[2J')
-			) {
+			if (data.includes('\x1B[2J')) {
 				session.outputHistory = [];
 			}
 
