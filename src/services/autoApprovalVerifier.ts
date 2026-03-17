@@ -2,6 +2,7 @@ import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {AutoApprovalResponse} from '../types/index.js';
 import {configReader} from './config/configReader.js';
+import {DEFAULT_TIMEOUT_SECONDS} from '../constants/autoApproval.js';
 import {logger} from '../utils/logger.js';
 import {
 	execFile,
@@ -12,8 +13,6 @@ import {
 } from 'child_process';
 import {homedir} from 'os';
 import path from 'path';
-
-const DEFAULT_TIMEOUT_SECONDS = 30;
 
 const getTimeoutMs = (): number => {
 	const config = configReader.getAutoApprovalConfig();

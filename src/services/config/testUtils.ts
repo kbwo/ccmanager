@@ -8,6 +8,7 @@
  */
 import {Effect, Either} from 'effect';
 import {existsSync, readFileSync, writeFileSync} from 'fs';
+import {DEFAULT_TIMEOUT_SECONDS} from '../../constants/autoApproval.js';
 import {
 	ConfigurationData,
 	DEFAULT_SHORTCUTS,
@@ -139,7 +140,7 @@ function applyDefaults(config: ConfigurationData): ConfigurationData {
 	if (!config.autoApproval) {
 		config.autoApproval = {
 			enabled: false,
-			timeout: 30,
+			timeout: DEFAULT_TIMEOUT_SECONDS,
 		};
 	} else {
 		if (!Object.prototype.hasOwnProperty.call(config.autoApproval, 'enabled')) {

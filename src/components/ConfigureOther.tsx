@@ -3,6 +3,7 @@ import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {DEFAULT_TIMEOUT_SECONDS} from '../constants/autoApproval.js';
 import ConfigureCustomCommand from './ConfigureCustomCommand.js';
 import ConfigureTimeout from './ConfigureTimeout.js';
 import CustomCommandSummary from './CustomCommandSummary.js';
@@ -32,7 +33,9 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 		autoApprovalConfig.customCommand ?? '',
 	);
 	const [customCommandDraft, setCustomCommandDraft] = useState(customCommand);
-	const [timeout, setTimeout] = useState(autoApprovalConfig.timeout ?? 30);
+	const [timeout, setTimeout] = useState(
+		autoApprovalConfig.timeout ?? DEFAULT_TIMEOUT_SECONDS,
+	);
 	const [timeoutDraft, setTimeoutDraft] = useState(timeout);
 	// Show if inheriting from global (for project scope)
 	const isInheriting =
