@@ -293,12 +293,18 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	private createTerminal(): pkg.Terminal {
-		return new Terminal({
+		const terminal = new Terminal({
 			cols: process.stdout.columns || 80,
 			rows: process.stdout.rows || 24,
 			allowProposedApi: true,
 			logLevel: 'off',
 		});
+		// Disable auto-wrap to match the real terminal setting (Session.tsx sends
+		// \x1b[?7l to stdout).  Without this, long lines wrap in xterm-headless but
+		// are clipped on the real terminal, causing Ink's cursor-up re-render to
+		// leave ghost content (old spinners, "esc to interrupt", etc.) in the buffer.
+		terminal.write('\x1b[?7l');
+		return terminal;
 	}
 
 	private async createSessionInternal(
@@ -426,12 +432,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			session.terminal.write(data);
 
 			// Check for screen clear escape sequence (e.g., from /clear command)
-			// When enabled and detected, clear the output history to prevent replaying old content on restore
+			// When detected, clear the output history to prevent replaying old content on restore
 			// This helps avoid excessive scrolling when restoring sessions with large output history
-			if (
-				configReader.isClearHistoryOnClearEnabled() &&
-				data.includes('\x1B[2J')
-			) {
+			if (data.includes('\x1B[2J')) {
 				session.outputHistory = [];
 			}
 
