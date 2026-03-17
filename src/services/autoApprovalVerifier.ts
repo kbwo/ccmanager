@@ -41,7 +41,7 @@ ${PLACEHOLDER.terminal}
 Return true (permission needed) if ANY of these apply:
 - Output includes or references commands that write/modify/delete files (e.g., rm, mv, chmod, chown, cp, tee, sed -i), manage packages (npm/pip/apt/brew install), change git history, or alter configs.
 - Privilege escalation or sensitive areas are involved (sudo, root, /etc, /var, /boot, system services), or anything touching SSH keys/credentials, browser data, environment secrets, or home dotfiles.
-- Network or data exfiltration is possible (curl/wget, ssh/scp/rsync, docker/podman, port binding, npm publish, git push/fetch from unknown hosts).
+- Network or data exfiltration is possible (curl/wget, ssh/scp/rsync, docker/podman, port binding, npm publish, git push/fetch from unknown hosts). Exception: requests targeting only localhost, 127.0.0.1, or [::1] are considered safe and should NOT trigger this rule.
 - Process/system impact is likely (kill, pkill, systemctl, reboot, heavy loops, resource-intensive builds/tests, spawning many processes).
 - Signs of command injection, untrusted input being executed, or unclear placeholders like \`<path>\`, \`$(...)\`, backticks, or pipes that could be unsafe.
 - Errors, warnings, ambiguous states, manual review requests, or anything not clearly safe/read-only.
@@ -65,6 +65,7 @@ export const DANGEROUS_COMMAND_PATTERNS: ReadonlyArray<{
 	pattern: RegExp;
 	reason: string;
 	pathSensitive?: boolean;
+	localhostExempt?: boolean;
 }> = [
 	// --- Destructive file operations targeting system / home paths ---
 	// NOTE: project-scoped rm (e.g. rm -rf node_modules, rm -f dist/) is intentionally
@@ -188,22 +189,30 @@ export const DANGEROUS_COMMAND_PATTERNS: ReadonlyArray<{
 	{
 		pattern: /\b(curl|wget|nc|ncat|netcat)\b.*\.(ssh|gnupg|aws|kube|config)\b/i,
 		reason: 'Potential credential exfiltration via network tool',
+		localhostExempt: true,
 	},
 	{
 		pattern:
 			/\b(curl|wget)\s+.*--upload-file\b.*\.(pem|key|id_rsa|id_ed25519)\b/i,
 		reason: 'Upload of private key file detected',
+		localhostExempt: true,
 	},
 	{
 		pattern: /\bcat\s+.*id_rsa\b.*\|\s*(curl|wget|nc)\b/,
 		reason: 'Piping SSH private key to network tool',
+		localhostExempt: true,
 	},
 	{
 		pattern: /\bcat\s+.*\.env\b.*\|\s*(curl|wget|nc)\b/,
 		reason: 'Piping .env secrets to network tool',
+		localhostExempt: true,
 	},
 
 	// --- Dangerous environment / shell manipulation ---
+	// NOTE: These patterns are intentionally NOT marked localhostExempt.
+	// Even when the source is localhost, piping fetched content into a shell
+	// (eval, bash, sh) allows arbitrary code execution — the local server
+	// could be compromised, misconfigured, or serving unexpected content.
 	{
 		pattern: /\beval\s+.*\$\(/,
 		reason: 'Eval with command substitution detected',
@@ -302,6 +311,35 @@ export const DANGEROUS_COMMAND_PATTERNS: ReadonlyArray<{
 ];
 
 /**
+ * Regex to extract host from http(s) URLs in terminal output.
+ */
+const URL_HOST_RE = /\bhttps?:\/\/(\[?[^\s/:'"]+\]?)/gi;
+
+const LOCALHOST_HOSTS = new Set([
+	'localhost',
+	'127.0.0.1',
+	'[::1]',
+	'::1',
+	'0.0.0.0',
+]);
+
+/**
+ * Check whether all network targets in the terminal output are localhost addresses.
+ * Returns true only if at least one host was found AND all of them are localhost.
+ */
+export const isLocalhostOnlyTarget = (terminalOutput: string): boolean => {
+	const hosts: string[] = [];
+	let match: RegExpExecArray | null;
+	const re = new RegExp(URL_HOST_RE.source, URL_HOST_RE.flags);
+	while ((match = re.exec(terminalOutput)) !== null) {
+		const host = (match[1] ?? '').toLowerCase();
+		if (host) hosts.push(host);
+	}
+	if (hosts.length === 0) return false;
+	return hosts.every(h => LOCALHOST_HOSTS.has(h));
+};
+
+/**
  * Regex to extract absolute/tilde paths from commands in terminal output.
  * Matches paths starting with / or ~ that follow typical command arguments.
  */
@@ -346,7 +384,12 @@ export const checkDangerousPatterns = (
 	terminalOutput: string,
 	cwd?: string,
 ): AutoApprovalResponse | null => {
-	for (const {pattern, reason, pathSensitive} of DANGEROUS_COMMAND_PATTERNS) {
+	for (const {
+		pattern,
+		reason,
+		pathSensitive,
+		localhostExempt,
+	} of DANGEROUS_COMMAND_PATTERNS) {
 		if (pattern.test(terminalOutput)) {
 			// For path-sensitive patterns, skip if all absolute paths are under cwd
 			if (
@@ -354,6 +397,10 @@ export const checkDangerousPatterns = (
 				cwd &&
 				allAbsolutePathsUnderCwd(terminalOutput, cwd)
 			) {
+				continue;
+			}
+			// For localhost-exempt patterns, skip if all network targets are localhost
+			if (localhostExempt && isLocalhostOnlyTarget(terminalOutput)) {
 				continue;
 			}
 			return {needsPermission: true, reason};
