@@ -428,8 +428,9 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					</Box>
 					<Box marginTop={1}>
 						<Text dimColor>
-							Tip: Enable "Auto Directory" in settings to generate paths
-							automatically from branch names.
+							{
+								'Tip: Enable "Auto Directory" in settings to generate paths automatically from branch names.'
+							}
 						</Text>
 					</Box>
 				</Box>
