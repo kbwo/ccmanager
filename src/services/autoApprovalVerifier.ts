@@ -10,6 +10,8 @@ import {
 	type ExecFileOptionsWithStringEncoding,
 	type SpawnOptions,
 } from 'child_process';
+import {homedir} from 'os';
+import path from 'path';
 
 const DEFAULT_TIMEOUT_SECONDS = 30;
 
@@ -62,17 +64,21 @@ Respond with ONLY valid JSON matching: {“needsPermission”: true|false, “re
 export const DANGEROUS_COMMAND_PATTERNS: ReadonlyArray<{
 	pattern: RegExp;
 	reason: string;
+	pathSensitive?: boolean;
 }> = [
 	// --- Destructive file operations targeting system / home paths ---
 	// NOTE: project-scoped rm (e.g. rm -rf node_modules, rm -f dist/) is intentionally
 	// NOT blocked here. Only rm targeting system-critical or home paths is blocked.
+	// pathSensitive: if the absolute path resolves to inside cwd, allow it.
 	{
 		pattern: /\brm\s+-[a-zA-Z]*\s+(['”]?\/|['”]?~)/,
 		reason: 'File deletion targeting root or home directory',
+		pathSensitive: true,
 	},
 	{
 		pattern: /\brm\s+(['”]?\/|['”]?~\/)/,
 		reason: 'File deletion targeting root or home directory',
+		pathSensitive: true,
 	},
 
 	// --- Disk / filesystem destruction ---
@@ -220,11 +226,13 @@ export const DANGEROUS_COMMAND_PATTERNS: ReadonlyArray<{
 		pattern:
 			/\bchmod\s+-[a-zA-Z]*R[a-zA-Z]*\s+\S+\s+(\/(?:\s|$)|~\/|\/etc(?:\s|\/|$)|\/var(?:\s|\/|$)|\/home(?:\s|\/|$))/,
 		reason: 'Recursive permission change on sensitive path',
+		pathSensitive: true,
 	},
 	{
 		pattern:
 			/\bchown\s+-[a-zA-Z]*R[a-zA-Z]*\s+\S+\s+(\/(?:\s|$)|~\/|\/etc(?:\s|\/|$)|\/var(?:\s|\/|$)|\/home(?:\s|\/|$))/,
 		reason: 'Recursive ownership change on sensitive path',
+		pathSensitive: true,
 	},
 
 	// --- Process mass-kill ---
@@ -294,14 +302,60 @@ export const DANGEROUS_COMMAND_PATTERNS: ReadonlyArray<{
 ];
 
 /**
+ * Regex to extract absolute/tilde paths from commands in terminal output.
+ * Matches paths starting with / or ~ that follow typical command arguments.
+ */
+const ABSOLUTE_PATH_RE = /['"]?([/~][^\s'"]*)/g;
+
+/**
+ * Resolve a path that may start with ~ to an absolute path.
+ */
+export const resolveTildePath = (p: string): string => {
+	if (p === '~') return homedir();
+	if (p.startsWith('~/')) return path.join(homedir(), p.slice(2));
+	return p;
+};
+
+/**
+ * Check whether every absolute/tilde path found in the terminal output
+ * is located within the given cwd. Returns true only if at least one path
+ * was found AND all of them are under cwd.
+ * Paths are resolved via path.resolve to normalize traversals like "..".
+ */
+export const allAbsolutePathsUnderCwd = (
+	terminalOutput: string,
+	cwd: string,
+): boolean => {
+	const resolvedCwd = path.resolve(cwd);
+	const normalizedCwd = resolvedCwd + '/';
+	const matches = [...terminalOutput.matchAll(ABSOLUTE_PATH_RE)];
+	const paths = matches.map(m => path.resolve(resolveTildePath(m[1]!)));
+	if (paths.length === 0) return false;
+	return paths.every(p => p === resolvedCwd || p.startsWith(normalizedCwd));
+};
+
+/**
  * Check terminal output against the hardcoded dangerous command blocklist.
  * Returns a matching result if a dangerous pattern is found, or null if safe.
+ *
+ * @param terminalOutput - Terminal output to analyze
+ * @param cwd - Optional working directory. If provided, path-sensitive patterns
+ *              will allow commands whose target paths are all within cwd.
  */
 export const checkDangerousPatterns = (
 	terminalOutput: string,
+	cwd?: string,
 ): AutoApprovalResponse | null => {
-	for (const {pattern, reason} of DANGEROUS_COMMAND_PATTERNS) {
+	for (const {pattern, reason, pathSensitive} of DANGEROUS_COMMAND_PATTERNS) {
 		if (pattern.test(terminalOutput)) {
+			// For path-sensitive patterns, skip if all absolute paths are under cwd
+			if (
+				pathSensitive &&
+				cwd &&
+				allAbsolutePathsUnderCwd(terminalOutput, cwd)
+			) {
+				continue;
+			}
 			return {needsPermission: true, reason};
 		}
 	}
@@ -537,10 +591,10 @@ export class AutoApprovalVerifier {
 	 */
 	verifyNeedsPermission(
 		terminalOutput: string,
-		options?: {signal?: AbortSignal},
+		options?: {signal?: AbortSignal; cwd?: string},
 	): Effect.Effect<AutoApprovalResponse, ProcessError, never> {
 		// Deterministic blocklist check BEFORE LLM — cannot be bypassed by prompt injection
-		const blockedResult = checkDangerousPatterns(terminalOutput);
+		const blockedResult = checkDangerousPatterns(terminalOutput, options?.cwd);
 		if (blockedResult) {
 			logger.info(
 				`Auto-approval blocked by dangerous pattern: ${blockedResult.reason}`,

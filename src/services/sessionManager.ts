@@ -151,6 +151,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		void Effect.runPromise(
 			autoApprovalVerifier.verifyNeedsPermission(terminalContent, {
 				signal: abortController.signal,
+				cwd: session.worktreePath,
 			}),
 		)
 			.then(async autoApprovalResult => {

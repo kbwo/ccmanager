@@ -3,8 +3,11 @@ import {Effect} from 'effect';
 import {EventEmitter} from 'events';
 import type {ChildProcess} from 'child_process';
 import type {Writable} from 'node:stream';
+import {homedir} from 'os';
 import {
 	checkDangerousPatterns,
+	allAbsolutePathsUnderCwd,
+	resolveTildePath,
 	DANGEROUS_COMMAND_PATTERNS,
 } from './autoApprovalVerifier.js';
 
@@ -480,5 +483,140 @@ describe('checkDangerousPatterns', () => {
 		);
 		const uniquePatterns = new Set(patternStrings);
 		expect(uniquePatterns.size).toBe(patternStrings.length);
+	});
+
+	describe('cwd-aware: allows path-sensitive patterns when paths are under cwd', () => {
+		const cwd = '/home/user/project';
+
+		it.each([
+			['rm -rf /home/user/project/dist', 'rm -rf under cwd (absolute)'],
+			[
+				'rm -rf /home/user/project/node_modules',
+				'rm -rf node_modules (absolute)',
+			],
+			['rm -f /home/user/project/tmp/file.log', 'rm -f under cwd'],
+			['rm /home/user/project/old-file', 'rm under cwd (no flags)'],
+		])('allows: %s (%s)', input => {
+			const result = checkDangerousPatterns(input, cwd);
+			expect(result).toBeNull();
+		});
+
+		it.each([
+			['rm -rf /home/user/other-project/dist', 'rm -rf outside cwd'],
+			['rm -rf /tmp/something', 'rm -rf /tmp (not under cwd)'],
+			['rm -rf /home/user/project/../secrets', 'rm -rf traversal outside cwd'],
+			['rm -rf /', 'rm -rf / (root)'],
+		])('still blocks: %s (%s)', input => {
+			const result = checkDangerousPatterns(input, cwd);
+			expect(result).not.toBeNull();
+			expect(result?.needsPermission).toBe(true);
+		});
+
+		it('allows chmod -R on path under cwd', () => {
+			const result = checkDangerousPatterns(
+				'chmod -R 755 /home/user/project/dist',
+				cwd,
+			);
+			expect(result).toBeNull();
+		});
+
+		it('blocks chmod -R on path outside cwd', () => {
+			const result = checkDangerousPatterns(
+				'chmod -R 755 /home/other/stuff',
+				cwd,
+			);
+			expect(result).not.toBeNull();
+		});
+
+		it('allows chown -R on path under cwd', () => {
+			const result = checkDangerousPatterns(
+				'chown -R user:user /home/user/project/build',
+				cwd,
+			);
+			expect(result).toBeNull();
+		});
+
+		it('blocks chown -R on path outside cwd', () => {
+			const result = checkDangerousPatterns('chown -R user:user /var/log', cwd);
+			expect(result).not.toBeNull();
+		});
+
+		it('blocks when no cwd is provided even for project-like paths', () => {
+			const result = checkDangerousPatterns('rm -rf /home/user/project/dist');
+			expect(result).not.toBeNull();
+		});
+	});
+
+	describe('cwd-aware: tilde paths resolved against home directory', () => {
+		it('allows rm ~/project/dist when cwd matches expanded path', () => {
+			const home = homedir();
+			const cwd = `${home}/project`;
+			const result = checkDangerousPatterns('rm -rf ~/project/dist', cwd);
+			expect(result).toBeNull();
+		});
+
+		it('blocks rm ~/other when cwd is different', () => {
+			const home = homedir();
+			const cwd = `${home}/project`;
+			const result = checkDangerousPatterns('rm -rf ~/other/dist', cwd);
+			expect(result).not.toBeNull();
+		});
+	});
+});
+
+describe('allAbsolutePathsUnderCwd', () => {
+	const cwd = '/home/user/project';
+
+	it('returns true when all paths are under cwd', () => {
+		expect(
+			allAbsolutePathsUnderCwd('rm -rf /home/user/project/dist', cwd),
+		).toBe(true);
+	});
+
+	it('returns true for exact cwd path', () => {
+		expect(allAbsolutePathsUnderCwd('rm -rf /home/user/project', cwd)).toBe(
+			true,
+		);
+	});
+
+	it('returns false when any path is outside cwd', () => {
+		expect(
+			allAbsolutePathsUnderCwd('rm -rf /home/user/project/dist /tmp/bad', cwd),
+		).toBe(false);
+	});
+
+	it('returns false when no absolute paths found', () => {
+		expect(allAbsolutePathsUnderCwd('rm -rf node_modules', cwd)).toBe(false);
+	});
+
+	it('returns false for parent traversal', () => {
+		expect(
+			allAbsolutePathsUnderCwd('rm -rf /home/user/project/../secrets', cwd),
+		).toBe(false);
+	});
+
+	it('resolves tilde paths using home directory', () => {
+		const home = homedir();
+		const cwdWithHome = `${home}/myproject`;
+		expect(
+			allAbsolutePathsUnderCwd('rm -rf ~/myproject/dist', cwdWithHome),
+		).toBe(true);
+		expect(allAbsolutePathsUnderCwd('rm -rf ~/other', cwdWithHome)).toBe(false);
+	});
+});
+
+describe('resolveTildePath', () => {
+	it('expands ~ to home directory', () => {
+		const home = homedir();
+		expect(resolveTildePath('~')).toBe(home);
+	});
+
+	it('expands ~/path to home directory + path', () => {
+		const home = homedir();
+		expect(resolveTildePath('~/Documents')).toBe(`${home}/Documents`);
+	});
+
+	it('returns absolute paths unchanged', () => {
+		expect(resolveTildePath('/etc/passwd')).toBe('/etc/passwd');
 	});
 });
