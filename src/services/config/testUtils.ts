@@ -147,7 +147,7 @@ function applyDefaults(config: ConfigurationData): ConfigurationData {
 			config.autoApproval.enabled = false;
 		}
 		if (!Object.prototype.hasOwnProperty.call(config.autoApproval, 'timeout')) {
-			config.autoApproval.timeout = 30;
+			config.autoApproval.timeout = DEFAULT_TIMEOUT_SECONDS;
 		}
 	}
 
