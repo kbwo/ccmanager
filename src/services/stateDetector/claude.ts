@@ -10,6 +10,8 @@ const SPINNER_ACTIVITY_PATTERN = new RegExp(
 	'm',
 );
 
+const BUSY_LOOKBACK_LINES = 5;
+
 export class ClaudeStateDetector extends BaseStateDetector {
 	/**
 	 * Extract content above the prompt box.
@@ -40,6 +42,45 @@ export class ClaudeStateDetector extends BaseStateDetector {
 
 		// No prompt box found, return all content
 		return lines.join('\n');
+	}
+
+	/**
+	 * Claude Code frequently redraws the lower pane using cursor-addressed updates.
+	 * xterm's buffer can retain transient fragments from those redraws outside the
+	 * latest visible content block, so busy detection should only inspect the most
+	 * recent contiguous block directly above the prompt box.
+	 */
+	private getRecentContentAbovePromptBox(
+		terminal: Terminal,
+		maxLines: number,
+	): string {
+		const lines = this.getContentAbovePromptBox(terminal, maxLines).split('\n');
+
+		while (lines.length > 0) {
+			const trimmed = lines[lines.length - 1]!.trim();
+			if (trimmed === '' || trimmed === '❯' || /^[-─\s]+$/.test(trimmed)) {
+				lines.pop();
+				continue;
+			}
+			break;
+		}
+
+		if (lines.length === 0) {
+			return '';
+		}
+
+		let start = lines.length - 1;
+		while (start >= 0) {
+			const trimmed = lines[start]!.trim();
+			if (trimmed === '' || /^[-─\s]+$/.test(trimmed)) {
+				start++;
+				break;
+			}
+			start--;
+		}
+
+		const recentBlock = lines.slice(Math.max(start, 0));
+		return recentBlock.slice(-BUSY_LOOKBACK_LINES).join('\n');
 	}
 
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
@@ -79,7 +120,7 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		}
 
 		// Content above the prompt box only for busy detection
-		const abovePromptBox = this.getContentAbovePromptBox(terminal, 30);
+		const abovePromptBox = this.getRecentContentAbovePromptBox(terminal, 30);
 		const aboveLowerContent = abovePromptBox.toLowerCase();
 
 		// Check for busy state

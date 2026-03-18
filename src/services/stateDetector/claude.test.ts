@@ -525,6 +525,44 @@ describe('ClaudeStateDetector', () => {
 			// Assert - Should be idle because search prompt takes precedence
 			expect(state).toBe('idle');
 		});
+
+		it('should ignore stale spinner output outside the latest block above the prompt box', () => {
+			terminal = createMockTerminal([
+				'✻ Seasoning… (44s · ↓ 247 tokens)',
+				'  ⎿ Tip: Use /btw to ask a quick side question',
+				'',
+				'⏺ 全て通過。',
+				'',
+				'  - lint: pass (0 errors)',
+				'  - typecheck: pass',
+				'  - tests: 56 files, 775 passed, 5 skipped',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			const state = detector.detectState(terminal, 'busy');
+
+			expect(state).toBe('idle');
+		});
+
+		it('should ignore stale interrupt text outside the latest block above the prompt box', () => {
+			terminal = createMockTerminal([
+				'Press esc to interrupt',
+				'Working...',
+				'',
+				'Command completed successfully',
+				'Ready for next command',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			const state = detector.detectState(terminal, 'busy');
+
+			expect(state).toBe('idle');
+		});
+
 		it('should ignore "esc to interrupt" inside prompt box', () => {
 			// Arrange - "esc to interrupt" is inside the prompt box, not above it
 			terminal = createMockTerminal([
