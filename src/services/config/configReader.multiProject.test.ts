@@ -5,6 +5,7 @@ import type {
 	ConfigurationData,
 	ProjectConfigurationData,
 } from '../../types/index.js';
+import {DEFAULT_TIMEOUT_SECONDS} from '../../constants/autoApproval.js';
 
 // Mock fs module
 vi.mock('fs', () => ({
@@ -40,7 +41,7 @@ describe('ConfigReader in multi-project mode', () => {
 		},
 		autoApproval: {
 			enabled: false,
-			timeout: 30,
+			timeout: DEFAULT_TIMEOUT_SECONDS,
 		},
 	};
 
@@ -150,7 +151,7 @@ describe('ConfigReader in multi-project mode', () => {
 
 		const autoApproval = reader.getAutoApprovalConfig();
 		expect(autoApproval.enabled).toBe(false);
-		expect(autoApproval.timeout).toBe(30);
+		expect(autoApproval.timeout).toBe(DEFAULT_TIMEOUT_SECONDS);
 	});
 
 	it('should return global worktree config in multi-project mode', async () => {

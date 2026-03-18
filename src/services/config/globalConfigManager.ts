@@ -17,6 +17,7 @@ import {
 	DEFAULT_SHORTCUTS,
 	IConfigEditor,
 } from '../../types/index.js';
+import {DEFAULT_TIMEOUT_SECONDS} from '../../constants/autoApproval.js';
 
 class GlobalConfigManager implements IConfigEditor {
 	private configPath: string;
@@ -103,7 +104,7 @@ class GlobalConfigManager implements IConfigEditor {
 		if (!this.config.autoApproval) {
 			this.config.autoApproval = {
 				enabled: false,
-				timeout: 30,
+				timeout: DEFAULT_TIMEOUT_SECONDS,
 			};
 		} else {
 			if (
@@ -120,7 +121,7 @@ class GlobalConfigManager implements IConfigEditor {
 					'timeout',
 				)
 			) {
-				this.config.autoApproval.timeout = 30;
+				this.config.autoApproval.timeout = DEFAULT_TIMEOUT_SECONDS;
 			}
 		}
 
@@ -204,10 +205,10 @@ class GlobalConfigManager implements IConfigEditor {
 		const config = this.config.autoApproval || {
 			enabled: false,
 		};
-		// Default timeout to 30 seconds if not set
+		// Default timeout if not set
 		return {
 			...config,
-			timeout: config.timeout ?? 30,
+			timeout: config.timeout ?? DEFAULT_TIMEOUT_SECONDS,
 		};
 	}
 

@@ -13,6 +13,7 @@ import {
 import {ValidationError} from '../../types/errors.js';
 import {globalConfigManager} from './globalConfigManager.js';
 import {projectConfigManager} from './projectConfigManager.js';
+import {DEFAULT_TIMEOUT_SECONDS} from '../../constants/autoApproval.js';
 
 /**
  * ConfigReader provides merged configuration reading for runtime components.
@@ -118,7 +119,7 @@ export class ConfigReader implements IConfigReader {
 		// Ensure timeout has a default value
 		return {
 			...merged,
-			timeout: merged.timeout ?? 30,
+			timeout: merged.timeout ?? DEFAULT_TIMEOUT_SECONDS,
 		};
 	}
 

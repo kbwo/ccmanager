@@ -3,6 +3,7 @@ import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import ConfigureOther from './ConfigureOther.js';
 import {ConfigEditorProvider} from '../contexts/ConfigEditorContext.js';
+import {DEFAULT_TIMEOUT_SECONDS} from '../constants/autoApproval.js';
 
 // Mock ink to avoid stdin issues during tests
 vi.mock('ink', async () => {
@@ -94,7 +95,7 @@ describe('ConfigureOther', () => {
 		mockFns.getAutoApprovalConfig.mockReturnValue({
 			enabled: true,
 			customCommand: '',
-			timeout: 30,
+			timeout: DEFAULT_TIMEOUT_SECONDS,
 		});
 
 		const {lastFrame} = render(
@@ -114,7 +115,7 @@ describe('ConfigureOther', () => {
 		mockFns.getAutoApprovalConfig.mockReturnValue({
 			enabled: false,
 			customCommand: 'jq -n \'{"needsPermission":true}\'',
-			timeout: 30,
+			timeout: DEFAULT_TIMEOUT_SECONDS,
 		});
 
 		const {lastFrame} = render(
