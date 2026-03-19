@@ -39,6 +39,7 @@ export const MENU_ICONS = {
 	RENAME_SESSION: '✎',
 	MERGE_WORKTREE: '⇄',
 	DELETE_WORKTREE: '✕',
+	KILL_SESSION: '✕',
 	CONFIGURE_SHORTCUTS: '⌨',
 	EXIT: '⏻',
 } as const;

@@ -569,8 +569,28 @@ const Menu: React.FC<MenuProps> = ({
 					});
 				}
 				break;
-			case 'q':
 			case 'x':
+				// Kill session if one is highlighted, otherwise exit
+				if (highlightedSessionMeta) {
+					onSelectWorktree(
+						{
+							path: 'KILL_SESSION:' + highlightedSessionMeta.id,
+							branch: '',
+							isMainWorktree: false,
+							hasSession: false,
+						},
+						highlightedSessionMeta,
+					);
+				} else if (!projectName) {
+					onSelectWorktree({
+						path: 'EXIT_APPLICATION',
+						branch: '',
+						isMainWorktree: false,
+						hasSession: false,
+					});
+				}
+				break;
+			case 'q':
 				// Trigger exit action (only in single-project mode)
 				if (!projectName) {
 					onSelectWorktree({
@@ -746,12 +766,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New S-NewSession R-Rename M-Merge D-Delete ${
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New S-NewSession R-Rename X-KillSession M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New S-NewSession R-Rename M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New S-NewSession R-Rename X-KillSession M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
