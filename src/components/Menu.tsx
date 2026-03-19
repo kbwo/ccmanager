@@ -500,20 +500,6 @@ const Menu: React.FC<MenuProps> = ({
 					);
 				}
 				break;
-			case 'k':
-				// Kill/delete highlighted session
-				if (highlightedSessionMeta) {
-					onSelectWorktree(
-						{
-							path: 'KILL_SESSION:' + highlightedSessionMeta.id,
-							branch: '',
-							isMainWorktree: false,
-							hasSession: false,
-						},
-						highlightedSessionMeta,
-					);
-				}
-				break;
 			case 'n':
 				// Trigger new worktree action
 				onSelectWorktree({
@@ -760,12 +746,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New S-NewSession R-Rename K-Kill M-Merge D-Delete ${
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New S-NewSession R-Rename M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New S-NewSession R-Rename K-Kill M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New S-NewSession R-Rename M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'

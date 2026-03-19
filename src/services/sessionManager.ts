@@ -749,7 +749,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return this.autoApprovalDisabledWorktrees.has(worktreePath);
 	}
 
-	destroySession(sessionId: string): void {
+	destroySession(sessionId: string, options?: {preserveMeta?: boolean}): void {
 		const session = this.sessions.get(sessionId);
 		if (session) {
 			const stateData = session.stateMutex.getSnapshot();
@@ -774,8 +774,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 			this.sessions.delete(sessionId);
 			this.waitingWithBottomBorder.delete(sessionId);
-			// Remove from session store
-			sessionStore.removeSessionMeta(sessionId);
+			// Remove session meta unless preserveMeta is set.
+			// preserveMeta is used during app shutdown (destroy()) so metas
+			// survive restart. On normal process exit, meta is removed.
+			if (!options?.preserveMeta) {
+				sessionStore.removeSessionMeta(sessionId);
+			}
 			this.emit('sessionDestroyed', session);
 		}
 	}
@@ -832,8 +836,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				// Remove from sessions map and cleanup
 				this.sessions.delete(sessionId);
 				this.waitingWithBottomBorder.delete(sessionId);
-				// Remove from session store
-				sessionStore.removeSessionMeta(sessionId);
+				// NOTE: Do NOT remove session meta here — see destroySession comment.
 				this.emit('sessionDestroyed', session);
 			},
 			catch: (error: unknown) => {
@@ -936,9 +939,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	destroy(): void {
-		// Clean up all sessions
+		// Clean up all sessions, but preserve metas so they survive app restart
 		for (const sessionId of Array.from(this.sessions.keys())) {
-			this.destroySession(sessionId);
+			this.destroySession(sessionId, {preserveMeta: true});
 		}
 	}
 

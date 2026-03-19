@@ -79,6 +79,12 @@ const App: React.FC<AppProps> = ({
 	const [activeSession, setActiveSession] = useState<ISession | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
+
+	// Startup cleanup: remove stale session metas from previous runs.
+	// On a fresh start no sessions are running, so this clears all leftover metas.
+	useState(() => {
+		sessionStore.cleanupStaleMetas(new Set());
+	});
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
@@ -232,11 +238,12 @@ const App: React.FC<AppProps> = ({
 				// Session meta exists but no running session — create with that meta
 			}
 
-			// Check if there's exactly one running session for this worktree (backward compat)
-			// Skip when forceNew is set (S key — always create new session)
+			// Check if there are running sessions for this worktree.
+			// Navigate to the first one found (matches old getSession(path) behavior).
+			// Skip when forceNew is set (S key — always create new session).
 			if (!options?.sessionMeta && !options?.forceNew) {
 				const wtSessions = sessionManager.getSessionsForWorktree(worktree.path);
-				if (wtSessions.length === 1 && wtSessions[0]) {
+				if (wtSessions.length > 0 && wtSessions[0]) {
 					navigateToSession(wtSessions[0]);
 					return;
 				}
@@ -449,22 +456,6 @@ const App: React.FC<AppProps> = ({
 				setRenameSessionMeta(meta);
 				navigateWithClear('rename-session');
 			}
-			return;
-		}
-
-		// Check if this is a kill session request
-		if (worktree.path.startsWith('KILL_SESSION:')) {
-			const sessionId = worktree.path.substring('KILL_SESSION:'.length);
-			// Destroy running session if it exists
-			const running = sessionManager.getSessionById(sessionId);
-			if (running) {
-				sessionManager.destroySession(sessionId);
-			} else {
-				// No running session — just remove the persisted meta
-				sessionStore.removeSessionMeta(sessionId);
-			}
-			// Refresh menu
-			setMenuKey(prev => prev + 1);
 			return;
 		}
 

@@ -109,6 +109,19 @@ class SessionStore {
 			this.save();
 		}
 	}
+
+	/**
+	 * Remove metas whose IDs are not in the given set of running session IDs.
+	 * Called on startup to clean up metas from sessions that exited while the
+	 * app was not running (e.g., killed without clean shutdown).
+	 */
+	cleanupStaleMetas(runningSessionIds: Set<string>): void {
+		const before = this.sessions.length;
+		this.sessions = this.sessions.filter(s => runningSessionIds.has(s.id));
+		if (this.sessions.length !== before) {
+			this.save();
+		}
+	}
 }
 
 export const sessionStore = new SessionStore();

@@ -69,7 +69,7 @@ export interface SessionManager {
 	sessions: Map<string, Session>;
 	getSessionById(id: string): Session | undefined;
 	getSessionsForWorktree(worktreePath: string): Session[];
-	destroySession(sessionId: string): void;
+	destroySession(sessionId: string, options?: {preserveMeta?: boolean}): void;
 	getAllSessions(): Session[];
 	cancelAutoApproval(sessionId: string, reason?: string): void;
 }

@@ -159,6 +159,7 @@ vi.mock('../services/sessionStore.js', () => ({
 		getAllSessionMetas: vi.fn(() => []),
 		getSessionMeta: vi.fn(),
 		cleanupOrphanedPaths: vi.fn(),
+		cleanupStaleMetas: vi.fn(),
 	},
 }));
 
