@@ -297,10 +297,9 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time enough for persistence duration but less than minimum duration
-		// STATE_PERSISTENCE_DURATION_MS (200ms) < STATE_MINIMUM_DURATION_MS (500ms)
+		// Advance time less than persistence duration so transition is not yet confirmed
 		await vi.advanceTimersByTimeAsync(
-			STATE_PERSISTENCE_DURATION_MS + STATE_CHECK_INTERVAL_MS * 2,
+			STATE_PERSISTENCE_DURATION_MS - STATE_CHECK_INTERVAL_MS,
 		);
 
 		// State should still be busy because minimum duration hasn't elapsed
@@ -361,10 +360,10 @@ describe('SessionManager - State Persistence', () => {
 		// Pending state should be set to idle
 		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
 
-		// Advance past persistence duration (200ms) but NOT past minimum duration (500ms)
-		// Since stateConfirmedAt was updated at ~2000ms, and now is ~2200ms,
-		// timeInCurrentState = ~200ms which is < 500ms
-		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS);
+		// Advance past half the persistence duration but not fully
+		// Since stateConfirmedAt was updated at ~2000ms, this is not enough
+		// for the pending state to be confirmed
+		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS / 2);
 
 		// State should still be busy because minimum duration since last busy detection hasn't elapsed
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');

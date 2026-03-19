@@ -168,7 +168,7 @@ export interface ConfigurationData {
 	autoApproval?: {
 		enabled: boolean; // Whether auto-approval is enabled
 		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse
-		timeout?: number; // Timeout in seconds for auto-approval verification (default: 30)
+		timeout?: number; // Timeout in seconds for auto-approval verification (default: DEFAULT_TIMEOUT_SECONDS)
 	};
 }
 

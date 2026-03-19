@@ -289,18 +289,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	private createTerminal(): pkg.Terminal {
-		const terminal = new Terminal({
+		return new Terminal({
 			cols: process.stdout.columns || 80,
 			rows: process.stdout.rows || 24,
 			allowProposedApi: true,
 			logLevel: 'off',
 		});
-		// Disable auto-wrap to match the real terminal setting (Session.tsx sends
-		// \x1b[?7l to stdout).  Without this, long lines wrap in xterm-headless but
-		// are clipped on the real terminal, causing Ink's cursor-up re-render to
-		// leave ghost content (old spinners, "esc to interrupt", etc.) in the buffer.
-		terminal.write('\x1b[?7l');
-		return terminal;
 	}
 
 	private async createSessionInternal(
