@@ -452,6 +452,22 @@ const App: React.FC<AppProps> = ({
 			return;
 		}
 
+		// Check if this is a kill session request
+		if (worktree.path.startsWith('KILL_SESSION:')) {
+			const sessionId = worktree.path.substring('KILL_SESSION:'.length);
+			// Destroy running session if exists
+			const running = sessionManager.getSessionById(sessionId);
+			if (running) {
+				sessionManager.destroySession(sessionId);
+			} else {
+				// No running session — just remove persisted meta
+				sessionStore.removeSessionMeta(sessionId);
+			}
+			// Refresh menu
+			setMenuKey(prev => prev + 1);
+			return;
+		}
+
 		// Check if this is the delete worktree option
 		if (worktree.path === 'DELETE_WORKTREE') {
 			navigateWithClear('delete-worktree');
