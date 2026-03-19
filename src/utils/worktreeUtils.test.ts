@@ -234,6 +234,7 @@ describe('prepareWorktreeItems', () => {
 	const mockSession: Session = {
 		id: 'test-session',
 		worktreePath: '/path/to/worktree',
+		sessionNumber: 1,
 		process: {} as Session['process'],
 		output: [],
 		outputHistory: [],

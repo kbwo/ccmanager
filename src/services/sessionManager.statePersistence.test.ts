@@ -14,6 +14,28 @@ vi.mock('./bunTerminal.js', () => ({
 		return null;
 	}),
 }));
+
+// Mock sessionStore to avoid filesystem writes
+vi.mock('./sessionStore.js', () => {
+	let counter = 0;
+	return {
+		sessionStore: {
+			createSessionMeta: vi.fn((worktreePath: string) => ({
+				id: `mock-session-${++counter}-${worktreePath.replace(/\//g, '-')}`,
+				worktreePath,
+				number: 1,
+				name: undefined,
+			})),
+			removeSessionMeta: vi.fn(),
+			removeSessionsForWorktree: vi.fn(),
+			renameSession: vi.fn(),
+			getSessionsForWorktree: vi.fn(() => []),
+			getAllSessionMetas: vi.fn(() => []),
+			getSessionMeta: vi.fn(),
+			cleanupOrphanedPaths: vi.fn(),
+		},
+	};
+});
 vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getConfig: vi.fn().mockReturnValue({
@@ -275,11 +297,12 @@ describe('SessionManager - State Persistence', () => {
 		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 
 		// Destroy the session
-		sessionManager.destroySession('/test/path');
+		sessionManager.destroySession(session.id);
 
 		// Check that pending state is cleared
-		const destroyedSession = sessionManager.getSession('/test/path');
-		expect(destroyedSession).toBeUndefined();
+		const remainingSessions =
+			sessionManager.getSessionsForWorktree('/test/path');
+		expect(remainingSessions).toHaveLength(0);
 	});
 
 	it('should not transition state before minimum duration in current state has elapsed', async () => {

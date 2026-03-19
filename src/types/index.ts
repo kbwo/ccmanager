@@ -35,6 +35,8 @@ export interface Worktree {
 export interface Session {
 	id: string;
 	worktreePath: string;
+	sessionNumber: number; // Auto-incremented per worktree from SessionMeta
+	sessionName?: string; // User-assigned name from SessionMeta
 	process: IPty;
 	output: string[]; // Recent output for state detection
 	outputHistory: Buffer[]; // Full output history as buffers
@@ -65,10 +67,11 @@ export interface AutoApprovalResponse {
 
 export interface SessionManager {
 	sessions: Map<string, Session>;
-	getSession(worktreePath: string): Session | undefined;
-	destroySession(worktreePath: string): void;
+	getSessionById(id: string): Session | undefined;
+	getSessionsForWorktree(worktreePath: string): Session[];
+	destroySession(sessionId: string): void;
 	getAllSessions(): Session[];
-	cancelAutoApproval(worktreePath: string, reason?: string): void;
+	cancelAutoApproval(sessionId: string, reason?: string): void;
 }
 
 export interface ShortcutKey {

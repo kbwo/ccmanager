@@ -101,7 +101,7 @@ const Session: React.FC<SessionProps> = ({
 		sessionManager.on('sessionRestore', handleSessionRestore);
 
 		// Mark session as active (this will trigger the restore event)
-		sessionManager.setSessionActive(session.worktreePath, true);
+		sessionManager.setSessionActive(session.id, true);
 
 		// Immediately resize the PTY and terminal to current dimensions
 		// This fixes rendering issues when terminal width changed while in menu
@@ -178,7 +178,7 @@ const Session: React.FC<SessionProps> = ({
 
 			if (session.stateMutex.getSnapshot().state === 'pending_auto_approval') {
 				sessionManager.cancelAutoApproval(
-					session.worktreePath,
+					session.id,
 					'User input received during auto-approval',
 				);
 			}
@@ -199,7 +199,7 @@ const Session: React.FC<SessionProps> = ({
 			}
 
 			// Mark session as inactive
-			sessionManager.setSessionActive(session.worktreePath, false);
+			sessionManager.setSessionActive(session.id, false);
 
 			// Remove event listeners
 			sessionManager.off('sessionRestore', handleSessionRestore);

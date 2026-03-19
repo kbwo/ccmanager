@@ -26,16 +26,26 @@ vi.mock('./sessionManager.js', () => {
 			this.sessions.clear();
 		}
 
-		getSession(worktreePath: string) {
-			return this.sessions.get(worktreePath);
+		getSessionById(id: string) {
+			return this.sessions.get(id);
 		}
 
-		setSessionActive(_worktreePath: string, _active: boolean) {
+		getSessionsForWorktree(worktreePath: string) {
+			return Array.from(this.sessions.values()).filter(
+				(s: MockSession) => s.worktreePath === worktreePath,
+			);
+		}
+
+		setSessionActive(_sessionId: string, _active: boolean) {
 			// Mock implementation
 		}
 
-		destroySession(worktreePath: string) {
-			this.sessions.delete(worktreePath);
+		destroySession(sessionId: string) {
+			this.sessions.delete(sessionId);
+		}
+
+		cancelAutoApproval(_sessionId: string, _reason?: string) {
+			// Mock implementation
 		}
 
 		on() {

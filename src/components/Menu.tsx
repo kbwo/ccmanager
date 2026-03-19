@@ -25,11 +25,12 @@ import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
+import {sessionStore, type SessionMeta} from '../services/sessionStore.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
 	worktreeService: WorktreeService;
-	onSelectWorktree: (worktree: Worktree) => void;
+	onSelectWorktree: (worktree: Worktree, sessionMeta?: SessionMeta) => void;
 	onSelectRecentProject?: (project: GitProject) => void;
 	error?: string | null;
 	onDismissError?: () => void;
@@ -49,6 +50,7 @@ interface WorktreeItem {
 	label: string;
 	value: string;
 	worktree: Worktree;
+	sessionMeta?: SessionMeta;
 }
 
 interface ProjectItem {
@@ -102,6 +104,9 @@ const Menu: React.FC<MenuProps> = ({
 	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<
 		string | null
 	>(null);
+	const [highlightedSessionMeta, setHighlightedSessionMeta] = useState<
+		SessionMeta | undefined
+	>(undefined);
 	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
 
 	// Use the search mode hook
@@ -156,7 +161,9 @@ const Menu: React.FC<MenuProps> = ({
 
 						// Update worktree session status
 						result.worktrees.forEach(wt => {
-							wt.hasSession = allSessions.some(s => s.worktreePath === wt.path);
+							wt.hasSession =
+								allSessions.some(s => s.worktreePath === wt.path) ||
+								sessionStore.getSessionsForWorktree(wt.path).length > 0;
 						});
 
 						setBaseWorktrees(result.worktrees);
@@ -210,7 +217,8 @@ const Menu: React.FC<MenuProps> = ({
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
-		const items = prepareWorktreeItems(worktrees, sessions);
+		const allSessionMetas = sessionStore.getAllSessionMetas();
+		const items = prepareWorktreeItems(worktrees, sessions, allSessionMetas);
 		const columnPositions = calculateColumnPositions(items);
 
 		// Filter worktrees based on search query
@@ -237,11 +245,17 @@ const Menu: React.FC<MenuProps> = ({
 				const numberPrefix =
 					!isSearchMode && index < 10 ? `${index} ❯ ` : '  ❯ ';
 
+				// Use session meta id for value if present, otherwise worktree path
+				const value = item.sessionMeta
+					? `session:${item.sessionMeta.id}`
+					: item.worktree.path;
+
 				return {
 					type: 'worktree',
 					label: numberPrefix + label,
-					value: item.worktree.path,
+					value,
 					worktree: item.worktree,
+					sessionMeta: item.sessionMeta,
 				};
 			},
 		);
@@ -364,16 +378,22 @@ const Menu: React.FC<MenuProps> = ({
 		setItems(menuItems);
 
 		// Ensure highlighted worktree path is valid for hotkey support
-		// (e.g., on initial render or when returning from a session view)
 		setHighlightedWorktreePath(prev => {
 			if (
 				prev &&
-				menuItems.some(item => item.type === 'worktree' && item.value === prev)
+				menuItems.some(
+					item => item.type === 'worktree' && item.worktree.path === prev,
+				)
 			) {
 				return prev;
 			}
 			const first = menuItems.find(item => item.type === 'worktree');
-			return first && first.type === 'worktree' ? first.worktree.path : null;
+			if (first && first.type === 'worktree') {
+				setHighlightedSessionMeta(first.sessionMeta);
+				return first.worktree.path;
+			}
+			setHighlightedSessionMeta(undefined);
+			return null;
 		});
 	}, [
 		worktrees,
@@ -423,7 +443,10 @@ const Menu: React.FC<MenuProps> = ({
 
 			// Check if it's a worktree
 			if (index < worktreeItems.length && worktreeItems[index]) {
-				onSelectWorktree(worktreeItems[index].worktree);
+				onSelectWorktree(
+					worktreeItems[index].worktree,
+					worktreeItems[index].sessionMeta,
+				);
 				return;
 			}
 
@@ -447,6 +470,34 @@ const Menu: React.FC<MenuProps> = ({
 				if (configReader.isAutoApprovalEnabled() && highlightedWorktreePath) {
 					sessionManager.toggleAutoApprovalForWorktree(highlightedWorktreePath);
 					setAutoApprovalToggleCounter(c => c + 1);
+				}
+				break;
+			case 's':
+				// Create new session for highlighted worktree
+				if (highlightedWorktreePath) {
+					onSelectWorktree(
+						{
+							path: 'NEW_SESSION:' + highlightedWorktreePath,
+							branch: '',
+							isMainWorktree: false,
+							hasSession: false,
+						},
+						undefined,
+					);
+				}
+				break;
+			case 'r':
+				// Rename highlighted session
+				if (highlightedSessionMeta) {
+					onSelectWorktree(
+						{
+							path: 'RENAME_SESSION:' + highlightedSessionMeta.id,
+							branch: '',
+							isMainWorktree: false,
+							hasSession: false,
+						},
+						highlightedSessionMeta,
+					);
 				}
 				break;
 			case 'n':
@@ -612,7 +663,7 @@ const Menu: React.FC<MenuProps> = ({
 				hasSession: false,
 			});
 		} else if (item.type === 'worktree') {
-			onSelectWorktree(item.worktree);
+			onSelectWorktree(item.worktree, item.sessionMeta);
 		}
 	};
 
@@ -657,6 +708,7 @@ const Menu: React.FC<MenuProps> = ({
 						const menuItem = item as MenuItem;
 						if (menuItem.type === 'worktree') {
 							setHighlightedWorktreePath(menuItem.worktree.path);
+							setHighlightedSessionMeta(menuItem.sessionMeta);
 						}
 					}}
 					isFocused={!error}
@@ -694,12 +746,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete ${
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New S-NewSession R-Rename M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New S-NewSession R-Rename M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'

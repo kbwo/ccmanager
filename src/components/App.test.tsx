@@ -86,8 +86,11 @@ const mockSession = {
 class MockSessionManager {
 	on = vi.fn((_: string, __: (...args: unknown[]) => void) => this);
 	off = vi.fn((_: string, __: (...args: unknown[]) => void) => this);
-	getSession = vi.fn((_: string) => null as SessionType | null);
+	getSessionById = vi.fn((_: string) => null as SessionType | null);
+	getSessionsForWorktree = vi.fn((_: string) => [] as SessionType[]);
 	getAllSessions = vi.fn(() => [] as SessionType[]);
+	destroySession = vi.fn((_: string) => {});
+	cancelAutoApproval = vi.fn((_: string, __?: string) => {});
 	createSessionWithPresetEffect = vi.fn((_: string, __?: string) =>
 		Effect.succeed(mockSession),
 	);
@@ -140,6 +143,23 @@ function createInkMock<TProps>(
 
 vi.mock('../services/sessionManager.js', () => ({
 	SessionManager: MockSessionManager,
+}));
+
+vi.mock('../services/sessionStore.js', () => ({
+	sessionStore: {
+		createSessionMeta: vi.fn((worktreePath: string) => ({
+			id: `session-${Date.now()}`,
+			worktreePath,
+			number: 1,
+		})),
+		removeSessionMeta: vi.fn(),
+		removeSessionsForWorktree: vi.fn(),
+		renameSession: vi.fn(),
+		getSessionsForWorktree: vi.fn(() => []),
+		getAllSessionMetas: vi.fn(() => []),
+		getSessionMeta: vi.fn(),
+		cleanupOrphanedPaths: vi.fn(),
+	},
 }));
 
 vi.mock('../services/globalSessionOrchestrator.js', () => ({
@@ -407,6 +427,10 @@ describe('App component loading state machine', () => {
 			createdPath,
 			'claude',
 			'trim worktree name output',
+			expect.objectContaining({
+				worktreePath: createdPath,
+				number: 1,
+			}),
 		);
 		expect(sessionProps?.session).toEqual(mockSession);
 
@@ -460,6 +484,10 @@ describe('App component loading state machine', () => {
 			'/tmp/resolved-worktree',
 			'claude',
 			'trim worktree name output',
+			expect.objectContaining({
+				worktreePath: '/tmp/resolved-worktree',
+				number: 1,
+			}),
 		);
 
 		unmount();

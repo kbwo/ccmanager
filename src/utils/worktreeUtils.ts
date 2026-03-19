@@ -8,6 +8,7 @@ import {
 	formatGitAheadBehind,
 	formatParentBranch,
 } from './gitStatus.js';
+import type {SessionMeta} from '../services/sessionStore.js';
 
 // Constants
 const MAX_BRANCH_NAME_LENGTH = 70; // Maximum characters for branch name display
@@ -19,6 +20,7 @@ const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 export interface WorktreeItem {
 	worktree: Worktree;
 	session?: Session;
+	sessionMeta?: SessionMeta;
 	baseLabel: string;
 	fileChanges: string;
 	aheadBehind: string;
@@ -144,68 +146,113 @@ export function extractBranchParts(branchName: string): {
 }
 
 /**
+ * Build a single WorktreeItem row for display.
+ */
+function buildWorktreeItem(
+	wt: Worktree,
+	session: Session | undefined,
+	sessionMeta: SessionMeta | undefined,
+	sessionSuffix: string,
+): WorktreeItem {
+	const stateData = session?.stateMutex.getSnapshot();
+	const status = stateData
+		? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
+		: '';
+	const fullBranchName = wt.branch
+		? wt.branch.replace('refs/heads/', '')
+		: 'detached';
+	const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
+	const isMain = wt.isMainWorktree ? ' (main)' : '';
+	const baseLabel = `${branchName}${isMain}${sessionSuffix}${status}`;
+
+	let fileChanges = '';
+	let aheadBehind = '';
+	let parentBranch = '';
+	let error = '';
+
+	if (wt.gitStatus) {
+		fileChanges = formatGitFileChanges(wt.gitStatus);
+		aheadBehind = formatGitAheadBehind(wt.gitStatus);
+		parentBranch = formatParentBranch(
+			wt.gitStatus.parentBranch,
+			fullBranchName,
+		);
+	} else if (wt.gitStatusError) {
+		error = `\x1b[31m[git error]\x1b[0m`;
+	} else {
+		fileChanges = '\x1b[90m[fetching...]\x1b[0m';
+	}
+
+	const lastCommitDate = wt.lastCommitDate
+		? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
+		: '';
+
+	return {
+		worktree: wt,
+		session,
+		sessionMeta,
+		baseLabel,
+		fileChanges,
+		aheadBehind,
+		parentBranch,
+		lastCommitDate,
+		error,
+		lengths: {
+			base: stripAnsi(baseLabel).length,
+			fileChanges: stripAnsi(fileChanges).length,
+			aheadBehind: stripAnsi(aheadBehind).length,
+			parentBranch: stripAnsi(parentBranch).length,
+			lastCommitDate: stripAnsi(lastCommitDate).length,
+		},
+	};
+}
+
+/**
  * Prepares worktree content for display with plain and colored versions.
+ * Supports multiple sessions per worktree.
  */
 export function prepareWorktreeItems(
 	worktrees: Worktree[],
 	sessions: Session[],
+	sessionMetas?: SessionMeta[],
 ): WorktreeItem[] {
-	return worktrees.map(wt => {
-		const session = sessions.find(s => s.worktreePath === wt.path);
-		const stateData = session?.stateMutex.getSnapshot();
-		const status = stateData
-			? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
-			: '';
-		const fullBranchName = wt.branch
-			? wt.branch.replace('refs/heads/', '')
-			: 'detached';
-		const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
-		const isMain = wt.isMainWorktree ? ' (main)' : '';
-		const baseLabel = `${branchName}${isMain}${status}`;
+	const items: WorktreeItem[] = [];
 
-		let fileChanges = '';
-		let aheadBehind = '';
-		let parentBranch = '';
-		let error = '';
+	for (const wt of worktrees) {
+		const wtSessions = sessions.filter(s => s.worktreePath === wt.path);
+		const wtMetas = sessionMetas
+			? sessionMetas.filter(m => m.worktreePath === wt.path)
+			: [];
 
-		if (wt.gitStatus) {
-			fileChanges = formatGitFileChanges(wt.gitStatus);
-			aheadBehind = formatGitAheadBehind(wt.gitStatus);
-			parentBranch = formatParentBranch(
-				wt.gitStatus.parentBranch,
-				fullBranchName,
-			);
-		} else if (wt.gitStatusError) {
-			// Format error in red
-			error = `\x1b[31m[git error]\x1b[0m`;
+		if (wtSessions.length === 0 && wtMetas.length === 0) {
+			// No sessions — show single row without suffix
+			items.push(buildWorktreeItem(wt, undefined, undefined, ''));
+		} else if (wtSessions.length === 1 && wtMetas.length <= 1) {
+			// Single session — no suffix needed
+			items.push(buildWorktreeItem(wt, wtSessions[0], wtMetas[0], ''));
 		} else {
-			// Show fetching status in dim gray
-			fileChanges = '\x1b[90m[fetching...]\x1b[0m';
+			// Multiple sessions: show one row per session with suffix
+			// First, show running sessions
+			for (const session of wtSessions) {
+				const meta = wtMetas.find(m => m.id === session.id);
+				const suffix = meta
+					? meta.name
+						? `: ${meta.name}`
+						: ` #${meta.number}`
+					: ` #${session.sessionNumber}`;
+				items.push(buildWorktreeItem(wt, session, meta, suffix));
+			}
+			// Then show persisted metas without running sessions (for restart)
+			for (const meta of wtMetas) {
+				if (!wtSessions.some(s => s.id === meta.id)) {
+					const suffix = meta.name ? `: ${meta.name}` : ` #${meta.number}`;
+					items.push(buildWorktreeItem(wt, undefined, meta, suffix));
+				}
+			}
 		}
+	}
 
-		// Format last commit date as dim relative time
-		const lastCommitDate = wt.lastCommitDate
-			? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
-			: '';
-
-		return {
-			worktree: wt,
-			session,
-			baseLabel,
-			fileChanges,
-			aheadBehind,
-			parentBranch,
-			lastCommitDate,
-			error,
-			lengths: {
-				base: stripAnsi(baseLabel).length,
-				fileChanges: stripAnsi(fileChanges).length,
-				aheadBehind: stripAnsi(aheadBehind).length,
-				parentBranch: stripAnsi(parentBranch).length,
-				lastCommitDate: stripAnsi(lastCommitDate).length,
-			},
-		};
-	});
+	return items;
 }
 
 /**
