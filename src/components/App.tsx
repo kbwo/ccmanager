@@ -26,6 +26,7 @@ import {
 	Session as ISession,
 	DevcontainerConfig,
 	GitProject,
+	MenuAction,
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
@@ -419,104 +420,59 @@ const App: React.FC<AppProps> = ({
 		}
 	};
 
-	const handleSelectWorktree = async (
-		worktree: Worktree,
-		sessionMeta?: SessionMeta,
-	) => {
-		// Check if this is the new worktree option
-		if (worktree.path === '') {
-			navigateWithClear('new-worktree');
-			return;
-		}
-
-		// Check if this is a new session request
-		if (worktree.path.startsWith('NEW_SESSION:')) {
-			const worktreePath = worktree.path.substring('NEW_SESSION:'.length);
-			await startSessionForWorktree(
-				{
-					path: worktreePath,
-					branch: '',
-					isMainWorktree: false,
-					hasSession: true,
-				},
-				{forceNew: true},
-			);
-			return;
-		}
-
-		// Check if this is a rename session request
-		if (worktree.path.startsWith('RENAME_SESSION:')) {
-			const sessionId = worktree.path.substring('RENAME_SESSION:'.length);
-			const meta = sessionMeta ?? sessionManager.getSessionMeta(sessionId);
-			if (meta) {
-				setRenameSessionMeta(meta);
+	const handleMenuAction = async (action: MenuAction) => {
+		switch (action.type) {
+			case 'newWorktree':
+				navigateWithClear('new-worktree');
+				return;
+			case 'newSession':
+				await startSessionForWorktree(
+					{
+						path: action.worktreePath,
+						branch: '',
+						isMainWorktree: false,
+						hasSession: true,
+					},
+					{forceNew: true},
+				);
+				return;
+			case 'renameSession':
+				setRenameSessionMeta(action.sessionMeta);
 				navigateWithClear('rename-session');
+				return;
+			case 'killSession': {
+				const running = sessionManager.getSessionById(action.sessionMeta.id);
+				if (running) {
+					sessionManager.destroySession(action.sessionMeta.id);
+				}
+				sessionManager.removeSessionMeta(action.sessionMeta.id);
+				setMenuKey(prev => prev + 1);
+				return;
 			}
-			return;
+			case 'deleteWorktree':
+				navigateWithClear('delete-worktree');
+				return;
+			case 'mergeWorktree':
+				navigateWithClear('merge-worktree');
+				return;
+			case 'configuration':
+				setConfigScope(action.scope);
+				navigateWithClear('configuration');
+				return;
+			case 'exit':
+				if (multiProject && selectedProject) {
+					handleBackToProjectList();
+				} else {
+					globalSessionOrchestrator.destroyAllSessions();
+					exit();
+				}
+				return;
+			case 'selectWorktree':
+				await startSessionForWorktree(action.worktree, {
+					sessionMeta: action.sessionMeta,
+				});
+				return;
 		}
-
-		// Check if this is a kill session request
-		if (worktree.path.startsWith('KILL_SESSION:')) {
-			const sessionId = worktree.path.substring('KILL_SESSION:'.length);
-			// Destroy running session if exists
-			const running = sessionManager.getSessionById(sessionId);
-			if (running) {
-				sessionManager.destroySession(sessionId);
-			}
-			// Also remove persisted meta
-			sessionManager.removeSessionMeta(sessionId);
-			// Refresh menu
-			setMenuKey(prev => prev + 1);
-			return;
-		}
-
-		// Check if this is the delete worktree option
-		if (worktree.path === 'DELETE_WORKTREE') {
-			navigateWithClear('delete-worktree');
-			return;
-		}
-
-		// Check if this is the merge worktree option
-		if (worktree.path === 'MERGE_WORKTREE') {
-			navigateWithClear('merge-worktree');
-			return;
-		}
-
-		// Check if this is the configuration option
-		if (worktree.path === 'CONFIGURATION') {
-			setConfigScope('global');
-			navigateWithClear('configuration');
-			return;
-		}
-
-		// Check if this is the project configuration option
-		if (worktree.path === 'CONFIGURATION_PROJECT') {
-			setConfigScope('project');
-			navigateWithClear('configuration');
-			return;
-		}
-
-		// Check if this is the global configuration option
-		if (worktree.path === 'CONFIGURATION_GLOBAL') {
-			setConfigScope('global');
-			navigateWithClear('configuration');
-			return;
-		}
-
-		// Check if this is the exit application option
-		if (worktree.path === 'EXIT_APPLICATION') {
-			// In multi-project mode with a selected project, go back to project list
-			if (multiProject && selectedProject) {
-				handleBackToProjectList();
-			} else {
-				// Only destroy all sessions when actually exiting the app
-				globalSessionOrchestrator.destroyAllSessions();
-				exit();
-			}
-			return;
-		}
-
-		await startSessionForWorktree(worktree, {sessionMeta});
 	};
 
 	const handlePresetSelected = async (presetId: string) => {
@@ -860,7 +816,7 @@ const App: React.FC<AppProps> = ({
 				key={menuKey}
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={handleSelectWorktree}
+				onMenuAction={handleMenuAction}
 				onSelectRecentProject={handleSelectProject}
 				error={error}
 				onDismissError={() => setError(null)}

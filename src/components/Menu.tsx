@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
-import {Worktree, Session, GitProject} from '../types/index.js';
+import {Worktree, Session, GitProject, MenuAction} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {GitError} from '../types/errors.js';
@@ -30,7 +30,7 @@ import {type SessionMeta} from '../types/index.js';
 interface MenuProps {
 	sessionManager: SessionManager;
 	worktreeService: WorktreeService;
-	onSelectWorktree: (worktree: Worktree, sessionMeta?: SessionMeta) => void;
+	onMenuAction: (action: MenuAction) => void;
 	onSelectRecentProject?: (project: GitProject) => void;
 	error?: string | null;
 	onDismissError?: () => void;
@@ -86,7 +86,7 @@ const formatGitError = (error: GitError): string => {
 const Menu: React.FC<MenuProps> = ({
 	sessionManager,
 	worktreeService,
-	onSelectWorktree,
+	onMenuAction,
 	onSelectRecentProject,
 	error,
 	onDismissError,
@@ -443,10 +443,11 @@ const Menu: React.FC<MenuProps> = ({
 
 			// Check if it's a worktree
 			if (index < worktreeItems.length && worktreeItems[index]) {
-				onSelectWorktree(
-					worktreeItems[index].worktree,
-					worktreeItems[index].sessionMeta,
-				);
+				onMenuAction({
+					type: 'selectWorktree',
+					worktree: worktreeItems[index].worktree,
+					sessionMeta: worktreeItems[index].sessionMeta,
+				});
 				return;
 			}
 
@@ -475,130 +476,60 @@ const Menu: React.FC<MenuProps> = ({
 			case 's':
 				// Create new session for highlighted worktree
 				if (highlightedWorktreePath) {
-					onSelectWorktree(
-						{
-							path: 'NEW_SESSION:' + highlightedWorktreePath,
-							branch: '',
-							isMainWorktree: false,
-							hasSession: false,
-						},
-						undefined,
-					);
+					onMenuAction({
+						type: 'newSession',
+						worktreePath: highlightedWorktreePath,
+					});
 				}
 				break;
 			case 'r':
 				// Rename highlighted session
 				if (highlightedSessionMeta) {
-					onSelectWorktree(
-						{
-							path: 'RENAME_SESSION:' + highlightedSessionMeta.id,
-							branch: '',
-							isMainWorktree: false,
-							hasSession: false,
-						},
-						highlightedSessionMeta,
-					);
+					onMenuAction({
+						type: 'renameSession',
+						sessionMeta: highlightedSessionMeta,
+					});
 				}
 				break;
 			case 'n':
-				// Trigger new worktree action
-				onSelectWorktree({
-					path: '',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				onMenuAction({type: 'newWorktree'});
 				break;
 			case 'm':
-				// Trigger merge worktree action
-				onSelectWorktree({
-					path: 'MERGE_WORKTREE',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				onMenuAction({type: 'mergeWorktree'});
 				break;
 			case 'd':
-				// Trigger delete worktree action
-				onSelectWorktree({
-					path: 'DELETE_WORKTREE',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				onMenuAction({type: 'deleteWorktree'});
 				break;
 			case 'p':
 				// Trigger project configuration action (only in single-project mode)
 				if (!multiProject) {
-					onSelectWorktree({
-						path: 'CONFIGURATION_PROJECT',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
+					onMenuAction({type: 'configuration', scope: 'project'});
 				}
 				break;
 			case 'c':
-				// Trigger configuration action
-				if (multiProject) {
-					// In multi-project mode, 'c' opens global configuration (backward compatible)
-					onSelectWorktree({
-						path: 'CONFIGURATION',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
-				} else {
-					// In single-project mode, 'c' opens global configuration
-					onSelectWorktree({
-						path: 'CONFIGURATION_GLOBAL',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
-				}
+				onMenuAction({type: 'configuration', scope: 'global'});
 				break;
 			case 'b':
 				// In multi-project mode, go back to project list
 				if (projectName) {
-					onSelectWorktree({
-						path: 'EXIT_APPLICATION',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
+					onMenuAction({type: 'exit'});
 				}
 				break;
 			case 'x':
 				// Kill session if one is highlighted, otherwise exit
 				if (highlightedSessionMeta) {
-					onSelectWorktree(
-						{
-							path: 'KILL_SESSION:' + highlightedSessionMeta.id,
-							branch: '',
-							isMainWorktree: false,
-							hasSession: false,
-						},
-						highlightedSessionMeta,
-					);
-				} else if (!projectName) {
-					onSelectWorktree({
-						path: 'EXIT_APPLICATION',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
+					onMenuAction({
+						type: 'killSession',
+						sessionMeta: highlightedSessionMeta,
 					});
+				} else if (!projectName) {
+					onMenuAction({type: 'exit'});
 				}
 				break;
 			case 'q':
 				// Trigger exit action (only in single-project mode)
 				if (!projectName) {
-					onSelectWorktree({
-						path: 'EXIT_APPLICATION',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
+					onMenuAction({type: 'exit'});
 				}
 				break;
 		}
@@ -608,7 +539,6 @@ const Menu: React.FC<MenuProps> = ({
 		if (item.value.endsWith('-separator') || item.value === 'recent-header') {
 			// Do nothing for separators and headers
 		} else if (item.type === 'project') {
-			// Handle recent project selection
 			if (onSelectRecentProject) {
 				const project: GitProject = {
 					path: item.recentProject.path,
@@ -619,71 +549,25 @@ const Menu: React.FC<MenuProps> = ({
 				onSelectRecentProject(project);
 			}
 		} else if (item.value === 'new-worktree') {
-			// Handle in parent component
-			onSelectWorktree({
-				path: '',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'newWorktree'});
 		} else if (item.value === 'merge-worktree') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'MERGE_WORKTREE',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'mergeWorktree'});
 		} else if (item.value === 'delete-worktree') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'DELETE_WORKTREE',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'deleteWorktree'});
 		} else if (item.value === 'configuration') {
-			// Handle in parent component - use special marker (backward compatible for multi-project mode)
-			onSelectWorktree({
-				path: 'CONFIGURATION',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'configuration', scope: 'global'});
 		} else if (item.value === 'configuration-project') {
-			// Handle in parent component - use special marker for project config
-			onSelectWorktree({
-				path: 'CONFIGURATION_PROJECT',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'configuration', scope: 'project'});
 		} else if (item.value === 'configuration-global') {
-			// Handle in parent component - use special marker for global config
-			onSelectWorktree({
-				path: 'CONFIGURATION_GLOBAL',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
-		} else if (item.value === 'exit') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'EXIT_APPLICATION',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
-		} else if (item.value === 'back-to-projects') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'EXIT_APPLICATION',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'configuration', scope: 'global'});
+		} else if (item.value === 'exit' || item.value === 'back-to-projects') {
+			onMenuAction({type: 'exit'});
 		} else if (item.type === 'worktree') {
-			onSelectWorktree(item.worktree, item.sessionMeta);
+			onMenuAction({
+				type: 'selectWorktree',
+				worktree: item.worktree,
+				sessionMeta: item.sessionMeta,
+			});
 		}
 	};
 

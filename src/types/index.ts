@@ -72,6 +72,17 @@ export interface SessionMeta {
 	name?: string;
 }
 
+export type MenuAction =
+	| {type: 'selectWorktree'; worktree: Worktree; sessionMeta?: SessionMeta}
+	| {type: 'newWorktree'}
+	| {type: 'newSession'; worktreePath: string}
+	| {type: 'renameSession'; sessionMeta: SessionMeta}
+	| {type: 'killSession'; sessionMeta: SessionMeta}
+	| {type: 'deleteWorktree'}
+	| {type: 'mergeWorktree'}
+	| {type: 'configuration'; scope: ConfigScope}
+	| {type: 'exit'};
+
 export interface SessionManager {
 	sessions: Map<string, Session>;
 	getSessionById(id: string): Session | undefined;

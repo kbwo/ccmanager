@@ -16,13 +16,14 @@ import type {
 	Worktree,
 	GitProject,
 	DevcontainerConfig,
+	MenuAction,
 } from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
 
 type AppComponent = typeof import('./App.js').default;
 
 type MenuMockProps = {
-	onSelectWorktree: (worktree: Worktree) => void | Promise<void>;
+	onMenuAction: (action: MenuAction) => void | Promise<void>;
 	onSelectRecentProject?: (project: GitProject) => void | Promise<void>;
 };
 
@@ -340,12 +341,7 @@ describe('App component loading state machine', () => {
 
 		const menu = menuProps!;
 		const selectPromise = Promise.resolve(
-			menu.onSelectWorktree({
-				path: '',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			}),
+			menu.onMenuAction({type: 'newWorktree'}),
 		);
 		await waitForCondition(() => Boolean(newWorktreeProps));
 
@@ -383,14 +379,7 @@ describe('App component loading state machine', () => {
 
 		const sessionManager = sessionManagers[0]!;
 		const menu = menuProps!;
-		await Promise.resolve(
-			menu.onSelectWorktree({
-				path: '',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			}),
-		);
+		await Promise.resolve(menu.onMenuAction({type: 'newWorktree'}));
 		await waitForCondition(() => Boolean(newWorktreeProps));
 
 		await Promise.resolve(
@@ -445,14 +434,7 @@ describe('App component loading state machine', () => {
 		await waitForCondition(() => Boolean(menuProps));
 		const sessionManager = sessionManagers[0]!;
 
-		await Promise.resolve(
-			menuProps!.onSelectWorktree({
-				path: '',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			}),
-		);
+		await Promise.resolve(menuProps!.onMenuAction({type: 'newWorktree'}));
 		await waitForCondition(() => Boolean(newWorktreeProps));
 
 		await Promise.resolve(
@@ -505,12 +487,7 @@ describe('App component loading state machine', () => {
 
 		const menu = menuProps!;
 		const selectPromise = Promise.resolve(
-			menu.onSelectWorktree({
-				path: 'DELETE_WORKTREE',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			}),
+			menu.onMenuAction({type: 'deleteWorktree'}),
 		);
 		await waitForCondition(() => Boolean(deleteWorktreeProps));
 
@@ -565,11 +542,14 @@ describe('App component loading state machine', () => {
 
 		const menu = menuProps!;
 		const selectPromise = Promise.resolve(
-			menu.onSelectWorktree({
-				path: '/project/worktree',
-				branch: 'feature',
-				isMainWorktree: false,
-				hasSession: false,
+			menu.onMenuAction({
+				type: 'selectWorktree',
+				worktree: {
+					path: '/project/worktree',
+					branch: 'feature',
+					isMainWorktree: false,
+					hasSession: false,
+				},
 			}),
 		);
 		await flush();
