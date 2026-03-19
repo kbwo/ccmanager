@@ -501,7 +501,7 @@ const Menu: React.FC<MenuProps> = ({
 				}
 				break;
 			case 'k':
-				// Kill (destroy) highlighted session
+				// Kill/delete highlighted session
 				if (highlightedSessionMeta) {
 					onSelectWorktree(
 						{

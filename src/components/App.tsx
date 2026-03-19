@@ -455,12 +455,12 @@ const App: React.FC<AppProps> = ({
 		// Check if this is a kill session request
 		if (worktree.path.startsWith('KILL_SESSION:')) {
 			const sessionId = worktree.path.substring('KILL_SESSION:'.length);
-			// Destroy running session if exists
+			// Destroy running session if it exists
 			const running = sessionManager.getSessionById(sessionId);
 			if (running) {
 				sessionManager.destroySession(sessionId);
 			} else {
-				// No running session — just remove persisted meta
+				// No running session — just remove the persisted meta
 				sessionStore.removeSessionMeta(sessionId);
 			}
 			// Refresh menu
