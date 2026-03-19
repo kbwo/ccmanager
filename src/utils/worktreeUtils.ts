@@ -8,7 +8,6 @@ import {
 	formatGitAheadBehind,
 	formatParentBranch,
 } from './gitStatus.js';
-import type {SessionMeta} from '../types/index.js';
 
 // Constants
 const MAX_BRANCH_NAME_LENGTH = 70; // Maximum characters for branch name display
@@ -20,7 +19,6 @@ const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 export interface SessionItem {
 	worktree: Worktree;
 	session?: Session;
-	sessionMeta?: SessionMeta;
 	baseLabel: string;
 	fileChanges: string;
 	aheadBehind: string;
@@ -151,7 +149,6 @@ export function extractBranchParts(branchName: string): {
 function buildSessionItem(
 	wt: Worktree,
 	session: Session | undefined,
-	sessionMeta: SessionMeta | undefined,
 	sessionSuffix: string,
 ): SessionItem {
 	const stateData = session?.stateMutex.getSnapshot();
@@ -190,7 +187,6 @@ function buildSessionItem(
 	return {
 		worktree: wt,
 		session,
-		sessionMeta,
 		baseLabel,
 		fileChanges,
 		aheadBehind,
@@ -208,30 +204,27 @@ function buildSessionItem(
 }
 
 /**
- * Prepares worktree content for display with plain and colored versions.
+ * Prepares session items for display.
  * Supports multiple sessions per worktree.
  * When sortByLastSession is true, worktrees are sorted by the most recent
- * session lastAccessedAt timestamp (descending).
+ * session lastAccessedAt timestamp (descending), and sessions within each
+ * worktree are also sorted by lastAccessedAt.
  */
 export function prepareSessionItems(
 	worktrees: Worktree[],
 	sessions: Session[],
-	sessionMetas?: SessionMeta[],
 	options?: {sortByLastSession?: boolean},
 ): SessionItem[] {
 	const items: SessionItem[] = [];
 
 	// Sort worktrees by most recent session access time if requested
 	let sortedWorktrees = worktrees;
-	if (options?.sortByLastSession && sessionMetas && sessionMetas.length > 0) {
-		// Build a map of worktreePath -> max lastAccessedAt
+	if (options?.sortByLastSession && sessions.length > 0) {
 		const maxAccessByWorktree = new Map<string, number>();
-		for (const meta of sessionMetas) {
-			if (meta.lastAccessedAt !== undefined) {
-				const current = maxAccessByWorktree.get(meta.worktreePath) ?? 0;
-				if (meta.lastAccessedAt > current) {
-					maxAccessByWorktree.set(meta.worktreePath, meta.lastAccessedAt);
-				}
+		for (const s of sessions) {
+			const current = maxAccessByWorktree.get(s.worktreePath) ?? 0;
+			if (s.lastAccessedAt > current) {
+				maxAccessByWorktree.set(s.worktreePath, s.lastAccessedAt);
 			}
 		}
 
@@ -245,42 +238,24 @@ export function prepareSessionItems(
 
 	for (const wt of sortedWorktrees) {
 		const wtSessions = sessions.filter(s => s.worktreePath === wt.path);
-		const wtMetas = sessionMetas
-			? sessionMetas.filter(m => m.worktreePath === wt.path)
-			: [];
 
-		// Count total unique sessions (running + persisted non-running)
-		const uniqueIds = new Set<string>();
-		for (const s of wtSessions) uniqueIds.add(s.id);
-		for (const m of wtMetas) uniqueIds.add(m.id);
-		const totalCount = uniqueIds.size;
-
-		if (totalCount <= 1) {
-			// 0 or 1 session — show single row without #N suffix
-			// (named sessions still show their name)
+		if (wtSessions.length <= 1) {
 			const session = wtSessions[0];
-			const meta = wtMetas[0];
-			const suffix = meta?.name && totalCount === 1 ? `: ${meta.name}` : '';
-			items.push(buildSessionItem(wt, session, meta, suffix));
+			const suffix =
+				session?.sessionName && wtSessions.length === 1
+					? `: ${session.sessionName}`
+					: '';
+			items.push(buildSessionItem(wt, session, suffix));
 		} else {
 			// Multiple sessions: sort by lastAccessedAt (most recent first)
-			const sessionById = new Map(wtSessions.map(s => [s.id, s]));
-			const sortedMetas = [...wtMetas].sort(
-				(a, b) => (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0),
+			const sorted = [...wtSessions].sort(
+				(a, b) => b.lastAccessedAt - a.lastAccessedAt,
 			);
-
-			for (const meta of sortedMetas) {
-				const session = sessionById.get(meta.id);
-				const suffix = meta.name ? `: ${meta.name}` : ` #${meta.number}`;
-				items.push(buildSessionItem(wt, session, meta, suffix));
-			}
-
-			// Show running sessions that have no meta (should not normally happen)
-			for (const session of wtSessions) {
-				if (!wtMetas.some(m => m.id === session.id)) {
-					const suffix = ` #${session.sessionNumber}`;
-					items.push(buildSessionItem(wt, session, undefined, suffix));
-				}
+			for (const session of sorted) {
+				const suffix = session.sessionName
+					? `: ${session.sessionName}`
+					: ` #${session.sessionNumber}`;
+				items.push(buildSessionItem(wt, session, suffix));
 			}
 		}
 	}

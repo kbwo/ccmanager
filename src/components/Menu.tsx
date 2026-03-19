@@ -25,7 +25,6 @@ import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
-import {type SessionMeta} from '../types/index.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -50,7 +49,7 @@ interface SessionMenuItem {
 	label: string;
 	value: string;
 	worktree: Worktree;
-	sessionMeta?: SessionMeta;
+	session?: Session;
 }
 
 interface ProjectItem {
@@ -104,8 +103,8 @@ const Menu: React.FC<MenuProps> = ({
 	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<
 		string | null
 	>(null);
-	const [highlightedSessionMeta, setHighlightedSessionMeta] = useState<
-		SessionMeta | undefined
+	const [highlightedSession, setHighlightedSession] = useState<
+		Session | undefined
 	>(undefined);
 	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
 
@@ -159,9 +158,7 @@ const Menu: React.FC<MenuProps> = ({
 
 						// Update worktree session status
 						result.worktrees.forEach(wt => {
-							wt.hasSession =
-								allSessions.some(s => s.worktreePath === wt.path) ||
-								sessionManager.getSessionMetasForWorktree(wt.path).length > 0;
+							wt.hasSession = allSessions.some(s => s.worktreePath === wt.path);
 						});
 
 						setBaseWorktrees(result.worktrees);
@@ -210,8 +207,7 @@ const Menu: React.FC<MenuProps> = ({
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
-		const allSessionMetas = sessionManager.getAllSessionMetas();
-		const items = prepareSessionItems(worktrees, sessions, allSessionMetas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: worktreeConfig.sortByLastSession,
 		});
 		const columnPositions = calculateColumnPositions(items);
@@ -241,8 +237,8 @@ const Menu: React.FC<MenuProps> = ({
 					!isSearchMode && index < 10 ? `${index} ❯ ` : '  ❯ ';
 
 				// Use session meta id for value if present, otherwise worktree path
-				const value = item.sessionMeta
-					? `session:${item.sessionMeta.id}`
+				const value = item.session
+					? `session:${item.session.id}`
 					: item.worktree.path;
 
 				return {
@@ -250,7 +246,7 @@ const Menu: React.FC<MenuProps> = ({
 					label: numberPrefix + label,
 					value,
 					worktree: item.worktree,
-					sessionMeta: item.sessionMeta,
+					session: item.session,
 				};
 			},
 		);
@@ -384,10 +380,10 @@ const Menu: React.FC<MenuProps> = ({
 			}
 			const first = menuItems.find(item => item.type === 'worktree');
 			if (first && first.type === 'worktree') {
-				setHighlightedSessionMeta(first.sessionMeta);
+				setHighlightedSession(first.session);
 				return first.worktree.path;
 			}
-			setHighlightedSessionMeta(undefined);
+			setHighlightedSession(undefined);
 			return null;
 		});
 	}, [
@@ -442,7 +438,7 @@ const Menu: React.FC<MenuProps> = ({
 				onMenuAction({
 					type: 'selectWorktree',
 					worktree: worktreeItems[index].worktree,
-					sessionMeta: worktreeItems[index].sessionMeta,
+					session: worktreeItems[index].session,
 				});
 				return;
 			}
@@ -480,10 +476,10 @@ const Menu: React.FC<MenuProps> = ({
 				break;
 			case 'r':
 				// Rename highlighted session
-				if (highlightedSessionMeta) {
+				if (highlightedSession) {
 					onMenuAction({
 						type: 'renameSession',
-						sessionMeta: highlightedSessionMeta,
+						session: highlightedSession,
 					});
 				}
 				break;
@@ -513,10 +509,10 @@ const Menu: React.FC<MenuProps> = ({
 				break;
 			case 'x':
 				// Kill session if one is highlighted, otherwise exit
-				if (highlightedSessionMeta) {
+				if (highlightedSession) {
 					onMenuAction({
 						type: 'killSession',
-						sessionMeta: highlightedSessionMeta,
+						sessionId: highlightedSession.id,
 					});
 				} else if (!projectName) {
 					onMenuAction({type: 'exit'});
@@ -562,7 +558,7 @@ const Menu: React.FC<MenuProps> = ({
 			onMenuAction({
 				type: 'selectWorktree',
 				worktree: item.worktree,
-				sessionMeta: item.sessionMeta,
+				session: item.session,
 			});
 		}
 	};
@@ -608,7 +604,7 @@ const Menu: React.FC<MenuProps> = ({
 						const menuItem = item as MenuItem;
 						if (menuItem.type === 'worktree') {
 							setHighlightedWorktreePath(menuItem.worktree.path);
-							setHighlightedSessionMeta(menuItem.sessionMeta);
+							setHighlightedSession(menuItem.session);
 						}
 					}}
 					isFocused={!error}

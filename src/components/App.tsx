@@ -37,7 +37,6 @@ import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
 import {projectManager} from '../services/projectManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
-import {type SessionMeta} from '../types/index.js';
 
 type View =
 	| 'menu'
@@ -84,8 +83,10 @@ const App: React.FC<AppProps> = ({
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
-	const [renameSessionMeta, setRenameSessionMeta] =
-		useState<SessionMeta | null>(null);
+	const [renameTarget, setRenameTarget] = useState<{
+		id: string;
+		name?: string;
+	} | null>(null);
 	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
 		null,
 	); // Store selected project in multi-project mode
@@ -138,39 +139,27 @@ const App: React.FC<AppProps> = ({
 			worktreePath: string,
 			presetId?: string,
 			initialPrompt?: string,
-			sessionMeta?: SessionMeta,
 		): Promise<{
 			success: boolean;
 			session?: ISession;
 			errorMessage?: string;
 		}> => {
-			// Create session meta if not provided
-			const meta =
-				sessionMeta ?? sessionManager.createSessionMeta(worktreePath);
-
 			const sessionEffect = devcontainerConfig
 				? sessionManager.createSessionWithDevcontainerEffect(
 						worktreePath,
 						devcontainerConfig,
 						presetId,
 						initialPrompt,
-						meta,
 					)
 				: sessionManager.createSessionWithPresetEffect(
 						worktreePath,
 						presetId,
 						initialPrompt,
-						meta,
 					);
 
-			// Execute the Effect and handle both success and failure cases
 			const result = await Effect.runPromise(Effect.either(sessionEffect));
 
 			if (result._tag === 'Left') {
-				// Clean up the meta we created on failure to prevent orphaned metas
-				if (!sessionMeta) {
-					sessionManager.removeSessionMeta(meta.id);
-				}
 				const errorMessage = formatErrorMessage(result.left);
 				return {
 					success: false,
@@ -221,24 +210,20 @@ const App: React.FC<AppProps> = ({
 			options?: {
 				presetId?: string;
 				initialPrompt?: string;
-				sessionMeta?: SessionMeta;
+				session?: ISession;
 				forceNew?: boolean;
 			},
 		) => {
-			// If a sessionMeta is provided, try to find the existing running session
-			if (options?.sessionMeta) {
-				const existing = sessionManager.getSessionById(options.sessionMeta.id);
-				if (existing) {
-					navigateToSession(existing);
-					return;
-				}
-				// Session meta exists but no running session — create with that meta
+			// If a specific session is provided, navigate to it directly
+			if (options?.session) {
+				navigateToSession(options.session);
+				return;
 			}
 
 			// Check if there are running sessions for this worktree.
 			// Navigate to the first one found (matches old getSession(path) behavior).
 			// Skip when forceNew is set (S key — always create new session).
-			if (!options?.sessionMeta && !options?.forceNew) {
+			if (!options?.forceNew) {
 				const wtSessions = sessionManager.getSessionsForWorktree(worktree.path);
 				if (wtSessions.length > 0 && wtSessions[0]) {
 					navigateToSession(wtSessions[0]);
@@ -260,7 +245,6 @@ const App: React.FC<AppProps> = ({
 				worktree.path,
 				options?.presetId,
 				options?.initialPrompt,
-				options?.sessionMeta,
 			);
 
 			if (!result.success) {
@@ -437,18 +421,16 @@ const App: React.FC<AppProps> = ({
 				);
 				return;
 			case 'renameSession':
-				setRenameSessionMeta(action.sessionMeta);
+				setRenameTarget({
+					id: action.session.id,
+					name: action.session.sessionName,
+				});
 				navigateWithClear('rename-session');
 				return;
-			case 'killSession': {
-				const running = sessionManager.getSessionById(action.sessionMeta.id);
-				if (running) {
-					sessionManager.destroySession(action.sessionMeta.id);
-				}
-				sessionManager.removeSessionMeta(action.sessionMeta.id);
+			case 'killSession':
+				sessionManager.destroySession(action.sessionId);
 				setMenuKey(prev => prev + 1);
 				return;
-			}
 			case 'deleteWorktree':
 				navigateWithClear('delete-worktree');
 				return;
@@ -469,7 +451,7 @@ const App: React.FC<AppProps> = ({
 				return;
 			case 'selectWorktree':
 				await startSessionForWorktree(action.worktree, {
-					sessionMeta: action.sessionMeta,
+					session: action.session,
 				});
 				return;
 		}
@@ -711,8 +693,6 @@ const App: React.FC<AppProps> = ({
 			for (const s of wtSessions) {
 				sessionManager.destroySession(s.id);
 			}
-			// Remove persisted session metadata
-			sessionManager.removeSessionsForWorktree(path);
 
 			const result = await Effect.runPromise(
 				Effect.either(
@@ -926,25 +906,21 @@ const App: React.FC<AppProps> = ({
 		);
 	}
 
-	if (view === 'rename-session' && renameSessionMeta) {
+	if (view === 'rename-session' && renameTarget) {
 		return (
 			<SessionRename
-				sessionId={renameSessionMeta.id}
-				currentName={renameSessionMeta.name}
+				sessionId={renameTarget.id}
+				currentName={renameTarget.name}
 				onRename={name => {
-					sessionManager.renameSession(renameSessionMeta.id, name);
-					// Also update the running session if it exists
-					const runningSession = sessionManager.getSessionById(
-						renameSessionMeta.id,
-					);
-					if (runningSession) {
-						runningSession.sessionName = name;
+					const session = sessionManager.getSessionById(renameTarget.id);
+					if (session) {
+						session.sessionName = name;
 					}
-					setRenameSessionMeta(null);
+					setRenameTarget(null);
 					handleReturnToMenu();
 				}}
 				onCancel={() => {
-					setRenameSessionMeta(null);
+					setRenameTarget(null);
 					handleReturnToMenu();
 				}}
 			/>

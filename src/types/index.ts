@@ -35,8 +35,9 @@ export interface Worktree {
 export interface Session {
 	id: string;
 	worktreePath: string;
-	sessionNumber: number; // Auto-incremented per worktree from SessionMeta
-	sessionName?: string; // User-assigned name from SessionMeta
+	sessionNumber: number; // Auto-incremented per worktree
+	sessionName?: string; // User-assigned name
+	lastAccessedAt: number; // Timestamp for sorting
 	process: IPty;
 	output: string[]; // Recent output for state detection
 	outputHistory: Buffer[]; // Full output history as buffers
@@ -65,20 +66,12 @@ export interface AutoApprovalResponse {
 	reason?: string;
 }
 
-export interface SessionMeta {
-	id: string;
-	worktreePath: string;
-	number: number;
-	name?: string;
-	lastAccessedAt?: number;
-}
-
 export type MenuAction =
-	| {type: 'selectWorktree'; worktree: Worktree; sessionMeta?: SessionMeta}
+	| {type: 'selectWorktree'; worktree: Worktree; session?: Session}
 	| {type: 'newWorktree'}
 	| {type: 'newSession'; worktreePath: string}
-	| {type: 'renameSession'; sessionMeta: SessionMeta}
-	| {type: 'killSession'; sessionMeta: SessionMeta}
+	| {type: 'renameSession'; session: Session}
+	| {type: 'killSession'; sessionId: string}
 	| {type: 'deleteWorktree'}
 	| {type: 'mergeWorktree'}
 	| {type: 'configuration'; scope: ConfigScope}
@@ -91,13 +84,6 @@ export interface SessionManager {
 	destroySession(sessionId: string): void;
 	getAllSessions(): Session[];
 	cancelAutoApproval(sessionId: string, reason?: string): void;
-	createSessionMeta(worktreePath: string): SessionMeta;
-	removeSessionMeta(id: string): void;
-	removeSessionsForWorktree(worktreePath: string): void;
-	renameSession(id: string, name?: string): void;
-	getSessionMetasForWorktree(worktreePath: string): SessionMeta[];
-	getAllSessionMetas(): SessionMeta[];
-	getSessionMeta(id: string): SessionMeta | undefined;
 }
 
 export interface ShortcutKey {

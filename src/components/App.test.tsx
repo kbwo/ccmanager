@@ -98,17 +98,6 @@ class MockSessionManager {
 	createSessionWithDevcontainerEffect = vi.fn(
 		(_: string, __?: Record<string, unknown>) => Effect.succeed(mockSession),
 	);
-	createSessionMeta = vi.fn((worktreePath: string) => ({
-		id: `session-${Date.now()}`,
-		worktreePath,
-		number: 1,
-	}));
-	removeSessionMeta = vi.fn((_: string) => {});
-	removeSessionsForWorktree = vi.fn((_: string) => {});
-	renameSession = vi.fn((_: string, __?: string) => {});
-	getSessionMetasForWorktree = vi.fn((_: string) => []);
-	getAllSessionMetas = vi.fn(() => []);
-	getSessionMeta = vi.fn((_: string) => undefined);
 }
 
 const sessionManagers: MockSessionManager[] = [];
@@ -410,10 +399,6 @@ describe('App component loading state machine', () => {
 			createdPath,
 			'claude',
 			'trim worktree name output',
-			expect.objectContaining({
-				worktreePath: createdPath,
-				number: 1,
-			}),
 		);
 		expect(sessionProps?.session).toEqual(mockSession);
 
@@ -460,10 +445,6 @@ describe('App component loading state machine', () => {
 			'/tmp/resolved-worktree',
 			'claude',
 			'trim worktree name output',
-			expect.objectContaining({
-				worktreePath: '/tmp/resolved-worktree',
-				number: 1,
-			}),
 		);
 
 		unmount();

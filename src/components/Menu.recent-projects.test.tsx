@@ -105,8 +105,6 @@ describe('Menu - Recent Projects', () => {
 			destroy: vi.fn(),
 			isAutoApprovalDisabledForWorktree: vi.fn().mockReturnValue(false),
 			toggleAutoApprovalForWorktree: vi.fn().mockReturnValue(false),
-			getSessionMetasForWorktree: vi.fn().mockReturnValue([]),
-			getAllSessionMetas: vi.fn().mockReturnValue([]),
 		} as unknown as SessionManager;
 
 		mockWorktreeService = {

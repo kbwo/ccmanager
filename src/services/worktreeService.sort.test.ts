@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {prepareSessionItems} from '../utils/worktreeUtils.js';
-import type {Worktree, SessionMeta} from '../types/index.js';
+import type {Worktree, Session} from '../types/index.js';
 
 const makeWorktree = (path: string, branch: string): Worktree => ({
 	path,
@@ -9,6 +9,28 @@ const makeWorktree = (path: string, branch: string): Worktree => ({
 	hasSession: false,
 });
 
+const makeSession = (
+	id: string,
+	worktreePath: string,
+	number: number,
+	lastAccessedAt: number,
+	name?: string,
+): Session =>
+	({
+		id,
+		worktreePath,
+		sessionNumber: number,
+		sessionName: name,
+		lastAccessedAt,
+		stateMutex: {
+			getSnapshot: () => ({
+				state: 'idle',
+				backgroundTaskCount: 0,
+				teamMemberCount: 0,
+			}),
+		},
+	}) as unknown as Session;
+
 describe('prepareSessionItems - sortByLastSession', () => {
 	it('should not sort worktrees when sortByLastSession is false', () => {
 		const worktrees = [
@@ -16,17 +38,12 @@ describe('prepareSessionItems - sortByLastSession', () => {
 			makeWorktree('/repo/feature-a', 'feature-a'),
 			makeWorktree('/repo/feature-b', 'feature-b'),
 		];
-		const metas: SessionMeta[] = [
-			{id: 's1', worktreePath: '/repo', number: 1, lastAccessedAt: 1000},
-			{
-				id: 's2',
-				worktreePath: '/repo/feature-a',
-				number: 1,
-				lastAccessedAt: 3000,
-			},
+		const sessions = [
+			makeSession('s1', '/repo', 1, 1000),
+			makeSession('s2', '/repo/feature-a', 1, 3000),
 		];
 
-		const items = prepareSessionItems(worktrees, [], metas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: false,
 		});
 
@@ -41,23 +58,13 @@ describe('prepareSessionItems - sortByLastSession', () => {
 			makeWorktree('/repo/feature-a', 'feature-a'),
 			makeWorktree('/repo/feature-b', 'feature-b'),
 		];
-		const metas: SessionMeta[] = [
-			{id: 's1', worktreePath: '/repo', number: 1, lastAccessedAt: 2000},
-			{
-				id: 's2',
-				worktreePath: '/repo/feature-a',
-				number: 1,
-				lastAccessedAt: 1000,
-			},
-			{
-				id: 's3',
-				worktreePath: '/repo/feature-b',
-				number: 1,
-				lastAccessedAt: 3000,
-			},
+		const sessions = [
+			makeSession('s1', '/repo', 1, 2000),
+			makeSession('s2', '/repo/feature-a', 1, 1000),
+			makeSession('s3', '/repo/feature-b', 1, 3000),
 		];
 
-		const items = prepareSessionItems(worktrees, [], metas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: true,
 		});
 
@@ -71,13 +78,13 @@ describe('prepareSessionItems - sortByLastSession', () => {
 			makeWorktree('/repo/wt-a', 'a'),
 			makeWorktree('/repo/wt-b', 'b'),
 		];
-		const metas: SessionMeta[] = [
-			{id: 's1', worktreePath: '/repo/wt-a', number: 1, lastAccessedAt: 1000},
-			{id: 's2', worktreePath: '/repo/wt-a', number: 2, lastAccessedAt: 5000},
-			{id: 's3', worktreePath: '/repo/wt-b', number: 1, lastAccessedAt: 3000},
+		const sessions = [
+			makeSession('s1', '/repo/wt-a', 1, 1000),
+			makeSession('s2', '/repo/wt-a', 2, 5000),
+			makeSession('s3', '/repo/wt-b', 1, 3000),
 		];
 
-		const items = prepareSessionItems(worktrees, [], metas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: true,
 		});
 
@@ -92,16 +99,9 @@ describe('prepareSessionItems - sortByLastSession', () => {
 			makeWorktree('/repo/no-session', 'no-session'),
 			makeWorktree('/repo/has-session', 'has-session'),
 		];
-		const metas: SessionMeta[] = [
-			{
-				id: 's1',
-				worktreePath: '/repo/has-session',
-				number: 1,
-				lastAccessedAt: 1000,
-			},
-		];
+		const sessions = [makeSession('s1', '/repo/has-session', 1, 1000)];
 
-		const items = prepareSessionItems(worktrees, [], metas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: true,
 		});
 
@@ -111,27 +111,24 @@ describe('prepareSessionItems - sortByLastSession', () => {
 
 	it('should sort sessions within a worktree by lastAccessedAt', () => {
 		const worktrees = [makeWorktree('/repo/wt', 'wt')];
-		const metas: SessionMeta[] = [
-			{id: 's1', worktreePath: '/repo/wt', number: 1, lastAccessedAt: 1000},
-			{id: 's2', worktreePath: '/repo/wt', number: 2, lastAccessedAt: 3000},
-			{id: 's3', worktreePath: '/repo/wt', number: 3, lastAccessedAt: 2000},
+		const sessions = [
+			makeSession('s1', '/repo/wt', 1, 1000),
+			makeSession('s2', '/repo/wt', 2, 3000),
+			makeSession('s3', '/repo/wt', 3, 2000),
 		];
 
-		const items = prepareSessionItems(worktrees, [], metas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: true,
 		});
 
-		// Within the worktree, sessions sorted by lastAccessedAt descending
 		expect(items).toHaveLength(3);
-		expect(items[0]?.sessionMeta?.id).toBe('s2'); // 3000
-		expect(items[1]?.sessionMeta?.id).toBe('s3'); // 2000
-		expect(items[2]?.sessionMeta?.id).toBe('s1'); // 1000
+		expect(items[0]?.session?.id).toBe('s2'); // 3000
+		expect(items[1]?.session?.id).toBe('s3'); // 2000
+		expect(items[2]?.session?.id).toBe('s1'); // 1000
 	});
 
 	it('should handle empty worktree list', () => {
-		const items = prepareSessionItems([], [], [], {
-			sortByLastSession: true,
-		});
+		const items = prepareSessionItems([], [], {sortByLastSession: true});
 		expect(items).toHaveLength(0);
 	});
 
@@ -140,17 +137,12 @@ describe('prepareSessionItems - sortByLastSession', () => {
 			makeWorktree('/repo', 'main'),
 			makeWorktree('/repo/feature', 'feature'),
 		];
-		const metas: SessionMeta[] = [
-			{
-				id: 's1',
-				worktreePath: '/repo/feature',
-				number: 1,
-				lastAccessedAt: 2000,
-			},
-			{id: 's2', worktreePath: '/repo', number: 1, lastAccessedAt: 1000},
+		const sessions = [
+			makeSession('s1', '/repo/feature', 1, 2000),
+			makeSession('s2', '/repo', 1, 1000),
 		];
 
-		const items = prepareSessionItems(worktrees, [], metas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: true,
 		});
 
@@ -167,13 +159,13 @@ describe('prepareSessionItems - sortByLastSession', () => {
 			makeWorktree('/repo/b', 'b'),
 			makeWorktree('/repo/c', 'c'),
 		];
-		const metas: SessionMeta[] = [
-			{id: 's1', worktreePath: '/repo/a', number: 1, lastAccessedAt: 1000},
-			{id: 's2', worktreePath: '/repo/b', number: 1, lastAccessedAt: 1000},
-			{id: 's3', worktreePath: '/repo/c', number: 1, lastAccessedAt: 1000},
+		const sessions = [
+			makeSession('s1', '/repo/a', 1, 1000),
+			makeSession('s2', '/repo/b', 1, 1000),
+			makeSession('s3', '/repo/c', 1, 1000),
 		];
 
-		const items = prepareSessionItems(worktrees, [], metas, {
+		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: true,
 		});
 
@@ -182,13 +174,13 @@ describe('prepareSessionItems - sortByLastSession', () => {
 		expect(items[2]?.worktree.path).toBe('/repo/c');
 	});
 
-	it('should not sort when no session metas are provided', () => {
+	it('should not sort when no sessions exist', () => {
 		const worktrees = [
 			makeWorktree('/repo', 'main'),
 			makeWorktree('/repo/feature', 'feature'),
 		];
 
-		const items = prepareSessionItems(worktrees, [], undefined, {
+		const items = prepareSessionItems(worktrees, [], {
 			sortByLastSession: true,
 		});
 

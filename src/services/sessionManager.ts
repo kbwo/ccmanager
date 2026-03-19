@@ -2,7 +2,6 @@ import {spawn, type IPty, type IExitEvent} from './bunTerminal.js';
 import {
 	Session,
 	SessionManager as ISessionManager,
-	SessionMeta,
 	SessionState,
 	DevcontainerConfig,
 	StateDetectionStrategy,
@@ -48,7 +47,6 @@ export interface SessionCounts {
 
 export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
-	private sessionMetas: SessionMeta[] = [];
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 	private autoApprovalDisabledWorktrees: Set<string> = new Set();
@@ -290,48 +288,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions = new Map();
 	}
 
-	createSessionMeta(worktreePath: string): SessionMeta {
-		const existing = this.getSessionMetasForWorktree(worktreePath);
-		const maxNumber = existing.reduce((max, s) => Math.max(max, s.number), 0);
-		const meta: SessionMeta = {
-			id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-			worktreePath,
-			number: maxNumber + 1,
-			lastAccessedAt: Date.now(),
-		};
-		this.sessionMetas.push(meta);
-		return meta;
-	}
-
-	removeSessionMeta(id: string): void {
-		this.sessionMetas = this.sessionMetas.filter(s => s.id !== id);
-	}
-
-	removeSessionsForWorktree(worktreePath: string): void {
-		this.sessionMetas = this.sessionMetas.filter(
-			s => s.worktreePath !== worktreePath,
-		);
-	}
-
-	renameSession(id: string, name?: string): void {
-		const session = this.sessionMetas.find(s => s.id === id);
-		if (session) {
-			session.name = name;
-		}
-	}
-
-	getSessionMetasForWorktree(worktreePath: string): SessionMeta[] {
-		return this.sessionMetas.filter(s => s.worktreePath === worktreePath);
-	}
-
-	getAllSessionMetas(): SessionMeta[] {
-		return [...this.sessionMetas];
-	}
-
-	getSessionMeta(id: string): SessionMeta | undefined {
-		return this.sessionMetas.find(s => s.id === id);
-	}
-
 	private createTerminal(): pkg.Terminal {
 		const terminal = new Terminal({
 			cols: process.stdout.columns || 80,
@@ -354,19 +310,23 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			isPrimaryCommand?: boolean;
 			detectionStrategy?: StateDetectionStrategy;
 			devcontainerConfig?: DevcontainerConfig;
-			sessionMeta?: SessionMeta;
 		} = {},
 	): Promise<Session> {
-		const meta = options.sessionMeta ?? this.createSessionMeta(worktreePath);
+		const existingSessions = this.getSessionsForWorktree(worktreePath);
+		const maxNumber = existingSessions.reduce(
+			(max, s) => Math.max(max, s.sessionNumber),
+			0,
+		);
 		const terminal = this.createTerminal();
 		const detectionStrategy = options.detectionStrategy ?? 'claude';
 		const stateDetector = createStateDetector(detectionStrategy);
 
 		const session: Session = {
-			id: meta.id,
+			id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 			worktreePath,
-			sessionNumber: meta.number,
-			sessionName: meta.name,
+			sessionNumber: maxNumber + 1,
+			sessionName: undefined,
+			lastAccessedAt: Date.now(),
 			process: ptyProcess,
 			output: [],
 			outputHistory: [],
@@ -413,7 +373,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		worktreePath: string,
 		presetId?: string,
 		initialPrompt?: string,
-		sessionMeta?: SessionMeta,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -431,7 +390,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					{
 						isPrimaryCommand: true,
 						detectionStrategy: preset.detectionStrategy,
-						sessionMeta,
 					},
 				);
 
@@ -721,11 +679,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			session.isActive = active;
 
 			if (active) {
-				// Update session meta's lastAccessedAt
-				const meta = this.getSessionMeta(sessionId);
-				if (meta) {
-					meta.lastAccessedAt = Date.now();
-				}
+				session.lastAccessedAt = Date.now();
 
 				// Emit a restore event with the output history if available
 				if (session.outputHistory.length > 0) {
@@ -815,7 +769,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 			this.sessions.delete(sessionId);
 			this.waitingWithBottomBorder.delete(sessionId);
-			this.removeSessionMeta(sessionId);
 			this.emit('sessionDestroyed', session);
 		}
 	}
@@ -906,7 +859,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		devcontainerConfig: DevcontainerConfig,
 		presetId?: string,
 		initialPrompt?: string,
-		sessionMeta?: SessionMeta,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -946,7 +898,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						isPrimaryCommand: true,
 						detectionStrategy: preset.detectionStrategy,
 						devcontainerConfig,
-						sessionMeta,
 					},
 				);
 
