@@ -164,6 +164,10 @@ const App: React.FC<AppProps> = ({
 			const result = await Effect.runPromise(Effect.either(sessionEffect));
 
 			if (result._tag === 'Left') {
+				// Clean up the meta we created on failure to prevent orphaned metas
+				if (!sessionMeta) {
+					sessionStore.removeSessionMeta(meta.id);
+				}
 				const errorMessage = formatErrorMessage(result.left);
 				return {
 					success: false,
@@ -215,6 +219,7 @@ const App: React.FC<AppProps> = ({
 				presetId?: string;
 				initialPrompt?: string;
 				sessionMeta?: SessionMeta;
+				forceNew?: boolean;
 			},
 		) => {
 			// If a sessionMeta is provided, try to find the existing running session
@@ -228,7 +233,8 @@ const App: React.FC<AppProps> = ({
 			}
 
 			// Check if there's exactly one running session for this worktree (backward compat)
-			if (!options?.sessionMeta) {
+			// Skip when forceNew is set (S key — always create new session)
+			if (!options?.sessionMeta && !options?.forceNew) {
 				const wtSessions = sessionManager.getSessionsForWorktree(worktree.path);
 				if (wtSessions.length === 1 && wtSessions[0]) {
 					navigateToSession(wtSessions[0]);
@@ -423,7 +429,6 @@ const App: React.FC<AppProps> = ({
 		// Check if this is a new session request
 		if (worktree.path.startsWith('NEW_SESSION:')) {
 			const worktreePath = worktree.path.substring('NEW_SESSION:'.length);
-			const newMeta = sessionStore.createSessionMeta(worktreePath);
 			await startSessionForWorktree(
 				{
 					path: worktreePath,
@@ -431,7 +436,7 @@ const App: React.FC<AppProps> = ({
 					isMainWorktree: false,
 					hasSession: true,
 				},
-				{sessionMeta: newMeta},
+				{forceNew: true},
 			);
 			return;
 		}

@@ -224,12 +224,19 @@ export function prepareWorktreeItems(
 			? sessionMetas.filter(m => m.worktreePath === wt.path)
 			: [];
 
-		if (wtSessions.length === 0 && wtMetas.length === 0) {
-			// No sessions — show single row without suffix
-			items.push(buildWorktreeItem(wt, undefined, undefined, ''));
-		} else if (wtSessions.length === 1 && wtMetas.length <= 1) {
-			// Single session — no suffix needed
-			items.push(buildWorktreeItem(wt, wtSessions[0], wtMetas[0], ''));
+		// Count total unique sessions (running + persisted non-running)
+		const uniqueIds = new Set<string>();
+		for (const s of wtSessions) uniqueIds.add(s.id);
+		for (const m of wtMetas) uniqueIds.add(m.id);
+		const totalCount = uniqueIds.size;
+
+		if (totalCount <= 1) {
+			// 0 or 1 session — show single row without #N suffix
+			// (named sessions still show their name)
+			const session = wtSessions[0];
+			const meta = wtMetas[0];
+			const suffix = meta?.name && totalCount === 1 ? `: ${meta.name}` : '';
+			items.push(buildWorktreeItem(wt, session, meta, suffix));
 		} else {
 			// Multiple sessions: show one row per session with suffix
 			// First, show running sessions
