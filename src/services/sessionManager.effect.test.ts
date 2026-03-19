@@ -23,9 +23,6 @@ vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getDefaultPreset: vi.fn(),
 		getPresetByIdEffect: vi.fn(),
-		setWorktreeLastOpened: vi.fn(),
-		getWorktreeLastOpenedTime: vi.fn(),
-		getWorktreeLastOpened: vi.fn(() => ({})),
 		isAutoApprovalEnabled: vi.fn(() => false),
 		setAutoApprovalEnabled: vi.fn(),
 		getStatusHooks: vi.fn(() => ({})),

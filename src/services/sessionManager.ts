@@ -13,7 +13,6 @@ import pkg from '@xterm/headless';
 import {exec} from 'child_process';
 import {promisify} from 'util';
 import {configReader} from './config/configReader.js';
-import {setWorktreeLastOpened} from './worktreeService.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector/index.js';
 import {
@@ -298,6 +297,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 			worktreePath,
 			number: maxNumber + 1,
+			lastAccessedAt: Date.now(),
 		};
 		this.sessionMetas.push(meta);
 		return meta;
@@ -385,9 +385,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.setupBackgroundHandler(session);
 
 		this.sessions.set(session.id, session);
-
-		// Record the timestamp when this worktree was opened
-		setWorktreeLastOpened(worktreePath, Date.now());
 
 		this.emit('sessionCreated', session);
 
@@ -723,9 +720,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (session) {
 			session.isActive = active;
 
-			// If becoming active, record the timestamp when this worktree was opened
 			if (active) {
-				setWorktreeLastOpened(session.worktreePath, Date.now());
+				// Update session meta's lastAccessedAt
+				const meta = this.getSessionMeta(sessionId);
+				if (meta) {
+					meta.lastAccessedAt = Date.now();
+				}
 
 				// Emit a restore event with the output history if available
 				if (session.outputHistory.length > 0) {

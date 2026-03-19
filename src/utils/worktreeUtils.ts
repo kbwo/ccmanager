@@ -17,7 +17,7 @@ const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 /**
  * Worktree item with formatted content for display.
  */
-export interface WorktreeItem {
+export interface SessionItem {
 	worktree: Worktree;
 	session?: Session;
 	sessionMeta?: SessionMeta;
@@ -146,14 +146,14 @@ export function extractBranchParts(branchName: string): {
 }
 
 /**
- * Build a single WorktreeItem row for display.
+ * Build a single SessionItem row for display.
  */
-function buildWorktreeItem(
+function buildSessionItem(
 	wt: Worktree,
 	session: Session | undefined,
 	sessionMeta: SessionMeta | undefined,
 	sessionSuffix: string,
-): WorktreeItem {
+): SessionItem {
 	const stateData = session?.stateMutex.getSnapshot();
 	const status = stateData
 		? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
@@ -210,15 +210,40 @@ function buildWorktreeItem(
 /**
  * Prepares worktree content for display with plain and colored versions.
  * Supports multiple sessions per worktree.
+ * When sortByLastSession is true, worktrees are sorted by the most recent
+ * session lastAccessedAt timestamp (descending).
  */
-export function prepareWorktreeItems(
+export function prepareSessionItems(
 	worktrees: Worktree[],
 	sessions: Session[],
 	sessionMetas?: SessionMeta[],
-): WorktreeItem[] {
-	const items: WorktreeItem[] = [];
+	options?: {sortByLastSession?: boolean},
+): SessionItem[] {
+	const items: SessionItem[] = [];
 
-	for (const wt of worktrees) {
+	// Sort worktrees by most recent session access time if requested
+	let sortedWorktrees = worktrees;
+	if (options?.sortByLastSession && sessionMetas && sessionMetas.length > 0) {
+		// Build a map of worktreePath -> max lastAccessedAt
+		const maxAccessByWorktree = new Map<string, number>();
+		for (const meta of sessionMetas) {
+			if (meta.lastAccessedAt !== undefined) {
+				const current = maxAccessByWorktree.get(meta.worktreePath) ?? 0;
+				if (meta.lastAccessedAt > current) {
+					maxAccessByWorktree.set(meta.worktreePath, meta.lastAccessedAt);
+				}
+			}
+		}
+
+		sortedWorktrees = [...worktrees].sort((a, b) => {
+			const timeA = maxAccessByWorktree.get(a.path);
+			const timeB = maxAccessByWorktree.get(b.path);
+			if (timeA === undefined && timeB === undefined) return 0;
+			return (timeB ?? 0) - (timeA ?? 0);
+		});
+	}
+
+	for (const wt of sortedWorktrees) {
 		const wtSessions = sessions.filter(s => s.worktreePath === wt.path);
 		const wtMetas = sessionMetas
 			? sessionMetas.filter(m => m.worktreePath === wt.path)
@@ -236,24 +261,25 @@ export function prepareWorktreeItems(
 			const session = wtSessions[0];
 			const meta = wtMetas[0];
 			const suffix = meta?.name && totalCount === 1 ? `: ${meta.name}` : '';
-			items.push(buildWorktreeItem(wt, session, meta, suffix));
+			items.push(buildSessionItem(wt, session, meta, suffix));
 		} else {
-			// Multiple sessions: show one row per session with suffix
-			// First, show running sessions
-			for (const session of wtSessions) {
-				const meta = wtMetas.find(m => m.id === session.id);
-				const suffix = meta
-					? meta.name
-						? `: ${meta.name}`
-						: ` #${meta.number}`
-					: ` #${session.sessionNumber}`;
-				items.push(buildWorktreeItem(wt, session, meta, suffix));
+			// Multiple sessions: sort by lastAccessedAt (most recent first)
+			const sessionById = new Map(wtSessions.map(s => [s.id, s]));
+			const sortedMetas = [...wtMetas].sort(
+				(a, b) => (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0),
+			);
+
+			for (const meta of sortedMetas) {
+				const session = sessionById.get(meta.id);
+				const suffix = meta.name ? `: ${meta.name}` : ` #${meta.number}`;
+				items.push(buildSessionItem(wt, session, meta, suffix));
 			}
-			// Then show persisted metas without running sessions (for restart)
-			for (const meta of wtMetas) {
-				if (!wtSessions.some(s => s.id === meta.id)) {
-					const suffix = meta.name ? `: ${meta.name}` : ` #${meta.number}`;
-					items.push(buildWorktreeItem(wt, undefined, meta, suffix));
+
+			// Show running sessions that have no meta (should not normally happen)
+			for (const session of wtSessions) {
+				if (!wtMetas.some(m => m.id === session.id)) {
+					const suffix = ` #${session.sessionNumber}`;
+					items.push(buildSessionItem(wt, session, undefined, suffix));
 				}
 			}
 		}
@@ -265,7 +291,7 @@ export function prepareWorktreeItems(
 /**
  * Calculates column positions based on content widths.
  */
-export function calculateColumnPositions(items: WorktreeItem[]) {
+export function calculateColumnPositions(items: SessionItem[]) {
 	// Calculate maximum widths from pre-calculated lengths
 	let maxBranchLength = 0;
 	let maxFileChangesLength = 0;
@@ -316,8 +342,8 @@ function padTo(str: string, visibleLength: number, column: number): string {
 /**
  * Assembles the final worktree label with proper column alignment
  */
-export function assembleWorktreeLabel(
-	item: WorktreeItem,
+export function assembleSessionLabel(
+	item: SessionItem,
 	columns: ReturnType<typeof calculateColumnPositions>,
 ): string {
 	// If there's an error, just show the base label with error appended

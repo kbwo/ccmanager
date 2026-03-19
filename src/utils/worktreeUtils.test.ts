@@ -3,9 +3,9 @@ import {
 	generateWorktreeDirectory,
 	extractBranchParts,
 	truncateString,
-	prepareWorktreeItems,
+	prepareSessionItems,
 	calculateColumnPositions,
-	assembleWorktreeLabel,
+	assembleSessionLabel,
 } from './worktreeUtils.js';
 import {Worktree, Session} from '../types/index.js';
 import {execSync} from 'child_process';
@@ -222,7 +222,7 @@ describe('truncateString', () => {
 	});
 });
 
-describe('prepareWorktreeItems', () => {
+describe('prepareSessionItems', () => {
 	const mockWorktree: Worktree = {
 		path: '/path/to/worktree',
 		branch: 'feature/test-branch',
@@ -253,19 +253,19 @@ describe('prepareWorktreeItems', () => {
 	};
 
 	it('should prepare basic worktree without git status', () => {
-		const items = prepareWorktreeItems([mockWorktree], []);
+		const items = prepareSessionItems([mockWorktree], []);
 		expect(items).toHaveLength(1);
 		expect(items[0]?.baseLabel).toBe('feature/test-branch');
 	});
 
 	it('should include session status in label', () => {
-		const items = prepareWorktreeItems([mockWorktree], [mockSession]);
+		const items = prepareSessionItems([mockWorktree], [mockSession]);
 		expect(items[0]?.baseLabel).toContain('[○ Idle]');
 	});
 
 	it('should mark main worktree', () => {
 		const mainWorktree = {...mockWorktree, isMainWorktree: true};
-		const items = prepareWorktreeItems([mainWorktree], []);
+		const items = prepareSessionItems([mainWorktree], []);
 		expect(items[0]?.baseLabel).toContain('(main)');
 	});
 
@@ -275,7 +275,7 @@ describe('prepareWorktreeItems', () => {
 			branch:
 				'feature/this-is-a-very-long-branch-name-that-should-be-truncated',
 		};
-		const items = prepareWorktreeItems([longBranch], []);
+		const items = prepareSessionItems([longBranch], []);
 		expect(items[0]?.baseLabel.length).toBeLessThanOrEqual(80); // 70 + status + default
 	});
 });
@@ -324,7 +324,7 @@ describe('column alignment', () => {
 	it('should assemble label with proper alignment', () => {
 		const item = mockItems[0]!;
 		const columns = calculateColumnPositions(mockItems);
-		const result = assembleWorktreeLabel(item, columns);
+		const result = assembleSessionLabel(item, columns);
 
 		expect(result).toContain('feature/test-branch');
 		expect(result).toContain('\x1b[32m+10\x1b[0m');

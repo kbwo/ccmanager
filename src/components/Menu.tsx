@@ -13,9 +13,9 @@ import {
 } from '../constants/statusIcons.js';
 import {useGitStatus} from '../hooks/useGitStatus.js';
 import {
-	prepareWorktreeItems,
+	prepareSessionItems,
 	calculateColumnPositions,
-	assembleWorktreeLabel,
+	assembleSessionLabel,
 } from '../utils/worktreeUtils.js';
 import {projectManager} from '../services/projectManager.js';
 import {RecentProject} from '../types/index.js';
@@ -45,7 +45,7 @@ interface CommonItem {
 	value: string;
 }
 
-interface WorktreeItem {
+interface SessionMenuItem {
 	type: 'worktree';
 	label: string;
 	value: string;
@@ -60,7 +60,7 @@ interface ProjectItem {
 	recentProject: RecentProject;
 }
 
-type MenuItem = CommonItem | WorktreeItem | ProjectItem;
+type MenuItem = CommonItem | SessionMenuItem | ProjectItem;
 
 const createSeparatorWithText = (
 	text: string,
@@ -129,9 +129,7 @@ const Menu: React.FC<MenuProps> = ({
 		// Load worktrees and default branch using Effect composition
 		// Chain getWorktreesEffect and getDefaultBranchEffect using Effect.flatMap
 		const loadWorktreesAndBranch = Effect.flatMap(
-			worktreeService.getWorktreesEffect({
-				sortByLastSession: worktreeConfig.sortByLastSession,
-			}),
+			worktreeService.getWorktreesEffect(),
 			worktrees =>
 				Effect.map(worktreeService.getDefaultBranchEffect(), defaultBranch => ({
 					worktrees,
@@ -208,17 +206,14 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [
-		sessionManager,
-		worktreeService,
-		multiProject,
-		worktreeConfig.sortByLastSession,
-	]);
+	}, [sessionManager, worktreeService, multiProject]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
 		const allSessionMetas = sessionManager.getAllSessionMetas();
-		const items = prepareWorktreeItems(worktrees, sessions, allSessionMetas);
+		const items = prepareSessionItems(worktrees, sessions, allSessionMetas, {
+			sortByLastSession: worktreeConfig.sortByLastSession,
+		});
 		const columnPositions = calculateColumnPositions(items);
 
 		// Filter worktrees based on search query
@@ -233,8 +228,8 @@ const Menu: React.FC<MenuProps> = ({
 
 		// Build menu items with proper alignment
 		const menuItems: MenuItem[] = filteredItems.map(
-			(item, index): WorktreeItem => {
-				const baseLabel = assembleWorktreeLabel(item, columnPositions);
+			(item, index): SessionMenuItem => {
+				const baseLabel = assembleSessionLabel(item, columnPositions);
 				const aaDisabled =
 					configReader.isAutoApprovalEnabled() &&
 					sessionManager.isAutoApprovalDisabledForWorktree(item.worktree.path);
@@ -406,6 +401,7 @@ const Menu: React.FC<MenuProps> = ({
 		isSearchMode,
 		autoApprovalToggleCounter,
 		sessionManager,
+		worktreeConfig.sortByLastSession,
 	]);
 
 	// Handle hotkeys

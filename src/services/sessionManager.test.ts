@@ -29,9 +29,6 @@ vi.mock('./config/configReader.js', () => ({
 		getStatusHooks: vi.fn(() => ({})),
 		getDefaultPreset: vi.fn(),
 		getPresetByIdEffect: vi.fn(),
-		setWorktreeLastOpened: vi.fn(),
-		getWorktreeLastOpenedTime: vi.fn(),
-		getWorktreeLastOpened: vi.fn(() => ({})),
 		isAutoApprovalEnabled: vi.fn(() => false),
 		setAutoApprovalEnabled: vi.fn(),
 	},
@@ -63,9 +60,6 @@ vi.mock('./worktreeService.js', () => ({
 	WorktreeService: vi.fn(function () {
 		return {};
 	}),
-	setWorktreeLastOpened: vi.fn(),
-	getWorktreeLastOpened: vi.fn(() => ({})),
-	getWorktreeLastOpenedTime: vi.fn(),
 }));
 
 // Create a mock IPty class

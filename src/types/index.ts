@@ -70,6 +70,7 @@ export interface SessionMeta {
 	worktreePath: string;
 	number: number;
 	name?: string;
+	lastAccessedAt?: number;
 }
 
 export type MenuAction =
@@ -333,9 +334,7 @@ export class AmbiguousBranchError extends Error {
 }
 
 export interface IWorktreeService {
-	getWorktreesEffect(options?: {
-		sortByLastSession?: boolean;
-	}): import('effect').Effect.Effect<
+	getWorktreesEffect(): import('effect').Effect.Effect<
 		Worktree[],
 		import('../types/errors.js').GitError,
 		never
