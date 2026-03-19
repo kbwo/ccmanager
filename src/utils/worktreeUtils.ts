@@ -8,7 +8,7 @@ import {
 	formatGitAheadBehind,
 	formatParentBranch,
 } from './gitStatus.js';
-import type {SessionMeta} from '../services/sessionStore.js';
+import type {SessionMeta} from '../types/index.js';
 
 // Constants
 const MAX_BRANCH_NAME_LENGTH = 70; // Maximum characters for branch name display

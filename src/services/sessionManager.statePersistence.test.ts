@@ -15,27 +15,6 @@ vi.mock('./bunTerminal.js', () => ({
 	}),
 }));
 
-// Mock sessionStore to avoid filesystem writes
-vi.mock('./sessionStore.js', () => {
-	let counter = 0;
-	return {
-		sessionStore: {
-			createSessionMeta: vi.fn((worktreePath: string) => ({
-				id: `mock-session-${++counter}-${worktreePath.replace(/\//g, '-')}`,
-				worktreePath,
-				number: 1,
-				name: undefined,
-			})),
-			removeSessionMeta: vi.fn(),
-			removeSessionsForWorktree: vi.fn(),
-			renameSession: vi.fn(),
-			getSessionsForWorktree: vi.fn(() => []),
-			getAllSessionMetas: vi.fn(() => []),
-			getSessionMeta: vi.fn(),
-			cleanupOrphanedPaths: vi.fn(),
-		},
-	};
-});
 vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getConfig: vi.fn().mockReturnValue({

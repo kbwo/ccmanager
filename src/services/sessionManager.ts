@@ -2,6 +2,7 @@ import {spawn, type IPty, type IExitEvent} from './bunTerminal.js';
 import {
 	Session,
 	SessionManager as ISessionManager,
+	SessionMeta,
 	SessionState,
 	DevcontainerConfig,
 	StateDetectionStrategy,
@@ -32,7 +33,6 @@ import {
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
 import {injectTeammateMode} from '../utils/commandArgs.js';
 import {preparePresetLaunch} from '../utils/presetPrompt.js';
-import {sessionStore, type SessionMeta} from './sessionStore.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const TERMINAL_CONTENT_MAX_LINES = 300;
@@ -49,6 +49,7 @@ export interface SessionCounts {
 
 export class SessionManager extends EventEmitter implements ISessionManager {
 	sessions: Map<string, Session>;
+	private sessionMetas: SessionMeta[] = [];
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 	private autoApprovalDisabledWorktrees: Set<string> = new Set();
@@ -290,6 +291,47 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions = new Map();
 	}
 
+	createSessionMeta(worktreePath: string): SessionMeta {
+		const existing = this.getSessionMetasForWorktree(worktreePath);
+		const maxNumber = existing.reduce((max, s) => Math.max(max, s.number), 0);
+		const meta: SessionMeta = {
+			id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+			worktreePath,
+			number: maxNumber + 1,
+		};
+		this.sessionMetas.push(meta);
+		return meta;
+	}
+
+	removeSessionMeta(id: string): void {
+		this.sessionMetas = this.sessionMetas.filter(s => s.id !== id);
+	}
+
+	removeSessionsForWorktree(worktreePath: string): void {
+		this.sessionMetas = this.sessionMetas.filter(
+			s => s.worktreePath !== worktreePath,
+		);
+	}
+
+	renameSession(id: string, name?: string): void {
+		const session = this.sessionMetas.find(s => s.id === id);
+		if (session) {
+			session.name = name;
+		}
+	}
+
+	getSessionMetasForWorktree(worktreePath: string): SessionMeta[] {
+		return this.sessionMetas.filter(s => s.worktreePath === worktreePath);
+	}
+
+	getAllSessionMetas(): SessionMeta[] {
+		return [...this.sessionMetas];
+	}
+
+	getSessionMeta(id: string): SessionMeta | undefined {
+		return this.sessionMetas.find(s => s.id === id);
+	}
+
 	private createTerminal(): pkg.Terminal {
 		const terminal = new Terminal({
 			cols: process.stdout.columns || 80,
@@ -315,8 +357,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			sessionMeta?: SessionMeta;
 		} = {},
 	): Promise<Session> {
-		const meta =
-			options.sessionMeta ?? sessionStore.createSessionMeta(worktreePath);
+		const meta = options.sessionMeta ?? this.createSessionMeta(worktreePath);
 		const terminal = this.createTerminal();
 		const detectionStrategy = options.detectionStrategy ?? 'claude';
 		const stateDetector = createStateDetector(detectionStrategy);
@@ -749,7 +790,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return this.autoApprovalDisabledWorktrees.has(worktreePath);
 	}
 
-	destroySession(sessionId: string, options?: {preserveMeta?: boolean}): void {
+	destroySession(sessionId: string): void {
 		const session = this.sessions.get(sessionId);
 		if (session) {
 			const stateData = session.stateMutex.getSnapshot();
@@ -774,12 +815,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 			this.sessions.delete(sessionId);
 			this.waitingWithBottomBorder.delete(sessionId);
-			// Remove session meta unless preserveMeta is set.
-			// preserveMeta is used during app shutdown (destroy()) so metas
-			// survive restart. On normal process exit, meta is removed.
-			if (!options?.preserveMeta) {
-				sessionStore.removeSessionMeta(sessionId);
-			}
+			this.removeSessionMeta(sessionId);
 			this.emit('sessionDestroyed', session);
 		}
 	}
@@ -939,9 +975,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	destroy(): void {
-		// Clean up all sessions, but preserve metas so they survive app restart
 		for (const sessionId of Array.from(this.sessions.keys())) {
-			this.destroySession(sessionId, {preserveMeta: true});
+			this.destroySession(sessionId);
 		}
 	}
 

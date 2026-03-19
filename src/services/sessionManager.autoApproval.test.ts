@@ -27,23 +27,6 @@ vi.mock('./bunTerminal.js', () => ({
 	}),
 }));
 
-vi.mock('./sessionStore.js', () => ({
-	sessionStore: {
-		createSessionMeta: vi.fn((worktreePath: string) => ({
-			id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-			worktreePath,
-			number: 1,
-		})),
-		removeSessionMeta: vi.fn(),
-		removeSessionsForWorktree: vi.fn(),
-		getSessionsForWorktree: vi.fn(() => []),
-		getAllSessionMetas: vi.fn(() => []),
-		getSessionMeta: vi.fn(),
-		renameSession: vi.fn(),
-		cleanupOrphanedPaths: vi.fn(),
-	},
-}));
-
 vi.mock('./stateDetector/index.js', () => ({
 	createStateDetector: () => ({
 		detectState: detectStateMock,

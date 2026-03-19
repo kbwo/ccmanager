@@ -65,13 +65,27 @@ export interface AutoApprovalResponse {
 	reason?: string;
 }
 
+export interface SessionMeta {
+	id: string;
+	worktreePath: string;
+	number: number;
+	name?: string;
+}
+
 export interface SessionManager {
 	sessions: Map<string, Session>;
 	getSessionById(id: string): Session | undefined;
 	getSessionsForWorktree(worktreePath: string): Session[];
-	destroySession(sessionId: string, options?: {preserveMeta?: boolean}): void;
+	destroySession(sessionId: string): void;
 	getAllSessions(): Session[];
 	cancelAutoApproval(sessionId: string, reason?: string): void;
+	createSessionMeta(worktreePath: string): SessionMeta;
+	removeSessionMeta(id: string): void;
+	removeSessionsForWorktree(worktreePath: string): void;
+	renameSession(id: string, name?: string): void;
+	getSessionMetasForWorktree(worktreePath: string): SessionMeta[];
+	getAllSessionMetas(): SessionMeta[];
+	getSessionMeta(id: string): SessionMeta | undefined;
 }
 
 export interface ShortcutKey {

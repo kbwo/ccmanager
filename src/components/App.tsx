@@ -36,7 +36,7 @@ import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
 import {projectManager} from '../services/projectManager.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
-import {sessionStore, type SessionMeta} from '../services/sessionStore.js';
+import {type SessionMeta} from '../types/index.js';
 
 type View =
 	| 'menu'
@@ -80,11 +80,6 @@ const App: React.FC<AppProps> = ({
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 
-	// Startup cleanup: remove stale session metas from previous runs.
-	// On a fresh start no sessions are running, so this clears all leftover metas.
-	useState(() => {
-		sessionStore.cleanupStaleMetas(new Set());
-	});
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
@@ -149,7 +144,8 @@ const App: React.FC<AppProps> = ({
 			errorMessage?: string;
 		}> => {
 			// Create session meta if not provided
-			const meta = sessionMeta ?? sessionStore.createSessionMeta(worktreePath);
+			const meta =
+				sessionMeta ?? sessionManager.createSessionMeta(worktreePath);
 
 			const sessionEffect = devcontainerConfig
 				? sessionManager.createSessionWithDevcontainerEffect(
@@ -172,7 +168,7 @@ const App: React.FC<AppProps> = ({
 			if (result._tag === 'Left') {
 				// Clean up the meta we created on failure to prevent orphaned metas
 				if (!sessionMeta) {
-					sessionStore.removeSessionMeta(meta.id);
+					sessionManager.removeSessionMeta(meta.id);
 				}
 				const errorMessage = formatErrorMessage(result.left);
 				return {
@@ -451,7 +447,7 @@ const App: React.FC<AppProps> = ({
 		// Check if this is a rename session request
 		if (worktree.path.startsWith('RENAME_SESSION:')) {
 			const sessionId = worktree.path.substring('RENAME_SESSION:'.length);
-			const meta = sessionMeta ?? sessionStore.getSessionMeta(sessionId);
+			const meta = sessionMeta ?? sessionManager.getSessionMeta(sessionId);
 			if (meta) {
 				setRenameSessionMeta(meta);
 				navigateWithClear('rename-session');
@@ -468,7 +464,7 @@ const App: React.FC<AppProps> = ({
 				sessionManager.destroySession(sessionId);
 			}
 			// Also remove persisted meta
-			sessionStore.removeSessionMeta(sessionId);
+			sessionManager.removeSessionMeta(sessionId);
 			// Refresh menu
 			setMenuKey(prev => prev + 1);
 			return;
@@ -760,7 +756,7 @@ const App: React.FC<AppProps> = ({
 				sessionManager.destroySession(s.id);
 			}
 			// Remove persisted session metadata
-			sessionStore.removeSessionsForWorktree(path);
+			sessionManager.removeSessionsForWorktree(path);
 
 			const result = await Effect.runPromise(
 				Effect.either(
@@ -980,7 +976,7 @@ const App: React.FC<AppProps> = ({
 				sessionId={renameSessionMeta.id}
 				currentName={renameSessionMeta.name}
 				onRename={name => {
-					sessionStore.renameSession(renameSessionMeta.id, name);
+					sessionManager.renameSession(renameSessionMeta.id, name);
 					// Also update the running session if it exists
 					const runningSession = sessionManager.getSessionById(
 						renameSessionMeta.id,

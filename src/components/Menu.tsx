@@ -25,7 +25,7 @@ import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
-import {sessionStore, type SessionMeta} from '../services/sessionStore.js';
+import {type SessionMeta} from '../types/index.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -163,7 +163,7 @@ const Menu: React.FC<MenuProps> = ({
 						result.worktrees.forEach(wt => {
 							wt.hasSession =
 								allSessions.some(s => s.worktreePath === wt.path) ||
-								sessionStore.getSessionsForWorktree(wt.path).length > 0;
+								sessionManager.getSessionMetasForWorktree(wt.path).length > 0;
 						});
 
 						setBaseWorktrees(result.worktrees);
@@ -217,7 +217,7 @@ const Menu: React.FC<MenuProps> = ({
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
-		const allSessionMetas = sessionStore.getAllSessionMetas();
+		const allSessionMetas = sessionManager.getAllSessionMetas();
 		const items = prepareWorktreeItems(worktrees, sessions, allSessionMetas);
 		const columnPositions = calculateColumnPositions(items);
 

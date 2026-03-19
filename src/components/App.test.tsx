@@ -97,6 +97,17 @@ class MockSessionManager {
 	createSessionWithDevcontainerEffect = vi.fn(
 		(_: string, __?: Record<string, unknown>) => Effect.succeed(mockSession),
 	);
+	createSessionMeta = vi.fn((worktreePath: string) => ({
+		id: `session-${Date.now()}`,
+		worktreePath,
+		number: 1,
+	}));
+	removeSessionMeta = vi.fn((_: string) => {});
+	removeSessionsForWorktree = vi.fn((_: string) => {});
+	renameSession = vi.fn((_: string, __?: string) => {});
+	getSessionMetasForWorktree = vi.fn((_: string) => []);
+	getAllSessionMetas = vi.fn(() => []);
+	getSessionMeta = vi.fn((_: string) => undefined);
 }
 
 const sessionManagers: MockSessionManager[] = [];
@@ -143,24 +154,6 @@ function createInkMock<TProps>(
 
 vi.mock('../services/sessionManager.js', () => ({
 	SessionManager: MockSessionManager,
-}));
-
-vi.mock('../services/sessionStore.js', () => ({
-	sessionStore: {
-		createSessionMeta: vi.fn((worktreePath: string) => ({
-			id: `session-${Date.now()}`,
-			worktreePath,
-			number: 1,
-		})),
-		removeSessionMeta: vi.fn(),
-		removeSessionsForWorktree: vi.fn(),
-		renameSession: vi.fn(),
-		getSessionsForWorktree: vi.fn(() => []),
-		getAllSessionMetas: vi.fn(() => []),
-		getSessionMeta: vi.fn(),
-		cleanupOrphanedPaths: vi.fn(),
-		cleanupStaleMetas: vi.fn(),
-	},
 }));
 
 vi.mock('../services/globalSessionOrchestrator.js', () => ({
