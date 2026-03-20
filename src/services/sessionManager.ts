@@ -302,6 +302,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		ptyProcess: IPty,
 		options: {
 			isPrimaryCommand?: boolean;
+			command?: string;
+			fallbackArgs?: string[];
 			detectionStrategy?: StateDetectionStrategy;
 			devcontainerConfig?: DevcontainerConfig;
 		} = {},
@@ -320,6 +322,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			worktreePath,
 			sessionNumber: maxNumber + 1,
 			sessionName: undefined,
+			command: options.command ?? 'claude',
+			fallbackArgs: options.fallbackArgs,
 			lastAccessedAt: Date.now(),
 			process: ptyProcess,
 			output: [],
@@ -383,6 +387,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					ptyProcess,
 					{
 						isPrimaryCommand: true,
+						command,
+						fallbackArgs: preset.fallbackArgs,
 						detectionStrategy: preset.detectionStrategy,
 					},
 				);
@@ -455,9 +461,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	/**
 	 * Sets up exit handler for the session process.
 	 * When the process exits with code 1 and it's the primary command,
-	 * it will attempt to spawn a fallback process.
-	 * If fallbackArgs are configured, they will be used.
-	 * If no fallbackArgs are configured, the command will be retried with no arguments.
+	 * it will attempt a single retry using the configured command with fallback args.
+	 * If fallbackArgs are not configured, it retries the configured command with no args.
 	 */
 	private setupExitHandler(session: Session): void {
 		session.process.onExit(async (e: IExitEvent) => {
@@ -465,6 +470,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (e.exitCode === 1 && !e.signal && session.isPrimaryCommand) {
 				try {
 					let fallbackProcess: IPty;
+					const fallbackArgs = injectTeammateMode(
+						session.command,
+						session.fallbackArgs ?? [],
+						session.detectionStrategy,
+					);
 
 					// Check if we're in a devcontainer session
 					if (session.devcontainerConfig) {
@@ -474,17 +484,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						const devcontainerCmd = execParts[0] || 'devcontainer';
 						const execArgs = execParts.slice(1);
 
-						// Build fallback command for devcontainer
-						const fallbackClaudeArgs = injectTeammateMode(
-							'claude',
-							[],
-							session.detectionStrategy,
-						);
 						const fallbackFullArgs = [
 							...execArgs,
 							'--',
-							'claude',
-							...fallbackClaudeArgs,
+							session.command,
+							...fallbackArgs,
 						];
 
 						fallbackProcess = await this.spawn(
@@ -493,14 +497,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 							session.worktreePath,
 						);
 					} else {
-						// Regular fallback without devcontainer
-						const fallbackArgs = injectTeammateMode(
-							'claude',
-							[],
-							session.detectionStrategy,
-						);
 						fallbackProcess = await this.spawn(
-							'claude',
+							session.command,
 							fallbackArgs,
 							session.worktreePath,
 						);
@@ -893,6 +891,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					ptyProcess,
 					{
 						isPrimaryCommand: true,
+						command: preset.command,
+						fallbackArgs: preset.fallbackArgs,
 						detectionStrategy: preset.detectionStrategy,
 						devcontainerConfig,
 					},

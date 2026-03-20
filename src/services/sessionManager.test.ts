@@ -338,13 +338,14 @@ describe('SessionManager', () => {
 			).rejects.toThrow('Command not found');
 		});
 
-		it('should fallback to default command when main command exits with code 1', async () => {
+		it('should retry the configured command with fallback args when main command exits with code 1', async () => {
 			// Setup mock preset with args
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
 				command: 'claude',
 				args: ['--invalid-flag'],
+				fallbackArgs: ['--safe-flag'],
 			});
 
 			// First spawn attempt - will exit with code 1
@@ -375,17 +376,19 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called (with no args since commandConfig was removed)
+			// Verify fallback spawn was called with the configured fallback args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
 				'claude',
-				['--teammate-mode', 'in-process'],
+				['--safe-flag', '--teammate-mode', 'in-process'],
 				expect.objectContaining({cwd: '/test/worktree'}),
 			);
 
 			// Verify session process was replaced
 			expect(session.process).toBe(secondMockPty);
+			expect(session.command).toBe('claude');
+			expect(session.fallbackArgs).toEqual(['--safe-flag']);
 			expect(session.isPrimaryCommand).toBe(false);
 		});
 
@@ -468,7 +471,52 @@ describe('SessionManager', () => {
 
 			// Verify session process was replaced
 			expect(session.process).toBe(secondMockPty);
+			expect(session.command).toBe('claude');
+			expect(session.fallbackArgs).toBeUndefined();
 			expect(session.isPrimaryCommand).toBe(false);
+		});
+
+		it('should cleanup and emit exit when fallback command also exits with code 1', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'opencode',
+				args: ['run', '--bad-flag'],
+				fallbackArgs: ['run', '--safe-mode'],
+				detectionStrategy: 'opencode',
+			});
+
+			const firstMockPty = new MockPty();
+			const secondMockPty = new MockPty();
+			let exitedSession: Session | null = null;
+
+			vi.mocked(spawn)
+				.mockReturnValueOnce(firstMockPty as unknown as IPty)
+				.mockReturnValueOnce(secondMockPty as unknown as IPty);
+
+			sessionManager.on('sessionExit', (session: Session) => {
+				exitedSession = session;
+			});
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+
+			firstMockPty.emit('exit', {exitCode: 1});
+			await new Promise(resolve => setTimeout(resolve, 50));
+			secondMockPty.emit('exit', {exitCode: 1});
+			await new Promise(resolve => setTimeout(resolve, 50));
+
+			expect(spawn).toHaveBeenNthCalledWith(
+				2,
+				'opencode',
+				['run', '--safe-mode'],
+				expect.objectContaining({cwd: '/test/worktree'}),
+			);
+			expect(exitedSession).toBe(session);
+			expect(
+				sessionManager.getSessionsForWorktree('/test/worktree'),
+			).toHaveLength(0);
 		});
 
 		it('should handle custom command configuration', async () => {
@@ -1102,7 +1150,7 @@ describe('SessionManager', () => {
 			expect(session.isPrimaryCommand).toBe(false);
 		});
 
-		it('should fallback to default command in devcontainer when primary command exits with code 1', async () => {
+		it('should retry the configured command with fallback args in devcontainer when primary command exits with code 1', async () => {
 			// Setup exec mock for devcontainer up
 			type MockExecParams = Parameters<typeof exec>;
 			const mockExec = vi.mocked(exec);
@@ -1129,6 +1177,7 @@ describe('SessionManager', () => {
 				name: 'Main',
 				command: 'claude',
 				args: ['--bad-flag'],
+				fallbackArgs: ['--safe-flag'],
 			});
 
 			// First spawn attempt - will exit with code 1
@@ -1170,7 +1219,7 @@ describe('SessionManager', () => {
 			// Wait for fallback to occur
 			await new Promise(resolve => setTimeout(resolve, 50));
 
-			// Verify fallback spawn was called with teammate-mode args
+			// Verify fallback spawn was called with the configured fallback args
 			expect(spawn).toHaveBeenCalledTimes(2);
 			expect(spawn).toHaveBeenNthCalledWith(
 				2,
@@ -1181,6 +1230,7 @@ describe('SessionManager', () => {
 					'.',
 					'--',
 					'claude',
+					'--safe-flag',
 					'--teammate-mode',
 					'in-process',
 				],

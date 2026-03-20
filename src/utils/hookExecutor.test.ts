@@ -534,6 +534,8 @@ describe('hookExecutor Integration Tests', () => {
 				id: 'test-session-123',
 				worktreePath: tmpDir, // Use tmpDir as the worktree path
 				sessionNumber: 1,
+				command: 'claude',
+				fallbackArgs: undefined,
 				lastAccessedAt: Date.now(),
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
@@ -597,6 +599,8 @@ describe('hookExecutor Integration Tests', () => {
 				id: 'test-session-456',
 				worktreePath: tmpDir, // Use tmpDir as the worktree path
 				sessionNumber: 1,
+				command: 'claude',
+				fallbackArgs: undefined,
 				lastAccessedAt: Date.now(),
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
@@ -659,6 +663,8 @@ describe('hookExecutor Integration Tests', () => {
 				id: 'test-session-789',
 				worktreePath: tmpDir, // Use tmpDir as the worktree path
 				sessionNumber: 1,
+				command: 'claude',
+				fallbackArgs: undefined,
 				lastAccessedAt: Date.now(),
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
@@ -722,6 +728,8 @@ describe('hookExecutor Integration Tests', () => {
 				id: 'test-session-failure',
 				worktreePath: tmpDir,
 				sessionNumber: 1,
+				command: 'claude',
+				fallbackArgs: undefined,
 				lastAccessedAt: Date.now(),
 				process: {} as unknown as Session['process'],
 				terminal: {} as unknown as Session['terminal'],
