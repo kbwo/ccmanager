@@ -465,21 +465,13 @@ const Menu: React.FC<MenuProps> = ({
 					setAutoApprovalToggleCounter(c => c + 1);
 				}
 				break;
-			case 's':
-				// Create new session for highlighted worktree
-				if (highlightedWorktreePath) {
+			case ' ':
+				// Open session actions for highlighted session
+				if (highlightedSession && highlightedWorktreePath) {
 					onMenuAction({
-						type: 'newSession',
-						worktreePath: highlightedWorktreePath,
-					});
-				}
-				break;
-			case 'r':
-				// Rename highlighted session
-				if (highlightedSession) {
-					onMenuAction({
-						type: 'renameSession',
+						type: 'sessionActions',
 						session: highlightedSession,
+						worktreePath: highlightedWorktreePath,
 					});
 				}
 				break;
@@ -508,13 +500,7 @@ const Menu: React.FC<MenuProps> = ({
 				}
 				break;
 			case 'x':
-				// Kill session if one is highlighted, otherwise exit
-				if (highlightedSession) {
-					onMenuAction({
-						type: 'killSession',
-						sessionId: highlightedSession.id,
-					});
-				} else if (!projectName) {
+				if (!projectName) {
 					onMenuAction({type: 'exit'});
 				}
 				break;
@@ -642,12 +628,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New S-NewSession R-Rename X-KillSession M-Merge D-Delete ${
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Space-SessionMenu N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New S-NewSession R-Rename X-KillSession M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Space-SessionMenu N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'

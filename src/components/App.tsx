@@ -13,6 +13,7 @@ import RemoteBranchSelector from './RemoteBranchSelector.js';
 import LoadingSpinner from './LoadingSpinner.js';
 import type {NewWorktreeRequest} from './NewWorktree.js';
 import SessionRename from './SessionRename.js';
+import SessionActions, {type SessionActionType} from './SessionActions.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -53,6 +54,7 @@ type View =
 	| 'preset-selector'
 	| 'remote-branch-selector'
 	| 'rename-session'
+	| 'session-actions'
 	| 'clearing';
 
 interface AppProps {
@@ -86,6 +88,10 @@ const App: React.FC<AppProps> = ({
 	const [renameTarget, setRenameTarget] = useState<{
 		id: string;
 		name?: string;
+	} | null>(null);
+	const [sessionActionsTarget, setSessionActionsTarget] = useState<{
+		session: ISession;
+		worktreePath: string;
 	} | null>(null);
 	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
 		null,
@@ -430,6 +436,13 @@ const App: React.FC<AppProps> = ({
 			case 'killSession':
 				sessionManager.destroySession(action.sessionId);
 				setMenuKey(prev => prev + 1);
+				return;
+			case 'sessionActions':
+				setSessionActionsTarget({
+					session: action.session,
+					worktreePath: action.worktreePath,
+				});
+				navigateWithClear('session-actions');
 				return;
 			case 'deleteWorktree':
 				navigateWithClear('delete-worktree');
@@ -921,6 +934,52 @@ const App: React.FC<AppProps> = ({
 				}}
 				onCancel={() => {
 					setRenameTarget(null);
+					handleReturnToMenu();
+				}}
+			/>
+		);
+	}
+
+	if (view === 'session-actions' && sessionActionsTarget) {
+		const {session: targetSession, worktreePath} = sessionActionsTarget;
+		const label = targetSession.sessionName
+			? `${worktreePath} : ${targetSession.sessionName}`
+			: `${worktreePath} #${targetSession.sessionNumber}`;
+
+		const handleSessionAction = async (action: SessionActionType) => {
+			setSessionActionsTarget(null);
+			switch (action) {
+				case 'newSession':
+					await startSessionForWorktree(
+						{
+							path: worktreePath,
+							branch: '',
+							isMainWorktree: false,
+							hasSession: true,
+						},
+						{forceNew: true},
+					);
+					return;
+				case 'rename':
+					setRenameTarget({
+						id: targetSession.id,
+						name: targetSession.sessionName,
+					});
+					navigateWithClear('rename-session');
+					return;
+				case 'kill':
+					sessionManager.destroySession(targetSession.id);
+					handleReturnToMenu();
+					return;
+			}
+		};
+
+		return (
+			<SessionActions
+				sessionLabel={label}
+				onSelect={handleSessionAction}
+				onCancel={() => {
+					setSessionActionsTarget(null);
 					handleReturnToMenu();
 				}}
 			/>

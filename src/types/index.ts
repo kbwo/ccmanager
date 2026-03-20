@@ -72,6 +72,11 @@ export type MenuAction =
 	| {type: 'newSession'; worktreePath: string}
 	| {type: 'renameSession'; session: Session}
 	| {type: 'killSession'; sessionId: string}
+	| {
+			type: 'sessionActions';
+			session: Session;
+			worktreePath: string;
+	  }
 	| {type: 'deleteWorktree'}
 	| {type: 'mergeWorktree'}
 	| {type: 'configuration'; scope: ConfigScope}
