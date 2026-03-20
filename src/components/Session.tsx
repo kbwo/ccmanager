@@ -3,6 +3,7 @@ import {useStdout} from 'ink';
 import {Session as ISession} from '../types/index.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {stripBunTerminalAutoResponses} from '../utils/stripBunTerminalAutoResponses.js';
 
 interface SessionProps {
 	session: ISession;
@@ -57,11 +58,13 @@ const Session: React.FC<SessionProps> = ({
 		const sanitizeReplayBuffer = (input: string): string => {
 			// Remove terminal mode toggles emitted by Codex so replay doesn't re-enable them
 			// on our own TTY when restoring the session view.
-			return stripOscColorSequences(input)
-				.replace(/\x1B\[>4;?\d*m/g, '') // modifyOtherKeys set/reset
-				.replace(/\x1B\[>[0-9;]*u/g, '') // kitty keyboard protocol enables
-				.replace(/\x1B\[\?1004[hl]/g, '') // focus tracking
-				.replace(/\x1B\[\?2004[hl]/g, ''); // bracketed paste
+			return stripBunTerminalAutoResponses(
+				stripOscColorSequences(input)
+					.replace(/\x1B\[>4;?\d*m/g, '') // modifyOtherKeys set/reset
+					.replace(/\x1B\[>[0-9;]*u/g, '') // kitty keyboard protocol enables
+					.replace(/\x1B\[\?1004[hl]/g, '') // focus tracking
+					.replace(/\x1B\[\?2004[hl]/g, ''), // bracketed paste
+			);
 		};
 
 		// Reset modes immediately on entry in case a previous session left them on

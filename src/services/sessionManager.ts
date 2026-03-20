@@ -31,6 +31,7 @@ import {
 import {getTerminalScreenContent} from '../utils/screenCapture.js';
 import {injectTeammateMode} from '../utils/commandArgs.js';
 import {preparePresetLaunch} from '../utils/presetPrompt.js';
+import {createBunTerminalOutputSanitizer} from '../utils/stripBunTerminalAutoResponses.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const TERMINAL_CONTENT_MAX_LINES = 300;
@@ -414,10 +415,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	}
 
 	private setupDataHandler(session: Session): void {
+		const sanitizer = createBunTerminalOutputSanitizer();
+
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
+			const cleaned = sanitizer.push(data);
+
 			// Write data to virtual terminal
-			session.terminal.write(data);
+			session.terminal.write(cleaned);
 
 			// Check for screen clear escape sequence (e.g., from /clear command)
 			// When detected, clear the output history to prevent replaying old content on restore
@@ -426,8 +431,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				session.outputHistory = [];
 			}
 
+			session.lastActivity = new Date();
+
+			if (cleaned.length === 0) {
+				return;
+			}
+
 			// Store in output history as Buffer
-			const buffer = Buffer.from(data, 'utf8');
+			const buffer = Buffer.from(cleaned, 'utf8');
 			session.outputHistory.push(buffer);
 
 			// Limit memory usage - keep max 10MB of output history
@@ -443,11 +454,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				}
 			}
 
-			session.lastActivity = new Date();
-
 			// Only emit data events when session is active
 			if (session.isActive) {
-				this.emit('sessionData', session, data);
+				this.emit('sessionData', session, cleaned);
 			}
 		});
 	}
