@@ -14,7 +14,7 @@ const MAX_BRANCH_NAME_LENGTH = 70; // Maximum characters for branch name display
 const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 
 /**
- * Worktree item with formatted content for display.
+ * One menu row: worktree metadata plus optional session (for multi-session worktrees).
  */
 export interface SessionItem {
 	worktree: Worktree;
@@ -144,6 +144,79 @@ export function extractBranchParts(branchName: string): {
 }
 
 /**
+ * One pass over sessions: group by worktree path and track latest lastAccessedAt per path.
+ */
+function indexSessionsByWorktree(sessions: Session[]): {
+	byWorktreePath: Map<string, Session[]>;
+	maxAccessAt: Map<string, number>;
+} {
+	const byWorktreePath = new Map<string, Session[]>();
+	const maxAccessAt = new Map<string, number>();
+
+	for (const s of sessions) {
+		const path = s.worktreePath;
+		let list = byWorktreePath.get(path);
+		if (!list) {
+			list = [];
+			byWorktreePath.set(path, list);
+		}
+		list.push(s);
+
+		const prevMax = maxAccessAt.get(path) ?? 0;
+		if (s.lastAccessedAt > prevMax) {
+			maxAccessAt.set(path, s.lastAccessedAt);
+		}
+	}
+
+	return {byWorktreePath, maxAccessAt};
+}
+
+function displaySuffix(session: Session, multipleForWorktree: boolean): string {
+	if (multipleForWorktree) {
+		return session.sessionName
+			? `: ${session.sessionName}`
+			: ` #${session.sessionNumber}`;
+	}
+	return session.sessionName ? `: ${session.sessionName}` : '';
+}
+
+type GitStatusColumns = Pick<
+	SessionItem,
+	'fileChanges' | 'aheadBehind' | 'parentBranch'
+> & {
+	error?: string;
+};
+
+function gitStatusColumns(
+	wt: Worktree,
+	fullBranchName: string,
+): GitStatusColumns {
+	if (wt.gitStatus) {
+		return {
+			fileChanges: formatGitFileChanges(wt.gitStatus),
+			aheadBehind: formatGitAheadBehind(wt.gitStatus),
+			parentBranch: formatParentBranch(
+				wt.gitStatus.parentBranch,
+				fullBranchName,
+			),
+		};
+	}
+	if (wt.gitStatusError) {
+		return {
+			fileChanges: '',
+			aheadBehind: '',
+			parentBranch: '',
+			error: `\x1b[31m[git error]\x1b[0m`,
+		};
+	}
+	return {
+		fileChanges: '\x1b[90m[fetching...]\x1b[0m',
+		aheadBehind: '',
+		parentBranch: '',
+	};
+}
+
+/**
  * Build a single SessionItem row for display.
  */
 function buildSessionItem(
@@ -161,25 +234,10 @@ function buildSessionItem(
 	const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
 	const isMain = wt.isMainWorktree ? ' (main)' : '';
 	const baseLabel = `${branchName}${isMain}${sessionSuffix}${status}`;
-
-	let fileChanges = '';
-	let aheadBehind = '';
-	let parentBranch = '';
-	let error = '';
-
-	if (wt.gitStatus) {
-		fileChanges = formatGitFileChanges(wt.gitStatus);
-		aheadBehind = formatGitAheadBehind(wt.gitStatus);
-		parentBranch = formatParentBranch(
-			wt.gitStatus.parentBranch,
-			fullBranchName,
-		);
-	} else if (wt.gitStatusError) {
-		error = `\x1b[31m[git error]\x1b[0m`;
-	} else {
-		fileChanges = '\x1b[90m[fetching...]\x1b[0m';
-	}
-
+	const {fileChanges, aheadBehind, parentBranch, error} = gitStatusColumns(
+		wt,
+		fullBranchName,
+	);
 	const lastCommitDate = wt.lastCommitDate
 		? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
 		: '';
@@ -215,48 +273,37 @@ export function prepareSessionItems(
 	sessions: Session[],
 	options?: {sortByLastSession?: boolean},
 ): SessionItem[] {
+	const {byWorktreePath, maxAccessAt} = indexSessionsByWorktree(sessions);
 	const items: SessionItem[] = [];
 
-	// Sort worktrees by most recent session access time if requested
-	let sortedWorktrees = worktrees;
-	if (options?.sortByLastSession && sessions.length > 0) {
-		const maxAccessByWorktree = new Map<string, number>();
-		for (const s of sessions) {
-			const current = maxAccessByWorktree.get(s.worktreePath) ?? 0;
-			if (s.lastAccessedAt > current) {
-				maxAccessByWorktree.set(s.worktreePath, s.lastAccessedAt);
-			}
+	const orderedWorktrees =
+		options?.sortByLastSession && sessions.length > 0
+			? [...worktrees].sort((a, b) => {
+					const timeA = maxAccessAt.get(a.path);
+					const timeB = maxAccessAt.get(b.path);
+					if (timeA === undefined && timeB === undefined) return 0;
+					return (timeB ?? 0) - (timeA ?? 0);
+				})
+			: worktrees;
+
+	for (const wt of orderedWorktrees) {
+		const wtSessions = byWorktreePath.get(wt.path) ?? [];
+
+		if (wtSessions.length === 0) {
+			items.push(buildSessionItem(wt, undefined, ''));
+			continue;
 		}
 
-		sortedWorktrees = [...worktrees].sort((a, b) => {
-			const timeA = maxAccessByWorktree.get(a.path);
-			const timeB = maxAccessByWorktree.get(b.path);
-			if (timeA === undefined && timeB === undefined) return 0;
-			return (timeB ?? 0) - (timeA ?? 0);
-		});
-	}
+		const ordered =
+			wtSessions.length > 1
+				? [...wtSessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)
+				: wtSessions;
+		const multiple = ordered.length > 1;
 
-	for (const wt of sortedWorktrees) {
-		const wtSessions = sessions.filter(s => s.worktreePath === wt.path);
-
-		if (wtSessions.length <= 1) {
-			const session = wtSessions[0];
-			const suffix =
-				session?.sessionName && wtSessions.length === 1
-					? `: ${session.sessionName}`
-					: '';
-			items.push(buildSessionItem(wt, session, suffix));
-		} else {
-			// Multiple sessions: sort by lastAccessedAt (most recent first)
-			const sorted = [...wtSessions].sort(
-				(a, b) => b.lastAccessedAt - a.lastAccessedAt,
+		for (const session of ordered) {
+			items.push(
+				buildSessionItem(wt, session, displaySuffix(session, multiple)),
 			);
-			for (const session of sorted) {
-				const suffix = session.sessionName
-					? `: ${session.sessionName}`
-					: ` #${session.sessionNumber}`;
-				items.push(buildSessionItem(wt, session, suffix));
-			}
 		}
 	}
 
