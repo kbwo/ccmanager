@@ -101,6 +101,50 @@ describe('CursorStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
+	it('should detect waiting_input state for Allow ... (y) pattern', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Allow this web search?',
+			' → Allow search (y)',
+			'   Run Everything (shift+tab)',
+			'   Skip (esc or n)',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input state for Run ... (y) pattern', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Run this command?',
+			'Not in allowlist: cd /some/path, npm run test',
+			' → Run (once) (y)',
+			'   Run Everything (shift+tab)',
+			'   Skip (esc or n)',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input state for Skip (esc or n) pattern', () => {
+		// Arrange
+		terminal = createMockTerminal(['Some prompt', '   Skip (esc or n)']);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
 	it('should detect busy state for ctrl+c to stop pattern', () => {
 		// Arrange
 		terminal = createMockTerminal([

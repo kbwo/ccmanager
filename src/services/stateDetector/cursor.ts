@@ -10,7 +10,10 @@ export class CursorStateDetector extends BaseStateDetector {
 		if (
 			lowerContent.includes('(y) (enter)') ||
 			lowerContent.includes('keep (n)') ||
-			/auto .* \(shift\+tab\)/.test(lowerContent)
+			/auto .* \(shift\+tab\)/.test(lowerContent) ||
+			/allow .+ \(y\)/.test(lowerContent) ||
+			/run .+ \(y\)/.test(lowerContent) ||
+			lowerContent.includes('skip (esc or n)')
 		) {
 			return 'waiting_input';
 		}
