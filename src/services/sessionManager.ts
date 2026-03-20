@@ -770,7 +770,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	/**
 	 * Terminate session and cleanup resources using Effect-based error handling
 	 *
-	 * @param {string} worktreePath - Path to the worktree
+	 * @param {string} sessionId - Session identifier
 	 * @returns {Effect.Effect<void, ProcessError, never>} Effect that may fail with ProcessError if session does not exist or cleanup fails
 	 *
 	 * @example
@@ -797,6 +797,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					});
 				}
 
+				const stateData = session.stateMutex.getSnapshot();
+				if (stateData.autoApprovalAbortController) {
+					this.cancelAutoApprovalVerification(session, 'Session terminated');
+				}
+
 				// Clear the state check interval
 				if (session.stateCheckInterval) {
 					clearInterval(session.stateCheckInterval);
@@ -816,10 +821,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					this.busyTimers.delete(sessionId);
 				}
 
-				// Remove from sessions map and cleanup
 				this.sessions.delete(sessionId);
 				this.waitingWithBottomBorder.delete(sessionId);
-				// NOTE: Do NOT remove session meta here — see destroySession comment.
 				this.emit('sessionDestroyed', session);
 			},
 			catch: (error: unknown) => {

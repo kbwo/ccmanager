@@ -3,7 +3,6 @@ import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 
 interface SessionRenameProps {
-	sessionId: string;
 	currentName?: string;
 	onRename: (name?: string) => void;
 	onCancel: () => void;

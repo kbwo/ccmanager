@@ -236,7 +236,7 @@ const Menu: React.FC<MenuProps> = ({
 				const numberPrefix =
 					!isSearchMode && index < 10 ? `${index} ❯ ` : '  ❯ ';
 
-				// Use session meta id for value if present, otherwise worktree path
+				// Use session id for value if present, otherwise worktree path
 				const value = item.session
 					? `session:${item.session.id}`
 					: item.worktree.path;
@@ -628,12 +628,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Space-SessionMenu N-New M-Merge D-Delete ${
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Space-Session actions (session rows only) N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Space-SessionMenu N-New M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Space-Session actions (session rows only) N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'

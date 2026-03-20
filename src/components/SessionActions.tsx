@@ -1,6 +1,5 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
-import SelectInput from 'ink-select-input';
 
 export type SessionActionType = 'newSession' | 'rename' | 'kill';
 
@@ -21,9 +20,29 @@ const SessionActions: React.FC<SessionActionsProps> = ({
 	onSelect,
 	onCancel,
 }) => {
+	const [selectedIndex, setSelectedIndex] = useState(0);
+
 	useInput((input, key) => {
 		if (key.escape) {
 			onCancel();
+			return;
+		}
+
+		if (key.upArrow) {
+			setSelectedIndex(i => Math.max(0, i - 1));
+			return;
+		}
+
+		if (key.downArrow) {
+			setSelectedIndex(i => Math.min(items.length - 1, i + 1));
+			return;
+		}
+
+		if (key.return) {
+			const item = items[selectedIndex];
+			if (item) {
+				onSelect(item.value);
+			}
 			return;
 		}
 
@@ -48,11 +67,19 @@ const SessionActions: React.FC<SessionActionsProps> = ({
 			<Box marginTop={1}>
 				<Text dimColor>{sessionLabel}</Text>
 			</Box>
-			<Box marginTop={1}>
-				<SelectInput items={items} onSelect={item => onSelect(item.value)} />
+			<Box marginTop={1} flexDirection="column">
+				{items.map((item, index) => (
+					<Text
+						key={item.value}
+						color={index === selectedIndex ? 'cyan' : undefined}
+					>
+						{index === selectedIndex ? '❯ ' : '  '}
+						{item.label}
+					</Text>
+				))}
 			</Box>
 			<Box marginTop={1}>
-				<Text dimColor>S/R/X or arrow keys + Enter | Escape to cancel</Text>
+				<Text dimColor>S/R/X or ↑↓ + Enter | Escape to cancel</Text>
 			</Box>
 		</Box>
 	);

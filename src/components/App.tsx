@@ -922,7 +922,6 @@ const App: React.FC<AppProps> = ({
 	if (view === 'rename-session' && renameTarget) {
 		return (
 			<SessionRename
-				sessionId={renameTarget.id}
 				currentName={renameTarget.name}
 				onRename={name => {
 					const session = sessionManager.getSessionById(renameTarget.id);
