@@ -35,8 +35,11 @@ export const getTeamMemberTag = (count: number): string => {
 
 export const MENU_ICONS = {
 	NEW_WORKTREE: '⊕',
+	NEW_SESSION: '⊕',
+	RENAME_SESSION: '✎',
 	MERGE_WORKTREE: '⇄',
 	DELETE_WORKTREE: '✕',
+	KILL_SESSION: '✕',
 	CONFIGURE_SHORTCUTS: '⌨',
 	EXIT: '⏻',
 } as const;

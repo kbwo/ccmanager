@@ -14,6 +14,7 @@ vi.mock('./bunTerminal.js', () => ({
 		return null;
 	}),
 }));
+
 vi.mock('./config/configReader.js', () => ({
 	configReader: {
 		getConfig: vi.fn().mockReturnValue({
@@ -43,9 +44,6 @@ vi.mock('./config/configReader.js', () => ({
 		}),
 		getHooks: vi.fn().mockReturnValue({}),
 		getStatusHooks: vi.fn().mockReturnValue({}),
-		setWorktreeLastOpened: vi.fn(),
-		getWorktreeLastOpenedTime: vi.fn(),
-		getWorktreeLastOpened: vi.fn(() => ({})),
 		isAutoApprovalEnabled: vi.fn(() => false),
 		setAutoApprovalEnabled: vi.fn(),
 	},
@@ -275,11 +273,12 @@ describe('SessionManager - State Persistence', () => {
 		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 
 		// Destroy the session
-		sessionManager.destroySession('/test/path');
+		sessionManager.destroySession(session.id);
 
 		// Check that pending state is cleared
-		const destroyedSession = sessionManager.getSession('/test/path');
-		expect(destroyedSession).toBeUndefined();
+		const remainingSessions =
+			sessionManager.getSessionsForWorktree('/test/path');
+		expect(remainingSessions).toHaveLength(0);
 	});
 
 	it('should not transition state before minimum duration in current state has elapsed', async () => {

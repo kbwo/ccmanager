@@ -138,7 +138,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				multiProject={false}
 				version="test"
 			/>,
@@ -171,7 +171,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
 				version="test"
@@ -183,7 +183,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
 				version="test"
@@ -205,7 +205,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
 				version="test"
@@ -240,7 +240,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
 				version="test"
@@ -273,7 +273,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={worktreeServiceWithGitRoot}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
 				version="test"
@@ -285,7 +285,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={worktreeServiceWithGitRoot}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
 				version="test"
@@ -319,7 +319,7 @@ describe('Menu - Recent Projects', () => {
 			<Menu
 				sessionManager={mockSessionManager}
 				worktreeService={mockWorktreeService}
-				onSelectWorktree={vi.fn()}
+				onMenuAction={vi.fn()}
 				onSelectRecentProject={vi.fn()}
 				multiProject={true}
 				version="test"

@@ -29,9 +29,6 @@ vi.mock('./config/configReader.js', () => ({
 		getStatusHooks: vi.fn(() => ({})),
 		getDefaultPreset: vi.fn(),
 		getPresetByIdEffect: vi.fn(),
-		setWorktreeLastOpened: vi.fn(),
-		getWorktreeLastOpenedTime: vi.fn(),
-		getWorktreeLastOpened: vi.fn(() => ({})),
 		isAutoApprovalEnabled: vi.fn(() => false),
 		setAutoApprovalEnabled: vi.fn(),
 	},
@@ -63,9 +60,6 @@ vi.mock('./worktreeService.js', () => ({
 	WorktreeService: vi.fn(function () {
 		return {};
 	}),
-	setWorktreeLastOpened: vi.fn(),
-	getWorktreeLastOpened: vi.fn(() => ({})),
-	getWorktreeLastOpenedTime: vi.fn(),
 }));
 
 // Create a mock IPty class
@@ -295,7 +289,7 @@ describe('SessionManager', () => {
 			);
 		});
 
-		it('should return existing session if already created', async () => {
+		it('should create a new session each time for multi-session support', async () => {
 			// Setup mock preset
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
@@ -306,7 +300,7 @@ describe('SessionManager', () => {
 			// Setup spawn mock
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			// Create session twice
+			// Create session twice - multi-session API creates a new session each time
 			const session1 = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
@@ -314,10 +308,11 @@ describe('SessionManager', () => {
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
 
-			// Should return the same session
-			expect(session1).toBe(session2);
-			// Spawn should only be called once
-			expect(spawn).toHaveBeenCalledTimes(1);
+			// Should return different sessions for multi-session support
+			expect(session1).not.toBe(session2);
+			expect(session1.worktreePath).toBe(session2.worktreePath);
+			// Spawn should be called once per session
+			expect(spawn).toHaveBeenCalledTimes(2);
 		});
 
 		it('should throw error when spawn fails with fallback args', async () => {
@@ -537,14 +532,16 @@ describe('SessionManager', () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 			// Create and destroy session
-			await Effect.runPromise(
+			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
-			sessionManager.destroySession('/test/worktree');
+			sessionManager.destroySession(session.id);
 
 			// Verify cleanup
 			expect(mockPty.kill).toHaveBeenCalled();
-			expect(sessionManager.getSession('/test/worktree')).toBeUndefined();
+			expect(
+				sessionManager.getSessionsForWorktree('/test/worktree'),
+			).toHaveLength(0);
 		});
 
 		it('should handle session exit event', async () => {
@@ -576,7 +573,9 @@ describe('SessionManager', () => {
 			await new Promise(resolve => setTimeout(resolve, 700));
 
 			expect(exitedSession).toBe(createdSession);
-			expect(sessionManager.getSession('/test/worktree')).toBeUndefined();
+			expect(
+				sessionManager.getSessionsForWorktree('/test/worktree'),
+			).toHaveLength(0);
 		});
 	});
 
@@ -722,7 +721,7 @@ describe('SessionManager', () => {
 			);
 		});
 
-		it('should return existing session if already created', async () => {
+		it('should create a new session each time for multi-session support', async () => {
 			// Setup mock preset
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
@@ -738,7 +737,7 @@ describe('SessionManager', () => {
 				execCommand: 'devcontainer exec',
 			};
 
-			// Create session twice
+			// Create session twice - multi-session API creates a new session each time
 			const session1 = await Effect.runPromise(
 				sessionManager.createSessionWithDevcontainerEffect(
 					'/test/worktree',
@@ -752,10 +751,11 @@ describe('SessionManager', () => {
 				),
 			);
 
-			// Should return the same session
-			expect(session1).toBe(session2);
-			// spawn should only be called once
-			expect(spawn).toHaveBeenCalledTimes(1);
+			// Should return different sessions for multi-session support
+			expect(session1).not.toBe(session2);
+			expect(session1.worktreePath).toBe(session2.worktreePath);
+			// spawn should be called once per session
+			expect(spawn).toHaveBeenCalledTimes(2);
 		});
 
 		it('should handle complex exec commands with multiple arguments', async () => {
@@ -895,8 +895,9 @@ describe('SessionManager', () => {
 			);
 
 			// Should call createSessionWithPreset internally
-			const session = sessionManager.getSession('/test/worktree');
-			expect(session).toBeDefined();
+			const sessions = sessionManager.getSessionsForWorktree('/test/worktree');
+			expect(sessions).toHaveLength(1);
+			const session = sessions[0];
 			expect(session?.devcontainerConfig).toEqual({
 				upCommand: 'devcontainer up --workspace-folder .',
 				execCommand: 'devcontainer exec --workspace-folder .',

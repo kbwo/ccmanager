@@ -35,6 +35,9 @@ export interface Worktree {
 export interface Session {
 	id: string;
 	worktreePath: string;
+	sessionNumber: number; // Auto-incremented per worktree
+	sessionName?: string; // User-assigned name
+	lastAccessedAt: number; // Timestamp for sorting
 	process: IPty;
 	output: string[]; // Recent output for state detection
 	outputHistory: Buffer[]; // Full output history as buffers
@@ -63,12 +66,29 @@ export interface AutoApprovalResponse {
 	reason?: string;
 }
 
+export type MenuAction =
+	| {type: 'selectWorktree'; worktree: Worktree; session?: Session}
+	| {type: 'newWorktree'}
+	| {type: 'newSession'; worktreePath: string}
+	| {type: 'renameSession'; session: Session}
+	| {type: 'killSession'; sessionId: string}
+	| {
+			type: 'sessionActions';
+			session: Session;
+			worktreePath: string;
+	  }
+	| {type: 'deleteWorktree'}
+	| {type: 'mergeWorktree'}
+	| {type: 'configuration'; scope: ConfigScope}
+	| {type: 'exit'};
+
 export interface SessionManager {
 	sessions: Map<string, Session>;
-	getSession(worktreePath: string): Session | undefined;
-	destroySession(worktreePath: string): void;
+	getSessionById(id: string): Session | undefined;
+	getSessionsForWorktree(worktreePath: string): Session[];
+	destroySession(sessionId: string): void;
 	getAllSessions(): Session[];
-	cancelAutoApproval(worktreePath: string, reason?: string): void;
+	cancelAutoApproval(sessionId: string, reason?: string): void;
 }
 
 export interface ShortcutKey {
@@ -305,9 +325,7 @@ export class AmbiguousBranchError extends Error {
 }
 
 export interface IWorktreeService {
-	getWorktreesEffect(options?: {
-		sortByLastSession?: boolean;
-	}): import('effect').Effect.Effect<
+	getWorktreesEffect(): import('effect').Effect.Effect<
 		Worktree[],
 		import('../types/errors.js').GitError,
 		never

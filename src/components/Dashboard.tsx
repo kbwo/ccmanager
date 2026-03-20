@@ -24,10 +24,10 @@ import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import {useGitStatus} from '../hooks/useGitStatus.js';
 import {
-	type WorktreeItem,
+	type SessionItem,
 	truncateString,
 	calculateColumnPositions,
-	assembleWorktreeLabel,
+	assembleSessionLabel,
 	formatRelativeDate,
 } from '../utils/worktreeUtils.js';
 import {
@@ -346,8 +346,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
 		// --- Active Sessions section ---
 		if (sessionEntries.length > 0) {
-			// Build WorktreeItems for column alignment
-			const sessionWorkItems: WorktreeItem[] = sessionEntries.map(entry => {
+			// Build SessionItems for column alignment
+			const sessionWorkItems: SessionItem[] = sessionEntries.map(entry => {
 				// Use enriched worktree if available (has git status)
 				const wt =
 					enrichedWorktrees.find(w => w.path === entry.worktree.path) ||
@@ -428,7 +428,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 			filteredEntries.forEach(entry => {
 				const itemIndex = sessionEntries.indexOf(entry);
 				const workItem = sessionWorkItems[itemIndex]!;
-				const label = assembleWorktreeLabel(workItem, columns);
+				const label = assembleSessionLabel(workItem, columns);
 
 				const numberPrefix =
 					!isSearchMode && currentIndex < 10 ? `${currentIndex} ❯ ` : '❯ ';

@@ -98,7 +98,7 @@ describe('Menu component Effect-based error handling', () => {
 		const {Effect} = await import('effect');
 		const {GitError} = await import('../types/errors.js');
 
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 		const onDismissError = vi.fn();
 
 		// Mock getWorktreesEffect to return a failing Effect
@@ -117,7 +117,7 @@ describe('Menu component Effect-based error handling', () => {
 			<Menu
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				onDismissError={onDismissError}
 				version="test"
 			/>,
@@ -137,7 +137,7 @@ describe('Menu component Effect-based error handling', () => {
 	it('should successfully load worktrees using getWorktreesEffect', async () => {
 		const {Effect} = await import('effect');
 
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 
 		const mockWorktrees = [
 			{
@@ -167,7 +167,7 @@ describe('Menu component Effect-based error handling', () => {
 			<Menu
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				version="test"
 			/>,
 		);
@@ -186,7 +186,7 @@ describe('Menu component Effect-based error handling', () => {
 		const {Effect} = await import('effect');
 		const {GitError} = await import('../types/errors.js');
 
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 		const onDismissError = vi.fn();
 
 		const mockWorktrees = [
@@ -219,7 +219,7 @@ describe('Menu component Effect-based error handling', () => {
 			<Menu
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				onDismissError={onDismissError}
 				version="test"
 			/>,
@@ -241,7 +241,7 @@ describe('Menu component Effect-based error handling', () => {
 	it('should use Effect composition to load worktrees and default branch together', async () => {
 		const {Effect} = await import('effect');
 
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 
 		const mockWorktrees = [
 			{
@@ -264,7 +264,7 @@ describe('Menu component Effect-based error handling', () => {
 			<Menu
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				version="test"
 			/>,
 		);
@@ -304,7 +304,7 @@ describe('Menu component rendering', () => {
 	});
 
 	it('should not render duplicate title when re-rendered with new key', async () => {
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 
 		// First render
 		const {unmount, lastFrame} = render(
@@ -312,7 +312,7 @@ describe('Menu component rendering', () => {
 				key={1}
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				version="test"
 			/>,
 		);
@@ -337,7 +337,7 @@ describe('Menu component rendering', () => {
 				key={2}
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				version="test"
 			/>,
 		);
@@ -353,13 +353,13 @@ describe('Menu component rendering', () => {
 	});
 
 	it('should render title and description only once', async () => {
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 
 		const {lastFrame} = render(
 			<Menu
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				version="test"
 			/>,
 		);
@@ -383,7 +383,7 @@ describe('Menu component rendering', () => {
 
 	it('should display number shortcuts for recent projects when worktrees < 10', async () => {
 		const {Effect} = await import('effect');
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 		const onSelectRecentProject = vi.fn();
 
 		// Setup: 3 worktrees
@@ -442,7 +442,7 @@ describe('Menu component rendering', () => {
 			<Menu
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				onSelectRecentProject={onSelectRecentProject}
 				multiProject={true}
 				version="test"
@@ -466,7 +466,7 @@ describe('Menu component rendering', () => {
 
 	it('should not display number shortcuts for recent projects when worktrees >= 10', async () => {
 		const {Effect} = await import('effect');
-		const onSelectWorktree = vi.fn();
+		const onMenuAction = vi.fn();
 		const onSelectRecentProject = vi.fn();
 
 		// Setup: 10 worktrees
@@ -510,7 +510,7 @@ describe('Menu component rendering', () => {
 			<Menu
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={onSelectWorktree}
+				onMenuAction={onMenuAction}
 				onSelectRecentProject={onSelectRecentProject}
 				multiProject={true}
 				version="test"

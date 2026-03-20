@@ -12,6 +12,8 @@ import PresetSelector from './PresetSelector.js';
 import RemoteBranchSelector from './RemoteBranchSelector.js';
 import LoadingSpinner from './LoadingSpinner.js';
 import type {NewWorktreeRequest} from './NewWorktree.js';
+import SessionRename from './SessionRename.js';
+import SessionActions, {type SessionActionType} from './SessionActions.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -25,6 +27,7 @@ import {
 	Session as ISession,
 	DevcontainerConfig,
 	GitProject,
+	MenuAction,
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
@@ -50,6 +53,8 @@ type View =
 	| 'configuration'
 	| 'preset-selector'
 	| 'remote-branch-selector'
+	| 'rename-session'
+	| 'session-actions'
 	| 'clearing';
 
 interface AppProps {
@@ -76,9 +81,18 @@ const App: React.FC<AppProps> = ({
 	const [activeSession, setActiveSession] = useState<ISession | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
+
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
+	const [renameTarget, setRenameTarget] = useState<{
+		id: string;
+		name?: string;
+	} | null>(null);
+	const [sessionActionsTarget, setSessionActionsTarget] = useState<{
+		session: ISession;
+		worktreePath: string;
+	} | null>(null);
 	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
 		null,
 	); // Store selected project in multi-project mode
@@ -149,7 +163,6 @@ const App: React.FC<AppProps> = ({
 						initialPrompt,
 					);
 
-			// Execute the Effect and handle both success and failure cases
 			const result = await Effect.runPromise(Effect.either(sessionEffect));
 
 			if (result._tag === 'Left') {
@@ -203,37 +216,50 @@ const App: React.FC<AppProps> = ({
 			options?: {
 				presetId?: string;
 				initialPrompt?: string;
+				session?: ISession;
+				forceNew?: boolean;
 			},
 		) => {
-			let session = sessionManager.getSession(worktree.path);
-
-			if (!session) {
-				if (!options?.presetId && configReader.getSelectPresetOnStart()) {
-					setSelectedWorktree(worktree);
-					navigateWithClear('preset-selector');
-					return;
-				}
-
-				setView(
-					options?.presetId ? 'creating-session-preset' : 'creating-session',
-				);
-
-				const result = await createSessionWithEffect(
-					worktree.path,
-					options?.presetId,
-					options?.initialPrompt,
-				);
-
-				if (!result.success) {
-					setError(result.errorMessage!);
-					navigateWithClear('menu');
-					return;
-				}
-
-				session = result.session!;
+			// If a specific session is provided, navigate to it directly
+			if (options?.session) {
+				navigateToSession(options.session);
+				return;
 			}
 
-			navigateToSession(session);
+			// Check if there are running sessions for this worktree.
+			// Navigate to the first one found (matches old getSession(path) behavior).
+			// Skip when forceNew is set (S key — always create new session).
+			if (!options?.forceNew) {
+				const wtSessions = sessionManager.getSessionsForWorktree(worktree.path);
+				if (wtSessions.length > 0 && wtSessions[0]) {
+					navigateToSession(wtSessions[0]);
+					return;
+				}
+			}
+
+			if (!options?.presetId && configReader.getSelectPresetOnStart()) {
+				setSelectedWorktree(worktree);
+				navigateWithClear('preset-selector');
+				return;
+			}
+
+			setView(
+				options?.presetId ? 'creating-session-preset' : 'creating-session',
+			);
+
+			const result = await createSessionWithEffect(
+				worktree.path,
+				options?.presetId,
+				options?.initialPrompt,
+			);
+
+			if (!result.success) {
+				setError(result.errorMessage!);
+				navigateWithClear('menu');
+				return;
+			}
+
+			navigateToSession(result.session!);
 		},
 		[
 			sessionManager,
@@ -384,60 +410,64 @@ const App: React.FC<AppProps> = ({
 		}
 	};
 
-	const handleSelectWorktree = async (worktree: Worktree) => {
-		// Check if this is the new worktree option
-		if (worktree.path === '') {
-			navigateWithClear('new-worktree');
-			return;
+	const handleMenuAction = async (action: MenuAction) => {
+		switch (action.type) {
+			case 'newWorktree':
+				navigateWithClear('new-worktree');
+				return;
+			case 'newSession':
+				await startSessionForWorktree(
+					{
+						path: action.worktreePath,
+						branch: '',
+						isMainWorktree: false,
+						hasSession: true,
+					},
+					{forceNew: true},
+				);
+				return;
+			case 'renameSession':
+				setRenameTarget({
+					id: action.session.id,
+					name: action.session.sessionName,
+				});
+				navigateWithClear('rename-session');
+				return;
+			case 'killSession':
+				sessionManager.destroySession(action.sessionId);
+				setMenuKey(prev => prev + 1);
+				return;
+			case 'sessionActions':
+				setSessionActionsTarget({
+					session: action.session,
+					worktreePath: action.worktreePath,
+				});
+				navigateWithClear('session-actions');
+				return;
+			case 'deleteWorktree':
+				navigateWithClear('delete-worktree');
+				return;
+			case 'mergeWorktree':
+				navigateWithClear('merge-worktree');
+				return;
+			case 'configuration':
+				setConfigScope(action.scope);
+				navigateWithClear('configuration');
+				return;
+			case 'exit':
+				if (multiProject && selectedProject) {
+					handleBackToProjectList();
+				} else {
+					globalSessionOrchestrator.destroyAllSessions();
+					exit();
+				}
+				return;
+			case 'selectWorktree':
+				await startSessionForWorktree(action.worktree, {
+					session: action.session,
+				});
+				return;
 		}
-
-		// Check if this is the delete worktree option
-		if (worktree.path === 'DELETE_WORKTREE') {
-			navigateWithClear('delete-worktree');
-			return;
-		}
-
-		// Check if this is the merge worktree option
-		if (worktree.path === 'MERGE_WORKTREE') {
-			navigateWithClear('merge-worktree');
-			return;
-		}
-
-		// Check if this is the configuration option
-		if (worktree.path === 'CONFIGURATION') {
-			setConfigScope('global');
-			navigateWithClear('configuration');
-			return;
-		}
-
-		// Check if this is the project configuration option
-		if (worktree.path === 'CONFIGURATION_PROJECT') {
-			setConfigScope('project');
-			navigateWithClear('configuration');
-			return;
-		}
-
-		// Check if this is the global configuration option
-		if (worktree.path === 'CONFIGURATION_GLOBAL') {
-			setConfigScope('global');
-			navigateWithClear('configuration');
-			return;
-		}
-
-		// Check if this is the exit application option
-		if (worktree.path === 'EXIT_APPLICATION') {
-			// In multi-project mode with a selected project, go back to project list
-			if (multiProject && selectedProject) {
-				handleBackToProjectList();
-			} else {
-				// Only destroy all sessions when actually exiting the app
-				globalSessionOrchestrator.destroyAllSessions();
-				exit();
-			}
-			return;
-		}
-
-		await startSessionForWorktree(worktree);
 	};
 
 	const handlePresetSelected = async (presetId: string) => {
@@ -671,6 +701,12 @@ const App: React.FC<AppProps> = ({
 		// Delete the worktrees sequentially using Effect
 		let hasError = false;
 		for (const path of worktreePaths) {
+			// Destroy any running sessions for this worktree
+			const wtSessions = sessionManager.getSessionsForWorktree(path);
+			for (const s of wtSessions) {
+				sessionManager.destroySession(s.id);
+			}
+
 			const result = await Effect.runPromise(
 				Effect.either(
 					worktreeService.deleteWorktreeEffect(path, {deleteBranch}),
@@ -773,7 +809,7 @@ const App: React.FC<AppProps> = ({
 				key={menuKey}
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
-				onSelectWorktree={handleSelectWorktree}
+				onMenuAction={handleMenuAction}
 				onSelectRecentProject={handleSelectProject}
 				error={error}
 				onDismissError={() => setError(null)}
@@ -880,6 +916,72 @@ const App: React.FC<AppProps> = ({
 	if (view === 'configuration') {
 		return (
 			<Configuration scope={configScope} onComplete={handleReturnToMenu} />
+		);
+	}
+
+	if (view === 'rename-session' && renameTarget) {
+		return (
+			<SessionRename
+				currentName={renameTarget.name}
+				onRename={name => {
+					const session = sessionManager.getSessionById(renameTarget.id);
+					if (session) {
+						session.sessionName = name;
+					}
+					setRenameTarget(null);
+					handleReturnToMenu();
+				}}
+				onCancel={() => {
+					setRenameTarget(null);
+					handleReturnToMenu();
+				}}
+			/>
+		);
+	}
+
+	if (view === 'session-actions' && sessionActionsTarget) {
+		const {session: targetSession, worktreePath} = sessionActionsTarget;
+		const label = targetSession.sessionName
+			? `${worktreePath} : ${targetSession.sessionName}`
+			: `${worktreePath} #${targetSession.sessionNumber}`;
+
+		const handleSessionAction = async (action: SessionActionType) => {
+			setSessionActionsTarget(null);
+			switch (action) {
+				case 'newSession':
+					await startSessionForWorktree(
+						{
+							path: worktreePath,
+							branch: '',
+							isMainWorktree: false,
+							hasSession: true,
+						},
+						{forceNew: true},
+					);
+					return;
+				case 'rename':
+					setRenameTarget({
+						id: targetSession.id,
+						name: targetSession.sessionName,
+					});
+					navigateWithClear('rename-session');
+					return;
+				case 'kill':
+					sessionManager.destroySession(targetSession.id);
+					handleReturnToMenu();
+					return;
+			}
+		};
+
+		return (
+			<SessionActions
+				sessionLabel={label}
+				onSelect={handleSessionAction}
+				onCancel={() => {
+					setSessionActionsTarget(null);
+					handleReturnToMenu();
+				}}
+			/>
 		);
 	}
 

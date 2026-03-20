@@ -14,9 +14,9 @@ const MAX_BRANCH_NAME_LENGTH = 70; // Maximum characters for branch name display
 const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 
 /**
- * Worktree item with formatted content for display.
+ * One menu row: worktree metadata plus optional session (for multi-session worktrees).
  */
-export interface WorktreeItem {
+export interface SessionItem {
 	worktree: Worktree;
 	session?: Session;
 	baseLabel: string;
@@ -144,74 +144,176 @@ export function extractBranchParts(branchName: string): {
 }
 
 /**
- * Prepares worktree content for display with plain and colored versions.
+ * One pass over sessions: group by worktree path and track latest lastAccessedAt per path.
  */
-export function prepareWorktreeItems(
-	worktrees: Worktree[],
-	sessions: Session[],
-): WorktreeItem[] {
-	return worktrees.map(wt => {
-		const session = sessions.find(s => s.worktreePath === wt.path);
-		const stateData = session?.stateMutex.getSnapshot();
-		const status = stateData
-			? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
-			: '';
-		const fullBranchName = wt.branch
-			? wt.branch.replace('refs/heads/', '')
-			: 'detached';
-		const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
-		const isMain = wt.isMainWorktree ? ' (main)' : '';
-		const baseLabel = `${branchName}${isMain}${status}`;
+function indexSessionsByWorktree(sessions: Session[]): {
+	byWorktreePath: Map<string, Session[]>;
+	maxAccessAt: Map<string, number>;
+} {
+	const byWorktreePath = new Map<string, Session[]>();
+	const maxAccessAt = new Map<string, number>();
 
-		let fileChanges = '';
-		let aheadBehind = '';
-		let parentBranch = '';
-		let error = '';
+	for (const s of sessions) {
+		const path = s.worktreePath;
+		let list = byWorktreePath.get(path);
+		if (!list) {
+			list = [];
+			byWorktreePath.set(path, list);
+		}
+		list.push(s);
 
-		if (wt.gitStatus) {
-			fileChanges = formatGitFileChanges(wt.gitStatus);
-			aheadBehind = formatGitAheadBehind(wt.gitStatus);
-			parentBranch = formatParentBranch(
+		const prevMax = maxAccessAt.get(path) ?? 0;
+		if (s.lastAccessedAt > prevMax) {
+			maxAccessAt.set(path, s.lastAccessedAt);
+		}
+	}
+
+	return {byWorktreePath, maxAccessAt};
+}
+
+function displaySuffix(session: Session, multipleForWorktree: boolean): string {
+	if (multipleForWorktree) {
+		return session.sessionName
+			? `: ${session.sessionName}`
+			: ` #${session.sessionNumber}`;
+	}
+	return session.sessionName ? `: ${session.sessionName}` : '';
+}
+
+type GitStatusColumns = Pick<
+	SessionItem,
+	'fileChanges' | 'aheadBehind' | 'parentBranch'
+> & {
+	error?: string;
+};
+
+function gitStatusColumns(
+	wt: Worktree,
+	fullBranchName: string,
+): GitStatusColumns {
+	if (wt.gitStatus) {
+		return {
+			fileChanges: formatGitFileChanges(wt.gitStatus),
+			aheadBehind: formatGitAheadBehind(wt.gitStatus),
+			parentBranch: formatParentBranch(
 				wt.gitStatus.parentBranch,
 				fullBranchName,
-			);
-		} else if (wt.gitStatusError) {
-			// Format error in red
-			error = `\x1b[31m[git error]\x1b[0m`;
-		} else {
-			// Show fetching status in dim gray
-			fileChanges = '\x1b[90m[fetching...]\x1b[0m';
+			),
+		};
+	}
+	if (wt.gitStatusError) {
+		return {
+			fileChanges: '',
+			aheadBehind: '',
+			parentBranch: '',
+			error: `\x1b[31m[git error]\x1b[0m`,
+		};
+	}
+	return {
+		fileChanges: '\x1b[90m[fetching...]\x1b[0m',
+		aheadBehind: '',
+		parentBranch: '',
+	};
+}
+
+/**
+ * Build a single SessionItem row for display.
+ */
+function buildSessionItem(
+	wt: Worktree,
+	session: Session | undefined,
+	sessionSuffix: string,
+): SessionItem {
+	const stateData = session?.stateMutex.getSnapshot();
+	const status = stateData
+		? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
+		: '';
+	const fullBranchName = wt.branch
+		? wt.branch.replace('refs/heads/', '')
+		: 'detached';
+	const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
+	const isMain = wt.isMainWorktree ? ' (main)' : '';
+	const baseLabel = `${branchName}${isMain}${sessionSuffix}${status}`;
+	const {fileChanges, aheadBehind, parentBranch, error} = gitStatusColumns(
+		wt,
+		fullBranchName,
+	);
+	const lastCommitDate = wt.lastCommitDate
+		? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
+		: '';
+
+	return {
+		worktree: wt,
+		session,
+		baseLabel,
+		fileChanges,
+		aheadBehind,
+		parentBranch,
+		lastCommitDate,
+		error,
+		lengths: {
+			base: stripAnsi(baseLabel).length,
+			fileChanges: stripAnsi(fileChanges).length,
+			aheadBehind: stripAnsi(aheadBehind).length,
+			parentBranch: stripAnsi(parentBranch).length,
+			lastCommitDate: stripAnsi(lastCommitDate).length,
+		},
+	};
+}
+
+/**
+ * Prepares session items for display.
+ * Supports multiple sessions per worktree.
+ * When sortByLastSession is true, worktrees are sorted by the most recent
+ * session lastAccessedAt timestamp (descending), and sessions within each
+ * worktree are also sorted by lastAccessedAt.
+ */
+export function prepareSessionItems(
+	worktrees: Worktree[],
+	sessions: Session[],
+	options?: {sortByLastSession?: boolean},
+): SessionItem[] {
+	const {byWorktreePath, maxAccessAt} = indexSessionsByWorktree(sessions);
+	const items: SessionItem[] = [];
+
+	const orderedWorktrees =
+		options?.sortByLastSession && sessions.length > 0
+			? [...worktrees].sort((a, b) => {
+					const timeA = maxAccessAt.get(a.path);
+					const timeB = maxAccessAt.get(b.path);
+					if (timeA === undefined && timeB === undefined) return 0;
+					return (timeB ?? 0) - (timeA ?? 0);
+				})
+			: worktrees;
+
+	for (const wt of orderedWorktrees) {
+		const wtSessions = byWorktreePath.get(wt.path) ?? [];
+
+		if (wtSessions.length === 0) {
+			items.push(buildSessionItem(wt, undefined, ''));
+			continue;
 		}
 
-		// Format last commit date as dim relative time
-		const lastCommitDate = wt.lastCommitDate
-			? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
-			: '';
+		const ordered =
+			wtSessions.length > 1
+				? [...wtSessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)
+				: wtSessions;
+		const multiple = ordered.length > 1;
 
-		return {
-			worktree: wt,
-			session,
-			baseLabel,
-			fileChanges,
-			aheadBehind,
-			parentBranch,
-			lastCommitDate,
-			error,
-			lengths: {
-				base: stripAnsi(baseLabel).length,
-				fileChanges: stripAnsi(fileChanges).length,
-				aheadBehind: stripAnsi(aheadBehind).length,
-				parentBranch: stripAnsi(parentBranch).length,
-				lastCommitDate: stripAnsi(lastCommitDate).length,
-			},
-		};
-	});
+		for (const session of ordered) {
+			items.push(
+				buildSessionItem(wt, session, displaySuffix(session, multiple)),
+			);
+		}
+	}
+
+	return items;
 }
 
 /**
  * Calculates column positions based on content widths.
  */
-export function calculateColumnPositions(items: WorktreeItem[]) {
+export function calculateColumnPositions(items: SessionItem[]) {
 	// Calculate maximum widths from pre-calculated lengths
 	let maxBranchLength = 0;
 	let maxFileChangesLength = 0;
@@ -262,8 +364,8 @@ function padTo(str: string, visibleLength: number, column: number): string {
 /**
  * Assembles the final worktree label with proper column alignment
  */
-export function assembleWorktreeLabel(
-	item: WorktreeItem,
+export function assembleSessionLabel(
+	item: SessionItem,
 	columns: ReturnType<typeof calculateColumnPositions>,
 ): string {
 	// If there's an error, just show the base label with error appended

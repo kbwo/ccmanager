@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
-import {Worktree, Session, GitProject} from '../types/index.js';
+import {Worktree, Session, GitProject, MenuAction} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {GitError} from '../types/errors.js';
@@ -13,9 +13,9 @@ import {
 } from '../constants/statusIcons.js';
 import {useGitStatus} from '../hooks/useGitStatus.js';
 import {
-	prepareWorktreeItems,
+	prepareSessionItems,
 	calculateColumnPositions,
-	assembleWorktreeLabel,
+	assembleSessionLabel,
 } from '../utils/worktreeUtils.js';
 import {projectManager} from '../services/projectManager.js';
 import {RecentProject} from '../types/index.js';
@@ -29,7 +29,7 @@ import {configReader} from '../services/config/configReader.js';
 interface MenuProps {
 	sessionManager: SessionManager;
 	worktreeService: WorktreeService;
-	onSelectWorktree: (worktree: Worktree) => void;
+	onMenuAction: (action: MenuAction) => void;
 	onSelectRecentProject?: (project: GitProject) => void;
 	error?: string | null;
 	onDismissError?: () => void;
@@ -44,11 +44,12 @@ interface CommonItem {
 	value: string;
 }
 
-interface WorktreeItem {
+interface SessionMenuItem {
 	type: 'worktree';
 	label: string;
 	value: string;
 	worktree: Worktree;
+	session?: Session;
 }
 
 interface ProjectItem {
@@ -58,7 +59,7 @@ interface ProjectItem {
 	recentProject: RecentProject;
 }
 
-type MenuItem = CommonItem | WorktreeItem | ProjectItem;
+type MenuItem = CommonItem | SessionMenuItem | ProjectItem;
 
 const createSeparatorWithText = (
 	text: string,
@@ -84,7 +85,7 @@ const formatGitError = (error: GitError): string => {
 const Menu: React.FC<MenuProps> = ({
 	sessionManager,
 	worktreeService,
-	onSelectWorktree,
+	onMenuAction,
 	onSelectRecentProject,
 	error,
 	onDismissError,
@@ -102,6 +103,9 @@ const Menu: React.FC<MenuProps> = ({
 	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<
 		string | null
 	>(null);
+	const [highlightedSession, setHighlightedSession] = useState<
+		Session | undefined
+	>(undefined);
 	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
 
 	// Use the search mode hook
@@ -124,9 +128,7 @@ const Menu: React.FC<MenuProps> = ({
 		// Load worktrees and default branch using Effect composition
 		// Chain getWorktreesEffect and getDefaultBranchEffect using Effect.flatMap
 		const loadWorktreesAndBranch = Effect.flatMap(
-			worktreeService.getWorktreesEffect({
-				sortByLastSession: worktreeConfig.sortByLastSession,
-			}),
+			worktreeService.getWorktreesEffect(),
 			worktrees =>
 				Effect.map(worktreeService.getDefaultBranchEffect(), defaultBranch => ({
 					worktrees,
@@ -201,16 +203,13 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [
-		sessionManager,
-		worktreeService,
-		multiProject,
-		worktreeConfig.sortByLastSession,
-	]);
+	}, [sessionManager, worktreeService, multiProject]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
-		const items = prepareWorktreeItems(worktrees, sessions);
+		const items = prepareSessionItems(worktrees, sessions, {
+			sortByLastSession: worktreeConfig.sortByLastSession,
+		});
 		const columnPositions = calculateColumnPositions(items);
 
 		// Filter worktrees based on search query
@@ -225,8 +224,8 @@ const Menu: React.FC<MenuProps> = ({
 
 		// Build menu items with proper alignment
 		const menuItems: MenuItem[] = filteredItems.map(
-			(item, index): WorktreeItem => {
-				const baseLabel = assembleWorktreeLabel(item, columnPositions);
+			(item, index): SessionMenuItem => {
+				const baseLabel = assembleSessionLabel(item, columnPositions);
 				const aaDisabled =
 					configReader.isAutoApprovalEnabled() &&
 					sessionManager.isAutoApprovalDisabledForWorktree(item.worktree.path);
@@ -237,11 +236,17 @@ const Menu: React.FC<MenuProps> = ({
 				const numberPrefix =
 					!isSearchMode && index < 10 ? `${index} ❯ ` : '  ❯ ';
 
+				// Use session id for value if present, otherwise worktree path
+				const value = item.session
+					? `session:${item.session.id}`
+					: item.worktree.path;
+
 				return {
 					type: 'worktree',
 					label: numberPrefix + label,
-					value: item.worktree.path,
+					value,
 					worktree: item.worktree,
+					session: item.session,
 				};
 			},
 		);
@@ -364,16 +369,22 @@ const Menu: React.FC<MenuProps> = ({
 		setItems(menuItems);
 
 		// Ensure highlighted worktree path is valid for hotkey support
-		// (e.g., on initial render or when returning from a session view)
 		setHighlightedWorktreePath(prev => {
 			if (
 				prev &&
-				menuItems.some(item => item.type === 'worktree' && item.value === prev)
+				menuItems.some(
+					item => item.type === 'worktree' && item.worktree.path === prev,
+				)
 			) {
 				return prev;
 			}
 			const first = menuItems.find(item => item.type === 'worktree');
-			return first && first.type === 'worktree' ? first.worktree.path : null;
+			if (first && first.type === 'worktree') {
+				setHighlightedSession(first.session);
+				return first.worktree.path;
+			}
+			setHighlightedSession(undefined);
+			return null;
 		});
 	}, [
 		worktrees,
@@ -386,6 +397,7 @@ const Menu: React.FC<MenuProps> = ({
 		isSearchMode,
 		autoApprovalToggleCounter,
 		sessionManager,
+		worktreeConfig.sortByLastSession,
 	]);
 
 	// Handle hotkeys
@@ -423,7 +435,11 @@ const Menu: React.FC<MenuProps> = ({
 
 			// Check if it's a worktree
 			if (index < worktreeItems.length && worktreeItems[index]) {
-				onSelectWorktree(worktreeItems[index].worktree);
+				onMenuAction({
+					type: 'selectWorktree',
+					worktree: worktreeItems[index].worktree,
+					session: worktreeItems[index].session,
+				});
 				return;
 			}
 
@@ -449,85 +465,49 @@ const Menu: React.FC<MenuProps> = ({
 					setAutoApprovalToggleCounter(c => c + 1);
 				}
 				break;
+			case ' ':
+				// Open session actions for highlighted session
+				if (highlightedSession && highlightedWorktreePath) {
+					onMenuAction({
+						type: 'sessionActions',
+						session: highlightedSession,
+						worktreePath: highlightedWorktreePath,
+					});
+				}
+				break;
 			case 'n':
-				// Trigger new worktree action
-				onSelectWorktree({
-					path: '',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				onMenuAction({type: 'newWorktree'});
 				break;
 			case 'm':
-				// Trigger merge worktree action
-				onSelectWorktree({
-					path: 'MERGE_WORKTREE',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				onMenuAction({type: 'mergeWorktree'});
 				break;
 			case 'd':
-				// Trigger delete worktree action
-				onSelectWorktree({
-					path: 'DELETE_WORKTREE',
-					branch: '',
-					isMainWorktree: false,
-					hasSession: false,
-				});
+				onMenuAction({type: 'deleteWorktree'});
 				break;
 			case 'p':
 				// Trigger project configuration action (only in single-project mode)
 				if (!multiProject) {
-					onSelectWorktree({
-						path: 'CONFIGURATION_PROJECT',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
+					onMenuAction({type: 'configuration', scope: 'project'});
 				}
 				break;
 			case 'c':
-				// Trigger configuration action
-				if (multiProject) {
-					// In multi-project mode, 'c' opens global configuration (backward compatible)
-					onSelectWorktree({
-						path: 'CONFIGURATION',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
-				} else {
-					// In single-project mode, 'c' opens global configuration
-					onSelectWorktree({
-						path: 'CONFIGURATION_GLOBAL',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
-				}
+				onMenuAction({type: 'configuration', scope: 'global'});
 				break;
 			case 'b':
 				// In multi-project mode, go back to project list
 				if (projectName) {
-					onSelectWorktree({
-						path: 'EXIT_APPLICATION',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
+					onMenuAction({type: 'exit'});
+				}
+				break;
+			case 'x':
+				if (!projectName) {
+					onMenuAction({type: 'exit'});
 				}
 				break;
 			case 'q':
-			case 'x':
 				// Trigger exit action (only in single-project mode)
 				if (!projectName) {
-					onSelectWorktree({
-						path: 'EXIT_APPLICATION',
-						branch: '',
-						isMainWorktree: false,
-						hasSession: false,
-					});
+					onMenuAction({type: 'exit'});
 				}
 				break;
 		}
@@ -537,7 +517,6 @@ const Menu: React.FC<MenuProps> = ({
 		if (item.value.endsWith('-separator') || item.value === 'recent-header') {
 			// Do nothing for separators and headers
 		} else if (item.type === 'project') {
-			// Handle recent project selection
 			if (onSelectRecentProject) {
 				const project: GitProject = {
 					path: item.recentProject.path,
@@ -548,71 +527,25 @@ const Menu: React.FC<MenuProps> = ({
 				onSelectRecentProject(project);
 			}
 		} else if (item.value === 'new-worktree') {
-			// Handle in parent component
-			onSelectWorktree({
-				path: '',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'newWorktree'});
 		} else if (item.value === 'merge-worktree') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'MERGE_WORKTREE',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'mergeWorktree'});
 		} else if (item.value === 'delete-worktree') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'DELETE_WORKTREE',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'deleteWorktree'});
 		} else if (item.value === 'configuration') {
-			// Handle in parent component - use special marker (backward compatible for multi-project mode)
-			onSelectWorktree({
-				path: 'CONFIGURATION',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'configuration', scope: 'global'});
 		} else if (item.value === 'configuration-project') {
-			// Handle in parent component - use special marker for project config
-			onSelectWorktree({
-				path: 'CONFIGURATION_PROJECT',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'configuration', scope: 'project'});
 		} else if (item.value === 'configuration-global') {
-			// Handle in parent component - use special marker for global config
-			onSelectWorktree({
-				path: 'CONFIGURATION_GLOBAL',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
-		} else if (item.value === 'exit') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'EXIT_APPLICATION',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
-		} else if (item.value === 'back-to-projects') {
-			// Handle in parent component - use special marker
-			onSelectWorktree({
-				path: 'EXIT_APPLICATION',
-				branch: '',
-				isMainWorktree: false,
-				hasSession: false,
-			});
+			onMenuAction({type: 'configuration', scope: 'global'});
+		} else if (item.value === 'exit' || item.value === 'back-to-projects') {
+			onMenuAction({type: 'exit'});
 		} else if (item.type === 'worktree') {
-			onSelectWorktree(item.worktree);
+			onMenuAction({
+				type: 'selectWorktree',
+				worktree: item.worktree,
+				session: item.session,
+			});
 		}
 	};
 
@@ -657,6 +590,7 @@ const Menu: React.FC<MenuProps> = ({
 						const menuItem = item as MenuItem;
 						if (menuItem.type === 'worktree') {
 							setHighlightedWorktreePath(menuItem.worktree.path);
+							setHighlightedSession(menuItem.session);
 						}
 					}}
 					isFocused={!error}
@@ -694,12 +628,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select N-New M-Merge D-Delete ${
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Space-Session actions (session rows only) N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search N-New M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Space-Session actions (session rows only) N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'

@@ -64,9 +64,6 @@ vi.mock('./config/configReader.js', () => ({
 		}),
 		getHooks: vi.fn().mockReturnValue({}),
 		getStatusHooks: vi.fn().mockReturnValue({}),
-		setWorktreeLastOpened: vi.fn(),
-		getWorktreeLastOpenedTime: vi.fn(),
-		getWorktreeLastOpened: vi.fn(() => ({})),
 		isAutoApprovalEnabled: vi.fn(() => true),
 		setAutoApprovalEnabled: vi.fn(),
 	},
@@ -218,10 +215,7 @@ describe('SessionManager - Auto Approval Recovery', () => {
 		const handler = vi.fn();
 		sessionManager.on('sessionStateChanged', handler);
 
-		sessionManager.cancelAutoApproval(
-			session.worktreePath,
-			'User pressed a key',
-		);
+		sessionManager.cancelAutoApproval(session.id, 'User pressed a key');
 
 		// Wait for async mutex update to complete (use vi.waitFor for proper async handling)
 		await vi.waitFor(() => {
