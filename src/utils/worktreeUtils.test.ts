@@ -235,6 +235,8 @@ describe('prepareSessionItems', () => {
 		id: 'test-session',
 		worktreePath: '/path/to/worktree',
 		sessionNumber: 1,
+		command: 'claude',
+		fallbackArgs: undefined,
 		lastAccessedAt: Date.now(),
 		process: {} as Session['process'],
 		output: [],
