@@ -50,6 +50,6 @@ tmux set -g status-right "Claude: $CCMANAGER_NEW_STATE" && noti -t "Claude Statu
 - `CCMANAGER_OLD_STATE`: Previous state (idle, busy, waiting_input)
 - `CCMANAGER_NEW_STATE`: New state (idle, busy, waiting_input)
 - `CCMANAGER_WORKTREE_PATH`: Path to the worktree where status changed
-- `CCMANAGER_WORKTREE_DIR`: Parent directory containing the worktree
+- `CCMANAGER_WORKTREE_DIR`: Directory of the worktree where status changed
 - `CCMANAGER_WORKTREE_BRANCH`: Git branch name of the worktree
 - `CCMANAGER_SESSION_ID`: Unique session identifier

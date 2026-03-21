@@ -1,5 +1,4 @@
 import {spawn} from 'child_process';
-import {dirname} from 'path';
 import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
 import {Worktree, Session, SessionState} from '../types/index.js';
@@ -211,7 +210,7 @@ export function executeStatusHook(
 		// Build environment for status hook
 		const environment: HookEnvironment = {
 			CCMANAGER_WORKTREE_PATH: session.worktreePath,
-			CCMANAGER_WORKTREE_DIR: dirname(session.worktreePath),
+			CCMANAGER_WORKTREE_DIR: session.worktreePath,
 			CCMANAGER_WORKTREE_BRANCH: branch,
 			CCMANAGER_GIT_ROOT: session.worktreePath, // For status hooks, we use worktree path as cwd
 			CCMANAGER_OLD_STATE: oldState,
