@@ -217,6 +217,7 @@ export function executeStatusHook(
 			CCMANAGER_OLD_STATE: oldState,
 			CCMANAGER_NEW_STATE: newState,
 			CCMANAGER_SESSION_ID: session.id,
+			CCMANAGER_PRESET_NAME: session.presetName || '',
 		};
 
 		yield* Effect.catchAll(

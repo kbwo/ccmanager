@@ -46,6 +46,7 @@ export interface Session {
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
 	stateCheckInterval: NodeJS.Timeout | undefined; // Interval for checking terminal state
 	isPrimaryCommand: boolean; // Track if process was started with main command args
+	presetName: string | undefined; // Name of the command preset used for this session
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	/**
