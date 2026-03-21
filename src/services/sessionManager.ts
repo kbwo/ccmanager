@@ -302,6 +302,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		ptyProcess: IPty,
 		options: {
 			isPrimaryCommand?: boolean;
+			presetName?: string;
 			detectionStrategy?: StateDetectionStrategy;
 			devcontainerConfig?: DevcontainerConfig;
 		} = {},
@@ -329,6 +330,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
+			presetName: options.presetName,
 			detectionStrategy,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
@@ -383,6 +385,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					ptyProcess,
 					{
 						isPrimaryCommand: true,
+						presetName: preset.name,
 						detectionStrategy: preset.detectionStrategy,
 					},
 				);
@@ -893,6 +896,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					ptyProcess,
 					{
 						isPrimaryCommand: true,
+						presetName: preset.name,
 						detectionStrategy: preset.detectionStrategy,
 						devcontainerConfig,
 					},

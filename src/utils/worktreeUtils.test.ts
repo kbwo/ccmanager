@@ -244,6 +244,7 @@ describe('prepareSessionItems', () => {
 		terminal: {} as Session['terminal'],
 		stateCheckInterval: undefined,
 		isPrimaryCommand: true,
+		presetName: undefined,
 		detectionStrategy: 'claude',
 		devcontainerConfig: undefined,
 		stateMutex: new Mutex({
