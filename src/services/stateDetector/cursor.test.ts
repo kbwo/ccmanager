@@ -175,6 +175,24 @@ describe('CursorStateDetector', () => {
 		expect(state).toBe('busy');
 	});
 
+	it('should detect busy state for spinner activity (⬡ …ing..)', () => {
+		terminal = createMockTerminal(['  ⬡ Grepping..', 'Some footer']);
+
+		expect(detector.detectState(terminal, 'idle')).toBe('busy');
+	});
+
+	it('should detect busy state for spinner activity (⬢ …ing...)', () => {
+		terminal = createMockTerminal(['  ⬢ Reading...']);
+
+		expect(detector.detectState(terminal, 'idle')).toBe('busy');
+	});
+
+	it('should detect busy state for spinner activity with Unicode ellipsis', () => {
+		terminal = createMockTerminal(['⬡ Searching\u2026']);
+
+		expect(detector.detectState(terminal, 'idle')).toBe('busy');
+	});
+
 	it('should detect idle state when no patterns match', () => {
 		// Arrange
 		terminal = createMockTerminal(['Normal output', 'Some message', 'Ready']);
