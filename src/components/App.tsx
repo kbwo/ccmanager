@@ -698,6 +698,12 @@ const App: React.FC<AppProps> = ({
 		setView('deleting-worktree');
 		setError(null);
 
+		// Yield to the event loop so Ink can paint `deleting-worktree` before git work runs.
+		// Otherwise the confirmation UI stays visible until deletion finishes (no spinner).
+		await new Promise<void>(resolve => {
+			setTimeout(resolve, 0);
+		});
+
 		// Delete the worktrees sequentially using Effect
 		let hasError = false;
 		for (const path of worktreePaths) {
