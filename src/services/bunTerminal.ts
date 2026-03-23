@@ -30,6 +30,7 @@ export interface IPtyForkOptions {
 	rows?: number;
 	cwd?: string;
 	env?: Record<string, string | undefined>;
+	rawMode?: boolean;
 }
 
 /**
@@ -109,9 +110,10 @@ class BunTerminal implements IPty {
 			},
 		});
 
-		// Match node-pty behavior by starting in raw mode (no canonical input/echo),
-		// while keeping Bun's output processing defaults intact.
-		this._terminal.setRawMode(true);
+		// Most interactive CLIs work best when the PTY starts in raw mode, but
+		// terminal proxy commands such as `devcontainer exec` manage termios
+		// themselves and break if the outer PTY is forced raw first.
+		this._terminal.setRawMode(options.rawMode ?? true);
 
 		// Disable ONLCR in the PTY output flags to avoid double CRLF translation
 		// when forwarding PTY output to the real stdout TTY.

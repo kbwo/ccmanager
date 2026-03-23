@@ -4,7 +4,17 @@ import {ValidationError} from '../types/errors.js';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
 import {Session, DevcontainerConfig} from '../types/index.js';
-import {exec} from 'child_process';
+import {spawn as childSpawn} from 'child_process';
+
+// Helper to create a mock child process for child_process.spawn
+function createMockChildProcess(exitCode = 0) {
+	const stdout = new EventEmitter();
+	const stderr = new EventEmitter();
+	const proc = Object.assign(new EventEmitter(), {stdout, stderr});
+	// Emit 'close' asynchronously so listeners can be attached
+	process.nextTick(() => proc.emit('close', exitCode));
+	return proc;
+}
 
 // Mock bunTerminal
 vi.mock('./bunTerminal.js', () => ({
@@ -15,12 +25,11 @@ vi.mock('./bunTerminal.js', () => ({
 
 // Mock child_process
 vi.mock('child_process', () => ({
-	exec: vi.fn(function () {
-		return null;
+	spawn: vi.fn(function () {
+		return createMockChildProcess(0);
 	}),
-	execFile: vi.fn(function () {
-		return null;
-	}),
+	exec: vi.fn(),
+	execFile: vi.fn(),
 }));
 
 // Mock configuration manager
@@ -581,30 +590,10 @@ describe('SessionManager', () => {
 
 	describe('createSessionWithDevcontainerEffect', () => {
 		beforeEach(() => {
-			// Reset shouldFail flag
-			const mockExec = vi.mocked(exec) as ReturnType<typeof vi.fn> & {
-				shouldFail?: boolean;
-			};
-			mockExec.shouldFail = false;
-
-			// Setup exec mock to work with promisify
-			mockExec.mockImplementation(((...args: unknown[]) => {
-				const [command, , callback] = args as [
-					string,
-					unknown,
-					((err: Error | null, stdout?: string, stderr?: string) => void)?,
-				];
-				if (callback) {
-					// Handle callback style
-					if (command.includes('devcontainer up')) {
-						if (mockExec.shouldFail) {
-							callback(new Error('Container startup failed'));
-						} else {
-							callback(null, '', '');
-						}
-					}
-				}
-			}) as Parameters<typeof mockExec.mockImplementation>[0]);
+			// Setup childSpawn mock to return a successful mock child process
+			vi.mocked(childSpawn).mockImplementation(
+				() => createMockChildProcess(0) as ReturnType<typeof childSpawn>,
+			);
 		});
 
 		it('should execute devcontainer up command before creating session', async () => {
@@ -647,7 +636,7 @@ describe('SessionManager', () => {
 					'--teammate-mode',
 					'in-process',
 				],
-				expect.objectContaining({cwd: '/test/worktree'}),
+				expect.objectContaining({cwd: '/test/worktree', rawMode: false}),
 			);
 		});
 
@@ -697,11 +686,10 @@ describe('SessionManager', () => {
 		});
 
 		it('should throw error when devcontainer up fails', async () => {
-			// Setup exec to fail
-			const mockExec = vi.mocked(exec) as ReturnType<typeof vi.fn> & {
-				shouldFail?: boolean;
-			};
-			mockExec.shouldFail = true;
+			// Setup childSpawn to return a process that exits with code 1
+			vi.mocked(childSpawn).mockImplementation(
+				() => createMockChildProcess(1) as ReturnType<typeof childSpawn>,
+			);
 
 			// Create session with devcontainer
 			const devcontainerConfig = {
@@ -717,7 +705,7 @@ describe('SessionManager', () => {
 					),
 				),
 			).rejects.toThrow(
-				'Failed to start devcontainer: Container startup failed',
+				'Failed to start devcontainer: Command exited with code 1',
 			);
 		});
 
@@ -819,25 +807,6 @@ describe('SessionManager', () => {
 			// Setup spawn mock
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-						options = undefined;
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
-
 			await Effect.runPromise(
 				sessionManager.createSessionWithDevcontainerEffect('/test/worktree2', {
 					upCommand: 'devcontainer up --workspace-folder .',
@@ -859,30 +828,12 @@ describe('SessionManager', () => {
 				],
 				expect.objectContaining({
 					cwd: '/test/worktree2',
+					rawMode: false,
 				}),
 			);
 		});
 
 		it('should use preset with devcontainer', async () => {
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-						options = undefined;
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
-
 			await Effect.runPromise(
 				sessionManager.createSessionWithDevcontainerEffect(
 					'/test/worktree',
@@ -905,25 +856,6 @@ describe('SessionManager', () => {
 		});
 
 		it('should parse exec command and append preset command', async () => {
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-						options = undefined;
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
-
 			const config: DevcontainerConfig = {
 				upCommand: 'devcontainer up --workspace-folder /path/to/project',
 				execCommand:
@@ -955,25 +887,6 @@ describe('SessionManager', () => {
 		});
 
 		it('should handle preset with args in devcontainer', async () => {
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-						options = undefined;
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
-
 			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
 				Either.right({
 					id: 'claude-with-args',
@@ -1012,26 +925,6 @@ describe('SessionManager', () => {
 		});
 
 		it('should use empty args as fallback in devcontainer when no fallback args specified', async () => {
-			// Setup exec mock for devcontainer up
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-						options = undefined;
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
-
 			// Setup preset without fallback args
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
@@ -1094,7 +987,7 @@ describe('SessionManager', () => {
 					'--teammate-mode',
 					'in-process',
 				],
-				expect.objectContaining({cwd: '/test/worktree'}),
+				expect.objectContaining({cwd: '/test/worktree', rawMode: false}),
 			);
 
 			// Verify session process was replaced
@@ -1103,26 +996,6 @@ describe('SessionManager', () => {
 		});
 
 		it('should fallback to default command in devcontainer when primary command exits with code 1', async () => {
-			// Setup exec mock for devcontainer up
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-						options = undefined;
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
-
 			// Setup preset with args
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
@@ -1184,7 +1057,7 @@ describe('SessionManager', () => {
 					'--teammate-mode',
 					'in-process',
 				],
-				expect.objectContaining({cwd: '/test/worktree'}),
+				expect.objectContaining({cwd: '/test/worktree', rawMode: false}),
 			);
 
 			// Verify session process was replaced

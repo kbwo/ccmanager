@@ -12,8 +12,18 @@ vi.mock('./bunTerminal.js', () => ({
 	}),
 }));
 
+// Helper to create a mock child process for child_process.spawn
+function createMockChildProcess(exitCode = 0) {
+	const stdout = new EventEmitter();
+	const stderr = new EventEmitter();
+	const proc = Object.assign(new EventEmitter(), {stdout, stderr});
+	process.nextTick(() => proc.emit('close', exitCode));
+	return proc;
+}
+
 // Mock child_process
 vi.mock('child_process', () => ({
+	spawn: vi.fn(() => createMockChildProcess(0)),
 	exec: vi.fn(),
 	execFile: vi.fn(),
 }));
@@ -213,26 +223,6 @@ describe('SessionManager Effect-based Operations', () => {
 			// Setup spawn mock
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			// Mock exec to succeed
-			const {exec} = await import('child_process');
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
-
 			const devcontainerConfig: DevcontainerConfig = {
 				upCommand: 'devcontainer up --workspace-folder .',
 				execCommand: 'devcontainer exec --workspace-folder .',
@@ -253,24 +243,10 @@ describe('SessionManager Effect-based Operations', () => {
 		});
 
 		it('should return Effect that fails with ProcessError when devcontainer up fails', async () => {
-			// Mock exec to fail
-			const {exec} = await import('child_process');
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-					}
-					if (callback && typeof callback === 'function') {
-						callback(new Error('Container failed to start'), '', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
+			// Mock spawn to return a process that exits with code 1
+			const {spawn: childSpawn} = await import('child_process');
+			vi.mocked(childSpawn).mockImplementation(
+				() => createMockChildProcess(1) as ReturnType<typeof childSpawn>,
 			);
 
 			const devcontainerConfig: DevcontainerConfig = {
@@ -292,12 +268,18 @@ describe('SessionManager Effect-based Operations', () => {
 				expect(result.left._tag).toBe('ProcessError');
 				if (result.left._tag === 'ProcessError') {
 					expect(result.left.command).toContain('devcontainer up');
-					expect(result.left.message).toContain('Container failed');
+					expect(result.left.message).toContain('Command exited with code 1');
 				}
 			}
 		});
 
 		it('should return Effect that fails with ConfigError when preset not found', async () => {
+			// Reset childSpawn mock to succeed (devcontainer up should pass)
+			const {spawn: childSpawn} = await import('child_process');
+			vi.mocked(childSpawn).mockImplementation(
+				() => createMockChildProcess(0) as ReturnType<typeof childSpawn>,
+			);
+
 			// Setup mocks - getPresetByIdEffect returns Left, getDefaultPreset returns undefined
 			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
 				Either.left(
@@ -310,26 +292,6 @@ describe('SessionManager Effect-based Operations', () => {
 			);
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue(
 				undefined as unknown as CommandPreset,
-			);
-
-			// Mock exec to succeed (devcontainer up)
-			const {exec} = await import('child_process');
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
 			);
 
 			const devcontainerConfig: DevcontainerConfig = {
