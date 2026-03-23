@@ -123,6 +123,9 @@ const App: React.FC<AppProps> = ({
 		stage?: 'naming' | 'creating';
 	}>({});
 
+	// State for streaming devcontainer up logs
+	const [devcontainerLogs, setDevcontainerLogs] = useState<string[]>([]);
+
 	// Helper function to format error messages based on error type using _tag discrimination
 	const formatErrorMessage = (error: AppError): string => {
 		switch (error._tag) {
@@ -150,12 +153,20 @@ const App: React.FC<AppProps> = ({
 			session?: ISession;
 			errorMessage?: string;
 		}> => {
+			setDevcontainerLogs([]);
 			const sessionEffect = devcontainerConfig
 				? sessionManager.createSessionWithDevcontainerEffect(
 						worktreePath,
 						devcontainerConfig,
 						presetId,
 						initialPrompt,
+						(line: string) => {
+							setDevcontainerLogs(prev => {
+								const next = [...prev, line];
+								// Keep only the last 10 lines to avoid unbounded growth
+								return next.length > 10 ? next.slice(-10) : next;
+							});
+						},
 					)
 				: sessionManager.createSessionWithPresetEffect(
 						worktreePath,
@@ -1019,6 +1030,15 @@ const App: React.FC<AppProps> = ({
 		return (
 			<Box flexDirection="column">
 				<LoadingSpinner message={message} color={color} />
+				{devcontainerLogs.length > 0 && (
+					<Box flexDirection="column" marginTop={1} marginLeft={2}>
+						{devcontainerLogs.map((line, i) => (
+							<Text key={i} dimColor>
+								{line}
+							</Text>
+						))}
+					</Box>
+				)}
 			</Box>
 		);
 	}
@@ -1038,6 +1058,15 @@ const App: React.FC<AppProps> = ({
 		return (
 			<Box flexDirection="column">
 				<LoadingSpinner message={message} color={color} />
+				{devcontainerLogs.length > 0 && (
+					<Box flexDirection="column" marginTop={1} marginLeft={2}>
+						{devcontainerLogs.map((line, i) => (
+							<Text key={i} dimColor>
+								{line}
+							</Text>
+						))}
+					</Box>
+				)}
 			</Box>
 		);
 	}
