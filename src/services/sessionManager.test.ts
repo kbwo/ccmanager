@@ -636,7 +636,7 @@ describe('SessionManager', () => {
 					'--teammate-mode',
 					'in-process',
 				],
-				expect.objectContaining({cwd: '/test/worktree'}),
+				expect.objectContaining({cwd: '/test/worktree', rawMode: false}),
 			);
 		});
 
@@ -828,6 +828,7 @@ describe('SessionManager', () => {
 				],
 				expect.objectContaining({
 					cwd: '/test/worktree2',
+					rawMode: false,
 				}),
 			);
 		});
@@ -986,7 +987,7 @@ describe('SessionManager', () => {
 					'--teammate-mode',
 					'in-process',
 				],
-				expect.objectContaining({cwd: '/test/worktree'}),
+				expect.objectContaining({cwd: '/test/worktree', rawMode: false}),
 			);
 
 			// Verify session process was replaced
@@ -1056,7 +1057,7 @@ describe('SessionManager', () => {
 					'--teammate-mode',
 					'in-process',
 				],
-				expect.objectContaining({cwd: '/test/worktree'}),
+				expect.objectContaining({cwd: '/test/worktree', rawMode: false}),
 			);
 
 			// Verify session process was replaced

@@ -53,6 +53,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		command: string,
 		args: string[],
 		worktreePath: string,
+		options: {rawMode?: boolean} = {},
 	): Promise<IPty> {
 		const spawnOptions = {
 			name: 'xterm-256color',
@@ -60,6 +61,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			rows: process.stdout.rows || 24,
 			cwd: worktreePath,
 			env: process.env,
+			...(options.rawMode === undefined ? {} : {rawMode: options.rawMode}),
 		};
 
 		return spawn(command, args, spawnOptions);
@@ -492,6 +494,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 							devcontainerCmd,
 							fallbackFullArgs,
 							session.worktreePath,
+							{rawMode: false},
 						);
 					} else {
 						// Regular fallback without devcontainer
@@ -922,6 +925,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					devcontainerCmd,
 					fullArgs,
 					worktreePath,
+					{rawMode: false},
 				);
 
 				const session = await this.createSessionInternal(
