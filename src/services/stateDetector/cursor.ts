@@ -13,7 +13,11 @@ export class CursorStateDetector extends BaseStateDetector {
 			/auto .* \(shift\+tab\)/.test(lowerContent) ||
 			/allow .+ \(y\)/.test(lowerContent) ||
 			/run .+ \(y\)/.test(lowerContent) ||
-			lowerContent.includes('skip (esc or n)')
+			lowerContent.includes('skip (esc or n)') ||
+			lowerContent.includes('write to this file?') ||
+			lowerContent.includes('reject & propose changes') ||
+			(lowerContent.includes('add write(') &&
+				lowerContent.includes('allowlist'))
 		) {
 			return 'waiting_input';
 		}
