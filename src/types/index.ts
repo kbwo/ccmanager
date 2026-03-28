@@ -37,6 +37,8 @@ export interface Session {
 	worktreePath: string;
 	sessionNumber: number; // Auto-incremented per worktree
 	sessionName?: string; // User-assigned name
+	command: string; // The configured command used to launch the session
+	fallbackArgs?: string[]; // Fallback arguments for a single retry when startup fails
 	lastAccessedAt: number; // Timestamp for sorting
 	process: IPty;
 	output: string[]; // Recent output for state detection
