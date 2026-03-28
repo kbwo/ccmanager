@@ -145,6 +145,24 @@ describe('CursorStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
+	it('should detect waiting_input state for Write to this file? prompt', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			' │ Write to this file?                                                                                                                                                                                                                                                                                                                                                                  │',
+			' │ in /Users/kbwo/go/projects/github.com/kbwo/ccmanager--feature-takt/src/services/stateDetector/takt.ts                                                                                                                                                                                                                                                                                │',
+			' │  → Proceed (y)                                                                                                                                                                                                                                                                                                                                                                       │',
+			' │    Reject & propose changes (esc or n or p)                                                                                                                                                                                                                                                                                                                                          │',
+			' │    Add Write(/Users/.../takt.ts) to allowlist? (tab)                                                                                                                                                                                                                                                                                                                                 │',
+			' │    Run Everything (shift+tab)                                                                                                                                                                                                                                                                                                                                                        │',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
 	it('should detect busy state for ctrl+c to stop pattern', () => {
 		// Arrange
 		terminal = createMockTerminal([
