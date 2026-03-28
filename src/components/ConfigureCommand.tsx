@@ -45,7 +45,7 @@ const DEFAULT_COMMANDS: Record<StateDetectionStrategy, string> = {
 	claude: 'claude',
 	gemini: 'gemini',
 	codex: 'codex',
-	cursor: 'cursor',
+	cursor: 'agent',
 	'github-copilot': 'copilot',
 	cline: 'cline',
 	opencode: 'opencode',

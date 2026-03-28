@@ -9,8 +9,7 @@ import {
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
-import {exec} from 'child_process';
-import {promisify} from 'util';
+import {spawn as childSpawn} from 'child_process';
 import {configReader} from './config/configReader.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector/index.js';
@@ -32,7 +31,6 @@ import {getTerminalScreenContent} from '../utils/screenCapture.js';
 import {injectTeammateMode} from '../utils/commandArgs.js';
 import {preparePresetLaunch} from '../utils/presetPrompt.js';
 const {Terminal} = pkg;
-const execAsync = promisify(exec);
 const TERMINAL_CONTENT_MAX_LINES = 300;
 
 export interface SessionCounts {
@@ -55,6 +53,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		command: string,
 		args: string[],
 		worktreePath: string,
+		options: {rawMode?: boolean} = {},
 	): Promise<IPty> {
 		const spawnOptions = {
 			name: 'xterm-256color',
@@ -62,6 +61,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			rows: process.stdout.rows || 24,
 			cwd: worktreePath,
 			env: process.env,
+			...(options.rawMode === undefined ? {} : {rawMode: options.rawMode}),
 		};
 
 		return spawn(command, args, spawnOptions);
@@ -304,6 +304,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			isPrimaryCommand?: boolean;
 			command?: string;
 			fallbackArgs?: string[];
+			presetName?: string;
 			detectionStrategy?: StateDetectionStrategy;
 			devcontainerConfig?: DevcontainerConfig;
 		} = {},
@@ -333,6 +334,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
+			presetName: options.presetName,
 			detectionStrategy,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
@@ -389,6 +391,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						isPrimaryCommand: true,
 						command,
 						fallbackArgs: preset.fallbackArgs,
+						presetName: preset.name,
 						detectionStrategy: preset.detectionStrategy,
 					},
 				);
@@ -495,6 +498,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 							devcontainerCmd,
 							fallbackFullArgs,
 							session.worktreePath,
+							{rawMode: false},
 						);
 					} else {
 						fallbackProcess = await this.spawn(
@@ -854,12 +858,47 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		devcontainerConfig: DevcontainerConfig,
 		presetId?: string,
 		initialPrompt?: string,
+		onLog?: (line: string) => void,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
-				// Execute devcontainer up command first
+				// Execute devcontainer up command, streaming output in real-time
 				try {
-					await execAsync(devcontainerConfig.upCommand, {cwd: worktreePath});
+					await new Promise<void>((resolve, reject) => {
+						const parts = devcontainerConfig.upCommand.split(/\s+/);
+						const cmd = parts[0]!;
+						const args = parts.slice(1);
+						const proc = childSpawn(cmd, args, {
+							cwd: worktreePath,
+							stdio: ['ignore', 'pipe', 'pipe'],
+							shell: false,
+						});
+
+						const handleData = (data: Buffer) => {
+							const text = data.toString();
+							for (const line of text.split('\n')) {
+								const trimmed = line.trimEnd();
+								if (trimmed) {
+									onLog?.(trimmed);
+								}
+							}
+						};
+
+						proc.stdout?.on('data', handleData);
+						proc.stderr?.on('data', handleData);
+
+						proc.on('error', err => {
+							reject(err);
+						});
+
+						proc.on('close', code => {
+							if (code === 0) {
+								resolve();
+							} else {
+								reject(new Error(`Command exited with code ${code}`));
+							}
+						});
+					});
 				} catch (error) {
 					throw new ProcessError({
 						command: devcontainerConfig.upCommand,
@@ -884,6 +923,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					devcontainerCmd,
 					fullArgs,
 					worktreePath,
+					{rawMode: false},
 				);
 
 				const session = await this.createSessionInternal(
@@ -893,6 +933,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						isPrimaryCommand: true,
 						command: preset.command,
 						fallbackArgs: preset.fallbackArgs,
+						presetName: preset.name,
 						detectionStrategy: preset.detectionStrategy,
 						devcontainerConfig,
 					},
