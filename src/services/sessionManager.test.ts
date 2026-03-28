@@ -1044,25 +1044,6 @@ describe('SessionManager', () => {
 		});
 
 		it('should retry the configured command with fallback args in devcontainer when primary command exits with code 1', async () => {
-			// Setup exec mock for devcontainer up
-			type MockExecParams = Parameters<typeof exec>;
-			const mockExec = vi.mocked(exec);
-			mockExec.mockImplementation(
-				(
-					cmd: MockExecParams[0],
-					options: MockExecParams[1],
-					callback?: MockExecParams[2],
-				) => {
-					if (typeof options === 'function') {
-						callback = options as MockExecParams[2];
-						options = undefined;
-					}
-					if (callback && typeof callback === 'function') {
-						callback(null, 'Container started', '');
-					}
-					return {} as ReturnType<typeof exec>;
-				},
-			);
 			// Setup preset with args
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
