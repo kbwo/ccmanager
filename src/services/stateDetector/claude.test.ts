@@ -546,7 +546,7 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('idle');
 		});
 
-		it('should ignore stale interrupt text outside the latest block above the prompt box', () => {
+		it('should detect busy when "esc to interrupt" is in viewport (full lower content)', () => {
 			terminal = createMockTerminal([
 				'Press esc to interrupt',
 				'Working...',
@@ -560,11 +560,10 @@ describe('ClaudeStateDetector', () => {
 
 			const state = detector.detectState(terminal, 'busy');
 
-			expect(state).toBe('idle');
+			expect(state).toBe('busy');
 		});
 
-		it('should ignore "esc to interrupt" inside prompt box', () => {
-			// Arrange - "esc to interrupt" is inside the prompt box, not above it
+		it('should detect busy when "esc to interrupt" is inside prompt box (full lower content)', () => {
 			terminal = createMockTerminal([
 				'Some idle output',
 				'──────────────────────────────',
@@ -572,11 +571,9 @@ describe('ClaudeStateDetector', () => {
 				'──────────────────────────────',
 			]);
 
-			// Act
 			const state = detector.detectState(terminal, 'idle');
 
-			// Assert - should be idle because "esc to interrupt" is inside prompt box
-			expect(state).toBe('idle');
+			expect(state).toBe('busy');
 		});
 
 		it('should detect "esc to cancel" inside prompt box as waiting_input', () => {
