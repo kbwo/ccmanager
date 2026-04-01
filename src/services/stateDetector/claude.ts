@@ -119,16 +119,17 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
-		// Check for busy state (full viewport lower content; Claude Code layout)
+		// Content above the prompt box only for busy detection
+		const abovePromptBox = this.getRecentContentAbovePromptBox(terminal, 30);
+		const aboveLowerContent = abovePromptBox.toLowerCase();
+
+		// Check for busy state
 		if (
-			fullLowerContent.includes('esc to interrupt') ||
-			fullLowerContent.includes('ctrl+c to interrupt')
+			aboveLowerContent.includes('esc to interrupt') ||
+			aboveLowerContent.includes('ctrl+c to interrupt')
 		) {
 			return 'busy';
 		}
-
-		// Spinner labels: inspect the block above the prompt box only (xterm redraw noise)
-		const abovePromptBox = this.getRecentContentAbovePromptBox(terminal, 30);
 
 		// Check for spinner activity label (e.g., "✽ Tempering…", "✳ Simplifying…")
 		if (SPINNER_ACTIVITY_PATTERN.test(abovePromptBox)) {
