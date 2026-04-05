@@ -8,6 +8,7 @@ import {
 	STATE_CHECK_INTERVAL_MS,
 	STATE_MINIMUM_DURATION_MS,
 } from '../constants/statePersistence.js';
+import {IDLE_DEBOUNCE_MS} from './stateDetector/claude.js';
 
 vi.mock('./bunTerminal.js', () => ({
 	spawn: vi.fn(function () {
@@ -118,8 +119,11 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		// Advance time past idle debounce so detector starts returning idle,
+		// but not enough for persistence to confirm
+		await vi.advanceTimersByTimeAsync(
+			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
+		);
 
 		// State should still be busy, but pending state should be set
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
@@ -143,8 +147,10 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		// Advance time past idle debounce but not persistence+minimum
+		await vi.advanceTimersByTimeAsync(
+			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
+		);
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 		expect(stateChangeHandler).not.toHaveBeenCalled();
 
@@ -171,8 +177,10 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		// Advance time past idle debounce so detector starts returning idle
+		await vi.advanceTimersByTimeAsync(
+			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
+		);
 		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
 
 		// Simulate output that would trigger waiting_input state
@@ -199,8 +207,10 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		// Advance time past idle debounce so detector starts returning idle
+		await vi.advanceTimersByTimeAsync(
+			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
+		);
 		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
 		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 
@@ -232,8 +242,10 @@ describe('SessionManager - State Persistence', () => {
 		// Try to change to idle
 		eventEmitter.emit('data', 'Some idle output\n');
 
-		// Wait for detection but not full persistence (less than 200ms) (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS); // 100ms
+		// Wait past idle debounce so detector returns idle, then one check
+		await vi.advanceTimersByTimeAsync(
+			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
+		);
 
 		// Should have pending state but not confirmed
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
@@ -246,8 +258,8 @@ describe('SessionManager - State Persistence', () => {
 			'\x1b[2J\x1b[HDo you want to continue?\n❯ 1. Yes',
 		);
 
-		// Advance time to detect new state but still less than persistence duration from first change (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS); // Another 100ms, total 200ms exactly at threshold
+		// Advance time to detect new state
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
 
 		// Pending state should have changed to waiting_input
 		expect(session.stateMutex.getSnapshot().state).toBe('busy'); // Still original state
@@ -267,8 +279,10 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
+		// Advance time past idle debounce so detector returns idle
+		await vi.advanceTimersByTimeAsync(
+			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
+		);
 		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
 		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
 
@@ -297,9 +311,11 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time less than persistence duration so transition is not yet confirmed
+		// Advance past idle debounce but not past persistence + minimum duration
 		await vi.advanceTimersByTimeAsync(
-			STATE_PERSISTENCE_DURATION_MS - STATE_CHECK_INTERVAL_MS,
+			IDLE_DEBOUNCE_MS +
+				STATE_PERSISTENCE_DURATION_MS -
+				STATE_CHECK_INTERVAL_MS,
 		);
 
 		// State should still be busy because minimum duration hasn't elapsed
@@ -323,9 +339,9 @@ describe('SessionManager - State Persistence', () => {
 		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time past STATE_MINIMUM_DURATION_MS (which is longer than STATE_PERSISTENCE_DURATION_MS)
+		// Advance past idle debounce + persistence/minimum duration
 		await vi.advanceTimersByTimeAsync(
-			STATE_MINIMUM_DURATION_MS + STATE_CHECK_INTERVAL_MS,
+			IDLE_DEBOUNCE_MS + STATE_MINIMUM_DURATION_MS + STATE_CHECK_INTERVAL_MS,
 		);
 
 		// State should now be idle since both durations are satisfied
@@ -355,17 +371,13 @@ describe('SessionManager - State Persistence', () => {
 
 		// Now simulate a brief screen redraw: busy indicators disappear temporarily
 		eventEmitter.emit('data', '\x1b[2J\x1b[H'); // Clear screen
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS); // 100ms
 
-		// Pending state should be set to idle
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
+		// Idle debounce prevents the detector from returning idle for IDLE_DEBOUNCE_MS,
+		// so during a brief redraw (< 1500ms), no pending idle state is set.
+		// Advance a short time — still within the idle debounce window
+		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 3); // 300ms
 
-		// Advance past half the persistence duration but not fully
-		// Since stateConfirmedAt was updated at ~2000ms, this is not enough
-		// for the pending state to be confirmed
-		await vi.advanceTimersByTimeAsync(STATE_PERSISTENCE_DURATION_MS / 2);
-
-		// State should still be busy because minimum duration since last busy detection hasn't elapsed
+		// State should still be busy — idle debounce hasn't elapsed
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 		expect(stateChangeHandler).not.toHaveBeenCalled();
 
@@ -398,24 +410,16 @@ describe('SessionManager - State Persistence', () => {
 		// Session 1 goes to idle
 		eventEmitter1.emit('data', 'Idle output for session 1');
 
-		// Session 2 goes to waiting_input
+		// Session 2 goes to waiting_input (no idle debounce for waiting_input)
 		eventEmitter2.emit('data', 'Do you want to continue?\n❯ 1. Yes');
 
-		// Advance time to check but not confirm (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
-
-		// Both should have pending states but not changed yet
-		expect(session1.stateMutex.getSnapshot().state).toBe('busy');
-		expect(session1.stateMutex.getSnapshot().pendingState).toBe('idle');
-		expect(session2.stateMutex.getSnapshot().state).toBe('busy');
-		expect(session2.stateMutex.getSnapshot().pendingState).toBe(
-			'waiting_input',
+		// Advance past idle debounce for session 1 + persistence/minimum for both
+		await vi.advanceTimersByTimeAsync(
+			IDLE_DEBOUNCE_MS + STATE_MINIMUM_DURATION_MS + STATE_CHECK_INTERVAL_MS,
 		);
 
-		// Advance time to confirm both - need to exceed STATE_MINIMUM_DURATION_MS (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_MINIMUM_DURATION_MS);
-
 		// Both should now be in their new states
+		// Session 2 (waiting_input) transitions faster since it's not debounced
 		expect(session1.stateMutex.getSnapshot().state).toBe('idle');
 		expect(session1.stateMutex.getSnapshot().pendingState).toBeUndefined();
 		expect(session2.stateMutex.getSnapshot().state).toBe('waiting_input');
