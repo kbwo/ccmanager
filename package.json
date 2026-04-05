@@ -68,6 +68,7 @@
 	},
 	"prettier": "@vdemedes/prettier-config",
 	"dependencies": {
+		"@xterm/addon-serialize": "^0.14.0",
 		"@xterm/headless": "^6.0.0",
 		"effect": "^3.18.2",
 		"ink": "^6.6.0",

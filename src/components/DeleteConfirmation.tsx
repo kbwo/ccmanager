@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
+import type {Key} from 'ink';
 import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
 import Confirmation from './Confirmation.js';
@@ -76,10 +77,7 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({
 	};
 
 	// Handle keyboard input for branch options view
-	const handleBranchOptionsInput = (
-		input: string,
-		key: {[key: string]: boolean},
-	): boolean => {
+	const handleBranchOptionsInput = (input: string, key: Key): boolean => {
 		if (key['return']) {
 			// Move to confirm view when Enter is pressed
 			setView('confirm');

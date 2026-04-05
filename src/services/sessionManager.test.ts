@@ -43,19 +43,39 @@ vi.mock('./config/configReader.js', () => ({
 	},
 }));
 
+vi.mock('@xterm/addon-serialize', () => ({
+	SerializeAddon: vi.fn().mockImplementation(function () {
+		return {
+			serialize: vi.fn(() => ''),
+			activate: vi.fn(),
+			dispose: vi.fn(),
+		};
+	}),
+}));
+
 // Mock Terminal
 vi.mock('@xterm/headless', () => ({
 	default: {
 		Terminal: vi.fn(function () {
 			return {
+				rows: 24,
+				cols: 80,
 				buffer: {
 					active: {
+						type: 'normal',
+						baseY: 0,
 						length: 0,
 						getLine: vi.fn(function () {
 							return null;
 						}),
 					},
 				},
+				loadAddon: vi.fn(function () {
+					return undefined;
+				}),
+				resize: vi.fn(function () {
+					return undefined;
+				}),
 				write: vi.fn(function () {
 					return undefined;
 				}),
@@ -1116,9 +1136,8 @@ describe('SessionManager', () => {
 		});
 	});
 
-	describe('clearHistoryOnClear', () => {
-		it('should clear output history when screen clear escape sequence is detected', async () => {
-			// Setup
+	describe('session restore snapshots', () => {
+		it('should emit serialized terminal output when activating a session', async () => {
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
@@ -1126,28 +1145,25 @@ describe('SessionManager', () => {
 			});
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			// Create session
 			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
+			const serializeMock = vi
+				.spyOn(session.serializer, 'serialize')
+				.mockReturnValue('\u001b[31mrestored\u001b[0m');
+			const restoreHandler = vi.fn();
+			sessionManager.on('sessionRestore', restoreHandler);
 
-			// Simulate some data output
-			mockPty.emit('data', 'Hello World');
-			mockPty.emit('data', 'More data');
+			sessionManager.setSessionActive(session.id, true);
 
-			// Verify output history has data
-			expect(session.outputHistory.length).toBe(2);
-
-			// Simulate screen clear escape sequence
-			mockPty.emit('data', '\x1B[2J');
-
-			// Verify output history was cleared and only contains the clear sequence
-			expect(session.outputHistory.length).toBe(1);
-			expect(session.outputHistory[0]?.toString()).toBe('\x1B[2J');
+			expect(serializeMock).toHaveBeenCalledWith({scrollback: 5000});
+			expect(restoreHandler).toHaveBeenCalledWith(
+				session,
+				'\u001b[31mrestored\u001b[0m',
+			);
 		});
 
-		it('should not clear output history for normal data', async () => {
-			// Setup
+		it('should skip restore event when serialized output is empty', async () => {
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
@@ -1155,44 +1171,16 @@ describe('SessionManager', () => {
 			});
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
-			// Create session
 			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('');
+			const restoreHandler = vi.fn();
+			sessionManager.on('sessionRestore', restoreHandler);
 
-			// Simulate normal data output without screen clear
-			mockPty.emit('data', 'Hello World');
-			mockPty.emit('data', 'More data');
-			mockPty.emit('data', 'Even more data');
+			sessionManager.setSessionActive(session.id, true);
 
-			// Verify output history contains all data
-			expect(session.outputHistory.length).toBe(3);
-		});
-
-		it('should clear history when screen clear is part of larger data chunk', async () => {
-			// Setup
-			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
-				id: '1',
-				name: 'Main',
-				command: 'claude',
-			});
-			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
-
-			// Create session
-			const session = await Effect.runPromise(
-				sessionManager.createSessionWithPresetEffect('/test/worktree'),
-			);
-
-			// Simulate some data output
-			mockPty.emit('data', 'Hello World');
-			mockPty.emit('data', 'More data');
-
-			// Simulate screen clear as part of larger data chunk (e.g., from /clear command)
-			mockPty.emit('data', 'prefix\x1B[2Jsuffix');
-
-			// Verify output history was cleared and only contains the new chunk
-			expect(session.outputHistory.length).toBe(1);
-			expect(session.outputHistory[0]?.toString()).toBe('prefix\x1B[2Jsuffix');
+			expect(restoreHandler).not.toHaveBeenCalled();
 		});
 	});
 
