@@ -71,25 +71,30 @@ vi.mock('../services/config/configReader.js', () => ({
 
 import PresetSelector from './PresetSelector.js';
 
-const makeKey = (overrides: Partial<Key> = {}): Key => ({
-	upArrow: false,
-	downArrow: false,
-	leftArrow: false,
-	rightArrow: false,
-	pageDown: false,
-	pageUp: false,
-	home: false,
-	end: false,
-	return: false,
-	escape: false,
-	ctrl: false,
-	shift: false,
-	tab: false,
-	backspace: false,
-	delete: false,
-	meta: false,
-	...overrides,
-});
+const makeKey = (overrides: Partial<Key> = {}): Key =>
+	({
+		upArrow: false,
+		downArrow: false,
+		leftArrow: false,
+		rightArrow: false,
+		pageDown: false,
+		pageUp: false,
+		home: false,
+		end: false,
+		return: false,
+		escape: false,
+		ctrl: false,
+		shift: false,
+		tab: false,
+		backspace: false,
+		delete: false,
+		meta: false,
+		super: false,
+		hyper: false,
+		capsLock: false,
+		numLock: false,
+		...overrides,
+	}) as Key;
 
 describe('PresetSelector component', () => {
 	let onSelect: ReturnType<typeof vi.fn<(presetId: string) => void>>;

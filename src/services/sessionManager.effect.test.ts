@@ -39,17 +39,33 @@ vi.mock('./config/configReader.js', () => ({
 	},
 }));
 
+vi.mock('@xterm/addon-serialize', () => ({
+	SerializeAddon: vi.fn().mockImplementation(function () {
+		return {
+			serialize: vi.fn(() => ''),
+			activate: vi.fn(),
+			dispose: vi.fn(),
+		};
+	}),
+}));
+
 // Mock Terminal
 vi.mock('@xterm/headless', () => ({
 	default: {
 		Terminal: vi.fn().mockImplementation(function () {
 			return {
+				rows: 24,
+				cols: 80,
 				buffer: {
 					active: {
+						type: 'normal',
+						baseY: 0,
 						length: 0,
 						getLine: vi.fn(),
 					},
 				},
+				loadAddon: vi.fn(),
+				resize: vi.fn(),
 				write: vi.fn(),
 			};
 		}),

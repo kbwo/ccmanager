@@ -92,26 +92,14 @@ const Session: React.FC<SessionProps> = ({
 		// Clear screen when entering session
 		stdout.write('\x1B[2J\x1B[H');
 
-		// Handle session restoration by writing all buffered output at once.
-		// This is faster than chunk-by-chunk replay and preserves scrollback.
-		const handleSessionRestore = (restoredSession: ISession) => {
+		// Restore the current terminal state from the headless xterm snapshot.
+		const handleSessionRestore = (
+			restoredSession: ISession,
+			restoreSnapshot: string,
+		) => {
 			if (restoredSession.id === session.id) {
-				if (restoredSession.outputHistory.length === 0) return;
-
-				// Concatenate all history buffers and write at once for better performance
-				const allHistory = Buffer.concat(restoredSession.outputHistory);
-				const historyStr = allHistory.toString('utf8');
-
-				// Normalize the output
-				const normalized = normalizeLineEndings(historyStr);
-
-				// Remove leading clear screen sequences to avoid double-clear
-				const cleaned = normalized
-					.replace(/^\x1B\[2J/g, '')
-					.replace(/^\x1B\[H/g, '');
-
-				if (cleaned.length > 0) {
-					stdout.write(cleaned);
+				if (restoreSnapshot.length > 0) {
+					stdout.write(restoreSnapshot);
 				}
 			}
 		};
@@ -137,9 +125,6 @@ const Session: React.FC<SessionProps> = ({
 		sessionManager.on('sessionData', handleSessionData);
 		sessionManager.on('sessionExit', handleSessionExit);
 
-		// Mark session as active (this will trigger the restore event)
-		sessionManager.setSessionActive(session.id, true);
-
 		// Immediately resize the PTY and terminal to current dimensions
 		// This fixes rendering issues when terminal width changed while in menu
 		// https://github.com/kbwo/ccmanager/issues/2
@@ -156,6 +141,10 @@ const Session: React.FC<SessionProps> = ({
 		} catch {
 			/* empty */
 		}
+
+		// Mark session as active after resizing so the restore snapshot matches
+		// the current terminal dimensions.
+		sessionManager.setSessionActive(session.id, true);
 
 		// Handle terminal resize
 		const handleResize = () => {

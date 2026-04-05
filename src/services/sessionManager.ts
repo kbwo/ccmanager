@@ -9,6 +9,7 @@ import {
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
+import {SerializeAddon} from '@xterm/addon-serialize';
 import {spawn as childSpawn} from 'child_process';
 import {configReader} from './config/configReader.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
@@ -32,6 +33,7 @@ import {injectTeammateMode} from '../utils/commandArgs.js';
 import {preparePresetLaunch} from '../utils/presetPrompt.js';
 const {Terminal} = pkg;
 const TERMINAL_CONTENT_MAX_LINES = 300;
+const TERMINAL_SCROLLBACK_LINES = 5000;
 
 export interface SessionCounts {
 	idle: number;
@@ -292,8 +294,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return new Terminal({
 			cols: process.stdout.columns || 80,
 			rows: process.stdout.rows || 24,
+			scrollback: TERMINAL_SCROLLBACK_LINES,
 			allowProposedApi: true,
 			logLevel: 'off',
+		});
+	}
+
+	private getRestoreSnapshot(session: Session): string {
+		return session.serializer.serialize({
+			scrollback: TERMINAL_SCROLLBACK_LINES,
 		});
 	}
 
@@ -315,6 +324,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			0,
 		);
 		const terminal = this.createTerminal();
+		const serializer = new SerializeAddon();
+		terminal.loadAddon(serializer);
 		const detectionStrategy = options.detectionStrategy ?? 'claude';
 		const stateDetector = createStateDetector(detectionStrategy);
 
@@ -328,10 +339,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			lastAccessedAt: Date.now(),
 			process: ptyProcess,
 			output: [],
-			outputHistory: [],
 			lastActivity: new Date(),
 			isActive: false,
 			terminal,
+			serializer,
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			presetName: options.presetName,
@@ -427,30 +438,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		session.process.onData((data: string) => {
 			// Write data to virtual terminal
 			session.terminal.write(data);
-
-			// Check for screen clear escape sequence (e.g., from /clear command)
-			// When detected, clear the output history to prevent replaying old content on restore
-			// This helps avoid excessive scrolling when restoring sessions with large output history
-			if (data.includes('\x1B[2J')) {
-				session.outputHistory = [];
-			}
-
-			// Store in output history as Buffer
-			const buffer = Buffer.from(data, 'utf8');
-			session.outputHistory.push(buffer);
-
-			// Limit memory usage - keep max 10MB of output history
-			const MAX_HISTORY_SIZE = 10 * 1024 * 1024; // 10MB
-			let totalSize = session.outputHistory.reduce(
-				(sum, buf) => sum + buf.length,
-				0,
-			);
-			while (totalSize > MAX_HISTORY_SIZE && session.outputHistory.length > 0) {
-				const removed = session.outputHistory.shift();
-				if (removed) {
-					totalSize -= removed.length;
-				}
-			}
 
 			session.lastActivity = new Date();
 
@@ -676,10 +663,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			if (active) {
 				session.lastAccessedAt = Date.now();
-
-				// Emit a restore event with the output history if available
-				if (session.outputHistory.length > 0) {
-					this.emit('sessionRestore', session);
+				const restoreSnapshot = this.getRestoreSnapshot(session);
+				if (restoreSnapshot.length > 0) {
+					this.emit('sessionRestore', session, restoreSnapshot);
 				}
 			}
 		}

@@ -1,5 +1,6 @@
 import React from 'react';
 import {Box, Text, useInput} from 'ink';
+import type {Key} from 'ink';
 import SelectInput from 'ink-select-input';
 import {shortcutManager} from '../services/shortcutManager.js';
 
@@ -19,7 +20,7 @@ interface ConfirmationProps {
 	hint?: React.ReactNode;
 	onCancel?: () => void;
 	onEscape?: () => void;
-	onCustomInput?: (input: string, key: {[key: string]: boolean}) => boolean; // Return true if handled
+	onCustomInput?: (input: string, key: Key) => boolean; // Return true if handled
 }
 
 /**
