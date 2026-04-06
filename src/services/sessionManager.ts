@@ -302,7 +302,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	private getRestoreSnapshot(session: Session): string {
 		return session.serializer.serialize({
-			scrollback: TERMINAL_SCROLLBACK_LINES,
+			scrollback: 0,
 		});
 	}
 

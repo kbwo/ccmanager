@@ -1156,7 +1156,7 @@ describe('SessionManager', () => {
 
 			sessionManager.setSessionActive(session.id, true);
 
-			expect(serializeMock).toHaveBeenCalledWith({scrollback: 5000});
+			expect(serializeMock).toHaveBeenCalledWith({scrollback: 0});
 			expect(restoreHandler).toHaveBeenCalledWith(
 				session,
 				'\u001b[31mrestored\u001b[0m',
