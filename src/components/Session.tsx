@@ -86,13 +86,14 @@ const Session: React.FC<SessionProps> = ({
 
 		stdin.on('data', handleStdinData);
 
-		// Prevent line wrapping from drifting redraws in TUIs that rely on cursor-up clears.
-		stdout.write('\x1b[?7l');
-
 		// Clear screen when entering session
 		stdout.write('\x1B[2J\x1B[H');
 
 		// Restore the current terminal state from the headless xterm snapshot.
+		// The xterm serialize addon relies on auto-wrap (DECAWM) being enabled to
+		// render wrapped lines — it omits row separators for wrapped rows, expecting
+		// characters to naturally overflow to the next line.  We therefore keep
+		// auto-wrap enabled while writing the snapshot and only disable it afterward.
 		const handleSessionRestore = (
 			restoredSession: ISession,
 			restoreSnapshot: string,
@@ -143,8 +144,17 @@ const Session: React.FC<SessionProps> = ({
 		}
 
 		// Mark session as active after resizing so the restore snapshot matches
-		// the current terminal dimensions.
+		// the current terminal dimensions.  setSessionActive synchronously emits
+		// the 'sessionRestore' event, so the snapshot is written to stdout before
+		// we proceed.
 		sessionManager.setSessionActive(session.id, true);
+
+		// Prevent line wrapping from drifting redraws in TUIs that rely on
+		// cursor-up clears.  This MUST come after the restore snapshot write
+		// because the xterm serialize addon relies on auto-wrap (DECAWM) being
+		// enabled — it omits row separators for wrapped rows, expecting characters
+		// to naturally overflow to the next line.
+		stdout.write('\x1b[?7l');
 
 		// Handle terminal resize
 		const handleResize = () => {
