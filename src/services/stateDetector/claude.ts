@@ -12,7 +12,42 @@ const SPINNER_ACTIVITY_PATTERN = new RegExp(
 
 const BUSY_LOOKBACK_LINES = 5;
 
+// Workaround: Claude Code sometimes appears idle in terminal output while
+// still actively processing (busy). To mitigate false idle transitions,
+// require terminal output to remain unchanged for this duration before
+// confirming the idle state.
+export const IDLE_DEBOUNCE_MS = 1500;
+
 export class ClaudeStateDetector extends BaseStateDetector {
+	private lastContentHash: string = '';
+	private contentStableSince: number = 0;
+
+	/**
+	 * Debounce idle transitions: only return 'idle' when the terminal
+	 * content has been unchanged for IDLE_DEBOUNCE_MS.
+	 * Returns currentState if output is still changing.
+	 *
+	 * This is a workaround for Claude Code occasionally showing idle-like
+	 * terminal output while still busy (e.g. during screen redraws).
+	 */
+	private debounceIdle(
+		terminal: Terminal,
+		currentState: SessionState,
+		now: number = Date.now(),
+	): SessionState {
+		const content = this.getTerminalContent(terminal, 30);
+		if (content !== this.lastContentHash) {
+			this.lastContentHash = content;
+			this.contentStableSince = now;
+		}
+
+		const stableDuration = now - this.contentStableSince;
+		if (stableDuration >= IDLE_DEBOUNCE_MS) {
+			return 'idle';
+		}
+
+		return currentState;
+	}
 	/**
 	 * Extract content above the prompt box.
 	 * The prompt box is delimited by ─ border lines:
@@ -84,10 +119,10 @@ export class ClaudeStateDetector extends BaseStateDetector {
 	}
 
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
-		// Check for search prompt (⌕ Search…) within 200 lines - always idle
+		// Check for search prompt (⌕ Search…) within 200 lines - always idle (debounced)
 		const extendedContent = this.getTerminalContent(terminal, 200);
 		if (extendedContent.includes('⌕ Search…')) {
-			return 'idle';
+			return this.debounceIdle(terminal, currentState);
 		}
 
 		// Full content (including prompt box) for waiting_input detection
@@ -131,8 +166,8 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'busy';
 		}
 
-		// Otherwise idle
-		return 'idle';
+		// Otherwise idle (debounced)
+		return this.debounceIdle(terminal, currentState);
 	}
 
 	detectBackgroundTask(terminal: Terminal): number {
