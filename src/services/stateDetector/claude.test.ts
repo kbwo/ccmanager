@@ -416,6 +416,18 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
+		it('should detect busy for middle-dot activity label "· …ing…" (e.g. · Misting…)', () => {
+			terminal = createMockTerminal([
+				'· Misting…',
+				'   ⎿  Tip: Run /terminal-setup to enable convenient terminal integration',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.detectState(terminal, 'idle')).toBe('busy');
+		});
+
 		it('should detect busy when token stats line is above prompt box without interrupt or spinner', () => {
 			terminal = createMockTerminal([
 				'(9m 21s · ↓ 13.7k tokens)',

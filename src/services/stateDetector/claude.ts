@@ -1,10 +1,12 @@
 import {SessionState, Terminal} from '../../types/index.js';
 import {BaseStateDetector} from './base.js';
 
-// Spinner characters used by Claude Code during active processing
-const SPINNER_CHARS = '✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆';
+// Spinner / activity-prefix characters (line must still match SPINNER_ACTIVITY_PATTERN: …ing + …)
+// Includes: ornament spinners; · / • / ∙ / ⋅ bullets; ⏺ (record); ▸▹ triangles; ○● circles
+const SPINNER_CHARS =
+	'✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆·•⏺▸▹∙⋅○●';
 
-// Matches spinner activity labels like "✽ Tempering…" or "✳ Simplifying recompute_tangents…"
+// Matches spinner activity labels like "✽ Tempering…", "✳ Simplifying…", or "· Misting…"
 const SPINNER_ACTIVITY_PATTERN = new RegExp(
 	`^[${SPINNER_CHARS}] \\S+ing.*\u2026`,
 	'm',
