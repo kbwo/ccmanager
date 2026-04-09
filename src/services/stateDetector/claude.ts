@@ -10,6 +10,9 @@ const SPINNER_ACTIVITY_PATTERN = new RegExp(
 	'm',
 );
 
+// Session stats above the prompt, e.g. "(9m 21s · ↓ 13.7k tokens)" — requires parens, a digit, and "tokens"
+const TOKEN_STATS_LINE_PATTERN = /\([^)]*\d[^)]*tokens\s*\)/i;
+
 const BUSY_LOOKBACK_LINES = 5;
 
 // Workaround: Claude Code sometimes appears idle in terminal output while
@@ -163,6 +166,11 @@ export class ClaudeStateDetector extends BaseStateDetector {
 
 		// Check for spinner activity label (e.g., "✽ Tempering…", "✳ Simplifying…")
 		if (SPINNER_ACTIVITY_PATTERN.test(abovePromptBox)) {
+			return 'busy';
+		}
+
+		// Usage/time + token count line (often shown above the prompt while a turn is active)
+		if (TOKEN_STATS_LINE_PATTERN.test(abovePromptBox)) {
 			return 'busy';
 		}
 
