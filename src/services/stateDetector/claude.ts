@@ -3,8 +3,7 @@ import {BaseStateDetector} from './base.js';
 
 // Spinner / activity-prefix characters (line must still match SPINNER_ACTIVITY_PATTERN: …ing + …)
 // Includes: ornament spinners; · / • / ∙ / ⋅ bullets; ⏺ (record); ▸▹ triangles; ○● circles
-const SPINNER_CHARS =
-	'✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆·•⏺▸▹∙⋅○●';
+const SPINNER_CHARS = '✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆·•⏺▸▹∙⋅○●';
 
 // Matches spinner activity labels like "✽ Tempering…", "✳ Simplifying…", or "· Misting…"
 const SPINNER_ACTIVITY_PATTERN = new RegExp(
