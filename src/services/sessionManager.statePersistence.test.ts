@@ -3,12 +3,10 @@ import {Either} from 'effect';
 import {SessionManager} from './sessionManager.js';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
-import {
-	STATE_PERSISTENCE_DURATION_MS,
-	STATE_CHECK_INTERVAL_MS,
-	STATE_MINIMUM_DURATION_MS,
-} from '../constants/statePersistence.js';
 import {IDLE_DEBOUNCE_MS} from './stateDetector/claude.js';
+
+/** Must match `STATE_CHECK_INTERVAL_MS` in sessionManager.ts */
+const STATE_CHECK_INTERVAL_MS = 100;
 
 vi.mock('./bunTerminal.js', () => ({
 	spawn: vi.fn(function () {
@@ -60,7 +58,7 @@ interface MockPty {
 	pid: number;
 }
 
-describe('SessionManager - State Persistence', () => {
+describe('SessionManager - state detection', () => {
 	let sessionManager: SessionManager;
 	let mockPtyInstances: Map<string, MockPty>;
 	let eventEmitters: Map<string, EventEmitter>;
@@ -71,7 +69,6 @@ describe('SessionManager - State Persistence', () => {
 		mockPtyInstances = new Map();
 		eventEmitters = new Map();
 
-		// Create mock PTY process factory
 		(spawn as Mock).mockImplementation(
 			(command: string, args: string[], options: {cwd: string}) => {
 				const path = options.cwd;
@@ -106,292 +103,39 @@ describe('SessionManager - State Persistence', () => {
 		vi.clearAllMocks();
 	});
 
-	it('should not change state immediately when detected state changes', async () => {
+	it('transitions busy to idle after idle debounce and the next poll', async () => {
 		const {Effect} = await import('effect');
 		const session = await Effect.runPromise(
 			sessionManager.createSessionWithPresetEffect('/test/path'),
 		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
-		// Initial state should be busy
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
-		// Simulate output that would trigger idle state
 		eventEmitter.emit('data', 'Some output without busy indicators');
 
-		// Advance time past idle debounce so detector starts returning idle,
-		// but not enough for persistence to confirm
 		await vi.advanceTimersByTimeAsync(
 			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
 		);
 
-		// State should still be busy, but pending state should be set
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
-		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
-	});
-
-	it('should change state after both persistence and minimum duration are met', async () => {
-		const {Effect} = await import('effect');
-		const session = await Effect.runPromise(
-			sessionManager.createSessionWithPresetEffect('/test/path'),
-		);
-		const eventEmitter = eventEmitters.get('/test/path')!;
-
-		const stateChangeHandler = vi.fn();
-		sessionManager.on('sessionStateChanged', stateChangeHandler);
-
-		// Initial state should be busy
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
-
-		// Advance time past idle debounce but not persistence+minimum
-		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
-		);
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-		expect(stateChangeHandler).not.toHaveBeenCalled();
-
-		// Advance time past both persistence and minimum duration
-		await vi.advanceTimersByTimeAsync(STATE_MINIMUM_DURATION_MS);
-
-		// State should now be changed
 		expect(session.stateMutex.getSnapshot().state).toBe('idle');
-		expect(session.stateMutex.getSnapshot().pendingState).toBeUndefined();
-		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeUndefined();
-		expect(stateChangeHandler).toHaveBeenCalledWith(session);
 	});
 
-	it('should cancel pending state if detected state changes again before persistence', async () => {
+	it('transitions busy to waiting_input on the next poll without idle debounce', async () => {
 		const {Effect} = await import('effect');
 		const session = await Effect.runPromise(
 			sessionManager.createSessionWithPresetEffect('/test/path'),
 		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
-		// Initial state should be busy
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
-
-		// Advance time past idle debounce so detector starts returning idle
-		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
-		);
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
-
-		// Simulate output that would trigger waiting_input state
 		eventEmitter.emit('data', 'Do you want to continue?\n❯ 1. Yes');
 
-		// Advance time to trigger another check (use async to process mutex updates)
 		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
 
-		// Pending state should now be waiting_input, not idle
-		expect(session.stateMutex.getSnapshot().state).toBe('busy'); // Still original state
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('waiting_input');
+		expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
 	});
 
-	it('should clear pending state if detected state returns to current state', async () => {
-		const {Effect} = await import('effect');
-		const session = await Effect.runPromise(
-			sessionManager.createSessionWithPresetEffect('/test/path'),
-		);
-		const eventEmitter = eventEmitters.get('/test/path')!;
-
-		// Initial state should be busy
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
-
-		// Advance time past idle debounce so detector starts returning idle
-		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
-		);
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
-		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
-
-		// Simulate output that would trigger busy state again (back to original)
-		eventEmitter.emit('data', 'ESC to interrupt');
-
-		// Advance time to trigger another check (use async to process mutex updates)
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
-
-		// Pending state should be cleared
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-		expect(session.stateMutex.getSnapshot().pendingState).toBeUndefined();
-		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeUndefined();
-	});
-
-	it('should not confirm state changes that do not persist long enough', async () => {
-		const {Effect} = await import('effect');
-		const session = await Effect.runPromise(
-			sessionManager.createSessionWithPresetEffect('/test/path'),
-		);
-		const eventEmitter = eventEmitters.get('/test/path')!;
-
-		const stateChangeHandler = vi.fn();
-		sessionManager.on('sessionStateChanged', stateChangeHandler);
-
-		// Initial state should be busy
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Try to change to idle
-		eventEmitter.emit('data', 'Some idle output\n');
-
-		// Wait past idle debounce so detector returns idle, then one check
-		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
-		);
-
-		// Should have pending state but not confirmed
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
-
-		// Now change to a different state before idle persists
-		// Clear terminal first and add waiting prompt
-		eventEmitter.emit(
-			'data',
-			'\x1b[2J\x1b[HDo you want to continue?\n❯ 1. Yes',
-		);
-
-		// Advance time to detect new state
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
-
-		// Pending state should have changed to waiting_input
-		expect(session.stateMutex.getSnapshot().state).toBe('busy'); // Still original state
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('waiting_input');
-
-		// Since states kept changing before persisting, no state change should have been confirmed
-		expect(stateChangeHandler).not.toHaveBeenCalled();
-	});
-
-	it('should properly clean up pending state when session is destroyed', async () => {
-		const {Effect} = await import('effect');
-		const session = await Effect.runPromise(
-			sessionManager.createSessionWithPresetEffect('/test/path'),
-		);
-		const eventEmitter = eventEmitters.get('/test/path')!;
-
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
-
-		// Advance time past idle debounce so detector returns idle
-		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
-		);
-		expect(session.stateMutex.getSnapshot().pendingState).toBe('idle');
-		expect(session.stateMutex.getSnapshot().pendingStateStart).toBeDefined();
-
-		// Destroy the session
-		sessionManager.destroySession(session.id);
-
-		// Check that pending state is cleared
-		const remainingSessions =
-			sessionManager.getSessionsForWorktree('/test/path');
-		expect(remainingSessions).toHaveLength(0);
-	});
-
-	it('should not transition state before minimum duration in current state has elapsed', async () => {
-		const {Effect} = await import('effect');
-		const session = await Effect.runPromise(
-			sessionManager.createSessionWithPresetEffect('/test/path'),
-		);
-		const eventEmitter = eventEmitters.get('/test/path')!;
-
-		const stateChangeHandler = vi.fn();
-		sessionManager.on('sessionStateChanged', stateChangeHandler);
-
-		// Initial state should be busy
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
-
-		// Advance past idle debounce but not past persistence + minimum duration
-		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS +
-				STATE_PERSISTENCE_DURATION_MS -
-				STATE_CHECK_INTERVAL_MS,
-		);
-
-		// State should still be busy because minimum duration hasn't elapsed
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-		expect(stateChangeHandler).not.toHaveBeenCalled();
-	});
-
-	it('should transition state after both persistence and minimum duration are met', async () => {
-		const {Effect} = await import('effect');
-		const session = await Effect.runPromise(
-			sessionManager.createSessionWithPresetEffect('/test/path'),
-		);
-		const eventEmitter = eventEmitters.get('/test/path')!;
-
-		const stateChangeHandler = vi.fn();
-		sessionManager.on('sessionStateChanged', stateChangeHandler);
-
-		// Initial state should be busy
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
-
-		// Advance past idle debounce + persistence/minimum duration
-		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS + STATE_MINIMUM_DURATION_MS + STATE_CHECK_INTERVAL_MS,
-		);
-
-		// State should now be idle since both durations are satisfied
-		expect(session.stateMutex.getSnapshot().state).toBe('idle');
-		expect(stateChangeHandler).toHaveBeenCalledWith(session);
-	});
-
-	it('should not transition during brief screen redraw even after long time in current state', async () => {
-		const {Effect} = await import('effect');
-		const session = await Effect.runPromise(
-			sessionManager.createSessionWithPresetEffect('/test/path'),
-		);
-		const eventEmitter = eventEmitters.get('/test/path')!;
-
-		const stateChangeHandler = vi.fn();
-		sessionManager.on('sessionStateChanged', stateChangeHandler);
-
-		// Initial state should be busy
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Keep busy state active for a long time (simulating normal operation)
-		// Each check re-detects "busy" and updates stateConfirmedAt
-		eventEmitter.emit('data', 'ESC to interrupt');
-		await vi.advanceTimersByTimeAsync(2000); // 2 seconds of confirmed busy
-
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-
-		// Now simulate a brief screen redraw: busy indicators disappear temporarily
-		eventEmitter.emit('data', '\x1b[2J\x1b[H'); // Clear screen
-
-		// Idle debounce prevents the detector from returning idle for IDLE_DEBOUNCE_MS,
-		// so during a brief redraw (< 1500ms), no pending idle state is set.
-		// Advance a short time — still within the idle debounce window
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 3); // 300ms
-
-		// State should still be busy — idle debounce hasn't elapsed
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-		expect(stateChangeHandler).not.toHaveBeenCalled();
-
-		// Simulate busy indicators coming back (screen redraw complete)
-		eventEmitter.emit('data', 'ESC to interrupt');
-		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS);
-
-		// State should still be busy and pending should be cleared
-		expect(session.stateMutex.getSnapshot().state).toBe('busy');
-		expect(session.stateMutex.getSnapshot().pendingState).toBeUndefined();
-		expect(stateChangeHandler).not.toHaveBeenCalled();
-	});
-
-	it('should handle multiple sessions with independent state persistence', async () => {
+	it('handles multiple sessions independently', async () => {
 		const {Effect} = await import('effect');
 		const session1 = await Effect.runPromise(
 			sessionManager.createSessionWithPresetEffect('/test/path1'),
@@ -402,27 +146,17 @@ describe('SessionManager - State Persistence', () => {
 		const eventEmitter1 = eventEmitters.get('/test/path1')!;
 		const eventEmitter2 = eventEmitters.get('/test/path2')!;
 
-		// Both should start as busy
 		expect(session1.stateMutex.getSnapshot().state).toBe('busy');
 		expect(session2.stateMutex.getSnapshot().state).toBe('busy');
 
-		// Simulate different outputs for each session
-		// Session 1 goes to idle
 		eventEmitter1.emit('data', 'Idle output for session 1');
-
-		// Session 2 goes to waiting_input (no idle debounce for waiting_input)
 		eventEmitter2.emit('data', 'Do you want to continue?\n❯ 1. Yes');
 
-		// Advance past idle debounce for session 1 + persistence/minimum for both
 		await vi.advanceTimersByTimeAsync(
-			IDLE_DEBOUNCE_MS + STATE_MINIMUM_DURATION_MS + STATE_CHECK_INTERVAL_MS,
+			IDLE_DEBOUNCE_MS + STATE_CHECK_INTERVAL_MS,
 		);
 
-		// Both should now be in their new states
-		// Session 2 (waiting_input) transitions faster since it's not debounced
 		expect(session1.stateMutex.getSnapshot().state).toBe('idle');
-		expect(session1.stateMutex.getSnapshot().pendingState).toBeUndefined();
 		expect(session2.stateMutex.getSnapshot().state).toBe('waiting_input');
-		expect(session2.stateMutex.getSnapshot().pendingState).toBeUndefined();
 	});
 });
