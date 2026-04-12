@@ -1,18 +1,14 @@
 import {SessionState, Terminal} from '../../types/index.js';
 import {BaseStateDetector} from './base.js';
 
-// Spinner / activity-prefix characters (line must still match SPINNER_ACTIVITY_PATTERN: …ing + …)
-// Includes: ornament spinners; · / • / ∙ / ⋅ bullets; ⏺ (record); ▸▹ triangles; ○● circles
-const SPINNER_CHARS = '✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆·•⏺▸▹∙⋅○●';
+// Spinner characters used by Claude Code during active processing
+const SPINNER_CHARS = '✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆';
 
-// Matches spinner activity labels like "✽ Tempering…", "✳ Simplifying…", or "· Misting…"
+// Matches spinner activity labels like "✽ Tempering…" or "✳ Simplifying recompute_tangents…"
 const SPINNER_ACTIVITY_PATTERN = new RegExp(
 	`^[${SPINNER_CHARS}] \\S+ing.*\u2026`,
 	'm',
 );
-
-// Session stats above the prompt, e.g. "(9m 21s · ↓ 13.7k tokens)" — requires parens, a digit, and "tokens"
-const TOKEN_STATS_LINE_PATTERN = /\([^)]*\d[^)]*tokens\s*\)/i;
 
 const BUSY_LOOKBACK_LINES = 5;
 
@@ -167,11 +163,6 @@ export class ClaudeStateDetector extends BaseStateDetector {
 
 		// Check for spinner activity label (e.g., "✽ Tempering…", "✳ Simplifying…")
 		if (SPINNER_ACTIVITY_PATTERN.test(abovePromptBox)) {
-			return 'busy';
-		}
-
-		// Usage/time + token count line (often shown above the prompt while a turn is active)
-		if (TOKEN_STATS_LINE_PATTERN.test(abovePromptBox)) {
 			return 'busy';
 		}
 

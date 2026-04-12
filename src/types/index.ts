@@ -55,7 +55,7 @@ export interface Session {
 	/**
 	 * Mutex-protected session state data.
 	 * Access via stateMutex.runExclusive() or stateMutex.update() to ensure thread-safe operations.
-	 * Contains: state, autoApprovalFailed, autoApprovalReason, autoApprovalAbortController, backgroundTaskCount, teamMemberCount
+	 * Contains: state, pendingState, pendingStateStart, autoApprovalFailed, autoApprovalReason, autoApprovalAbortController
 	 */
 	stateMutex: Mutex<SessionStateData>;
 	/**
