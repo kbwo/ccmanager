@@ -47,6 +47,7 @@ export interface Session {
 	isActive: boolean;
 	terminal: Terminal; // Virtual terminal for state detection (xterm Terminal instance)
 	serializer: SerializeAddon; // Serialize addon for restoring terminal state
+	restoreScrollbackBaseLine: number; // Oldest normal-buffer line eligible for restore replay
 	stateCheckInterval: NodeJS.Timeout | undefined; // Interval for checking terminal state
 	isPrimaryCommand: boolean; // Track if process was started with main command args
 	presetName: string | undefined; // Name of the command preset used for this session

@@ -57,13 +57,27 @@ vi.mock('@xterm/addon-serialize', () => ({
 vi.mock('@xterm/headless', () => ({
 	default: {
 		Terminal: vi.fn(function () {
+			const normalBuffer = {
+				type: 'normal',
+				baseY: 0,
+				cursorY: 0,
+				cursorX: 0,
+				length: 0,
+				getLine: vi.fn(function () {
+					return null;
+				}),
+			};
 			return {
 				rows: 24,
 				cols: 80,
 				buffer: {
-					active: {
-						type: 'normal',
+					active: normalBuffer,
+					normal: normalBuffer,
+					alternate: {
+						type: 'alternate',
 						baseY: 0,
+						cursorY: 0,
+						cursorX: 0,
 						length: 0,
 						getLine: vi.fn(function () {
 							return null;
@@ -1137,7 +1151,7 @@ describe('SessionManager', () => {
 	});
 
 	describe('session restore snapshots', () => {
-		it('should emit serialized terminal output when activating a session', async () => {
+		it('should emit a bounded normal-buffer restore snapshot and restore the cursor position', async () => {
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
@@ -1148,6 +1162,17 @@ describe('SessionManager', () => {
 			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				baseY: number;
+				length: number;
+				cursorY: number;
+				cursorX: number;
+			};
+			normalBuffer.baseY = 260;
+			normalBuffer.length = 300;
+			normalBuffer.cursorY = 7;
+			normalBuffer.cursorX = 11;
+			session.restoreScrollbackBaseLine = 120;
 			const serializeMock = vi
 				.spyOn(session.serializer, 'serialize')
 				.mockReturnValue('\u001b[31mrestored\u001b[0m');
@@ -1156,10 +1181,47 @@ describe('SessionManager', () => {
 
 			sessionManager.setSessionActive(session.id, true);
 
+			expect(serializeMock).toHaveBeenCalledWith({
+				range: {
+					start: 120,
+					end: 299,
+				},
+				excludeAltBuffer: true,
+			});
+			expect(restoreHandler).toHaveBeenCalledWith(
+				session,
+				'\u001b[31mrestored\u001b[0m\u001b[8;12H',
+			);
+		});
+
+		it('should keep viewport-only restore behavior for alternate screen sessions', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			(
+				session.terminal.buffer as unknown as {
+					active: typeof session.terminal.buffer.alternate;
+				}
+			).active = session.terminal.buffer.alternate;
+			const serializeMock = vi
+				.spyOn(session.serializer, 'serialize')
+				.mockReturnValue('\u001b[31malt\u001b[0m');
+			const restoreHandler = vi.fn();
+			sessionManager.on('sessionRestore', restoreHandler);
+
+			sessionManager.setSessionActive(session.id, true);
+
 			expect(serializeMock).toHaveBeenCalledWith({scrollback: 0});
 			expect(restoreHandler).toHaveBeenCalledWith(
 				session,
-				'\u001b[31mrestored\u001b[0m',
+				'\u001b[31malt\u001b[0m',
 			);
 		});
 
@@ -1183,6 +1245,28 @@ describe('SessionManager', () => {
 			expect(restoreHandler).not.toHaveBeenCalled();
 		});
 
+		it('should reset restore scrollback baseline after a clear-screen sequence', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			(
+				session.terminal.buffer.normal as unknown as {
+					baseY: number;
+				}
+			).baseY = 17;
+
+			mockPty.emit('data', '\x1b[2J\x1b[Hfresh');
+
+			expect(session.restoreScrollbackBaseLine).toBe(17);
+		});
+
 		it('should flush live session data after the restore snapshot completes', async () => {
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
@@ -1194,6 +1278,11 @@ describe('SessionManager', () => {
 			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
+			(
+				session.terminal.buffer.normal as unknown as {
+					length: number;
+				}
+			).length = 1;
 			vi.spyOn(session.serializer, 'serialize').mockReturnValue('restored');
 			const eventOrder: string[] = [];
 

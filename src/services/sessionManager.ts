@@ -34,6 +34,7 @@ import {preparePresetLaunch} from '../utils/presetPrompt.js';
 const {Terminal} = pkg;
 const TERMINAL_CONTENT_MAX_LINES = 300;
 const TERMINAL_SCROLLBACK_LINES = 5000;
+const TERMINAL_RESTORE_SCROLLBACK_LINES = 200;
 
 export interface SessionCounts {
 	idle: number;
@@ -302,10 +303,49 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		});
 	}
 
+	private shouldResetRestoreScrollback(data: string): boolean {
+		return (
+			data.includes('\x1b[2J') ||
+			data.includes('\x1b[3J') ||
+			data.includes('\x1bc')
+		);
+	}
+
 	private getRestoreSnapshot(session: Session): string {
-		return session.serializer.serialize({
-			scrollback: 0,
+		const activeBuffer = session.terminal.buffer.active;
+		if (activeBuffer.type !== 'normal') {
+			return session.serializer.serialize({
+				scrollback: 0,
+			});
+		}
+
+		const normalBuffer = session.terminal.buffer.normal;
+		const bufferLength = normalBuffer.length;
+		if (bufferLength === 0) {
+			return '';
+		}
+
+		const scrollbackStart = Math.max(
+			0,
+			normalBuffer.baseY - TERMINAL_RESTORE_SCROLLBACK_LINES,
+		);
+		const rangeStart = Math.max(
+			session.restoreScrollbackBaseLine,
+			scrollbackStart,
+		);
+		const rangeEnd = bufferLength - 1;
+
+		const snapshot = session.serializer.serialize({
+			range: {
+				start: rangeStart,
+				end: rangeEnd,
+			},
+			excludeAltBuffer: true,
 		});
+		const cursorRow = normalBuffer.cursorY + 1;
+		const cursorCol = normalBuffer.cursorX + 1;
+
+		return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
 	}
 
 	private async createSessionInternal(
@@ -345,6 +385,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			isActive: false,
 			terminal,
 			serializer,
+			restoreScrollbackBaseLine: 0,
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			presetName: options.presetName,
@@ -440,6 +481,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		session.process.onData((data: string) => {
 			// Write data to virtual terminal
 			session.terminal.write(data);
+
+			if (this.shouldResetRestoreScrollback(data)) {
+				session.restoreScrollbackBaseLine =
+					session.terminal.buffer.normal.baseY;
+			}
 
 			session.lastActivity = new Date();
 
