@@ -1182,6 +1182,37 @@ describe('SessionManager', () => {
 
 			expect(restoreHandler).not.toHaveBeenCalled();
 		});
+
+		it('should flush live session data after the restore snapshot completes', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('restored');
+			const eventOrder: string[] = [];
+
+			sessionManager.on('sessionRestore', restoredSession => {
+				if (restoredSession.id === session.id) {
+					eventOrder.push('restore');
+					mockPty.emit('data', 'live-output');
+				}
+			});
+			sessionManager.on('sessionData', activeSession => {
+				if (activeSession.id === session.id) {
+					eventOrder.push('data');
+				}
+			});
+
+			sessionManager.setSessionActive(session.id, true);
+
+			expect(eventOrder).toEqual(['restore', 'data']);
+		});
 	});
 
 	describe('static methods', () => {

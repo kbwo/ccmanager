@@ -50,6 +50,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private waitingWithBottomBorder: Map<string, boolean> = new Map();
 	private busyTimers: Map<string, NodeJS.Timeout> = new Map();
 	private autoApprovalDisabledWorktrees: Set<string> = new Set();
+	private restoringSessions: Set<string> = new Set();
+	private bufferedRestoreData: Map<string, string[]> = new Map();
 
 	private async spawn(
 		command: string,
@@ -443,6 +445,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			// Only emit data events when session is active
 			if (session.isActive) {
+				if (this.restoringSessions.has(session.id)) {
+					const bufferedData = this.bufferedRestoreData.get(session.id) ?? [];
+					bufferedData.push(data);
+					this.bufferedRestoreData.set(session.id, bufferedData);
+					return;
+				}
+
 				this.emit('sessionData', session, data);
 			}
 		});
@@ -663,10 +672,25 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			if (active) {
 				session.lastAccessedAt = Date.now();
-				const restoreSnapshot = this.getRestoreSnapshot(session);
-				if (restoreSnapshot.length > 0) {
-					this.emit('sessionRestore', session, restoreSnapshot);
+				this.restoringSessions.add(session.id);
+				try {
+					const restoreSnapshot = this.getRestoreSnapshot(session);
+					if (restoreSnapshot.length > 0) {
+						this.emit('sessionRestore', session, restoreSnapshot);
+					}
+				} finally {
+					this.restoringSessions.delete(session.id);
+					const bufferedData = this.bufferedRestoreData.get(session.id);
+					if (bufferedData && bufferedData.length > 0) {
+						this.bufferedRestoreData.delete(session.id);
+						for (const chunk of bufferedData) {
+							this.emit('sessionData', session, chunk);
+						}
+					}
 				}
+			} else {
+				this.restoringSessions.delete(session.id);
+				this.bufferedRestoreData.delete(session.id);
 			}
 		}
 	}
@@ -751,6 +775,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 			this.sessions.delete(sessionId);
 			this.waitingWithBottomBorder.delete(sessionId);
+			this.restoringSessions.delete(sessionId);
+			this.bufferedRestoreData.delete(sessionId);
 			this.emit('sessionDestroyed', session);
 		}
 	}
