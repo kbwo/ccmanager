@@ -14,11 +14,9 @@ import {spawn as childSpawn} from 'child_process';
 import {configReader} from './config/configReader.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {createStateDetector} from './stateDetector/index.js';
-import {
-	STATE_PERSISTENCE_DURATION_MS,
-	STATE_CHECK_INTERVAL_MS,
-	STATE_MINIMUM_DURATION_MS,
-} from '../constants/statePersistence.js';
+
+/** Interval in milliseconds for polling terminal state detection. */
+const STATE_CHECK_INTERVAL_MS = 100;
 import {Effect, Either} from 'effect';
 import {ProcessError, ConfigError} from '../types/errors.js';
 import {autoApprovalVerifier} from './autoApprovalVerifier.js';
@@ -273,9 +271,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		await session.stateMutex.update(data => ({
 			...data,
 			state: newState,
-			pendingState: undefined,
-			pendingStateStart: undefined,
-			stateConfirmedAt: Date.now(),
 			...additionalUpdates,
 		}));
 
@@ -520,79 +515,40 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// Setup data handler
 		this.setupDataHandler(session);
 
-		// Set up interval-based state detection with persistence
+		// Set up interval-based state detection
 		session.stateCheckInterval = setInterval(() => {
 			const stateData = session.stateMutex.getSnapshot();
 			const oldState = stateData.state;
 			const detectedState = this.detectTerminalState(session);
-			const now = Date.now();
 
-			// If detected state is different from current state
 			if (detectedState !== oldState) {
-				// If this is a new pending state or the pending state changed
-				if (stateData.pendingState !== detectedState) {
-					void session.stateMutex.update(data => ({
-						...data,
-						pendingState: detectedState,
-						pendingStateStart: now,
-					}));
-				} else if (
-					stateData.pendingState !== undefined &&
-					stateData.pendingStateStart !== undefined
+				// Cancel auto-approval verification if state is changing away from pending_auto_approval
+				if (
+					stateData.autoApprovalAbortController &&
+					detectedState !== 'pending_auto_approval'
 				) {
-					// Check if the pending state has persisted long enough
-					// and that the current state has been active for the minimum duration
-					const duration = now - stateData.pendingStateStart;
-					const timeInCurrentState = now - stateData.stateConfirmedAt;
-					if (
-						duration >= STATE_PERSISTENCE_DURATION_MS &&
-						timeInCurrentState >= STATE_MINIMUM_DURATION_MS
-					) {
-						// Cancel auto-approval verification if state is changing away from pending_auto_approval
-						if (
-							stateData.autoApprovalAbortController &&
-							detectedState !== 'pending_auto_approval'
-						) {
-							this.cancelAutoApprovalVerification(
-								session,
-								`state changed to ${detectedState}`,
-							);
-						}
-
-						// Build additional updates for auto-approval reset
-						const additionalUpdates: Partial<
-							Omit<import('../utils/mutex.js').SessionStateData, 'state'>
-						> = {};
-
-						// If we previously blocked auto-approval and have moved out of a user prompt,
-						// allow future auto-approval attempts.
-						if (
-							stateData.autoApprovalFailed &&
-							detectedState !== 'waiting_input' &&
-							detectedState !== 'pending_auto_approval'
-						) {
-							additionalUpdates.autoApprovalFailed = false;
-							additionalUpdates.autoApprovalReason = undefined;
-						}
-
-						// Confirm the state change with hook execution
-						void this.updateSessionState(
-							session,
-							detectedState,
-							additionalUpdates,
-						);
-					}
+					this.cancelAutoApprovalVerification(
+						session,
+						`state changed to ${detectedState}`,
+					);
 				}
-			} else {
-				// Detected state matches current state, clear any pending state
-				// and update stateConfirmedAt so the minimum duration guard
-				// tracks "last time current state was seen" rather than "first confirmed"
-				void session.stateMutex.update(data => ({
-					...data,
-					pendingState: undefined,
-					pendingStateStart: undefined,
-					stateConfirmedAt: now,
-				}));
+
+				const additionalUpdates: Partial<
+					Omit<import('../utils/mutex.js').SessionStateData, 'state'>
+				> = {};
+
+				// If we previously blocked auto-approval and have moved out of a user prompt,
+				// allow future auto-approval attempts.
+				if (
+					stateData.autoApprovalFailed &&
+					detectedState !== 'waiting_input' &&
+					detectedState !== 'pending_auto_approval'
+				) {
+					additionalUpdates.autoApprovalFailed = false;
+					additionalUpdates.autoApprovalReason = undefined;
+				}
+
+				void this.updateSessionState(session, detectedState, additionalUpdates);
 			}
 
 			// Handle auto-approval if state is pending_auto_approval and no verification is in progress.
@@ -699,8 +655,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				...data,
 				autoApprovalFailed: true,
 				autoApprovalReason: reason,
-				pendingState: undefined,
-				pendingStateStart: undefined,
 			}));
 		}
 	}

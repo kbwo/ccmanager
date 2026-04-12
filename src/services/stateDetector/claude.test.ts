@@ -416,6 +416,51 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
+		it('should detect busy for middle-dot activity label "· …ing…" (e.g. · Misting…)', () => {
+			terminal = createMockTerminal([
+				'· Misting…',
+				'   ⎿  Tip: Run /terminal-setup to enable convenient terminal integration',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.detectState(terminal, 'idle')).toBe('busy');
+		});
+
+		it('should detect busy when token stats line is above prompt box without interrupt or spinner', () => {
+			terminal = createMockTerminal([
+				'(9m 21s · ↓ 13.7k tokens)',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.detectState(terminal, 'idle')).toBe('busy');
+		});
+
+		it('should detect busy for token stats line with varied spacing and casing', () => {
+			terminal = createMockTerminal([
+				'  ( 1m · 500 TOKENS )  ',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.detectState(terminal, 'idle')).toBe('busy');
+		});
+
+		it('should not treat parenthetical text with "tokens" but no digit as busy', () => {
+			terminal = createMockTerminal([
+				'(see tokens in docs)',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detectStateAfterDebounce(detector, terminal, 'idle')).toBe('idle');
+		});
+
 		it('should detect busy with various spinner characters', () => {
 			const spinnerChars = [
 				'✱',
