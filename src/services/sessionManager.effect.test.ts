@@ -53,13 +53,25 @@ vi.mock('@xterm/addon-serialize', () => ({
 vi.mock('@xterm/headless', () => ({
 	default: {
 		Terminal: vi.fn().mockImplementation(function () {
+			const normalBuffer = {
+				type: 'normal',
+				baseY: 0,
+				cursorY: 0,
+				cursorX: 0,
+				length: 0,
+				getLine: vi.fn(),
+			};
 			return {
 				rows: 24,
 				cols: 80,
 				buffer: {
-					active: {
-						type: 'normal',
+					active: normalBuffer,
+					normal: normalBuffer,
+					alternate: {
+						type: 'alternate',
 						baseY: 0,
+						cursorY: 0,
+						cursorX: 0,
 						length: 0,
 						getLine: vi.fn(),
 					},

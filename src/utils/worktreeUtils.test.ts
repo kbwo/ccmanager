@@ -244,6 +244,7 @@ describe('prepareSessionItems', () => {
 		isActive: true,
 		terminal: {} as Session['terminal'],
 		serializer: {} as Session['serializer'],
+		restoreScrollbackBaseLine: 0,
 		stateCheckInterval: undefined,
 		isPrimaryCommand: true,
 		presetName: undefined,
