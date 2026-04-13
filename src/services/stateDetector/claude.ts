@@ -1,18 +1,57 @@
 import {SessionState, Terminal} from '../../types/index.js';
 import {BaseStateDetector} from './base.js';
 
-// Spinner characters used by Claude Code during active processing
-const SPINNER_CHARS = '✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆';
+// Spinner / activity-prefix characters (line must still match SPINNER_ACTIVITY_PATTERN: …ing + …)
+// Includes: ornament spinners; · / • / ∙ / ⋅ bullets; ⏺ (record); ▸▹ triangles; ○● circles
+const SPINNER_CHARS = '✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆·•⏺▸▹∙⋅○●';
 
-// Matches spinner activity labels like "✽ Tempering…" or "✳ Simplifying recompute_tangents…"
+// Matches spinner activity labels like "✽ Tempering…", "✳ Simplifying…", or "· Misting…"
 const SPINNER_ACTIVITY_PATTERN = new RegExp(
 	`^[${SPINNER_CHARS}] \\S+ing.*\u2026`,
 	'm',
 );
 
+// Session stats above the prompt, e.g. "(9m 21s · ↓ 13.7k tokens)" — requires parens, a digit, and "tokens"
+const TOKEN_STATS_LINE_PATTERN = /\([^)]*\d[^)]*tokens\s*\)/i;
+
 const BUSY_LOOKBACK_LINES = 5;
 
+// Workaround: Claude Code sometimes appears idle in terminal output while
+// still actively processing (busy). To mitigate false idle transitions,
+// require terminal output to remain unchanged for this duration before
+// confirming the idle state.
+export const IDLE_DEBOUNCE_MS = 1500;
+
 export class ClaudeStateDetector extends BaseStateDetector {
+	private lastContentHash: string = '';
+	private contentStableSince: number = 0;
+
+	/**
+	 * Debounce idle transitions: only return 'idle' when the terminal
+	 * content has been unchanged for IDLE_DEBOUNCE_MS.
+	 * Returns currentState if output is still changing.
+	 *
+	 * This is a workaround for Claude Code occasionally showing idle-like
+	 * terminal output while still busy (e.g. during screen redraws).
+	 */
+	private debounceIdle(
+		terminal: Terminal,
+		currentState: SessionState,
+		now: number = Date.now(),
+	): SessionState {
+		const content = this.getTerminalContent(terminal, 30);
+		if (content !== this.lastContentHash) {
+			this.lastContentHash = content;
+			this.contentStableSince = now;
+		}
+
+		const stableDuration = now - this.contentStableSince;
+		if (stableDuration >= IDLE_DEBOUNCE_MS) {
+			return 'idle';
+		}
+
+		return currentState;
+	}
 	/**
 	 * Extract content above the prompt box.
 	 * The prompt box is delimited by ─ border lines:
@@ -84,10 +123,10 @@ export class ClaudeStateDetector extends BaseStateDetector {
 	}
 
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
-		// Check for search prompt (⌕ Search…) within 200 lines - always idle
+		// Check for search prompt (⌕ Search…) within 200 lines - always idle (debounced)
 		const extendedContent = this.getTerminalContent(terminal, 200);
 		if (extendedContent.includes('⌕ Search…')) {
-			return 'idle';
+			return this.debounceIdle(terminal, currentState);
 		}
 
 		// Full content (including prompt box) for waiting_input detection
@@ -106,11 +145,6 @@ export class ClaudeStateDetector extends BaseStateDetector {
 				fullLowerContent,
 			)
 		) {
-			return 'waiting_input';
-		}
-
-		// Check for selection prompt with ❯ cursor indicator and numbered options
-		if (/❯\s+\d+\./.test(fullContent)) {
 			return 'waiting_input';
 		}
 
@@ -136,8 +170,13 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'busy';
 		}
 
-		// Otherwise idle
-		return 'idle';
+		// Usage/time + token count line (often shown above the prompt while a turn is active)
+		if (TOKEN_STATS_LINE_PATTERN.test(abovePromptBox)) {
+			return 'busy';
+		}
+
+		// Otherwise idle (debounced)
+		return this.debounceIdle(terminal, currentState);
 	}
 
 	detectBackgroundTask(terminal: Terminal): number {

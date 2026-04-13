@@ -1,5 +1,5 @@
-import {describe, it, expect, beforeEach} from 'vitest';
-import {ClaudeStateDetector} from './claude.js';
+import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
+import {ClaudeStateDetector, IDLE_DEBOUNCE_MS} from './claude.js';
 import type {Terminal} from '../../types/index.js';
 import {createMockTerminal} from './testUtils.js';
 
@@ -8,8 +8,27 @@ describe('ClaudeStateDetector', () => {
 	let terminal: Terminal;
 
 	beforeEach(() => {
+		vi.useFakeTimers();
 		detector = new ClaudeStateDetector();
 	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	/**
+	 * Helper: call detectState, advance time past IDLE_DEBOUNCE_MS,
+	 * then call again with the same terminal to get the debounced result.
+	 */
+	const detectStateAfterDebounce = (
+		det: ClaudeStateDetector,
+		term: Terminal,
+		currentState: 'idle' | 'busy' | 'waiting_input' = 'idle',
+	) => {
+		det.detectState(term, currentState);
+		vi.advanceTimersByTime(IDLE_DEBOUNCE_MS);
+		return det.detectState(term, currentState);
+	};
 
 	describe('detectState', () => {
 		it('should detect busy when "ESC to interrupt" is above prompt box', () => {
@@ -60,7 +79,7 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
-		it('should detect idle when no specific patterns are found', () => {
+		it('should detect idle when no specific patterns are found (after debounce)', () => {
 			// Arrange
 			terminal = createMockTerminal([
 				'Command completed successfully',
@@ -69,7 +88,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal, 'idle');
+			const state = detectStateAfterDebounce(detector, terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -80,7 +99,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal([]);
 
 			// Act
-			const state = detector.detectState(terminal, 'idle');
+			const state = detectStateAfterDebounce(detector, terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -249,39 +268,6 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
-		it('should detect waiting_input when plan submit prompt with ❯ cursor is present', () => {
-			// Arrange
-			terminal = createMockTerminal([
-				'Ready to submit your answers?',
-				'',
-				'❯ 1. Submit answers',
-				'  2. Cancel',
-			]);
-
-			// Act
-			const state = detector.detectState(terminal, 'idle');
-
-			// Assert
-			expect(state).toBe('waiting_input');
-		});
-
-		it('should detect waiting_input for generic ❯ numbered selection prompt', () => {
-			// Arrange
-			terminal = createMockTerminal([
-				'Select an option:',
-				'',
-				'❯ 1. Option A',
-				'  2. Option B',
-				'  3. Option C',
-			]);
-
-			// Act
-			const state = detector.detectState(terminal, 'idle');
-
-			// Assert
-			expect(state).toBe('waiting_input');
-		});
-
 		it('should detect waiting_input when "esc to cancel" is above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([
@@ -349,7 +335,7 @@ describe('ClaudeStateDetector', () => {
 			);
 
 			// Act
-			const state = detector.detectState(terminal, 'busy');
+			const state = detectStateAfterDebounce(detector, terminal, 'busy');
 
 			// Assert - Should detect idle because viewport shows lines 5-7
 			expect(state).toBe('idle');
@@ -430,6 +416,51 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('busy');
 		});
 
+		it('should detect busy for middle-dot activity label "· …ing…" (e.g. · Misting…)', () => {
+			terminal = createMockTerminal([
+				'· Misting…',
+				'   ⎿  Tip: Run /terminal-setup to enable convenient terminal integration',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.detectState(terminal, 'idle')).toBe('busy');
+		});
+
+		it('should detect busy when token stats line is above prompt box without interrupt or spinner', () => {
+			terminal = createMockTerminal([
+				'(9m 21s · ↓ 13.7k tokens)',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.detectState(terminal, 'idle')).toBe('busy');
+		});
+
+		it('should detect busy for token stats line with varied spacing and casing', () => {
+			terminal = createMockTerminal([
+				'  ( 1m · 500 TOKENS )  ',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.detectState(terminal, 'idle')).toBe('busy');
+		});
+
+		it('should not treat parenthetical text with "tokens" but no digit as busy', () => {
+			terminal = createMockTerminal([
+				'(see tokens in docs)',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detectStateAfterDebounce(detector, terminal, 'idle')).toBe('idle');
+		});
+
 		it('should detect busy with various spinner characters', () => {
 			const spinnerChars = [
 				'✱',
@@ -476,7 +507,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(['✽ Some random text', '❯']);
 
 			// Act
-			const state = detector.detectState(terminal, 'idle');
+			const state = detectStateAfterDebounce(detector, terminal, 'idle');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -487,7 +518,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(['⌕ Search…', '✽ Tempering…']);
 
 			// Act
-			const state = detector.detectState(terminal, 'busy');
+			const state = detectStateAfterDebounce(detector, terminal, 'busy');
 
 			// Assert - Search prompt takes precedence
 			expect(state).toBe('idle');
@@ -498,7 +529,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(['⌕ Search…', 'Some content']);
 
 			// Act
-			const state = detector.detectState(terminal, 'busy');
+			const state = detectStateAfterDebounce(detector, terminal, 'busy');
 
 			// Assert
 			expect(state).toBe('idle');
@@ -509,7 +540,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(['⌕ Search…', 'esc to cancel']);
 
 			// Act
-			const state = detector.detectState(terminal, 'idle');
+			const state = detectStateAfterDebounce(detector, terminal, 'idle');
 
 			// Assert - Should be idle because search prompt takes precedence
 			expect(state).toBe('idle');
@@ -520,7 +551,7 @@ describe('ClaudeStateDetector', () => {
 			terminal = createMockTerminal(['⌕ Search…', 'Press esc to interrupt']);
 
 			// Act
-			const state = detector.detectState(terminal, 'idle');
+			const state = detectStateAfterDebounce(detector, terminal, 'idle');
 
 			// Assert - Should be idle because search prompt takes precedence
 			expect(state).toBe('idle');
@@ -541,7 +572,7 @@ describe('ClaudeStateDetector', () => {
 				'──────────────────────────────',
 			]);
 
-			const state = detector.detectState(terminal, 'busy');
+			const state = detectStateAfterDebounce(detector, terminal, 'busy');
 
 			expect(state).toBe('idle');
 		});
@@ -558,7 +589,7 @@ describe('ClaudeStateDetector', () => {
 				'──────────────────────────────',
 			]);
 
-			const state = detector.detectState(terminal, 'busy');
+			const state = detectStateAfterDebounce(detector, terminal, 'busy');
 
 			expect(state).toBe('idle');
 		});
@@ -573,7 +604,7 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal, 'idle');
+			const state = detectStateAfterDebounce(detector, terminal, 'idle');
 
 			// Assert - should be idle because "esc to interrupt" is inside prompt box
 			expect(state).toBe('idle');
@@ -622,10 +653,84 @@ describe('ClaudeStateDetector', () => {
 			]);
 
 			// Act
-			const state = detector.detectState(terminal, 'idle');
+			const state = detectStateAfterDebounce(detector, terminal, 'idle');
 
 			// Assert - should be idle because spinner is inside prompt box
 			expect(state).toBe('idle');
+		});
+
+		describe('idle debounce', () => {
+			it('should not return idle immediately when output just appeared', () => {
+				terminal = createMockTerminal(['Command completed successfully', '> ']);
+
+				const state = detector.detectState(terminal, 'busy');
+
+				// Should remain busy because debounce hasn't elapsed
+				expect(state).toBe('busy');
+			});
+
+			it('should return idle after output is stable for IDLE_DEBOUNCE_MS', () => {
+				terminal = createMockTerminal(['Command completed successfully', '> ']);
+
+				// First call registers the content
+				detector.detectState(terminal, 'busy');
+
+				// Advance time past debounce threshold
+				vi.advanceTimersByTime(IDLE_DEBOUNCE_MS);
+
+				// Second call with same content should return idle
+				const state = detector.detectState(terminal, 'busy');
+				expect(state).toBe('idle');
+			});
+
+			it('should reset debounce timer when output changes', () => {
+				terminal = createMockTerminal(['Output v1', '> ']);
+				detector.detectState(terminal, 'busy');
+
+				// Advance almost to threshold
+				vi.advanceTimersByTime(IDLE_DEBOUNCE_MS - 100);
+
+				// Output changes
+				terminal = createMockTerminal(['Output v2', '> ']);
+				const state1 = detector.detectState(terminal, 'busy');
+				expect(state1).toBe('busy');
+
+				// Advance past original threshold but not new one
+				vi.advanceTimersByTime(200);
+				const state2 = detector.detectState(terminal, 'busy');
+				expect(state2).toBe('busy');
+
+				// Advance to meet new threshold
+				vi.advanceTimersByTime(IDLE_DEBOUNCE_MS);
+				const state3 = detector.detectState(terminal, 'busy');
+				expect(state3).toBe('idle');
+			});
+
+			it('should not debounce busy transitions', () => {
+				terminal = createMockTerminal([
+					'Processing...',
+					'Press ESC to interrupt',
+					'──────────────────────────────',
+					'❯',
+					'──────────────────────────────',
+				]);
+
+				// Busy should be detected immediately without debounce
+				const state = detector.detectState(terminal, 'idle');
+				expect(state).toBe('busy');
+			});
+
+			it('should not debounce waiting_input transitions', () => {
+				terminal = createMockTerminal([
+					'Do you want to continue?',
+					'❯ 1. Yes',
+					'  2. No',
+				]);
+
+				// waiting_input should be detected immediately
+				const state = detector.detectState(terminal, 'idle');
+				expect(state).toBe('waiting_input');
+			});
 		});
 	});
 
