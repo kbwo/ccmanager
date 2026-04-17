@@ -17,6 +17,7 @@ import SessionActions, {type SessionActionType} from './SessionActions.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {launchTerminal} from '../services/terminalLauncher.js';
 import {
 	worktreeNameGenerator,
 	generateFallbackBranchName,
@@ -987,6 +988,17 @@ const App: React.FC<AppProps> = ({
 					sessionManager.destroySession(targetSession.id);
 					handleReturnToMenu();
 					return;
+				case 'openTerminal': {
+					const result = launchTerminal(worktreePath);
+					if (!result.success) {
+						setError(
+							result.error ??
+								'Failed to launch terminal. Set CCMANAGER_TERMINAL to override the default command.',
+						);
+					}
+					handleReturnToMenu();
+					return;
+				}
 			}
 		};
 
