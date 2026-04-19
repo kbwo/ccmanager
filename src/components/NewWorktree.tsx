@@ -7,6 +7,7 @@ import {configReader} from '../services/config/configReader.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import SearchableList from './SearchableList.js';
 import {Effect} from 'effect';
 import type {AppError} from '../types/errors.js';
@@ -69,7 +70,6 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const isAutoDirectory = worktreeConfig.autoDirectory;
 	const isAutoUseDefaultBranch = worktreeConfig.autoUseDefaultBranch ?? false;
 	const includeRemoteBranches = worktreeConfig.includeRemoteBranches ?? false;
-	const limit = 10;
 
 	const getInitialStep = (): Step => {
 		if (isAutoDirectory) {
@@ -191,6 +191,12 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		useSearchMode(allBranchItems.length, {
 			isDisabled: step !== 'base-branch',
 		});
+
+	const limit = useDynamicLimit({
+		fixedRows: includeRemoteBranches ? 10 : 8,
+		isSearchMode,
+		hasError: !!branchLoadError,
+	});
 
 	const branchItems = useMemo(() => {
 		if (!searchQuery) return allBranchItems;
