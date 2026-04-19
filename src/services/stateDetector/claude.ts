@@ -14,8 +14,6 @@ const SPINNER_ACTIVITY_PATTERN = new RegExp(
 // Session stats above the prompt, e.g. "(9m 21s · ↓ 13.7k tokens)" — requires parens, a digit, and "tokens"
 const TOKEN_STATS_LINE_PATTERN = /\([^)]*\d[^)]*tokens\s*\)/i;
 
-const BUSY_LOOKBACK_LINES = 5;
-
 // Workaround: Claude Code sometimes appears idle in terminal output while
 // still actively processing (busy). To mitigate false idle transitions,
 // require terminal output to remain unchanged for this duration before
@@ -118,8 +116,7 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			start--;
 		}
 
-		const recentBlock = lines.slice(Math.max(start, 0));
-		return recentBlock.slice(-BUSY_LOOKBACK_LINES).join('\n');
+		return lines.slice(Math.max(start, 0)).join('\n');
 	}
 
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {
