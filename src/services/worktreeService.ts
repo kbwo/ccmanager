@@ -592,6 +592,56 @@ export class WorktreeService {
 	}
 
 	/**
+	 * Effect-based getBranchesWithRemotes operation
+	 * Returns local and remote branches separately so callers can distinguish them.
+	 * Remote branches keep their `<remote>/<branch>` prefix (e.g. `origin/main`).
+	 *
+	 * @returns {Effect.Effect<{local: string[]; remote: string[]}, GitError, never>}
+	 */
+	getBranchesWithRemotesEffect(): Effect.Effect<
+		{local: string[]; remote: string[]},
+		GitError,
+		never
+	> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias
+		const self = this;
+		return Effect.catchAll(
+			Effect.try({
+				try: () => {
+					const output = execSync(
+						"git branch -a --format='%(refname:short)' | grep -v HEAD | sort -u",
+						{
+							cwd: self.rootPath,
+							encoding: 'utf8',
+							shell: '/bin/bash',
+						},
+					);
+
+					const remotes = self.getAllRemotes();
+					const remotePrefixes = remotes.map(r => `${r}/`);
+
+					const local: string[] = [];
+					const remote: string[] = [];
+
+					for (const raw of output.trim().split('\n')) {
+						const branch = raw.trim();
+						if (!branch) continue;
+						if (remotePrefixes.some(prefix => branch.startsWith(prefix))) {
+							remote.push(branch);
+						} else {
+							local.push(branch);
+						}
+					}
+
+					return {local, remote};
+				},
+				catch: (error: unknown) => error,
+			}),
+			(_error: unknown) => Effect.succeed({local: [], remote: []}),
+		);
+	}
+
+	/**
 	 * Effect-based getCurrentBranch operation
 	 * Returns Effect that may fail with GitError
 	 *
