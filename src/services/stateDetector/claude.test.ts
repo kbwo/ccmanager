@@ -557,6 +557,30 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('idle');
 		});
 
+		it('should detect busy when spinner + token stats header is followed by a long TodoWrite checklist', () => {
+			// Regression: the recent block contains a spinner/token header and
+			// many checklist items with no internal blank line. All lines are
+			// part of the same contiguous update and should be inspected.
+			terminal = createMockTerminal([
+				'✽ Add GitHub Actions workflow and commit… (50s · ↓ 794 tokens)',
+				'  ⎿  ✔ Create docs/index.config.json',
+				'     ✔ Reorganize existing docs into topic directories',
+				'     ✔ Add frontmatter to existing docs',
+				'     ✔ Create docs/INDEX.md, docs/README.md, templates, workflow',
+				'     ✔ Create root AGENTS.md and README.md',
+				'     ✔ Write manifest generation Go script',
+				'     ✔ Add Makefile tasks and run first generation',
+				'     ◼ Add GitHub Actions workflow and commit',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			const state = detector.detectState(terminal, 'idle');
+
+			expect(state).toBe('busy');
+		});
+
 		it('should ignore stale spinner output outside the latest block above the prompt box', () => {
 			terminal = createMockTerminal([
 				'✻ Seasoning… (44s · ↓ 247 tokens)',
