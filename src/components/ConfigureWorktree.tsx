@@ -38,6 +38,9 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 	const [autoUseDefaultBranch, setAutoUseDefaultBranch] = useState(
 		worktreeConfig.autoUseDefaultBranch ?? false,
 	);
+	const [includeRemoteBranches, setIncludeRemoteBranches] = useState(
+		worktreeConfig.includeRemoteBranches ?? false,
+	);
 	const [editMode, setEditMode] = useState<EditMode>('menu');
 	const [tempPattern, setTempPattern] = useState(pattern);
 
@@ -80,6 +83,10 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			value: 'toggleAutoUseDefault',
 		},
 		{
+			label: `Include Remote Branches: ${includeRemoteBranches ? '✅ Enabled' : '❌ Disabled'}`,
+			value: 'toggleIncludeRemote',
+		},
+		{
 			label: '💾 Save Changes',
 			value: 'save',
 		},
@@ -107,6 +114,9 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 			case 'toggleAutoUseDefault':
 				setAutoUseDefaultBranch(!autoUseDefaultBranch);
 				break;
+			case 'toggleIncludeRemote':
+				setIncludeRemoteBranches(!includeRemoteBranches);
+				break;
 			case 'save':
 				// Save the configuration
 				configEditor.setWorktreeConfig({
@@ -115,6 +125,7 @@ const ConfigureWorktree: React.FC<ConfigureWorktreeProps> = ({onComplete}) => {
 					copySessionData,
 					sortByLastSession,
 					autoUseDefaultBranch,
+					includeRemoteBranches,
 				});
 				onComplete();
 				break;

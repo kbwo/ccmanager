@@ -7,6 +7,7 @@ import {configReader} from '../services/config/configReader.js';
 import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
+import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import SearchableList from './SearchableList.js';
 import {Effect} from 'effect';
 import type {AppError} from '../types/errors.js';
@@ -68,7 +69,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const presetsConfig = configReader.getCommandPresets();
 	const isAutoDirectory = worktreeConfig.autoDirectory;
 	const isAutoUseDefaultBranch = worktreeConfig.autoUseDefaultBranch ?? false;
-	const limit = 10;
+	const includeRemoteBranches = worktreeConfig.includeRemoteBranches ?? false;
 
 	const getInitialStep = (): Step => {
 		if (isAutoDirectory) {
@@ -94,6 +95,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const [isLoadingBranches, setIsLoadingBranches] = useState(true);
 	const [branchLoadError, setBranchLoadError] = useState<string | null>(null);
 	const [branches, setBranches] = useState<string[]>([]);
+	const [remoteBranches, setRemoteBranches] = useState<string[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string>('main');
 
 	useEffect(() => {
@@ -101,8 +103,15 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		const service = new WorktreeService(projectPath);
 
 		const loadBranches = async () => {
+			const branchesEffect = includeRemoteBranches
+				? service.getBranchesWithRemotesEffect()
+				: Effect.map(service.getAllBranchesEffect(), (list: string[]) => ({
+						local: list,
+						remote: [] as string[],
+					}));
+
 			const workflow = Effect.all(
-				[service.getAllBranchesEffect(), service.getDefaultBranchEffect()],
+				[branchesEffect, service.getDefaultBranchEffect()],
 				{concurrency: 2},
 			);
 
@@ -112,9 +121,13 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 						type: 'error' as const,
 						message: formatError(error),
 					}),
-					onSuccess: ([branchList, defaultBr]: [string[], string]) => ({
+					onSuccess: ([branchData, defaultBr]: [
+						{local: string[]; remote: string[]},
+						string,
+					]) => ({
 						type: 'success' as const,
-						branches: branchList,
+						local: branchData.local,
+						remote: branchData.remote,
 						defaultBranch: defaultBr,
 					}),
 				}),
@@ -125,7 +138,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					setBranchLoadError(result.message);
 					setIsLoadingBranches(false);
 				} else {
-					setBranches(result.branches);
+					setBranches(result.local);
+					setRemoteBranches(result.remote);
 					setDefaultBranch(result.defaultBranch);
 					setIsLoadingBranches(false);
 
@@ -149,22 +163,40 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [projectPath, isAutoUseDefaultBranch]);
+	}, [projectPath, isAutoUseDefaultBranch, includeRemoteBranches]);
 
-	const allBranchItems: BranchItem[] = useMemo(
-		() => [
+	const allBranchItems: BranchItem[] = useMemo(() => {
+		const defaultRemoteSuffix = `/${defaultBranch}`;
+		const defaultRemotes = remoteBranches.filter(br =>
+			br.endsWith(defaultRemoteSuffix),
+		);
+		const otherRemotes = remoteBranches.filter(
+			br => !br.endsWith(defaultRemoteSuffix),
+		);
+
+		return [
 			{label: `${defaultBranch} (default)`, value: defaultBranch},
+			...defaultRemotes.map(br => ({
+				label: `${br} (default remote)`,
+				value: br,
+			})),
 			...branches
 				.filter(br => br !== defaultBranch)
 				.map(br => ({label: br, value: br})),
-		],
-		[branches, defaultBranch],
-	);
+			...otherRemotes.map(br => ({label: br, value: br})),
+		];
+	}, [branches, remoteBranches, defaultBranch]);
 
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
 		useSearchMode(allBranchItems.length, {
 			isDisabled: step !== 'base-branch',
 		});
+
+	const limit = useDynamicLimit({
+		fixedRows: includeRemoteBranches ? 10 : 8,
+		isSearchMode,
+		hasError: !!branchLoadError,
+	});
 
 	const branchItems = useMemo(() => {
 		if (!searchQuery) return allBranchItems;
@@ -462,6 +494,14 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					{!isSearchMode && (
 						<Box marginTop={1}>
 							<Text dimColor>Press / to search</Text>
+						</Box>
+					)}
+					{includeRemoteBranches && (
+						<Box marginTop={1}>
+							<Text dimColor>
+								Tip: If the branch list feels slow, disable &quot;Include Remote
+								Branches&quot; in Configuration → Configure Worktree Settings.
+							</Text>
 						</Box>
 					)}
 				</Box>

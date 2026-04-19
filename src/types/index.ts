@@ -141,6 +141,7 @@ export interface WorktreeConfig {
 	copySessionData?: boolean; // Whether to copy Claude session data by default
 	sortByLastSession?: boolean; // Whether to sort worktrees by last opened session
 	autoUseDefaultBranch?: boolean; // Whether to automatically use default branch as base branch
+	includeRemoteBranches?: boolean; // Whether to include remote branches in base branch selection
 }
 
 export interface MergeConfig {
