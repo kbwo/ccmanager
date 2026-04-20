@@ -1162,6 +1162,7 @@ describe('SessionManager', () => {
 			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
+			await session.stateMutex.update(data => ({...data, state: 'idle'}));
 			const normalBuffer = session.terminal.buffer.normal as unknown as {
 				baseY: number;
 				length: number;
@@ -1191,6 +1192,46 @@ describe('SessionManager', () => {
 			expect(restoreHandler).toHaveBeenCalledWith(
 				session,
 				'\u001b[31mrestored\u001b[0m\u001b[8;12H',
+			);
+		});
+
+		it('should emit a viewport-only restore snapshot while session is busy', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				baseY: number;
+				length: number;
+				cursorY: number;
+				cursorX: number;
+			};
+			normalBuffer.baseY = 260;
+			normalBuffer.length = 300;
+			normalBuffer.cursorY = 7;
+			normalBuffer.cursorX = 11;
+			session.restoreScrollbackBaseLine = 120;
+			const serializeMock = vi
+				.spyOn(session.serializer, 'serialize')
+				.mockReturnValue('\u001b[31mbusy-viewport\u001b[0m');
+			const restoreHandler = vi.fn();
+			sessionManager.on('sessionRestore', restoreHandler);
+
+			sessionManager.setSessionActive(session.id, true);
+
+			expect(serializeMock).toHaveBeenCalledWith({
+				scrollback: 0,
+				excludeAltBuffer: true,
+			});
+			expect(restoreHandler).toHaveBeenCalledWith(
+				session,
+				'\u001b[31mbusy-viewport\u001b[0m\u001b[8;12H',
 			);
 		});
 

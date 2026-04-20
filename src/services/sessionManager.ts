@@ -320,6 +320,21 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			return '';
 		}
 
+		// While the session is busy, cursor-addressed status-box redraws can push
+		// stale frames into scrollback (e.g. Claude's spinner + token stats line).
+		// Those ghost rows render as duplicated status bars when replayed, so
+		// restore only the viewport during busy state.
+		const isBusy = session.stateMutex.getSnapshot().state === 'busy';
+		if (isBusy) {
+			const snapshot = session.serializer.serialize({
+				scrollback: 0,
+				excludeAltBuffer: true,
+			});
+			const cursorRow = normalBuffer.cursorY + 1;
+			const cursorCol = normalBuffer.cursorX + 1;
+			return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
+		}
+
 		const scrollbackStart = Math.max(
 			0,
 			normalBuffer.baseY - TERMINAL_RESTORE_SCROLLBACK_LINES,
