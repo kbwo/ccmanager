@@ -33,6 +33,15 @@ const {Terminal} = pkg;
 const TERMINAL_CONTENT_MAX_LINES = 300;
 const TERMINAL_SCROLLBACK_LINES = 5000;
 const TERMINAL_RESTORE_SCROLLBACK_LINES = 200;
+// Claude Code's Ink-based renderer sometimes splits a single UI redraw across
+// multiple PTY writes with short time gaps. If we snapshot between chunks, the
+// resulting viewport can miss rows (e.g. empty middle area while the top/bottom
+// chrome already rendered). Re-emit the snapshot after the PTY output has been
+// quiet for this long so late chunks are accounted for.
+const RESTORE_REFRESH_QUIET_MS = 120;
+// Cap on how long we wait for quiet before forcing the refresh, so continuous
+// streaming output (e.g. a long busy turn) still produces an updated snapshot.
+const RESTORE_REFRESH_MAX_WAIT_MS = 400;
 
 export interface SessionCounts {
 	idle: number;
@@ -51,6 +60,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private autoApprovalDisabledWorktrees: Set<string> = new Set();
 	private restoringSessions: Set<string> = new Set();
 	private bufferedRestoreData: Map<string, string[]> = new Map();
+	private restoreRefreshTimers: Map<string, NodeJS.Timeout> = new Map();
+	private restoreRefreshDeadlines: Map<string, number> = new Map();
 
 	private async spawn(
 		command: string,
@@ -306,7 +317,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		);
 	}
 
-	private getRestoreSnapshot(session: Session): string {
+	private getRestoreSnapshot(
+		session: Session,
+		options: {viewportOnly?: boolean} = {},
+	): string {
 		const activeBuffer = session.terminal.buffer.active;
 		if (activeBuffer.type !== 'normal') {
 			return session.serializer.serialize({
@@ -323,9 +337,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		// While the session is busy, cursor-addressed status-box redraws can push
 		// stale frames into scrollback (e.g. Claude's spinner + token stats line).
 		// Those ghost rows render as duplicated status bars when replayed, so
-		// restore only the viewport during busy state.
+		// restore only the viewport during busy state. Refresh re-emits also
+		// bypass scrollback to avoid duplicating history into real-terminal
+		// scrollback on top of the initial emit.
 		const isBusy = session.stateMutex.getSnapshot().state === 'busy';
-		if (isBusy) {
+		if (options.viewportOnly || isBusy) {
 			const snapshot = session.serializer.serialize({
 				scrollback: 0,
 				excludeAltBuffer: true,
@@ -356,6 +372,57 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		const cursorCol = normalBuffer.cursorX + 1;
 
 		return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
+	}
+
+	private scheduleRestoreRefresh(session: Session): void {
+		this.restoreRefreshDeadlines.set(
+			session.id,
+			Date.now() + RESTORE_REFRESH_MAX_WAIT_MS,
+		);
+		this.armRestoreRefreshTimer(session);
+	}
+
+	private armRestoreRefreshTimer(session: Session): void {
+		const deadline = this.restoreRefreshDeadlines.get(session.id);
+		if (deadline === undefined) {
+			return;
+		}
+		const existing = this.restoreRefreshTimers.get(session.id);
+		if (existing !== undefined) {
+			clearTimeout(existing);
+			this.restoreRefreshTimers.delete(session.id);
+		}
+		const remaining = deadline - Date.now();
+		if (remaining <= 0) {
+			this.fireRestoreRefresh(session);
+			return;
+		}
+		const delay = Math.min(RESTORE_REFRESH_QUIET_MS, remaining);
+		const timer = setTimeout(() => this.fireRestoreRefresh(session), delay);
+		this.restoreRefreshTimers.set(session.id, timer);
+	}
+
+	private cancelRestoreRefresh(session: Session): void {
+		const existing = this.restoreRefreshTimers.get(session.id);
+		if (existing !== undefined) {
+			clearTimeout(existing);
+			this.restoreRefreshTimers.delete(session.id);
+		}
+		this.restoreRefreshDeadlines.delete(session.id);
+	}
+
+	private fireRestoreRefresh(session: Session): void {
+		this.restoreRefreshTimers.delete(session.id);
+		this.restoreRefreshDeadlines.delete(session.id);
+		if (!session.isActive) {
+			return;
+		}
+		const snapshot = this.getRestoreSnapshot(session, {viewportOnly: true});
+		if (snapshot.length > 0) {
+			// Home the cursor first so the viewport-only snapshot overwrites the
+			// real terminal in place rather than scrolling over the current view.
+			this.emit('sessionRestore', session, `\x1b[H${snapshot}`);
+		}
 	}
 
 	private async createSessionInternal(
@@ -498,6 +565,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			}
 
 			session.lastActivity = new Date();
+
+			// If a restore-refresh is pending, each incoming chunk resets the
+			// quiet timer so the follow-up snapshot only fires after Claude's
+			// multi-chunk redraw has settled.
+			if (this.restoreRefreshDeadlines.has(session.id)) {
+				this.armRestoreRefreshTimer(session);
+			}
 
 			// Only emit data events when session is active
 			if (session.isActive) {
@@ -705,9 +779,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						}
 					}
 				}
+				this.scheduleRestoreRefresh(session);
 			} else {
 				this.restoringSessions.delete(session.id);
 				this.bufferedRestoreData.delete(session.id);
+				this.cancelRestoreRefresh(session);
 			}
 		}
 	}
@@ -792,6 +868,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			this.waitingWithBottomBorder.delete(sessionId);
 			this.restoringSessions.delete(sessionId);
 			this.bufferedRestoreData.delete(sessionId);
+			this.cancelRestoreRefresh(session);
 			this.emit('sessionDestroyed', session);
 		}
 	}
@@ -852,6 +929,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 				this.sessions.delete(sessionId);
 				this.waitingWithBottomBorder.delete(sessionId);
+				this.cancelRestoreRefresh(session);
 				this.emit('sessionDestroyed', session);
 			},
 			catch: (error: unknown) => {
