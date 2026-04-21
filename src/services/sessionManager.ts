@@ -419,9 +419,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 		const snapshot = this.getRestoreSnapshot(session, {viewportOnly: true});
 		if (snapshot.length > 0) {
-			// Home the cursor first so the viewport-only snapshot overwrites the
-			// real terminal in place rather than scrolling over the current view.
-			this.emit('sessionRestore', session, `\x1b[H${snapshot}`);
+			// Clear the viewport before repainting. Without the \x1b[2J, a refresh
+			// snapshot that is shorter than the already-displayed content leaves a
+			// "ghost tail" at the bottom — the pre-refresh rows beyond the new
+			// snapshot's last row keep rendering and produce visible duplicates.
+			this.emit('sessionRestore', session, `\x1b[2J\x1b[H${snapshot}`);
 		}
 	}
 

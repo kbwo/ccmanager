@@ -1378,7 +1378,9 @@ describe('SessionManager', () => {
 
 				await vi.advanceTimersByTimeAsync(120);
 				expect(restoreHandler).toHaveBeenCalledTimes(2);
-				expect(restoreHandler.mock.calls[1]?.[1]).toMatch(/^\u001b\[Hsnap/);
+				expect(restoreHandler.mock.calls[1]?.[1]).toMatch(
+					/^\u001b\[2J\u001b\[Hsnap/,
+				);
 				expect(serializeMock).toHaveBeenLastCalledWith({
 					scrollback: 0,
 					excludeAltBuffer: true,
