@@ -419,11 +419,19 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}
 		const snapshot = this.getRestoreSnapshot(session, {viewportOnly: true});
 		if (snapshot.length > 0) {
-			// Clear the viewport before repainting. Without the \x1b[2J, a refresh
-			// snapshot that is shorter than the already-displayed content leaves a
-			// "ghost tail" at the bottom — the pre-refresh rows beyond the new
-			// snapshot's last row keep rendering and produce visible duplicates.
-			this.emit('sessionRestore', session, `\x1b[2J\x1b[H${snapshot}`);
+			// \x1b[2J: clear the viewport before repainting — without this, a
+			//   refresh snapshot shorter than the already-displayed content leaves
+			//   a "ghost tail" of pre-refresh rows at the bottom.
+			// \x1b[?7h / \x1b[?7l: Session.tsx disables auto-wrap (DECAWM) after
+			//   the initial restore, but SerializeAddon omits row separators for
+			//   wrapped lines and relies on DECAWM to advance to the next row
+			//   (see PR #276). Re-enable auto-wrap just for the snapshot write so
+			//   wrapped viewport rows don't overlap, then restore the TUI default.
+			this.emit(
+				'sessionRestore',
+				session,
+				`\x1b[?7h\x1b[2J\x1b[H${snapshot}\x1b[?7l`,
+			);
 		}
 	}
 
