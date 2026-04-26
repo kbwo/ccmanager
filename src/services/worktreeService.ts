@@ -4,6 +4,7 @@ import path from 'path';
 import {Effect, Either} from 'effect';
 import {
 	Worktree,
+	CreateWorktreeResult,
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 	MergeConfig,
@@ -19,6 +20,7 @@ import {
 	executeWorktreePreCreationHook,
 } from '../utils/hookExecutor.js';
 import {configReader} from './config/configReader.js';
+import {logger} from '../utils/logger.js';
 
 const CLAUDE_DIR = '.claude';
 
@@ -891,7 +893,11 @@ export class WorktreeService {
 		baseBranch: string,
 		copySessionData = false,
 		copyClaudeDirectory = false,
-	): Effect.Effect<Worktree, GitError | FileSystemError | ProcessError, never> {
+	): Effect.Effect<
+		CreateWorktreeResult,
+		GitError | FileSystemError | ProcessError,
+		never
+	> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
 		const self = this;
 
@@ -912,6 +918,17 @@ export class WorktreeService {
 				? worktreePath
 				: path.join(absoluteGitRoot, worktreePath);
 
+			logger.info('Worktree creation requested', {
+				inputPath: worktreePath,
+				resolvedPath,
+				branch,
+				baseBranch,
+				rootPath: self.rootPath,
+				absoluteGitRoot,
+				copySessionData,
+				copyClaudeDirectory,
+			});
+
 			// Check if branch exists
 			const branchExists = yield* Effect.catchAll(
 				Effect.try({
@@ -929,6 +946,14 @@ export class WorktreeService {
 
 			// Execute pre-creation hook if configured (BEFORE git worktree add)
 			const worktreeHooksConfig = configReader.getWorktreeHooks();
+			logger.info('Worktree hook config before creation', {
+				preCreationEnabled: Boolean(worktreeHooksConfig.pre_creation?.enabled),
+				preCreationCommand: worktreeHooksConfig.pre_creation?.command,
+				postCreationEnabled: Boolean(
+					worktreeHooksConfig.post_creation?.enabled,
+				),
+				postCreationCommand: worktreeHooksConfig.post_creation?.command,
+			});
 			if (
 				worktreeHooksConfig.pre_creation?.enabled &&
 				worktreeHooksConfig.pre_creation?.command
@@ -955,9 +980,17 @@ export class WorktreeService {
 			// Execute the worktree creation command
 			yield* Effect.try({
 				try: () => {
+					logger.info('Executing git worktree add command', {
+						command,
+						cwd: absoluteGitRoot,
+					});
 					execSync(command, {
 						cwd: absoluteGitRoot,
 						encoding: 'utf8',
+					});
+					logger.info('Git worktree add command succeeded', {
+						command,
+						cwd: absoluteGitRoot,
 					});
 				},
 				catch: (error: unknown) => {
@@ -1017,30 +1050,43 @@ export class WorktreeService {
 
 			// Execute post-creation hook if configured
 			const worktreeHooks = configReader.getWorktreeHooks();
-			if (
-				worktreeHooks.post_creation?.enabled &&
-				worktreeHooks.post_creation?.command
-			) {
-				const newWorktree: Worktree = {
-					path: resolvedPath,
-					branch: branch,
-					isMainWorktree: false,
-					hasSession: false,
-				};
-
-				yield* executeWorktreePostCreationHook(
-					worktreeHooks.post_creation.command,
-					newWorktree,
-					absoluteGitRoot,
-					baseBranch,
-				);
-			}
-
-			return {
+			logger.info('Worktree hook config after creation', {
+				postCreationEnabled: Boolean(worktreeHooks.post_creation?.enabled),
+				postCreationCommand: worktreeHooks.post_creation?.command,
+				resolvedPath,
+				branch,
+			});
+			let postCreationHookError: ProcessError | undefined;
+			const createdWorktree: Worktree = {
 				path: resolvedPath,
 				branch,
 				isMainWorktree: false,
 				hasSession: false,
+			};
+
+			if (
+				worktreeHooks.post_creation?.enabled &&
+				worktreeHooks.post_creation?.command
+			) {
+				const postCreationHookResult = yield* Effect.either(
+					executeWorktreePostCreationHook(
+						worktreeHooks.post_creation.command,
+						createdWorktree,
+						absoluteGitRoot,
+						baseBranch,
+					),
+				);
+				if (postCreationHookResult._tag === 'Left') {
+					postCreationHookError = postCreationHookResult.left;
+					logger.error(
+						`Failed to execute post-creation hook: ${postCreationHookError.message}`,
+					);
+				}
+			}
+
+			return {
+				worktree: createdWorktree,
+				postCreationHookError,
 			};
 		});
 	}

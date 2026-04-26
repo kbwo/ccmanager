@@ -14,17 +14,20 @@ import type {Effect as EffectType} from 'effect';
 import type {
 	Session as SessionType,
 	Worktree,
+	CreateWorktreeResult,
 	GitProject,
 	DevcontainerConfig,
 	MenuAction,
 } from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
+import {ProcessError} from '../types/errors.js';
 
 type AppComponent = typeof import('./App.js').default;
 
 type MenuMockProps = {
 	onMenuAction: (action: MenuAction) => void | Promise<void>;
 	onSelectRecentProject?: (project: GitProject) => void | Promise<void>;
+	error?: string | null;
 };
 
 type NewWorktreeMockProps = {
@@ -63,7 +66,7 @@ type CreateWorktreeEffect = (
 	baseBranch: string,
 	copySessionData: boolean,
 	copyClaudeDirectory: boolean,
-) => EffectType.Effect<Worktree, unknown, never>;
+) => EffectType.Effect<CreateWorktreeResult, unknown, never>;
 
 type DeleteWorktreeEffect = (
 	worktreePath: string,
@@ -256,11 +259,13 @@ beforeEach(() => {
 	deleteWorktreeEffectMock.mockReset();
 	createWorktreeEffectMock.mockImplementation((path, branch) =>
 		Effect.succeed({
-			path,
-			branch,
-			isMainWorktree: false,
-			hasSession: false,
-		} as Worktree),
+			worktree: {
+				path,
+				branch,
+				isMainWorktree: false,
+				hasSession: false,
+			} as Worktree,
+		}),
 	);
 	deleteWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
 	sessionManagers.length = 0;
@@ -312,14 +317,16 @@ describe('App component loading state machine', () => {
 		createWorktreeEffectMock.mockImplementation(() =>
 			Effect.tryPromise({
 				try: () =>
-					new Promise<Worktree>(resolve => {
+					new Promise<CreateWorktreeResult>(resolve => {
 						resolveWorktree = () =>
 							resolve({
-								path: '/tmp/test',
-								branch: 'feature',
-								isMainWorktree: false,
-								hasSession: false,
-							} as Worktree);
+								worktree: {
+									path: '/tmp/test',
+									branch: 'feature',
+									isMainWorktree: false,
+									hasSession: false,
+								} as Worktree,
+							});
 					}),
 				catch: (error: unknown) => error as never,
 			}),
@@ -405,14 +412,207 @@ describe('App component loading state machine', () => {
 		unmount();
 	});
 
+	it('shows a hook error screen before returning to menu when post-creation hook fails after manual worktree creation', async () => {
+		createWorktreeEffectMock.mockImplementation((path, branch) =>
+			Effect.succeed({
+				worktree: {
+					path,
+					branch,
+					isMainWorktree: false,
+					hasSession: false,
+				} as Worktree,
+				postCreationHookError: new ProcessError({
+					command: 'exit 1',
+					exitCode: 1,
+					message: 'Hook exited with code 1',
+				}),
+			}),
+		);
+
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'newWorktree'}));
+		await waitForCondition(() => Boolean(newWorktreeProps));
+
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'manual',
+				path: '/tmp/test',
+				branch: 'feature',
+				baseBranch: 'main',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			}),
+		);
+
+		await waitForCondition(
+			() => lastFrame()?.includes('Worktree hook error') ?? false,
+		);
+
+		expect(lastFrame()).toContain('Post-creation hook failed');
+		expect(lastFrame()).toContain('Hook exited with code 1');
+		expect(lastFrame()).toContain('Press any key to return to the menu');
+
+		await flush(120);
+		stdin.write('x');
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+		unmount();
+	});
+
+	it('shows a hook error screen before returning to menu when pre-creation hook fails', async () => {
+		createWorktreeEffectMock.mockImplementation(() =>
+			Effect.fail(
+				new ProcessError({
+					command: 'exit 1',
+					exitCode: 1,
+					message: 'Hook exited with code 1',
+				}),
+			),
+		);
+
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'newWorktree'}));
+		await waitForCondition(() => Boolean(newWorktreeProps));
+
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'manual',
+				path: '/tmp/test',
+				branch: 'feature',
+				baseBranch: 'main',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			}),
+		);
+
+		await waitForCondition(
+			() => lastFrame()?.includes('Worktree hook error') ?? false,
+		);
+
+		expect(lastFrame()).toContain('Pre-creation hook failed');
+		expect(lastFrame()).toContain('Hook exited with code 1');
+		expect(lastFrame()).toContain('Press any key to return to the menu');
+
+		await flush(120);
+		stdin.write('x');
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+		unmount();
+	});
+
+	it('ignores immediate input on the hook error screen so the error remains visible', async () => {
+		createWorktreeEffectMock.mockImplementation((path, branch) =>
+			Effect.succeed({
+				worktree: {
+					path,
+					branch,
+					isMainWorktree: false,
+					hasSession: false,
+				} as Worktree,
+				postCreationHookError: new ProcessError({
+					command: 'exit 1',
+					exitCode: 1,
+					message: 'Hook exited with code 1',
+				}),
+			}),
+		);
+
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'newWorktree'}));
+		await waitForCondition(() => Boolean(newWorktreeProps));
+
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'manual',
+				path: '/tmp/test',
+				branch: 'feature',
+				baseBranch: 'main',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			}),
+		);
+
+		await waitForCondition(
+			() => lastFrame()?.includes('Worktree hook error') ?? false,
+		);
+
+		stdin.write('x');
+		await flush(40);
+
+		expect(lastFrame()).toContain('Worktree hook error');
+		expect(lastFrame()).toContain('Hook exited with code 1');
+
+		await flush(120);
+		stdin.write('x');
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+		unmount();
+	});
+
+	it('does not auto-start a prompt-first session when post-creation hook fails', async () => {
+		createWorktreeEffectMock.mockImplementation((path, branch) =>
+			Effect.succeed({
+				worktree: {
+					path,
+					branch,
+					isMainWorktree: false,
+					hasSession: false,
+				} as Worktree,
+				postCreationHookError: new ProcessError({
+					command: 'exit 1',
+					exitCode: 1,
+					message: 'Hook exited with code 1',
+				}),
+			}),
+		);
+
+		const {lastFrame, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+		const sessionManager = sessionManagers[0]!;
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'newWorktree'}));
+		await waitForCondition(() => Boolean(newWorktreeProps));
+
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'prompt',
+				path: '/tmp/project',
+				projectPath: '/tmp/project',
+				autoDirectoryPattern: '../{branch}',
+				baseBranch: 'main',
+				presetId: 'claude',
+				initialPrompt: 'trim worktree name output',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			}),
+		);
+
+		await waitForCondition(
+			() => lastFrame()?.includes('Worktree hook error') ?? false,
+		);
+
+		expect(sessionManager.createSessionWithPresetEffect).not.toHaveBeenCalled();
+		expect(lastFrame()).toContain('Post-creation hook failed');
+
+		unmount();
+	});
+
 	it('uses the created worktree path when auto-starting a prompt-first session', async () => {
 		createWorktreeEffectMock.mockImplementation((_path, branch) =>
 			Effect.succeed({
-				path: '/tmp/resolved-worktree',
-				branch,
-				isMainWorktree: false,
-				hasSession: false,
-			} as Worktree),
+				worktree: {
+					path: '/tmp/resolved-worktree',
+					branch,
+					isMainWorktree: false,
+					hasSession: false,
+				} as Worktree,
+			}),
 		);
 
 		const {unmount} = render(<App version="test" />);

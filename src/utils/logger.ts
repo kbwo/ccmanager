@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {format} from 'util';
-import os from 'os';
+import * as os from 'os';
 
 /**
  * Logger configuration with size management and log rotation

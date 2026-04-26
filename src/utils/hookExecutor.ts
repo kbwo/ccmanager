@@ -5,6 +5,7 @@ import {ProcessError} from '../types/errors.js';
 import {Worktree, Session, SessionState} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {configReader} from '../services/config/configReader.js';
+import {logger} from './logger.js';
 
 export interface HookEnvironment {
 	CCMANAGER_WORKTREE_PATH: string;
@@ -54,6 +55,12 @@ export function executeHook(
 	environment: HookEnvironment,
 ): Effect.Effect<void, ProcessError> {
 	return Effect.async<void, ProcessError>(resume => {
+		logger.info('Hook execution starting', {
+			command,
+			cwd,
+			environment,
+		});
+
 		// Use spawn with shell to execute the command and wait for all child processes
 		const child = spawn(command, [], {
 			cwd,
@@ -65,7 +72,12 @@ export function executeHook(
 			stdio: ['ignore', 'pipe', 'pipe'],
 		});
 
+		let stdout = '';
 		let stderr = '';
+
+		child.stdout?.on('data', data => {
+			stdout += data.toString();
+		});
 
 		// Collect stderr for logging
 		child.stderr?.on('data', data => {
@@ -74,10 +86,25 @@ export function executeHook(
 
 		// Wait for the process and all its children to exit
 		child.on('exit', (code, signal) => {
+			logger.info('Hook execution finished', {
+				command,
+				cwd,
+				exitCode: code,
+				signal,
+				stdout,
+				stderr,
+			});
+
 			if (code !== 0 || signal) {
 				const errorMessage = signal
 					? `Hook terminated by signal ${signal}`
 					: `Hook exited with code ${code}`;
+				const outputDetails = [
+					stderr ? `Stderr: ${stderr}` : undefined,
+					stdout ? `Stdout: ${stdout}` : undefined,
+				]
+					.filter(Boolean)
+					.join('\n');
 
 				resume(
 					Effect.fail(
@@ -85,9 +112,11 @@ export function executeHook(
 							command,
 							exitCode: code ?? undefined,
 							signal: signal ?? undefined,
-							message: stderr
-								? `${errorMessage}\nStderr: ${stderr}`
+							message: outputDetails
+								? `${errorMessage}\n${outputDetails}`
 								: errorMessage,
+							stdout,
+							stderr,
 						}),
 					),
 				);
@@ -99,6 +128,11 @@ export function executeHook(
 
 		// Handle errors in spawning the process
 		child.on('error', error => {
+			logger.error('Hook spawn failed', {
+				command,
+				cwd,
+				error: error.message,
+			});
 			resume(
 				Effect.fail(
 					new ProcessError({
@@ -139,6 +173,14 @@ export function executeWorktreePreCreationHook(
 		environment.CCMANAGER_BASE_BRANCH = baseBranch;
 	}
 
+	logger.info('Worktree pre-creation hook configured', {
+		command,
+		worktreePath,
+		branch,
+		gitRoot,
+		baseBranch,
+	});
+
 	// Execute in git root (worktree doesn't exist yet)
 	// NO Effect.catchAll - errors must propagate to abort creation
 	return executeHook(command, gitRoot, environment);
@@ -153,7 +195,7 @@ export function executeWorktreePostCreationHook(
 	worktree: Worktree,
 	gitRoot: string,
 	baseBranch?: string,
-): Effect.Effect<void, never> {
+): Effect.Effect<void, ProcessError> {
 	const environment: HookEnvironment = {
 		CCMANAGER_WORKTREE_PATH: worktree.path,
 		CCMANAGER_WORKTREE_BRANCH: worktree.branch || 'unknown',
@@ -164,14 +206,15 @@ export function executeWorktreePostCreationHook(
 		environment.CCMANAGER_BASE_BRANCH = baseBranch;
 	}
 
-	return Effect.catchAll(
-		executeHook(command, worktree.path, environment),
-		error => {
-			// Log error but don't throw - hooks should not break the main flow
-			console.error(`Failed to execute post-creation hook: ${error.message}`);
-			return Effect.void;
-		},
-	);
+	logger.info('Worktree post-creation hook configured', {
+		command,
+		worktreePath: worktree.path,
+		branch: worktree.branch || 'unknown',
+		gitRoot,
+		baseBranch,
+	});
+
+	return executeHook(command, worktree.path, environment);
 }
 
 /**
