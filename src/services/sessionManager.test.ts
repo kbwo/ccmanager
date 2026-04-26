@@ -1162,6 +1162,7 @@ describe('SessionManager', () => {
 			const session = await Effect.runPromise(
 				sessionManager.createSessionWithPresetEffect('/test/worktree'),
 			);
+			await session.stateMutex.update(data => ({...data, state: 'idle'}));
 			const normalBuffer = session.terminal.buffer.normal as unknown as {
 				baseY: number;
 				length: number;
@@ -1191,6 +1192,46 @@ describe('SessionManager', () => {
 			expect(restoreHandler).toHaveBeenCalledWith(
 				session,
 				'\u001b[31mrestored\u001b[0m\u001b[8;12H',
+			);
+		});
+
+		it('should emit a viewport-only restore snapshot while session is busy', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				baseY: number;
+				length: number;
+				cursorY: number;
+				cursorX: number;
+			};
+			normalBuffer.baseY = 260;
+			normalBuffer.length = 300;
+			normalBuffer.cursorY = 7;
+			normalBuffer.cursorX = 11;
+			session.restoreScrollbackBaseLine = 120;
+			const serializeMock = vi
+				.spyOn(session.serializer, 'serialize')
+				.mockReturnValue('\u001b[31mbusy-viewport\u001b[0m');
+			const restoreHandler = vi.fn();
+			sessionManager.on('sessionRestore', restoreHandler);
+
+			sessionManager.setSessionActive(session.id, true);
+
+			expect(serializeMock).toHaveBeenCalledWith({
+				scrollback: 0,
+				excludeAltBuffer: true,
+			});
+			expect(restoreHandler).toHaveBeenCalledWith(
+				session,
+				'\u001b[31mbusy-viewport\u001b[0m\u001b[8;12H',
 			);
 		});
 
@@ -1301,6 +1342,120 @@ describe('SessionManager', () => {
 			sessionManager.setSessionActive(session.id, true);
 
 			expect(eventOrder).toEqual(['restore', 'data']);
+		});
+
+		it('should re-emit a viewport-only snapshot after the PTY quiet period', async () => {
+			vi.useFakeTimers();
+			try {
+				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+				(
+					session.terminal.buffer.normal as unknown as {
+						length: number;
+					}
+				).length = 1;
+				const serializeMock = vi
+					.spyOn(session.serializer, 'serialize')
+					.mockReturnValue('snap');
+				const restoreHandler = vi.fn();
+				sessionManager.on('sessionRestore', restoreHandler);
+
+				sessionManager.setSessionActive(session.id, true);
+				expect(restoreHandler).toHaveBeenCalledTimes(1);
+
+				await vi.advanceTimersByTimeAsync(50);
+				mockPty.emit('data', 'late-chunk');
+				await vi.advanceTimersByTimeAsync(50);
+				expect(restoreHandler).toHaveBeenCalledTimes(1);
+
+				await vi.advanceTimersByTimeAsync(120);
+				expect(restoreHandler).toHaveBeenCalledTimes(2);
+				expect(restoreHandler.mock.calls[1]?.[1]).toMatch(
+					/^\u001b\[\?7h\u001b\[2J\u001b\[Hsnap.*\u001b\[\?7l$/,
+				);
+				expect(serializeMock).toHaveBeenLastCalledWith({
+					scrollback: 0,
+					excludeAltBuffer: true,
+				});
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('should force a refresh at the max-wait deadline even while data keeps streaming', async () => {
+			vi.useFakeTimers();
+			try {
+				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+				(
+					session.terminal.buffer.normal as unknown as {
+						length: number;
+					}
+				).length = 1;
+				vi.spyOn(session.serializer, 'serialize').mockReturnValue('snap');
+				const restoreHandler = vi.fn();
+				sessionManager.on('sessionRestore', restoreHandler);
+
+				sessionManager.setSessionActive(session.id, true);
+				expect(restoreHandler).toHaveBeenCalledTimes(1);
+
+				for (let elapsed = 0; elapsed < 400; elapsed += 50) {
+					await vi.advanceTimersByTimeAsync(50);
+					mockPty.emit('data', 'chunk');
+				}
+				expect(restoreHandler).toHaveBeenCalledTimes(2);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('should cancel a scheduled refresh when the session is deactivated', async () => {
+			vi.useFakeTimers();
+			try {
+				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+				(
+					session.terminal.buffer.normal as unknown as {
+						length: number;
+					}
+				).length = 1;
+				vi.spyOn(session.serializer, 'serialize').mockReturnValue('snap');
+				const restoreHandler = vi.fn();
+				sessionManager.on('sessionRestore', restoreHandler);
+
+				sessionManager.setSessionActive(session.id, true);
+				expect(restoreHandler).toHaveBeenCalledTimes(1);
+
+				sessionManager.setSessionActive(session.id, false);
+				await vi.advanceTimersByTimeAsync(500);
+				expect(restoreHandler).toHaveBeenCalledTimes(1);
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 
