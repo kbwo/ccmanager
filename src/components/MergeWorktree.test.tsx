@@ -53,6 +53,79 @@ describe('MergeWorktree - Effect Integration', () => {
 		vi.clearAllMocks();
 	});
 
+	it('should pass projectPath to WorktreeService when provided', async () => {
+		const projectPath = '/test/project';
+		const mockWorktrees: Worktree[] = [
+			{
+				path: '/test/project/main',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+			{
+				path: '/test/project/feature',
+				branch: 'feature-1',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+		];
+
+		const mockEffect = Effect.succeed(mockWorktrees);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: vi.fn(() => mockEffect),
+			} as Partial<WorktreeService> as WorktreeService;
+		});
+
+		const onComplete = vi.fn();
+		const onCancel = vi.fn();
+
+		render(
+			<MergeWorktree
+				projectPath={projectPath}
+				onComplete={onComplete}
+				onCancel={onCancel}
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		expect(WorktreeService).toHaveBeenCalledWith(projectPath);
+	});
+
+	it('should use undefined when projectPath not provided', async () => {
+		const mockWorktrees: Worktree[] = [
+			{
+				path: '/test/main',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+			{
+				path: '/test/feature',
+				branch: 'feature-1',
+				isMainWorktree: false,
+				hasSession: false,
+			},
+		];
+
+		const mockEffect = Effect.succeed(mockWorktrees);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: vi.fn(() => mockEffect),
+			} as Partial<WorktreeService> as WorktreeService;
+		});
+
+		const onComplete = vi.fn();
+		const onCancel = vi.fn();
+
+		render(<MergeWorktree onComplete={onComplete} onCancel={onCancel} />);
+
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		expect(WorktreeService).toHaveBeenCalledWith(undefined);
+	});
+
 	it('should load worktrees using Effect-based method', async () => {
 		// GIVEN: Mock worktrees returned by Effect
 		const mockWorktrees: Worktree[] = [
