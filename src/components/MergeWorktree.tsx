@@ -11,6 +11,7 @@ import {MergeConfig} from '../types/index.js';
 import {hasUncommittedChanges} from '../utils/gitUtils.js';
 
 interface MergeWorktreeProps {
+	projectPath?: string;
 	onComplete: () => void;
 	onCancel: () => void;
 }
@@ -32,6 +33,7 @@ interface BranchItem {
 }
 
 const MergeWorktree: React.FC<MergeWorktreeProps> = ({
+	projectPath,
 	onComplete,
 	onCancel,
 }) => {
@@ -44,7 +46,6 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 	);
 	const [operation, setOperation] = useState<'merge' | 'rebase'>('merge');
 	const [mergeError, setMergeError] = useState<string | null>(null);
-	const [worktreeService] = useState(() => new WorktreeService());
 	const [mergeConfig] = useState<MergeConfig | undefined>(() =>
 		configReader.getMergeConfig(),
 	);
@@ -56,6 +57,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 
 		const loadWorktrees = async () => {
 			try {
+				const worktreeService = new WorktreeService(projectPath);
 				const loadedWorktrees = await Effect.runPromise(
 					worktreeService.getWorktreesEffect(),
 				);
@@ -93,7 +95,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [worktreeService]);
+	}, [projectPath]);
 
 	useInput((input, key) => {
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
@@ -130,6 +132,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 
 		const performMerge = async () => {
 			try {
+				const worktreeService = new WorktreeService(projectPath);
 				await Effect.runPromise(
 					worktreeService.mergeWorktreeEffect(
 						sourceBranch,
@@ -155,14 +158,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		};
 
 		performMerge();
-	}, [
-		step,
-		sourceBranch,
-		targetBranch,
-		operation,
-		mergeConfig,
-		worktreeService,
-	]);
+	}, [step, sourceBranch, targetBranch, operation, mergeConfig, projectPath]);
 
 	// Check for uncommitted changes in source worktree when entering check-uncommitted step
 	useEffect(() => {
@@ -171,6 +167,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		const checkUncommitted = async () => {
 			try {
 				// Find the worktree path for the source branch
+				const worktreeService = new WorktreeService(projectPath);
 				const worktrees = await Effect.runPromise(
 					worktreeService.getWorktreesEffect(),
 				);
@@ -191,7 +188,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		};
 
 		checkUncommitted();
-	}, [step, sourceBranch, worktreeService]);
+	}, [step, sourceBranch, projectPath]);
 
 	if (isLoading) {
 		return (
@@ -458,6 +455,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 				onConfirm={async () => {
 					try {
 						// Find the worktree path for the source branch
+						const worktreeService = new WorktreeService(projectPath);
 						const worktrees = await Effect.runPromise(
 							worktreeService.getWorktreesEffect(),
 						);

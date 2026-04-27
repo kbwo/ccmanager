@@ -923,6 +923,7 @@ const App: React.FC<AppProps> = ({
 					</Box>
 				)}
 				<MergeWorktree
+					projectPath={selectedProject?.path}
 					onComplete={handleReturnToMenu}
 					onCancel={handleReturnToMenu}
 				/>
