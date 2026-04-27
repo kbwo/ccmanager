@@ -158,14 +158,7 @@ const MergeWorktree: React.FC<MergeWorktreeProps> = ({
 		};
 
 		performMerge();
-	}, [
-		step,
-		sourceBranch,
-		targetBranch,
-		operation,
-		mergeConfig,
-		projectPath,
-	]);
+	}, [step, sourceBranch, targetBranch, operation, mergeConfig, projectPath]);
 
 	// Check for uncommitted changes in source worktree when entering check-uncommitted step
 	useEffect(() => {
