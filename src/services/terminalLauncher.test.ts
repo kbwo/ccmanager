@@ -16,6 +16,14 @@ vi.mock('../utils/logger.js', () => ({
 	},
 }));
 
+const mockGetTerminalLauncher = vi.fn();
+
+vi.mock('./config/configReader.js', () => ({
+	configReader: {
+		getTerminalLauncher: () => mockGetTerminalLauncher(),
+	},
+}));
+
 import {launchTerminal} from './terminalLauncher.js';
 
 type FakeChild = Pick<EventEmitter, 'on'> & {unref: () => void};
@@ -34,6 +42,7 @@ describe('terminalLauncher', () => {
 	beforeEach(() => {
 		mockSpawn.mockReset();
 		mockSpawn.mockReturnValue(makeFakeChild());
+		mockGetTerminalLauncher.mockReturnValue(undefined);
 		delete process.env['CCMANAGER_TERMINAL'];
 	});
 
@@ -44,6 +53,52 @@ describe('terminalLauncher', () => {
 		} else {
 			process.env['CCMANAGER_TERMINAL'] = originalEnv;
 		}
+	});
+
+	it('uses config terminalLauncher when set', () => {
+		mockGetTerminalLauncher.mockReturnValue({
+			command: 'alacritty',
+			args: ['--working-directory', '{cwd}'],
+		});
+
+		const result = launchTerminal('/tmp/worktree');
+
+		expect(result.success).toBe(true);
+		expect(mockSpawn).toHaveBeenCalledWith(
+			'alacritty',
+			['--working-directory', '/tmp/worktree'],
+			expect.objectContaining({cwd: '/tmp/worktree', detached: true}),
+		);
+	});
+
+	it('config takes priority over CCMANAGER_TERMINAL env', () => {
+		mockGetTerminalLauncher.mockReturnValue({
+			command: 'wezterm',
+			args: ['start', '--cwd', '{cwd}'],
+		});
+		process.env['CCMANAGER_TERMINAL'] = 'alacritty --working-directory {cwd}';
+
+		const result = launchTerminal('/tmp/wt');
+
+		expect(result.success).toBe(true);
+		expect(mockSpawn).toHaveBeenCalledWith(
+			'wezterm',
+			['start', '--cwd', '/tmp/wt'],
+			expect.objectContaining({cwd: '/tmp/wt'}),
+		);
+	});
+
+	it('falls back to CCMANAGER_TERMINAL env when no config', () => {
+		process.env['CCMANAGER_TERMINAL'] = 'alacritty --working-directory {cwd}';
+
+		const result = launchTerminal('/tmp/wt');
+
+		expect(result.success).toBe(true);
+		expect(mockSpawn).toHaveBeenCalledWith(
+			'alacritty',
+			['--working-directory', '/tmp/wt'],
+			expect.objectContaining({cwd: '/tmp/wt'}),
+		);
 	});
 
 	it('launches Terminal.app on macOS', () => {
@@ -85,27 +140,13 @@ describe('terminalLauncher', () => {
 		);
 	});
 
-	it('respects CCMANAGER_TERMINAL override with {cwd} substitution', () => {
-		Object.defineProperty(process, 'platform', {value: 'linux'});
-		process.env['CCMANAGER_TERMINAL'] = 'alacritty --working-directory {cwd}';
-
-		const result = launchTerminal('/tmp/wt');
-
-		expect(result.success).toBe(true);
-		expect(mockSpawn).toHaveBeenCalledWith(
-			'alacritty',
-			['--working-directory', '/tmp/wt'],
-			expect.objectContaining({cwd: '/tmp/wt'}),
-		);
-	});
-
 	it('returns an error on unsupported platform with no override', () => {
 		Object.defineProperty(process, 'platform', {value: 'sunos'});
 
 		const result = launchTerminal('/tmp/wt');
 
 		expect(result.success).toBe(false);
-		expect(result.error).toMatch(/CCMANAGER_TERMINAL/);
+		expect(result.error).toMatch(/terminalLauncher|CCMANAGER_TERMINAL/);
 		expect(mockSpawn).not.toHaveBeenCalled();
 	});
 
@@ -119,5 +160,20 @@ describe('terminalLauncher', () => {
 
 		expect(result.success).toBe(false);
 		expect(result.error).toContain('ENOENT');
+	});
+
+	it('handles config with no args', () => {
+		mockGetTerminalLauncher.mockReturnValue({
+			command: 'kitty',
+		});
+
+		const result = launchTerminal('/tmp/wt');
+
+		expect(result.success).toBe(true);
+		expect(mockSpawn).toHaveBeenCalledWith(
+			'kitty',
+			[],
+			expect.objectContaining({cwd: '/tmp/wt'}),
+		);
 	});
 });

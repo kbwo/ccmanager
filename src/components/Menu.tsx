@@ -481,6 +481,11 @@ const Menu: React.FC<MenuProps> = ({
 			case 'm':
 				onMenuAction({type: 'mergeWorktree'});
 				break;
+			case 't':
+				if (highlightedWorktreePath) {
+					onMenuAction({type: 'openTerminal', worktreePath: highlightedWorktreePath});
+				}
+				break;
 			case 'd':
 				onMenuAction({type: 'deleteWorktree'});
 				break;

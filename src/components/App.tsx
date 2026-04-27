@@ -456,6 +456,16 @@ const App: React.FC<AppProps> = ({
 				});
 				navigateWithClear('session-actions');
 				return;
+			case 'openTerminal': {
+				const result = launchTerminal(action.worktreePath);
+				if (!result.success) {
+					setError(
+						result.error ??
+							'Failed to launch terminal. Configure terminalLauncher in settings or set CCMANAGER_TERMINAL.',
+					);
+				}
+				return;
+			}
 			case 'deleteWorktree':
 				navigateWithClear('delete-worktree');
 				return;
@@ -993,7 +1003,7 @@ const App: React.FC<AppProps> = ({
 					if (!result.success) {
 						setError(
 							result.error ??
-								'Failed to launch terminal. Set CCMANAGER_TERMINAL to override the default command.',
+								'Failed to launch terminal. Configure terminalLauncher in settings or set CCMANAGER_TERMINAL.',
 						);
 					}
 					handleReturnToMenu();

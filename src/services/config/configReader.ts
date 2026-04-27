@@ -6,6 +6,7 @@ import {
 	WorktreeConfig,
 	CommandPresetsConfig,
 	MergeConfig,
+	TerminalLauncherConfig,
 	CommandPreset,
 	ConfigurationData,
 	IConfigReader,
@@ -93,6 +94,12 @@ export class ConfigReader implements IConfigReader {
 		};
 	}
 
+	getTerminalLauncher(): TerminalLauncherConfig | undefined {
+		const projectConfig = projectConfigManager.getTerminalLauncher();
+		if (projectConfig) return projectConfig;
+		return globalConfigManager.getTerminalLauncher();
+	}
+
 	// Get full merged configuration
 	getConfiguration(): ConfigurationData {
 		return {
@@ -102,6 +109,7 @@ export class ConfigReader implements IConfigReader {
 			worktree: this.getWorktreeConfig(),
 			commandPresets: this.getCommandPresets(),
 			mergeConfig: this.getMergeConfig(),
+			terminalLauncher: this.getTerminalLauncher(),
 			autoApproval: this.getAutoApprovalConfig(),
 		};
 	}
