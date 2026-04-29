@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useCallback} from 'react';
-import {useApp, Box, Text} from 'ink';
+import {useApp, useInput, Box, Text} from 'ink';
 import {Effect} from 'effect';
 import Menu from './Menu.js';
 import Dashboard from './Dashboard.js';
@@ -31,7 +31,7 @@ import {
 	AmbiguousBranchError,
 	RemoteBranchMatch,
 } from '../types/index.js';
-import {type AppError} from '../types/errors.js';
+import {type AppError, type ProcessError} from '../types/errors.js';
 import {configReader} from '../services/config/configReader.js';
 import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
@@ -45,6 +45,7 @@ type View =
 	| 'session'
 	| 'new-worktree'
 	| 'creating-worktree'
+	| 'worktree-hook-error'
 	| 'creating-session'
 	| 'creating-session-preset'
 	| 'delete-worktree'
@@ -80,6 +81,9 @@ const App: React.FC<AppProps> = ({
 	);
 	const [activeSession, setActiveSession] = useState<ISession | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [worktreeHookError, setWorktreeHookError] = useState<string | null>(
+		null,
+	);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
 
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
@@ -125,6 +129,31 @@ const App: React.FC<AppProps> = ({
 
 	// State for streaming devcontainer up logs
 	const [devcontainerLogs, setDevcontainerLogs] = useState<string[]>([]);
+	const [canReturnFromHookError, setCanReturnFromHookError] = useState(false);
+
+	useEffect(() => {
+		if (view !== 'worktree-hook-error') {
+			setCanReturnFromHookError(false);
+			return;
+		}
+
+		const timeout = setTimeout(() => {
+			setCanReturnFromHookError(true);
+		}, 100);
+
+		return () => {
+			clearTimeout(timeout);
+		};
+	}, [view]);
+
+	useInput(() => {
+		if (view !== 'worktree-hook-error' || !canReturnFromHookError) {
+			return;
+		}
+
+		setWorktreeHookError(null);
+		handleReturnToMenu();
+	});
 
 	// Helper function to format error messages based on error type using _tag discrimination
 	const formatErrorMessage = (error: AppError): string => {
@@ -141,6 +170,14 @@ const App: React.FC<AppProps> = ({
 				return `Validation failed for ${error.field}: ${error.constraint}`;
 		}
 	};
+
+	const formatPostCreationHookWarning = (error: ProcessError): string =>
+		`Post-creation hook failed: ${error.message}`;
+
+	const formatPreCreationHookError = (error: AppError): string =>
+		error._tag === 'ProcessError'
+			? `Pre-creation hook failed: ${error.message}`
+			: formatErrorMessage(error);
 
 	// Helper function to create session with Effect-based error handling
 	const createSessionWithEffect = useCallback(
@@ -373,7 +410,7 @@ const App: React.FC<AppProps> = ({
 
 	// Helper function to handle worktree creation results
 	const handleWorktreeCreationResult = (
-		result: {success: boolean; error?: string},
+		result: {success: boolean; error?: string; warning?: string},
 		creationData: {
 			path: string;
 			branch: string;
@@ -385,6 +422,13 @@ const App: React.FC<AppProps> = ({
 		},
 	) => {
 		if (result.success) {
+			if (result.warning) {
+				setError(null);
+				setWorktreeHookError(result.warning);
+				setView('worktree-hook-error');
+				return;
+			}
+
 			if (creationData.presetId && creationData.initialPrompt) {
 				setPendingMenuSessionLaunch({
 					worktree: {
@@ -599,7 +643,14 @@ const App: React.FC<AppProps> = ({
 		// Transform Effect result to legacy format for handleWorktreeCreationResult
 		if (result._tag === 'Left') {
 			// Handle error using pattern matching on _tag
-			const errorMessage = formatErrorMessage(result.left);
+			const errorMessage = formatPreCreationHookError(result.left);
+			if (result.left._tag === 'ProcessError') {
+				setError(null);
+				setWorktreeHookError(errorMessage);
+				setView('worktree-hook-error');
+				return;
+			}
+
 			handleWorktreeCreationResult(
 				{success: false, error: errorMessage},
 				{
@@ -618,9 +669,14 @@ const App: React.FC<AppProps> = ({
 			);
 		} else {
 			// Success case
-			const createdWorktree = result.right;
+			const {worktree: createdWorktree, postCreationHookError} = result.right;
 			handleWorktreeCreationResult(
-				{success: true},
+				{
+					success: true,
+					warning: postCreationHookError
+						? formatPostCreationHookWarning(postCreationHookError)
+						: undefined,
+				},
 				{
 					path: createdWorktree.path,
 					branch: createdWorktree.branch || branch,
@@ -675,15 +731,28 @@ const App: React.FC<AppProps> = ({
 
 		if (result._tag === 'Left') {
 			// Handle error using pattern matching on _tag
-			const errorMessage = formatErrorMessage(result.left);
+			const errorMessage = formatPreCreationHookError(result.left);
+			if (result.left._tag === 'ProcessError') {
+				setError(null);
+				setWorktreeHookError(errorMessage);
+				setView('worktree-hook-error');
+				return;
+			}
+
 			setError(errorMessage);
 			setView('new-worktree');
 		} else {
+			const {worktree: createdWorktree, postCreationHookError} = result.right;
 			handleWorktreeCreationResult(
-				{success: true},
 				{
-					path: creationData.path,
-					branch: creationData.branch,
+					success: true,
+					warning: postCreationHookError
+						? formatPostCreationHookWarning(postCreationHookError)
+						: undefined,
+				},
+				{
+					path: createdWorktree.path,
+					branch: createdWorktree.branch || creationData.branch,
 					baseBranch: selectedRemoteRef,
 					copySessionData: creationData.copySessionData,
 					copyClaudeDirectory: creationData.copyClaudeDirectory,
@@ -880,6 +949,20 @@ const App: React.FC<AppProps> = ({
 		return (
 			<Box flexDirection="column">
 				<LoadingSpinner message={message} color="cyan" />
+			</Box>
+		);
+	}
+
+	if (view === 'worktree-hook-error') {
+		return (
+			<Box flexDirection="column">
+				<Box marginBottom={1}>
+					<Text color="red">Worktree hook error</Text>
+				</Box>
+				<Box marginBottom={1}>
+					<Text color="red">{worktreeHookError}</Text>
+				</Box>
+				<Text dimColor>Press any key to return to the menu</Text>
 			</Box>
 		);
 	}

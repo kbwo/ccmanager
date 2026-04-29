@@ -41,6 +41,8 @@ export class ProcessError extends Data.TaggedError('ProcessError')<{
 	readonly signal?: string;
 	readonly exitCode?: number;
 	readonly message: string;
+	readonly stdout?: string;
+	readonly stderr?: string;
 }> {}
 
 /**

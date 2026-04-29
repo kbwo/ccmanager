@@ -4,7 +4,7 @@ import {execSync} from 'child_process';
 import {existsSync, statSync, Stats} from 'fs';
 import {configReader} from './config/configReader.js';
 import {Effect} from 'effect';
-import {GitError} from '../types/errors.js';
+import {GitError, ProcessError} from '../types/errors.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -30,6 +30,7 @@ vi.mock('./config/configReader.js', () => ({
 
 // Mock HookExecutor
 vi.mock('../utils/hookExecutor.js', () => ({
+	executeWorktreePreCreationHook: vi.fn(),
 	executeWorktreePostCreationHook: vi.fn(),
 }));
 
@@ -809,7 +810,7 @@ branch refs/heads/feature
 			);
 			const result = await Effect.runPromise(effect);
 
-			expect(result).toMatchObject({
+			expect(result.worktree).toMatchObject({
 				path: '/path/to/worktree',
 				branch: 'new-feature',
 				isMainWorktree: false,
@@ -851,6 +852,107 @@ branch refs/heads/feature
 			} else {
 				expect.fail('Should have returned Left with GitError');
 			}
+		});
+
+		it('should fail with ProcessError and skip git worktree add when pre-creation hook fails', async () => {
+			const {executeWorktreePreCreationHook} =
+				await import('../utils/hookExecutor.js');
+			const mockedPreHook = vi.mocked(executeWorktreePreCreationHook);
+			mockedGetWorktreeHooks.mockReturnValue({
+				pre_creation: {
+					command: 'exit 1',
+					enabled: true,
+				},
+			});
+			mockedPreHook.mockReturnValue(
+				Effect.fail(
+					new ProcessError({
+						command: 'exit 1',
+						exitCode: 1,
+						message: 'Hook exited with code 1',
+					}),
+				),
+			);
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+					if (cmd.includes('git worktree add')) {
+						throw new Error('git worktree add should not be called');
+					}
+				}
+				return '';
+			});
+
+			const result = await Effect.runPromise(
+				Effect.either(
+					service.createWorktreeEffect(
+						'/path/to/worktree',
+						'new-feature',
+						'main',
+					),
+				),
+			);
+
+			expect(result._tag).toBe('Left');
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(ProcessError);
+			}
+			expect(mockedExecSync).not.toHaveBeenCalledWith(
+				expect.stringContaining('git worktree add'),
+				expect.anything(),
+			);
+		});
+
+		it('should return Worktree with postCreationHookError when post-creation hook fails', async () => {
+			const {executeWorktreePostCreationHook} =
+				await import('../utils/hookExecutor.js');
+			const mockedPostHook = vi.mocked(executeWorktreePostCreationHook);
+			const hookError = new ProcessError({
+				command: 'exit 1',
+				exitCode: 1,
+				message: 'Hook exited with code 1',
+			});
+
+			mockedGetWorktreeHooks.mockReturnValue({
+				post_creation: {
+					command: 'exit 1',
+					enabled: true,
+				},
+			});
+			mockedPostHook.mockReturnValue(Effect.fail(hookError));
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('rev-parse --verify')) {
+						throw new Error('Branch not found');
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+				}
+				return '';
+			});
+
+			const result = await Effect.runPromise(
+				service.createWorktreeEffect(
+					'/path/to/worktree',
+					'new-feature',
+					'main',
+				),
+			);
+
+			expect(result.worktree).toMatchObject({
+				path: '/path/to/worktree',
+				branch: 'new-feature',
+			});
+			expect(result.postCreationHookError).toBe(hookError);
 		});
 	});
 

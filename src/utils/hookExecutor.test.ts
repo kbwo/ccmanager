@@ -205,7 +205,7 @@ describe('hookExecutor Integration Tests', () => {
 	});
 
 	describe('executeWorktreePostCreationHook (real execution)', () => {
-		it('should not throw even when command fails', async () => {
+		it('should fail with ProcessError when command fails', async () => {
 			// Arrange
 			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 			const worktree = {
@@ -216,12 +216,18 @@ describe('hookExecutor Integration Tests', () => {
 			};
 
 			try {
-				// Act & Assert - should not throw even with failing command
-				await expect(
-					Effect.runPromise(
+				// Act & Assert - post-creation hook failures are surfaced to callers
+				const result = await Effect.runPromise(
+					Effect.either(
 						executeWorktreePostCreationHook('exit 1', worktree, tmpDir, 'main'),
 					),
-				).resolves.toBeUndefined();
+				);
+
+				expect(result._tag).toBe('Left');
+				if (result._tag === 'Left') {
+					expect(result.left._tag).toBe('ProcessError');
+					expect(result.left.exitCode).toBe(1);
+				}
 			} finally {
 				// Cleanup
 				await rm(tmpDir, {recursive: true});

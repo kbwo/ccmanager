@@ -4,6 +4,7 @@ import type {SerializeAddon} from '@xterm/addon-serialize';
 import {GitStatus} from '../utils/gitStatus.js';
 import {Mutex, SessionStateData} from '../utils/mutex.js';
 import type {StateDetector} from '../services/stateDetector/types.js';
+import type {ProcessError} from './errors.js';
 
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
@@ -31,6 +32,11 @@ export interface Worktree {
 	gitStatus?: GitStatus;
 	gitStatusError?: string;
 	lastCommitDate?: Date;
+}
+
+export interface CreateWorktreeResult {
+	worktree: Worktree;
+	postCreationHookError?: ProcessError;
 }
 
 export interface Session {
@@ -344,7 +350,7 @@ export interface IWorktreeService {
 		copySessionData?: boolean,
 		copyClaudeDirectory?: boolean,
 	): import('effect').Effect.Effect<
-		Worktree,
+		CreateWorktreeResult,
 		| import('../types/errors.js').GitError
 		| import('../types/errors.js').FileSystemError
 		| import('../types/errors.js').ProcessError,
