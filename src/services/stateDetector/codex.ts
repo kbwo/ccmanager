@@ -23,7 +23,8 @@ export class CodexStateDetector extends BaseStateDetector {
 		if (
 			lowerContent.includes('allow command?') ||
 			lowerContent.includes('[y/n]') ||
-			lowerContent.includes('yes (y)')
+			lowerContent.includes('yes (y)') ||
+			lowerContent.includes('enter to submit')
 		) {
 			return 'waiting_input';
 		}

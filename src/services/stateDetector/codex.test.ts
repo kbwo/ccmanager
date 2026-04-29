@@ -219,4 +219,27 @@ describe('CodexStateDetector', () => {
 		// Assert
 		expect(state).toBe('waiting_input');
 	});
+
+	it('should detect waiting_input for MCP tool permission prompt with "enter to submit"', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Field 1/1',
+			'Allow the chrome-devtools MCP server to run tool "new_page"?',
+			'',
+			'timeout: 10000',
+			'url: http://localhost:4000/scenarios',
+			'',
+			'› 1. Allow                   Run the tool and continue.',
+			'2. Allow for this session  Run the tool and remember this choice for this session.',
+			'3. Always allow            Run the tool and remember this choice for future tool calls.',
+			'4. Cancel                  Cancel this tool call',
+			'enter to submit | esc to cancel',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
 });
