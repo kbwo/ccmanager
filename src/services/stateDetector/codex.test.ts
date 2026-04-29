@@ -220,7 +220,7 @@ describe('CodexStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
-	it('should detect waiting_input for MCP tool permission prompt with "esc to cancel"', () => {
+	it('should detect waiting_input for MCP tool permission prompt with "enter to submit"', () => {
 		// Arrange
 		terminal = createMockTerminal([
 			'Field 1/1',
