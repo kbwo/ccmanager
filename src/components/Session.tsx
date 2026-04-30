@@ -108,6 +108,21 @@ const Session: React.FC<SessionProps> = ({
 		// Listen for restore event first
 		sessionManager.on('sessionRestore', handleSessionRestore);
 
+		// Repaint the user's terminal viewport from the post-resize headless
+		// snapshot. Without this, Ink-based TUIs (e.g. Claude Code) re-emit
+		// their full static history on SIGWINCH, which the user's terminal
+		// appends below the (already-clipped) viewport, producing duplicated
+		// rows equal to the resize delta.
+		const handleSessionResize = (
+			resizedSession: ISession,
+			redrawPayload: string,
+		) => {
+			if (resizedSession.id === session.id && redrawPayload.length > 0) {
+				stdout.write(redrawPayload);
+			}
+		};
+		sessionManager.on('sessionResize', handleSessionResize);
+
 		// Listen for session data events
 		const handleSessionData = (activeSession: ISession, data: string) => {
 			// Only handle data for our session
@@ -157,11 +172,7 @@ const Session: React.FC<SessionProps> = ({
 		const handleResize = () => {
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
-			session.process.resize(cols, rows);
-			// Also resize the virtual terminal
-			if (session.terminal) {
-				session.terminal.resize(cols, rows);
-			}
+			sessionManager.performResize(session.id, cols, rows);
 		};
 
 		stdout.on('resize', handleResize);
@@ -180,6 +191,7 @@ const Session: React.FC<SessionProps> = ({
 
 			// Remove event listeners
 			sessionManager.off('sessionRestore', handleSessionRestore);
+			sessionManager.off('sessionResize', handleSessionResize);
 			sessionManager.off('sessionData', handleSessionData);
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);

@@ -1401,6 +1401,130 @@ describe('SessionManager', () => {
 		});
 	});
 
+	describe('performResize', () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
+		it('emits a wrapped viewport snapshot to repaint after resize', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = true;
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				cursorY: number;
+				cursorX: number;
+			};
+			normalBuffer.cursorY = 3;
+			normalBuffer.cursorX = 4;
+			const serializeMock = vi
+				.spyOn(session.serializer, 'serialize')
+				.mockReturnValue('VIEWPORT');
+			const resizeHandler = vi.fn();
+			sessionManager.on('sessionResize', resizeHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+
+			expect(session.process.resize).toHaveBeenCalledWith(100, 24);
+			expect(session.terminal.resize).toHaveBeenCalledWith(100, 24);
+			expect(serializeMock).toHaveBeenCalledWith({scrollback: 0});
+			expect(resizeHandler).toHaveBeenCalledWith(
+				session,
+				'[?7h[2J[HVIEWPORT[4;5H[?7l',
+			);
+		});
+
+		it('suppresses live PTY → stdout forwarding for the post-resize quiet window', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = true;
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('VIEWPORT');
+			const dataHandler = vi.fn();
+			sessionManager.on('sessionData', dataHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+
+			mockPty.emit('data', 'static-replay');
+			expect(dataHandler).not.toHaveBeenCalled();
+
+			vi.advanceTimersByTime(260);
+			mockPty.emit('data', 'live-after-window');
+
+			expect(dataHandler).toHaveBeenCalledTimes(1);
+			expect(dataHandler).toHaveBeenCalledWith(session, 'live-after-window');
+		});
+
+		it('skips emitting a resize repaint for inactive sessions', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = false;
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('VIEWPORT');
+			const resizeHandler = vi.fn();
+			sessionManager.on('sessionResize', resizeHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+
+			expect(resizeHandler).not.toHaveBeenCalled();
+			expect(session.process.resize).toHaveBeenCalledWith(100, 24);
+		});
+
+		it('clears the resize suppression when the session is deactivated', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = true;
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('VIEWPORT');
+			const dataHandler = vi.fn();
+			sessionManager.on('sessionData', dataHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+			sessionManager.setSessionActive(session.id, false);
+			session.isActive = true;
+
+			mockPty.emit('data', 'live-after-deactivate');
+
+			expect(dataHandler).toHaveBeenCalledTimes(1);
+			expect(dataHandler).toHaveBeenCalledWith(
+				session,
+				'live-after-deactivate',
+			);
+		});
+	});
+
 	describe('static methods', () => {
 		describe('getSessionCounts', () => {
 			// Helper to create mock session with stateMutex

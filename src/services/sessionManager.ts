@@ -33,6 +33,10 @@ const {Terminal} = pkg;
 const TERMINAL_CONTENT_MAX_LINES = 300;
 const TERMINAL_SCROLLBACK_LINES = 5000;
 const TERMINAL_RESTORE_SCROLLBACK_LINES = 200;
+// How long to suppress PTY → stdout forwarding after a viewport resize so the
+// child process's SIGWINCH-triggered re-emission of static content does not
+// duplicate already-displayed rows in the user's terminal.
+const RESIZE_SUPPRESS_MS = 250;
 
 export interface SessionCounts {
 	idle: number;
@@ -51,6 +55,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private autoApprovalDisabledWorktrees: Set<string> = new Set();
 	private restoringSessions: Set<string> = new Set();
 	private bufferedRestoreData: Map<string, string[]> = new Map();
+	private resizingSessions: Set<string> = new Set();
+	private resizeSuppressTimers: Map<string, NodeJS.Timeout> = new Map();
 
 	private async spawn(
 		command: string,
@@ -367,6 +373,83 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
 	}
 
+	private getViewportRedrawSnapshot(session: Session): string {
+		const snapshot = session.serializer.serialize({scrollback: 0});
+		if (snapshot.length === 0) {
+			return '';
+		}
+		const activeBuffer = session.terminal.buffer.active;
+		if (activeBuffer.type !== 'normal') {
+			// Serialized alternate-buffer output already carries its own cursor
+			// positioning, so do not append a cursor home sequence here.
+			return snapshot;
+		}
+		const normalBuffer = session.terminal.buffer.normal;
+		const cursorRow = normalBuffer.cursorY + 1;
+		const cursorCol = normalBuffer.cursorX + 1;
+		return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
+	}
+
+	/**
+	 * Resize a session's PTY and headless terminal, then repaint the user's
+	 * terminal viewport from the post-resize headless state. Live PTY → stdout
+	 * forwarding is suppressed for a short window so the child's SIGWINCH
+	 * redraw (which on Ink-based TUIs re-emits the full static history) cannot
+	 * append duplicates below the repainted viewport.
+	 */
+	performResize(sessionId: string, cols: number, rows: number): void {
+		const session = this.sessions.get(sessionId);
+		if (!session) {
+			return;
+		}
+
+		try {
+			session.process.resize(cols, rows);
+		} catch {
+			/* empty */
+		}
+		try {
+			session.terminal.resize(cols, rows);
+		} catch {
+			/* empty */
+		}
+
+		this.resizingSessions.add(sessionId);
+		const existing = this.resizeSuppressTimers.get(sessionId);
+		if (existing !== undefined) {
+			clearTimeout(existing);
+		}
+		const timer = setTimeout(() => {
+			this.resizeSuppressTimers.delete(sessionId);
+			this.resizingSessions.delete(sessionId);
+		}, RESIZE_SUPPRESS_MS);
+		this.resizeSuppressTimers.set(sessionId, timer);
+
+		if (!session.isActive) {
+			return;
+		}
+
+		const snapshot = this.getViewportRedrawSnapshot(session);
+		if (snapshot.length === 0) {
+			return;
+		}
+
+		// \x1b[?7h ... \x1b[?7l: SerializeAddon's wrapped-row encoding relies
+		//   on auto-wrap (DECAWM) being enabled to advance the cursor across
+		//   row boundaries (see PR #276). Session.tsx keeps DECAWM disabled
+		//   for live TUI redraws, so re-enable it just for the snapshot write
+		//   and restore the live default afterward.
+		// \x1b[2J\x1b[H: clear the post-resize viewport so the snapshot paints
+		//   onto a known canvas; rows that the child won't cover (e.g. trailing
+		//   blanks after a height shrink) stay clean rather than retaining
+		//   pre-resize content.
+		this.emit(
+			'sessionResize',
+			session,
+			`\x1b[?7h\x1b[2J\x1b[H${snapshot}\x1b[?7l`,
+		);
+	}
+
 	private async createSessionInternal(
 		worktreePath: string,
 		ptyProcess: IPty,
@@ -514,6 +597,16 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					const bufferedData = this.bufferedRestoreData.get(session.id) ?? [];
 					bufferedData.push(data);
 					this.bufferedRestoreData.set(session.id, bufferedData);
+					return;
+				}
+
+				// During a viewport resize, the child process re-emits its full
+				// static content to adapt to new line-wrapping. The headless
+				// terminal already absorbed the data above, so the post-resize
+				// snapshot we wrote on resize is in sync. Drop the live forward
+				// here to keep the user's terminal from acquiring duplicated
+				// rows below the snapshot.
+				if (this.resizingSessions.has(session.id)) {
 					return;
 				}
 
@@ -717,6 +810,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			} else {
 				this.restoringSessions.delete(session.id);
 				this.bufferedRestoreData.delete(session.id);
+				this.resizingSessions.delete(session.id);
+				const resizeTimer = this.resizeSuppressTimers.get(session.id);
+				if (resizeTimer !== undefined) {
+					clearTimeout(resizeTimer);
+					this.resizeSuppressTimers.delete(session.id);
+				}
 			}
 		}
 	}
@@ -801,6 +900,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			this.waitingWithBottomBorder.delete(sessionId);
 			this.restoringSessions.delete(sessionId);
 			this.bufferedRestoreData.delete(sessionId);
+			this.resizingSessions.delete(sessionId);
+			const resizeTimer = this.resizeSuppressTimers.get(sessionId);
+			if (resizeTimer !== undefined) {
+				clearTimeout(resizeTimer);
+				this.resizeSuppressTimers.delete(sessionId);
+			}
 			this.emit('sessionDestroyed', session);
 		}
 	}
@@ -861,6 +966,12 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 				this.sessions.delete(sessionId);
 				this.waitingWithBottomBorder.delete(sessionId);
+				this.resizingSessions.delete(sessionId);
+				const resizeTimer = this.resizeSuppressTimers.get(sessionId);
+				if (resizeTimer !== undefined) {
+					clearTimeout(resizeTimer);
+					this.resizeSuppressTimers.delete(sessionId);
+				}
 				this.emit('sessionDestroyed', session);
 			},
 			catch: (error: unknown) => {
