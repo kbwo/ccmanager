@@ -278,6 +278,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}));
 
 		if (oldState !== newState) {
+			// While busy, cursor-addressed footer redraws (spinner, token stats,
+			// "accept edits on …" line) can push ghost frames into scrollback as
+			// chat content scrolls. Once the busy turn ends, advance the restore
+			// baseline so the next session restore replays only post-busy
+			// scrollback and skips the ghost-bearing range.
+			if (oldState === 'busy' && newState !== 'busy') {
+				session.restoreScrollbackBaseLine =
+					session.terminal.buffer.normal.baseY;
+			}
 			void Effect.runPromise(executeStatusHook(oldState, newState, session));
 			this.emit('sessionStateChanged', session);
 		}
@@ -320,6 +329,23 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			return '';
 		}
 
+		const cursorRow = normalBuffer.cursorY + 1;
+		const cursorCol = normalBuffer.cursorX + 1;
+
+		// When the live viewport shows a transient footer (spinner activity,
+		// token stats, persistent shift+tab footer, etc.), the renderer keeps
+		// redrawing it in place and earlier copies have likely been pushed into
+		// scrollback by chat output scrolling beneath it. Replaying that
+		// scrollback would paint duplicated footer rows, so emit only the
+		// viewport in this case.
+		if (session.stateDetector.hasTransientRenderFooter(session.terminal)) {
+			const viewportSnapshot = session.serializer.serialize({
+				scrollback: 0,
+				excludeAltBuffer: true,
+			});
+			return `${viewportSnapshot}\x1b[${cursorRow};${cursorCol}H`;
+		}
+
 		const scrollbackStart = Math.max(
 			0,
 			normalBuffer.baseY - TERMINAL_RESTORE_SCROLLBACK_LINES,
@@ -337,8 +363,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			},
 			excludeAltBuffer: true,
 		});
-		const cursorRow = normalBuffer.cursorY + 1;
-		const cursorCol = normalBuffer.cursorX + 1;
 
 		return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
 	}

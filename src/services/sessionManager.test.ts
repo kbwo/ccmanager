@@ -3,7 +3,7 @@ import {Effect, Either} from 'effect';
 import {ValidationError} from '../types/errors.js';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
-import {Session, DevcontainerConfig} from '../types/index.js';
+import {Session, DevcontainerConfig, SessionState} from '../types/index.js';
 import {spawn as childSpawn} from 'child_process';
 
 // Helper to create a mock child process for child_process.spawn
@@ -1301,6 +1301,103 @@ describe('SessionManager', () => {
 			sessionManager.setSessionActive(session.id, true);
 
 			expect(eventOrder).toEqual(['restore', 'data']);
+		});
+
+		it('should fall back to viewport-only restore when the detector reports a transient footer', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				baseY: number;
+				length: number;
+				cursorY: number;
+				cursorX: number;
+			};
+			normalBuffer.baseY = 260;
+			normalBuffer.length = 300;
+			normalBuffer.cursorY = 7;
+			normalBuffer.cursorX = 11;
+			session.restoreScrollbackBaseLine = 120;
+			vi.spyOn(
+				session.stateDetector,
+				'hasTransientRenderFooter',
+			).mockReturnValue(true);
+			const serializeMock = vi
+				.spyOn(session.serializer, 'serialize')
+				.mockReturnValue('[31mviewport[0m');
+			const restoreHandler = vi.fn();
+			sessionManager.on('sessionRestore', restoreHandler);
+
+			sessionManager.setSessionActive(session.id, true);
+
+			expect(serializeMock).toHaveBeenCalledWith({
+				scrollback: 0,
+				excludeAltBuffer: true,
+			});
+			expect(serializeMock).not.toHaveBeenCalledWith(
+				expect.objectContaining({range: expect.anything()}),
+			);
+			expect(restoreHandler).toHaveBeenCalledWith(
+				session,
+				'[31mviewport[0m[8;12H',
+			);
+		});
+
+		it('should advance the restore baseline when transitioning out of busy', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			(session.terminal.buffer.normal as unknown as {baseY: number}).baseY = 42;
+			session.restoreScrollbackBaseLine = 5;
+			await session.stateMutex.update(data => ({...data, state: 'busy'}));
+
+			const updateState = (
+				sessionManager as unknown as {
+					updateSessionState: (s: Session, next: SessionState) => Promise<void>;
+				}
+			).updateSessionState.bind(sessionManager);
+			await updateState(session, 'idle');
+
+			expect(session.restoreScrollbackBaseLine).toBe(42);
+		});
+
+		it('should not advance the restore baseline on transitions that do not leave busy', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			(session.terminal.buffer.normal as unknown as {baseY: number}).baseY = 42;
+			session.restoreScrollbackBaseLine = 5;
+			await session.stateMutex.update(data => ({...data, state: 'idle'}));
+
+			const updateState = (
+				sessionManager as unknown as {
+					updateSessionState: (s: Session, next: SessionState) => Promise<void>;
+				}
+			).updateSessionState.bind(sessionManager);
+			await updateState(session, 'busy');
+
+			expect(session.restoreScrollbackBaseLine).toBe(5);
 		});
 	});
 

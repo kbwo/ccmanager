@@ -14,6 +14,11 @@ const SPINNER_ACTIVITY_PATTERN = new RegExp(
 // Session stats above the prompt, e.g. "(9m 21s · ↓ 13.7k tokens)" — requires parens, a digit, and "tokens"
 const TOKEN_STATS_LINE_PATTERN = /\([^)]*\d[^)]*tokens\s*\)/i;
 
+// Persistent footer hint Claude renders below the prompt box, e.g.
+// "⏵⏵ accept edits on (shift+tab to cycle)". The redraw of this footer is
+// what produces the most visible scrollback ghosts when chat content scrolls.
+const PERSISTENT_FOOTER_PATTERN = /\(shift\+tab\s+to\s+cycle\)/i;
+
 // Workaround: Claude Code sometimes appears idle in terminal output while
 // still actively processing (busy). To mitigate false idle transitions,
 // require terminal output to remain unchanged for this duration before
@@ -195,6 +200,30 @@ export class ClaudeStateDetector extends BaseStateDetector {
 
 		// No background task detected
 		return 0;
+	}
+
+	override hasTransientRenderFooter(terminal: Terminal): boolean {
+		const viewport = this.getTerminalContent(terminal, terminal.rows);
+		if (viewport.length === 0) {
+			return false;
+		}
+		if (SPINNER_ACTIVITY_PATTERN.test(viewport)) {
+			return true;
+		}
+		if (TOKEN_STATS_LINE_PATTERN.test(viewport)) {
+			return true;
+		}
+		if (PERSISTENT_FOOTER_PATTERN.test(viewport)) {
+			return true;
+		}
+		const lower = viewport.toLowerCase();
+		if (
+			lower.includes('esc to interrupt') ||
+			lower.includes('ctrl+c to interrupt')
+		) {
+			return true;
+		}
+		return false;
 	}
 
 	detectTeamMembers(terminal: Terminal): number {
