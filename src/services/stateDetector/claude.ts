@@ -197,6 +197,34 @@ export class ClaudeStateDetector extends BaseStateDetector {
 		return 0;
 	}
 
+	override hasTransientRenderFooter(terminal: Terminal): boolean {
+		// Only flag busy-turn footer markers. The persistent "(shift+tab to
+		// cycle)" footer is always visible during an active Claude session
+		// even when idle, but it does not by itself indicate that recent
+		// scrolling pushed ghost frames into scrollback — only an in-flight
+		// busy turn does. busy → non-busy transitions advance the restore
+		// baseline separately so already-scrolled ghosts from a just-ended
+		// turn are not replayed either.
+		const viewport = this.getTerminalContent(terminal, terminal.rows);
+		if (viewport.length === 0) {
+			return false;
+		}
+		if (SPINNER_ACTIVITY_PATTERN.test(viewport)) {
+			return true;
+		}
+		if (TOKEN_STATS_LINE_PATTERN.test(viewport)) {
+			return true;
+		}
+		const lower = viewport.toLowerCase();
+		if (
+			lower.includes('esc to interrupt') ||
+			lower.includes('ctrl+c to interrupt')
+		) {
+			return true;
+		}
+		return false;
+	}
+
 	detectTeamMembers(terminal: Terminal): number {
 		const lines = this.getTerminalLines(terminal, 3);
 

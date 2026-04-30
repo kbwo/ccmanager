@@ -3,7 +3,7 @@ import {Effect, Either} from 'effect';
 import {ValidationError} from '../types/errors.js';
 import {spawn, type IPty} from './bunTerminal.js';
 import {EventEmitter} from 'events';
-import {Session, DevcontainerConfig} from '../types/index.js';
+import {Session, DevcontainerConfig, SessionState} from '../types/index.js';
 import {spawn as childSpawn} from 'child_process';
 
 // Helper to create a mock child process for child_process.spawn
@@ -1301,6 +1301,313 @@ describe('SessionManager', () => {
 			sessionManager.setSessionActive(session.id, true);
 
 			expect(eventOrder).toEqual(['restore', 'data']);
+		});
+
+		it('should defer the viewport-only restore until PTY output is quiet when a transient footer is visible', async () => {
+			vi.useFakeTimers();
+			try {
+				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+				const normalBuffer = session.terminal.buffer.normal as unknown as {
+					baseY: number;
+					length: number;
+					cursorY: number;
+					cursorX: number;
+				};
+				normalBuffer.baseY = 260;
+				normalBuffer.length = 300;
+				normalBuffer.cursorY = 7;
+				normalBuffer.cursorX = 11;
+				session.restoreScrollbackBaseLine = 120;
+				vi.spyOn(
+					session.stateDetector,
+					'hasTransientRenderFooter',
+				).mockReturnValue(true);
+				const serializeMock = vi
+					.spyOn(session.serializer, 'serialize')
+					.mockReturnValue('[31mviewport[0m');
+				const restoreHandler = vi.fn();
+				sessionManager.on('sessionRestore', restoreHandler);
+
+				sessionManager.setSessionActive(session.id, true);
+
+				expect(restoreHandler).not.toHaveBeenCalled();
+				expect(serializeMock).not.toHaveBeenCalled();
+
+				vi.advanceTimersByTime(80);
+
+				expect(serializeMock).toHaveBeenCalledWith({
+					scrollback: 0,
+					excludeAltBuffer: true,
+				});
+				expect(serializeMock).not.toHaveBeenCalledWith(
+					expect.objectContaining({range: expect.anything()}),
+				);
+				expect(restoreHandler).toHaveBeenCalledWith(
+					session,
+					'[31mviewport[0m[8;12H',
+				);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('should extend the restore quiet timer while PTY output keeps streaming, capped by the deadline', async () => {
+			vi.useFakeTimers();
+			try {
+				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+				(session.terminal.buffer.normal as unknown as {length: number}).length =
+					1;
+				vi.spyOn(
+					session.stateDetector,
+					'hasTransientRenderFooter',
+				).mockReturnValue(true);
+				vi.spyOn(session.serializer, 'serialize').mockReturnValue('snap');
+				const restoreHandler = vi.fn();
+				sessionManager.on('sessionRestore', restoreHandler);
+
+				sessionManager.setSessionActive(session.id, true);
+				expect(restoreHandler).not.toHaveBeenCalled();
+
+				// Each chunk arrives within the quiet window and resets the timer
+				// without firing the snapshot. Three 50 ms ticks keep the cap
+				// (250 ms) safely ahead.
+				for (let i = 0; i < 3; i++) {
+					vi.advanceTimersByTime(50);
+					mockPty.emit('data', 'tick');
+				}
+				expect(restoreHandler).not.toHaveBeenCalled();
+
+				// Advance past the cap so the snapshot fires even though chunks
+				// kept arriving inside the quiet window.
+				vi.advanceTimersByTime(150);
+				expect(restoreHandler).toHaveBeenCalledTimes(1);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('should cancel a pending deferred restore when the session is deactivated', async () => {
+			vi.useFakeTimers();
+			try {
+				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+				vi.spyOn(
+					session.stateDetector,
+					'hasTransientRenderFooter',
+				).mockReturnValue(true);
+				vi.spyOn(session.serializer, 'serialize').mockReturnValue('snap');
+				const restoreHandler = vi.fn();
+				sessionManager.on('sessionRestore', restoreHandler);
+
+				sessionManager.setSessionActive(session.id, true);
+				sessionManager.setSessionActive(session.id, false);
+
+				vi.advanceTimersByTime(500);
+
+				expect(restoreHandler).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('should advance the restore baseline when transitioning out of busy', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			(session.terminal.buffer.normal as unknown as {baseY: number}).baseY = 42;
+			session.restoreScrollbackBaseLine = 5;
+			await session.stateMutex.update(data => ({...data, state: 'busy'}));
+
+			const updateState = (
+				sessionManager as unknown as {
+					updateSessionState: (s: Session, next: SessionState) => Promise<void>;
+				}
+			).updateSessionState.bind(sessionManager);
+			await updateState(session, 'idle');
+
+			expect(session.restoreScrollbackBaseLine).toBe(42);
+		});
+
+		it('should not advance the restore baseline on transitions that do not leave busy', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			(session.terminal.buffer.normal as unknown as {baseY: number}).baseY = 42;
+			session.restoreScrollbackBaseLine = 5;
+			await session.stateMutex.update(data => ({...data, state: 'idle'}));
+
+			const updateState = (
+				sessionManager as unknown as {
+					updateSessionState: (s: Session, next: SessionState) => Promise<void>;
+				}
+			).updateSessionState.bind(sessionManager);
+			await updateState(session, 'busy');
+
+			expect(session.restoreScrollbackBaseLine).toBe(5);
+		});
+	});
+
+	describe('performResize', () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
+		it('emits a wrapped viewport snapshot to repaint after resize', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = true;
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				cursorY: number;
+				cursorX: number;
+			};
+			normalBuffer.cursorY = 3;
+			normalBuffer.cursorX = 4;
+			const serializeMock = vi
+				.spyOn(session.serializer, 'serialize')
+				.mockReturnValue('VIEWPORT');
+			const resizeHandler = vi.fn();
+			sessionManager.on('sessionResize', resizeHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+
+			expect(session.process.resize).toHaveBeenCalledWith(100, 24);
+			expect(session.terminal.resize).toHaveBeenCalledWith(100, 24);
+			expect(serializeMock).toHaveBeenCalledWith({scrollback: 0});
+			expect(resizeHandler).toHaveBeenCalledWith(
+				session,
+				'[?7h[2J[HVIEWPORT[4;5H[?7l',
+			);
+		});
+
+		it('suppresses live PTY → stdout forwarding for the post-resize quiet window', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = true;
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('VIEWPORT');
+			const dataHandler = vi.fn();
+			sessionManager.on('sessionData', dataHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+
+			mockPty.emit('data', 'static-replay');
+			expect(dataHandler).not.toHaveBeenCalled();
+
+			vi.advanceTimersByTime(260);
+			mockPty.emit('data', 'live-after-window');
+
+			expect(dataHandler).toHaveBeenCalledTimes(1);
+			expect(dataHandler).toHaveBeenCalledWith(session, 'live-after-window');
+		});
+
+		it('skips emitting a resize repaint for inactive sessions', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = false;
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('VIEWPORT');
+			const resizeHandler = vi.fn();
+			sessionManager.on('sessionResize', resizeHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+
+			expect(resizeHandler).not.toHaveBeenCalled();
+			expect(session.process.resize).toHaveBeenCalledWith(100, 24);
+		});
+
+		it('clears the resize suppression when the session is deactivated', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			session.isActive = true;
+			vi.spyOn(session.serializer, 'serialize').mockReturnValue('VIEWPORT');
+			const dataHandler = vi.fn();
+			sessionManager.on('sessionData', dataHandler);
+
+			sessionManager.performResize(session.id, 100, 24);
+			sessionManager.setSessionActive(session.id, false);
+			session.isActive = true;
+
+			mockPty.emit('data', 'live-after-deactivate');
+
+			expect(dataHandler).toHaveBeenCalledTimes(1);
+			expect(dataHandler).toHaveBeenCalledWith(
+				session,
+				'live-after-deactivate',
+			);
 		});
 	});
 

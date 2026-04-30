@@ -971,6 +971,76 @@ describe('ClaudeStateDetector', () => {
 		});
 	});
 
+	describe('hasTransientRenderFooter', () => {
+		it('returns true when viewport contains spinner activity label', () => {
+			terminal = createMockTerminal([
+				'✶ Befuddling… (1m 1s · ↓ 283 tokens)',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(true);
+		});
+
+		it('returns true when viewport contains a token stats line', () => {
+			terminal = createMockTerminal([
+				'(9m 21s · ↓ 13.7k tokens)',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+			]);
+
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(true);
+		});
+
+		it('returns false for a steady idle viewport that only shows the persistent shift+tab footer', () => {
+			// The "(shift+tab to cycle)" line is rendered even when nothing
+			// is scrolling, so on its own it does not imply scrollback ghosts.
+			terminal = createMockTerminal([
+				'Some idle conversation',
+				'──────────────────────────────',
+				'❯',
+				'──────────────────────────────',
+				'⏵⏵ accept edits on (shift+tab to cycle)',
+			]);
+
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(false);
+		});
+
+		it('returns true when viewport contains "esc to interrupt"', () => {
+			terminal = createMockTerminal([
+				'Working...',
+				'Press esc to interrupt',
+				'❯',
+			]);
+
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(true);
+		});
+
+		it('returns true when viewport contains "ctrl+c to interrupt"', () => {
+			terminal = createMockTerminal(['Searching… (ctrl+c to interrupt)', '❯']);
+
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(true);
+		});
+
+		it('returns false on a quiet idle viewport without footer markers', () => {
+			terminal = createMockTerminal([
+				'Some output',
+				'Command completed successfully',
+				'> ',
+			]);
+
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(false);
+		});
+
+		it('returns false for an empty terminal', () => {
+			terminal = createMockTerminal([]);
+
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(false);
+		});
+	});
+
 	describe('detectTeamMembers', () => {
 		it('should return 2 when two @name members are present with shift+↑ to expand', () => {
 			terminal = createMockTerminal([

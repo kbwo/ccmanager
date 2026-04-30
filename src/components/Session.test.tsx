@@ -119,7 +119,10 @@ describe('Session', () => {
 		expect(terminalResize.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
 			setSessionActive.mock.invocationCallOrder[0] ?? 0,
 		);
-		expect(testState.stdout?.write).toHaveBeenNthCalledWith(2, '\nrestored');
+		expect(testState.stdout?.write).toHaveBeenNthCalledWith(
+			2,
+			'\x1b[?7h\nrestored\x1b[?7l',
+		);
 		expect(testState.stdout?.write).toHaveBeenNthCalledWith(3, '\x1b[?7l');
 	});
 });

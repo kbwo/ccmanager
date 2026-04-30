@@ -90,23 +90,41 @@ const Session: React.FC<SessionProps> = ({
 		stdout.write('\x1B[2J\x1B[H');
 
 		// Restore the current terminal state from the headless xterm snapshot.
-		// The xterm serialize addon relies on auto-wrap (DECAWM) being enabled to
-		// render wrapped lines. It omits row separators for wrapped rows and expects
-		// characters to naturally overflow to the next line, so auto-wrap must stay
-		// enabled while writing the snapshot and only be disabled afterward.
+		// The xterm serialize addon relies on auto-wrap (DECAWM) being enabled
+		// to render wrapped lines. It omits row separators for wrapped rows
+		// and expects characters to naturally overflow to the next line, so
+		// re-enable DECAWM around the snapshot write and restore the live-TUI
+		// default afterward. This matters for both the synchronous initial
+		// restore and the deferred restore that may fire after Session.tsx
+		// has already disabled DECAWM for live TUI redraws.
 		const handleSessionRestore = (
 			restoredSession: ISession,
 			restoreSnapshot: string,
 		) => {
 			if (restoredSession.id === session.id) {
 				if (restoreSnapshot.length > 0) {
-					stdout.write(restoreSnapshot);
+					stdout.write(`\x1b[?7h${restoreSnapshot}\x1b[?7l`);
 				}
 			}
 		};
 
 		// Listen for restore event first
 		sessionManager.on('sessionRestore', handleSessionRestore);
+
+		// Repaint the user's terminal viewport from the post-resize headless
+		// snapshot. Without this, Ink-based TUIs (e.g. Claude Code) re-emit
+		// their full static history on SIGWINCH, which the user's terminal
+		// appends below the (already-clipped) viewport, producing duplicated
+		// rows equal to the resize delta.
+		const handleSessionResize = (
+			resizedSession: ISession,
+			redrawPayload: string,
+		) => {
+			if (resizedSession.id === session.id && redrawPayload.length > 0) {
+				stdout.write(redrawPayload);
+			}
+		};
+		sessionManager.on('sessionResize', handleSessionResize);
 
 		// Listen for session data events
 		const handleSessionData = (activeSession: ISession, data: string) => {
@@ -157,11 +175,7 @@ const Session: React.FC<SessionProps> = ({
 		const handleResize = () => {
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
-			session.process.resize(cols, rows);
-			// Also resize the virtual terminal
-			if (session.terminal) {
-				session.terminal.resize(cols, rows);
-			}
+			sessionManager.performResize(session.id, cols, rows);
 		};
 
 		stdout.on('resize', handleResize);
@@ -180,6 +194,7 @@ const Session: React.FC<SessionProps> = ({
 
 			// Remove event listeners
 			sessionManager.off('sessionRestore', handleSessionRestore);
+			sessionManager.off('sessionResize', handleSessionResize);
 			sessionManager.off('sessionData', handleSessionData);
 			sessionManager.off('sessionExit', handleSessionExit);
 			stdout.off('resize', handleResize);

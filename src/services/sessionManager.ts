@@ -33,6 +33,18 @@ const {Terminal} = pkg;
 const TERMINAL_CONTENT_MAX_LINES = 300;
 const TERMINAL_SCROLLBACK_LINES = 5000;
 const TERMINAL_RESTORE_SCROLLBACK_LINES = 200;
+// How long to suppress PTY → stdout forwarding after a viewport resize so the
+// child process's SIGWINCH-triggered re-emission of static content does not
+// duplicate already-displayed rows in the user's terminal.
+const RESIZE_SUPPRESS_MS = 250;
+// While a busy TUI is mid-frame across multiple PTY chunks, a synchronous
+// viewport-only restore can capture an incomplete frame and paint a half-
+// drawn screen. Defer the restore emit until PTY output has been quiet for
+// this long (extended on each chunk) so the snapshot captures a coherent
+// post-frame state. Capped by RESTORE_DEFER_MAX_MS so a continuously
+// streaming session still restores within a small bounded delay.
+const RESTORE_DEFER_QUIET_MS = 80;
+const RESTORE_DEFER_MAX_MS = 250;
 
 export interface SessionCounts {
 	idle: number;
@@ -51,6 +63,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private autoApprovalDisabledWorktrees: Set<string> = new Set();
 	private restoringSessions: Set<string> = new Set();
 	private bufferedRestoreData: Map<string, string[]> = new Map();
+	private resizingSessions: Set<string> = new Set();
+	private resizeSuppressTimers: Map<string, NodeJS.Timeout> = new Map();
+	private restoreDeferTimers: Map<string, NodeJS.Timeout> = new Map();
+	private restoreDeferDeadlines: Map<string, number> = new Map();
 
 	private async spawn(
 		command: string,
@@ -278,6 +294,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		}));
 
 		if (oldState !== newState) {
+			// While busy, cursor-addressed footer redraws (spinner, token stats,
+			// "accept edits on …" line) can push ghost frames into scrollback as
+			// chat content scrolls. Once the busy turn ends, advance the restore
+			// baseline so the next session restore replays only post-busy
+			// scrollback and skips the ghost-bearing range.
+			if (oldState === 'busy' && newState !== 'busy') {
+				session.restoreScrollbackBaseLine =
+					session.terminal.buffer.normal.baseY;
+			}
 			void Effect.runPromise(executeStatusHook(oldState, newState, session));
 			this.emit('sessionStateChanged', session);
 		}
@@ -320,6 +345,23 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			return '';
 		}
 
+		const cursorRow = normalBuffer.cursorY + 1;
+		const cursorCol = normalBuffer.cursorX + 1;
+
+		// When the live viewport shows a transient footer (spinner activity,
+		// token stats, persistent shift+tab footer, etc.), the renderer keeps
+		// redrawing it in place and earlier copies have likely been pushed into
+		// scrollback by chat output scrolling beneath it. Replaying that
+		// scrollback would paint duplicated footer rows, so emit only the
+		// viewport in this case.
+		if (session.stateDetector.hasTransientRenderFooter(session.terminal)) {
+			const viewportSnapshot = session.serializer.serialize({
+				scrollback: 0,
+				excludeAltBuffer: true,
+			});
+			return `${viewportSnapshot}\x1b[${cursorRow};${cursorCol}H`;
+		}
+
 		const scrollbackStart = Math.max(
 			0,
 			normalBuffer.baseY - TERMINAL_RESTORE_SCROLLBACK_LINES,
@@ -337,10 +379,85 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			},
 			excludeAltBuffer: true,
 		});
-		const cursorRow = normalBuffer.cursorY + 1;
-		const cursorCol = normalBuffer.cursorX + 1;
 
 		return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
+	}
+
+	private getViewportRedrawSnapshot(session: Session): string {
+		const snapshot = session.serializer.serialize({scrollback: 0});
+		if (snapshot.length === 0) {
+			return '';
+		}
+		const activeBuffer = session.terminal.buffer.active;
+		if (activeBuffer.type !== 'normal') {
+			// Serialized alternate-buffer output already carries its own cursor
+			// positioning, so do not append a cursor home sequence here.
+			return snapshot;
+		}
+		const normalBuffer = session.terminal.buffer.normal;
+		const cursorRow = normalBuffer.cursorY + 1;
+		const cursorCol = normalBuffer.cursorX + 1;
+		return `${snapshot}\x1b[${cursorRow};${cursorCol}H`;
+	}
+
+	/**
+	 * Resize a session's PTY and headless terminal, then repaint the user's
+	 * terminal viewport from the post-resize headless state. Live PTY → stdout
+	 * forwarding is suppressed for a short window so the child's SIGWINCH
+	 * redraw (which on Ink-based TUIs re-emits the full static history) cannot
+	 * append duplicates below the repainted viewport.
+	 */
+	performResize(sessionId: string, cols: number, rows: number): void {
+		const session = this.sessions.get(sessionId);
+		if (!session) {
+			return;
+		}
+
+		try {
+			session.process.resize(cols, rows);
+		} catch {
+			/* empty */
+		}
+		try {
+			session.terminal.resize(cols, rows);
+		} catch {
+			/* empty */
+		}
+
+		this.resizingSessions.add(sessionId);
+		const existing = this.resizeSuppressTimers.get(sessionId);
+		if (existing !== undefined) {
+			clearTimeout(existing);
+		}
+		const timer = setTimeout(() => {
+			this.resizeSuppressTimers.delete(sessionId);
+			this.resizingSessions.delete(sessionId);
+		}, RESIZE_SUPPRESS_MS);
+		this.resizeSuppressTimers.set(sessionId, timer);
+
+		if (!session.isActive) {
+			return;
+		}
+
+		const snapshot = this.getViewportRedrawSnapshot(session);
+		if (snapshot.length === 0) {
+			return;
+		}
+
+		// \x1b[?7h ... \x1b[?7l: SerializeAddon's wrapped-row encoding relies
+		//   on auto-wrap (DECAWM) being enabled to advance the cursor across
+		//   row boundaries (see PR #276). Session.tsx keeps DECAWM disabled
+		//   for live TUI redraws, so re-enable it just for the snapshot write
+		//   and restore the live default afterward.
+		// \x1b[2J\x1b[H: clear the post-resize viewport so the snapshot paints
+		//   onto a known canvas; rows that the child won't cover (e.g. trailing
+		//   blanks after a height shrink) stay clean rather than retaining
+		//   pre-resize content.
+		this.emit(
+			'sessionResize',
+			session,
+			`\x1b[?7h\x1b[2J\x1b[H${snapshot}\x1b[?7l`,
+		);
 	}
 
 	private async createSessionInternal(
@@ -484,12 +601,31 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			session.lastActivity = new Date();
 
+			// Deferred restore is waiting for the TUI to finish a frame. Reset
+			// the quiet timer with each chunk; the snapshot fired at the end of
+			// the quiet window will already include this data through the
+			// headless write above, so do not buffer or forward.
+			if (this.restoreDeferDeadlines.has(session.id)) {
+				this.armRestoreDeferTimer(session);
+				return;
+			}
+
 			// Only emit data events when session is active
 			if (session.isActive) {
 				if (this.restoringSessions.has(session.id)) {
 					const bufferedData = this.bufferedRestoreData.get(session.id) ?? [];
 					bufferedData.push(data);
 					this.bufferedRestoreData.set(session.id, bufferedData);
+					return;
+				}
+
+				// During a viewport resize, the child process re-emits its full
+				// static content to adapt to new line-wrapping. The headless
+				// terminal already absorbed the data above, so the post-resize
+				// snapshot we wrote on resize is in sync. Drop the live forward
+				// here to keep the user's terminal from acquiring duplicated
+				// rows below the snapshot.
+				if (this.resizingSessions.has(session.id)) {
 					return;
 				}
 
@@ -675,26 +811,89 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (active) {
 				session.lastAccessedAt = Date.now();
 				this.restoringSessions.add(session.id);
-				try {
-					const restoreSnapshot = this.getRestoreSnapshot(session);
-					if (restoreSnapshot.length > 0) {
-						this.emit('sessionRestore', session, restoreSnapshot);
-					}
-				} finally {
-					this.restoringSessions.delete(session.id);
-					const bufferedData = this.bufferedRestoreData.get(session.id);
-					if (bufferedData && bufferedData.length > 0) {
-						this.bufferedRestoreData.delete(session.id);
-						for (const chunk of bufferedData) {
-							this.emit('sessionData', session, chunk);
-						}
-					}
+
+				// While the TUI shows a busy footer it may be mid-frame across
+				// multiple PTY chunks; capturing the snapshot synchronously can
+				// surface a half-drawn viewport. Defer until PTY output is
+				// quiet so the snapshot reflects a coherent post-frame state.
+				if (session.stateDetector.hasTransientRenderFooter(session.terminal)) {
+					this.restoreDeferDeadlines.set(
+						session.id,
+						Date.now() + RESTORE_DEFER_MAX_MS,
+					);
+					this.armRestoreDeferTimer(session);
+					return;
 				}
+
+				this.emitRestoreSnapshot(session);
 			} else {
 				this.restoringSessions.delete(session.id);
 				this.bufferedRestoreData.delete(session.id);
+				this.resizingSessions.delete(session.id);
+				const resizeTimer = this.resizeSuppressTimers.get(session.id);
+				if (resizeTimer !== undefined) {
+					clearTimeout(resizeTimer);
+					this.resizeSuppressTimers.delete(session.id);
+				}
+				this.cancelRestoreDefer(session.id);
 			}
 		}
+	}
+
+	private emitRestoreSnapshot(session: Session): void {
+		try {
+			const restoreSnapshot = this.getRestoreSnapshot(session);
+			if (restoreSnapshot.length > 0) {
+				this.emit('sessionRestore', session, restoreSnapshot);
+			}
+		} finally {
+			this.restoringSessions.delete(session.id);
+			const bufferedData = this.bufferedRestoreData.get(session.id);
+			if (bufferedData && bufferedData.length > 0) {
+				this.bufferedRestoreData.delete(session.id);
+				for (const chunk of bufferedData) {
+					this.emit('sessionData', session, chunk);
+				}
+			}
+		}
+	}
+
+	private armRestoreDeferTimer(session: Session): void {
+		const deadline = this.restoreDeferDeadlines.get(session.id);
+		if (deadline === undefined) {
+			return;
+		}
+		const existing = this.restoreDeferTimers.get(session.id);
+		if (existing !== undefined) {
+			clearTimeout(existing);
+		}
+		const remaining = deadline - Date.now();
+		if (remaining <= 0) {
+			this.fireRestoreDefer(session);
+			return;
+		}
+		const delay = Math.min(RESTORE_DEFER_QUIET_MS, remaining);
+		const timer = setTimeout(() => this.fireRestoreDefer(session), delay);
+		this.restoreDeferTimers.set(session.id, timer);
+	}
+
+	private fireRestoreDefer(session: Session): void {
+		this.restoreDeferTimers.delete(session.id);
+		this.restoreDeferDeadlines.delete(session.id);
+		if (!session.isActive) {
+			this.restoringSessions.delete(session.id);
+			return;
+		}
+		this.emitRestoreSnapshot(session);
+	}
+
+	private cancelRestoreDefer(sessionId: string): void {
+		const timer = this.restoreDeferTimers.get(sessionId);
+		if (timer !== undefined) {
+			clearTimeout(timer);
+			this.restoreDeferTimers.delete(sessionId);
+		}
+		this.restoreDeferDeadlines.delete(sessionId);
 	}
 
 	cancelAutoApproval(sessionId: string, reason = 'User input received'): void {
@@ -777,6 +976,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			this.waitingWithBottomBorder.delete(sessionId);
 			this.restoringSessions.delete(sessionId);
 			this.bufferedRestoreData.delete(sessionId);
+			this.resizingSessions.delete(sessionId);
+			const resizeTimer = this.resizeSuppressTimers.get(sessionId);
+			if (resizeTimer !== undefined) {
+				clearTimeout(resizeTimer);
+				this.resizeSuppressTimers.delete(sessionId);
+			}
+			this.cancelRestoreDefer(sessionId);
 			this.emit('sessionDestroyed', session);
 		}
 	}
@@ -837,6 +1043,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 				this.sessions.delete(sessionId);
 				this.waitingWithBottomBorder.delete(sessionId);
+				this.resizingSessions.delete(sessionId);
+				const resizeTimer = this.resizeSuppressTimers.get(sessionId);
+				if (resizeTimer !== undefined) {
+					clearTimeout(resizeTimer);
+					this.resizeSuppressTimers.delete(sessionId);
+				}
+				this.cancelRestoreDefer(sessionId);
 				this.emit('sessionDestroyed', session);
 			},
 			catch: (error: unknown) => {
