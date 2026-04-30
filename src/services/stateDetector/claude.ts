@@ -14,11 +14,6 @@ const SPINNER_ACTIVITY_PATTERN = new RegExp(
 // Session stats above the prompt, e.g. "(9m 21s · ↓ 13.7k tokens)" — requires parens, a digit, and "tokens"
 const TOKEN_STATS_LINE_PATTERN = /\([^)]*\d[^)]*tokens\s*\)/i;
 
-// Persistent footer hint Claude renders below the prompt box, e.g.
-// "⏵⏵ accept edits on (shift+tab to cycle)". The redraw of this footer is
-// what produces the most visible scrollback ghosts when chat content scrolls.
-const PERSISTENT_FOOTER_PATTERN = /\(shift\+tab\s+to\s+cycle\)/i;
-
 // Workaround: Claude Code sometimes appears idle in terminal output while
 // still actively processing (busy). To mitigate false idle transitions,
 // require terminal output to remain unchanged for this duration before
@@ -203,6 +198,13 @@ export class ClaudeStateDetector extends BaseStateDetector {
 	}
 
 	override hasTransientRenderFooter(terminal: Terminal): boolean {
+		// Only flag busy-turn footer markers. The persistent "(shift+tab to
+		// cycle)" footer is always visible during an active Claude session
+		// even when idle, but it does not by itself indicate that recent
+		// scrolling pushed ghost frames into scrollback — only an in-flight
+		// busy turn does. busy → non-busy transitions advance the restore
+		// baseline separately so already-scrolled ghosts from a just-ended
+		// turn are not replayed either.
 		const viewport = this.getTerminalContent(terminal, terminal.rows);
 		if (viewport.length === 0) {
 			return false;
@@ -211,9 +213,6 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return true;
 		}
 		if (TOKEN_STATS_LINE_PATTERN.test(viewport)) {
-			return true;
-		}
-		if (PERSISTENT_FOOTER_PATTERN.test(viewport)) {
 			return true;
 		}
 		const lower = viewport.toLowerCase();

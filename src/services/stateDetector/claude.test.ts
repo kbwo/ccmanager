@@ -994,15 +994,18 @@ describe('ClaudeStateDetector', () => {
 			expect(detector.hasTransientRenderFooter(terminal)).toBe(true);
 		});
 
-		it('returns true when viewport contains the persistent shift+tab footer', () => {
+		it('returns false for a steady idle viewport that only shows the persistent shift+tab footer', () => {
+			// The "(shift+tab to cycle)" line is rendered even when nothing
+			// is scrolling, so on its own it does not imply scrollback ghosts.
 			terminal = createMockTerminal([
+				'Some idle conversation',
 				'──────────────────────────────',
 				'❯',
 				'──────────────────────────────',
 				'⏵⏵ accept edits on (shift+tab to cycle)',
 			]);
 
-			expect(detector.hasTransientRenderFooter(terminal)).toBe(true);
+			expect(detector.hasTransientRenderFooter(terminal)).toBe(false);
 		});
 
 		it('returns true when viewport contains "esc to interrupt"', () => {
