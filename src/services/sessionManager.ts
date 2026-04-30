@@ -37,6 +37,14 @@ const TERMINAL_RESTORE_SCROLLBACK_LINES = 200;
 // child process's SIGWINCH-triggered re-emission of static content does not
 // duplicate already-displayed rows in the user's terminal.
 const RESIZE_SUPPRESS_MS = 250;
+// While a busy TUI is mid-frame across multiple PTY chunks, a synchronous
+// viewport-only restore can capture an incomplete frame and paint a half-
+// drawn screen. Defer the restore emit until PTY output has been quiet for
+// this long (extended on each chunk) so the snapshot captures a coherent
+// post-frame state. Capped by RESTORE_DEFER_MAX_MS so a continuously
+// streaming session still restores within a small bounded delay.
+const RESTORE_DEFER_QUIET_MS = 80;
+const RESTORE_DEFER_MAX_MS = 250;
 
 export interface SessionCounts {
 	idle: number;
@@ -57,6 +65,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private bufferedRestoreData: Map<string, string[]> = new Map();
 	private resizingSessions: Set<string> = new Set();
 	private resizeSuppressTimers: Map<string, NodeJS.Timeout> = new Map();
+	private restoreDeferTimers: Map<string, NodeJS.Timeout> = new Map();
+	private restoreDeferDeadlines: Map<string, number> = new Map();
 
 	private async spawn(
 		command: string,
@@ -591,6 +601,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 			session.lastActivity = new Date();
 
+			// Deferred restore is waiting for the TUI to finish a frame. Reset
+			// the quiet timer with each chunk; the snapshot fired at the end of
+			// the quiet window will already include this data through the
+			// headless write above, so do not buffer or forward.
+			if (this.restoreDeferDeadlines.has(session.id)) {
+				this.armRestoreDeferTimer(session);
+				return;
+			}
+
 			// Only emit data events when session is active
 			if (session.isActive) {
 				if (this.restoringSessions.has(session.id)) {
@@ -792,21 +811,21 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			if (active) {
 				session.lastAccessedAt = Date.now();
 				this.restoringSessions.add(session.id);
-				try {
-					const restoreSnapshot = this.getRestoreSnapshot(session);
-					if (restoreSnapshot.length > 0) {
-						this.emit('sessionRestore', session, restoreSnapshot);
-					}
-				} finally {
-					this.restoringSessions.delete(session.id);
-					const bufferedData = this.bufferedRestoreData.get(session.id);
-					if (bufferedData && bufferedData.length > 0) {
-						this.bufferedRestoreData.delete(session.id);
-						for (const chunk of bufferedData) {
-							this.emit('sessionData', session, chunk);
-						}
-					}
+
+				// While the TUI shows a busy footer it may be mid-frame across
+				// multiple PTY chunks; capturing the snapshot synchronously can
+				// surface a half-drawn viewport. Defer until PTY output is
+				// quiet so the snapshot reflects a coherent post-frame state.
+				if (session.stateDetector.hasTransientRenderFooter(session.terminal)) {
+					this.restoreDeferDeadlines.set(
+						session.id,
+						Date.now() + RESTORE_DEFER_MAX_MS,
+					);
+					this.armRestoreDeferTimer(session);
+					return;
 				}
+
+				this.emitRestoreSnapshot(session);
 			} else {
 				this.restoringSessions.delete(session.id);
 				this.bufferedRestoreData.delete(session.id);
@@ -816,8 +835,65 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					clearTimeout(resizeTimer);
 					this.resizeSuppressTimers.delete(session.id);
 				}
+				this.cancelRestoreDefer(session.id);
 			}
 		}
+	}
+
+	private emitRestoreSnapshot(session: Session): void {
+		try {
+			const restoreSnapshot = this.getRestoreSnapshot(session);
+			if (restoreSnapshot.length > 0) {
+				this.emit('sessionRestore', session, restoreSnapshot);
+			}
+		} finally {
+			this.restoringSessions.delete(session.id);
+			const bufferedData = this.bufferedRestoreData.get(session.id);
+			if (bufferedData && bufferedData.length > 0) {
+				this.bufferedRestoreData.delete(session.id);
+				for (const chunk of bufferedData) {
+					this.emit('sessionData', session, chunk);
+				}
+			}
+		}
+	}
+
+	private armRestoreDeferTimer(session: Session): void {
+		const deadline = this.restoreDeferDeadlines.get(session.id);
+		if (deadline === undefined) {
+			return;
+		}
+		const existing = this.restoreDeferTimers.get(session.id);
+		if (existing !== undefined) {
+			clearTimeout(existing);
+		}
+		const remaining = deadline - Date.now();
+		if (remaining <= 0) {
+			this.fireRestoreDefer(session);
+			return;
+		}
+		const delay = Math.min(RESTORE_DEFER_QUIET_MS, remaining);
+		const timer = setTimeout(() => this.fireRestoreDefer(session), delay);
+		this.restoreDeferTimers.set(session.id, timer);
+	}
+
+	private fireRestoreDefer(session: Session): void {
+		this.restoreDeferTimers.delete(session.id);
+		this.restoreDeferDeadlines.delete(session.id);
+		if (!session.isActive) {
+			this.restoringSessions.delete(session.id);
+			return;
+		}
+		this.emitRestoreSnapshot(session);
+	}
+
+	private cancelRestoreDefer(sessionId: string): void {
+		const timer = this.restoreDeferTimers.get(sessionId);
+		if (timer !== undefined) {
+			clearTimeout(timer);
+			this.restoreDeferTimers.delete(sessionId);
+		}
+		this.restoreDeferDeadlines.delete(sessionId);
 	}
 
 	cancelAutoApproval(sessionId: string, reason = 'User input received'): void {
@@ -906,6 +982,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				clearTimeout(resizeTimer);
 				this.resizeSuppressTimers.delete(sessionId);
 			}
+			this.cancelRestoreDefer(sessionId);
 			this.emit('sessionDestroyed', session);
 		}
 	}
@@ -972,6 +1049,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					clearTimeout(resizeTimer);
 					this.resizeSuppressTimers.delete(sessionId);
 				}
+				this.cancelRestoreDefer(sessionId);
 				this.emit('sessionDestroyed', session);
 			},
 			catch: (error: unknown) => {
