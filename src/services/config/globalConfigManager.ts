@@ -14,6 +14,7 @@ import {
 	WorktreeConfig,
 	CommandPresetsConfig,
 	MergeConfig,
+	TerminalLauncherConfig,
 	DEFAULT_SHORTCUTS,
 	IConfigEditor,
 } from '../../types/index.js';
@@ -244,6 +245,15 @@ class GlobalConfigManager implements IConfigEditor {
 
 	setCommandPresets(presets: CommandPresetsConfig): void {
 		this.config.commandPresets = presets;
+		this.saveConfig();
+	}
+
+	getTerminalLauncher(): TerminalLauncherConfig | undefined {
+		return this.config.terminalLauncher;
+	}
+
+	setTerminalLauncher(value: TerminalLauncherConfig): void {
+		this.config.terminalLauncher = value;
 		this.saveConfig();
 	}
 

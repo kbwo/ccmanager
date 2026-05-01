@@ -88,6 +88,7 @@ export type MenuAction =
 			session: Session;
 			worktreePath: string;
 	  }
+	| {type: 'openTerminal'; worktreePath: string}
 	| {type: 'deleteWorktree'}
 	| {type: 'mergeWorktree'}
 	| {type: 'configuration'; scope: ConfigScope}
@@ -170,6 +171,11 @@ export interface CommandPresetsConfig {
 	selectPresetOnStart?: boolean; // Whether to show preset selector before starting session
 }
 
+export interface TerminalLauncherConfig {
+	command: string;
+	args?: string[];
+}
+
 export interface DevcontainerConfig {
 	upCommand: string; // Command to start devcontainer
 	execCommand: string; // Command to execute in devcontainer
@@ -182,6 +188,7 @@ export interface ConfigurationData {
 	worktree?: WorktreeConfig;
 	commandPresets?: CommandPresetsConfig;
 	mergeConfig?: MergeConfig;
+	terminalLauncher?: TerminalLauncherConfig;
 	autoApproval?: {
 		enabled: boolean; // Whether auto-approval is enabled
 		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse
@@ -205,6 +212,7 @@ export interface ProjectConfigurationData {
 	worktree?: WorktreeConfig;
 	commandPresets?: CommandPresetsConfig;
 	mergeConfig?: MergeConfig;
+	terminalLauncher?: TerminalLauncherConfig;
 	autoApproval?: AutoApprovalConfig;
 }
 
@@ -231,6 +239,9 @@ export interface IConfigReader {
 
 	// Merge Config
 	getMergeConfig(): MergeConfig | undefined;
+
+	// Terminal Launcher
+	getTerminalLauncher(): TerminalLauncherConfig | undefined;
 
 	// Auto Approval
 	getAutoApprovalConfig(): AutoApprovalConfig | undefined;
@@ -262,6 +273,9 @@ export interface IConfigEditor extends IConfigReader {
 
 	// Merge Config
 	setMergeConfig(value: MergeConfig): void;
+
+	// Terminal Launcher
+	setTerminalLauncher(value: TerminalLauncherConfig): void;
 
 	// Auto Approval
 	setAutoApprovalConfig(value: AutoApprovalConfig): void;

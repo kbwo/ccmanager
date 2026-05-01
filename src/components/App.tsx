@@ -17,6 +17,7 @@ import SessionActions, {type SessionActionType} from './SessionActions.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {launchTerminal} from '../services/terminalLauncher.js';
 import {
 	worktreeNameGenerator,
 	generateFallbackBranchName,
@@ -499,6 +500,16 @@ const App: React.FC<AppProps> = ({
 				});
 				navigateWithClear('session-actions');
 				return;
+			case 'openTerminal': {
+				const result = launchTerminal(action.worktreePath);
+				if (!result.success) {
+					setError(
+						result.error ??
+							'Failed to launch terminal. Configure terminalLauncher in settings or set CCMANAGER_TERMINAL.',
+					);
+				}
+				return;
+			}
 			case 'deleteWorktree':
 				navigateWithClear('delete-worktree');
 				return;
@@ -1071,6 +1082,17 @@ const App: React.FC<AppProps> = ({
 					sessionManager.destroySession(targetSession.id);
 					handleReturnToMenu();
 					return;
+				case 'openTerminal': {
+					const result = launchTerminal(worktreePath);
+					if (!result.success) {
+						setError(
+							result.error ??
+								'Failed to launch terminal. Configure terminalLauncher in settings or set CCMANAGER_TERMINAL.',
+						);
+					}
+					handleReturnToMenu();
+					return;
+				}
 			}
 		};
 

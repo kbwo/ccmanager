@@ -13,6 +13,7 @@ import {
 	WorktreeConfig,
 	CommandPresetsConfig,
 	MergeConfig,
+	TerminalLauncherConfig,
 	IConfigEditor,
 	AutoApprovalConfig,
 } from '../../types/index.js';
@@ -135,6 +136,16 @@ class ProjectConfigManager implements IConfigEditor {
 	setCommandPresets(value: CommandPresetsConfig): void {
 		const config = this.ensureProjectConfig();
 		config.commandPresets = value;
+		this.saveProjectConfig();
+	}
+
+	getTerminalLauncher(): TerminalLauncherConfig | undefined {
+		return this.projectConfig?.terminalLauncher;
+	}
+
+	setTerminalLauncher(value: TerminalLauncherConfig): void {
+		const config = this.ensureProjectConfig();
+		config.terminalLauncher = value;
 		this.saveProjectConfig();
 	}
 

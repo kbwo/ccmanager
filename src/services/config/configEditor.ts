@@ -7,6 +7,7 @@ import {
 	WorktreeConfig,
 	CommandPresetsConfig,
 	MergeConfig,
+	TerminalLauncherConfig,
 	IConfigEditor,
 	AutoApprovalConfig,
 } from '../../types/index.js';
@@ -106,6 +107,16 @@ export class ConfigEditor implements IConfigEditor {
 
 	setCommandPresets(value: CommandPresetsConfig): void {
 		this.configEditor.setCommandPresets(value);
+	}
+
+	getTerminalLauncher(): TerminalLauncherConfig | undefined {
+		const scopedConfig = this.configEditor.getTerminalLauncher();
+		if (scopedConfig) return scopedConfig;
+		return globalConfigManager.getTerminalLauncher();
+	}
+
+	setTerminalLauncher(value: TerminalLauncherConfig): void {
+		this.configEditor.setTerminalLauncher(value);
 	}
 
 	getMergeConfig(): MergeConfig | undefined {
