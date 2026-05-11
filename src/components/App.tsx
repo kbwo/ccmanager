@@ -146,14 +146,17 @@ const App: React.FC<AppProps> = ({
 		};
 	}, [view]);
 
-	useInput(() => {
-		if (view !== 'worktree-hook-error' || !canReturnFromHookError) {
-			return;
-		}
+	useInput(
+		() => {
+			if (!canReturnFromHookError) {
+				return;
+			}
 
-		setWorktreeHookError(null);
-		handleReturnToMenu();
-	});
+			setWorktreeHookError(null);
+			handleReturnToMenu();
+		},
+		{isActive: view === 'worktree-hook-error'},
+	);
 
 	// Helper function to format error messages based on error type using _tag discrimination
 	const formatErrorMessage = (error: AppError): string => {
