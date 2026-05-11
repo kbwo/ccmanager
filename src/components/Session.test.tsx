@@ -125,4 +125,70 @@ describe('Session', () => {
 		);
 		expect(testState.stdout?.write).toHaveBeenNthCalledWith(3, '\x1b[?7l');
 	});
+
+	it('detaches synchronously when returning to menu so late session output cannot repaint', async () => {
+		const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+		const session = {
+			id: 'session-1',
+			process: {
+				write: vi.fn(),
+				resize: vi.fn(),
+			},
+			terminal: {
+				resize: vi.fn(),
+			},
+			stateMutex: {
+				getSnapshot: () => ({state: 'busy'}),
+			},
+		} as unknown as SessionType;
+		const onReturnToMenu = vi.fn();
+		const setSessionActive = vi.fn();
+		const sessionManager = {
+			on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+				const handlers = listeners.get(event) ?? new Set();
+				handlers.add(handler);
+				listeners.set(event, handlers);
+				return sessionManager;
+			}),
+			off: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+				listeners.get(event)?.delete(handler);
+				return sessionManager;
+			}),
+			setSessionActive,
+			cancelAutoApproval: vi.fn(),
+			performResize: vi.fn(),
+		};
+
+		const {unmount} = render(
+			<Session
+				session={session}
+				sessionManager={sessionManager as never}
+				onReturnToMenu={onReturnToMenu}
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 0));
+		testState.stdout?.write.mockClear();
+
+		process.stdin.emit('data', '\u0005');
+		for (const handler of listeners.get('sessionData') ?? []) {
+			handler(session, 'late-data');
+		}
+		for (const handler of listeners.get('sessionRestore') ?? []) {
+			handler(session, 'late-restore');
+		}
+		for (const handler of listeners.get('sessionResize') ?? []) {
+			handler(session, 'late-resize');
+		}
+
+		expect(setSessionActive).toHaveBeenCalledWith(session.id, false);
+		expect(onReturnToMenu).toHaveBeenCalledTimes(1);
+		expect(testState.stdout?.write).not.toHaveBeenCalledWith('late-data');
+		expect(testState.stdout?.write).not.toHaveBeenCalledWith(
+			'\x1b[?7hlate-restore\x1b[?7l',
+		);
+		expect(testState.stdout?.write).not.toHaveBeenCalledWith('late-resize');
+
+		unmount();
+	});
 });
