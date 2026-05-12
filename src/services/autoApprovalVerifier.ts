@@ -688,7 +688,8 @@ export class AutoApprovalVerifier {
 
 				return JSON.parse(responseText) as AutoApprovalResponse;
 			},
-			catch: (error: unknown) => error as Error,
+			catch: (error: unknown) =>
+				error instanceof Error ? error : new Error(String(error)),
 		});
 
 		return Effect.catchAll(attemptVerification, (error: Error) => {

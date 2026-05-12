@@ -11,6 +11,7 @@ interface ConfigureMergeProps {
 }
 
 type EditField = 'mergeArgs' | 'rebaseArgs';
+type MenuItemValue = EditField | 'separator' | 'back';
 
 const DEFAULT_MERGE_ARGS = ['--no-ff'];
 const DEFAULT_REBASE_ARGS: string[] = [];
@@ -33,7 +34,7 @@ const ConfigureMerge: React.FC<ConfigureMergeProps> = ({onComplete}) => {
 	const formatArgs = (args: string[]) =>
 		args.length > 0 ? args.join(' ') : '(none)';
 
-	const menuItems = [
+	const menuItems: Array<{label: string; value: MenuItemValue}> = [
 		{
 			label: `Merge Arguments: ${formatArgs(getMergeArgs())}`,
 			value: 'mergeArgs',
@@ -46,16 +47,15 @@ const ConfigureMerge: React.FC<ConfigureMergeProps> = ({onComplete}) => {
 		{label: '<- Back', value: 'back'},
 	];
 
-	const handleSelect = (item: {label: string; value: string}) => {
+	const handleSelect = (item: {label: string; value: MenuItemValue}) => {
 		if (item.value === 'separator') return;
 		if (item.value === 'back') {
 			onComplete();
 			return;
 		}
 
-		const field = item.value as EditField;
-		setEditField(field);
-		switch (field) {
+		setEditField(item.value);
+		switch (item.value) {
 			case 'mergeArgs':
 				setInputValue(getMergeArgs().join(' '));
 				break;

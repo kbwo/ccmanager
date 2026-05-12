@@ -128,7 +128,7 @@ function handleStatusExit(
 	} else if (Exit.isFailure(statusExit)) {
 		const failure = Cause.failureOption(statusExit.cause);
 		if (Option.isSome(failure)) {
-			const gitError = failure.value as GitError;
+			const gitError = failure.value;
 			update.gitStatus = undefined;
 			update.gitStatusError = formatGitError(gitError);
 			hasUpdate = true;

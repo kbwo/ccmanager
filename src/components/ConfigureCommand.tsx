@@ -284,12 +284,15 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		}
 	};
 
-	const handleStrategySelect = (item: {label: string; value: string}) => {
+	const handleStrategySelect = (item: {
+		label: string;
+		value: StateDetectionStrategy;
+	}) => {
 		const preset = presets.find(p => p.id === selectedPresetId);
 		if (!preset) return;
 
 		const updatedPreset = {...preset};
-		updatedPreset.detectionStrategy = item.value as StateDetectionStrategy;
+		updatedPreset.detectionStrategy = item.value;
 
 		const updatedPresets = presets.map(p =>
 			p.id === preset.id ? updatedPreset : p,
@@ -300,8 +303,11 @@ const ConfigureCommand: React.FC<ConfigureCommandProps> = ({onComplete}) => {
 		setIsSelectingStrategy(false);
 	};
 
-	const handleAddStrategySelect = (item: {label: string; value: string}) => {
-		const strategy = item.value as StateDetectionStrategy;
+	const handleAddStrategySelect = (item: {
+		label: string;
+		value: StateDetectionStrategy;
+	}) => {
+		const strategy = item.value;
 		const defaultCommand = DEFAULT_COMMANDS[strategy];
 
 		setNewPreset({

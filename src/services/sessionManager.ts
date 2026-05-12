@@ -214,7 +214,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			.catch(async (error: unknown) => {
 				if (abortController.signal.aborted) {
 					logger.debug(
-						`[${session.id}] Auto-approval verification aborted (${(error as Error)?.message ?? 'aborted'})`,
+						`[${session.id}] Auto-approval verification aborted (${error instanceof Error ? error.message : 'aborted'})`,
 					);
 					return;
 				}
@@ -230,8 +230,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					await this.updateSessionState(session, 'waiting_input', {
 						autoApprovalFailed: true,
 						autoApprovalReason:
-							(error as Error | undefined)?.message ??
-							'Auto-approval verification failed',
+							error instanceof Error
+								? error.message
+								: 'Auto-approval verification failed',
 					});
 				}
 			})
