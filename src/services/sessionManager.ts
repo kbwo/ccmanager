@@ -32,7 +32,7 @@ import {preparePresetLaunch} from '../utils/presetPrompt.js';
 const {Terminal} = pkg;
 const TERMINAL_CONTENT_MAX_LINES = 300;
 const TERMINAL_SCROLLBACK_LINES = 5000;
-const TERMINAL_RESTORE_SCROLLBACK_LINES = 200;
+const TERMINAL_RESTORE_SCROLLBACK_LINES = TERMINAL_SCROLLBACK_LINES;
 // How long to suppress PTY → stdout forwarding after a viewport resize so the
 // child process's SIGWINCH-triggered re-emission of static content does not
 // duplicate already-displayed rows in the user's terminal.
@@ -347,20 +347,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		const cursorRow = normalBuffer.cursorY + 1;
 		const cursorCol = normalBuffer.cursorX + 1;
-
-		// When the live viewport shows a transient footer (spinner activity,
-		// token stats, persistent shift+tab footer, etc.), the renderer keeps
-		// redrawing it in place and earlier copies have likely been pushed into
-		// scrollback by chat output scrolling beneath it. Replaying that
-		// scrollback would paint duplicated footer rows, so emit only the
-		// viewport in this case.
-		if (session.stateDetector.hasTransientRenderFooter(session.terminal)) {
-			const viewportSnapshot = session.serializer.serialize({
-				scrollback: 0,
-				excludeAltBuffer: true,
-			});
-			return `${viewportSnapshot}\x1b[${cursorRow};${cursorCol}H`;
-		}
 
 		const scrollbackStart = Math.max(
 			0,
