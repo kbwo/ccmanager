@@ -254,7 +254,14 @@ export class ProjectManager implements IProjectManager {
 				);
 			} catch (error) {
 				// Silently skip directories we can't read
-				if ((error as NodeJS.ErrnoException).code !== 'EACCES') {
+				if (
+					!(
+						typeof error === 'object' &&
+						error !== null &&
+						'code' in error &&
+						error.code === 'EACCES'
+					)
+				) {
 					console.error(`Error scanning directory ${dir}:`, error);
 				}
 			}
@@ -351,7 +358,7 @@ export class ProjectManager implements IProjectManager {
 				return null;
 			}
 		} catch (error) {
-			result.error = `Failed to process: ${(error as Error).message}`;
+			result.error = `Failed to process: ${error instanceof Error ? error.message : String(error)}`;
 		}
 
 		return result;
@@ -470,11 +477,14 @@ export class ProjectManager implements IProjectManager {
 					return error;
 				}
 
-				const nodeError = error as NodeJS.ErrnoException;
-				const cause =
-					nodeError.code === 'ENOENT'
-						? `Projects directory does not exist: ${projectsDir}`
-						: String(error);
+				const isEnoent =
+					typeof error === 'object' &&
+					error !== null &&
+					'code' in error &&
+					error.code === 'ENOENT';
+				const cause = isEnoent
+					? `Projects directory does not exist: ${projectsDir}`
+					: String(error);
 
 				return new FileSystemError({
 					operation: 'read',
