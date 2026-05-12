@@ -580,17 +580,17 @@ const Menu: React.FC<MenuProps> = ({
 			>
 				<SelectInput
 					items={items}
-					onSelect={item => handleSelect(item as MenuItem)}
-					onHighlight={item => {
-						// ink-select-input may call onHighlight with undefined when items are empty
-						// (e.g., during menu re-mount after returning from a session), so guard it.
-						if (!item) {
-							return;
-						}
-						const menuItem = item as MenuItem;
-						if (menuItem.type === 'worktree') {
-							setHighlightedWorktreePath(menuItem.worktree.path);
-							setHighlightedSession(menuItem.session);
+					onSelect={raw => {
+						const item = items.find(i => i.value === raw?.value);
+						if (!item) return;
+						handleSelect(item);
+					}}
+					onHighlight={raw => {
+						const item = items.find(i => i.value === raw?.value);
+						if (!item) return;
+						if (item.type === 'worktree') {
+							setHighlightedWorktreePath(item.worktree.path);
+							setHighlightedSession(item.session);
 						}
 					}}
 					isFocused={!error}

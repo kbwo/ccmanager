@@ -654,7 +654,11 @@ const Dashboard: React.FC<DashboardProps> = ({
 				>
 					<SelectInput
 						items={items}
-						onSelect={item => handleSelect(item as DashboardItem)}
+						onSelect={raw => {
+							const item = items.find(i => i.value === raw?.value);
+							if (!item) return;
+							handleSelect(item);
+						}}
 						isFocused={!displayError}
 						limit={limit}
 						initialIndex={selectedIndex}
