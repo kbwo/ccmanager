@@ -1304,6 +1304,94 @@ describe('SessionManager', () => {
 			expect(session.restoreScrollbackBaseLine).toBe(17);
 		});
 
+		it('should keep full scrollback for normal output that scrolls', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				baseY: number;
+			};
+			normalBuffer.baseY = 10;
+			vi.mocked(session.terminal.write).mockImplementation(() => {
+				normalBuffer.baseY = 12;
+			});
+
+			mockPty.emit('data', 'ordinary output\n');
+
+			expect(session.restoreScrollbackBaseLine).toBe(0);
+		});
+
+		it('should skip scrollback that grows during cursor-addressed redraws', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+			});
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+			const normalBuffer = session.terminal.buffer.normal as unknown as {
+				baseY: number;
+			};
+			normalBuffer.baseY = 10;
+			vi.mocked(session.terminal.write).mockImplementation(() => {
+				normalBuffer.baseY = 12;
+			});
+
+			mockPty.emit('data', '\x1b[Hredrawn status\n');
+
+			expect(session.restoreScrollbackBaseLine).toBe(12);
+		});
+
+		it('should keep cursor-addressed redraw tracking active for a short quiet window', async () => {
+			vi.useFakeTimers();
+			try {
+				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+				const normalBuffer = session.terminal.buffer.normal as unknown as {
+					baseY: number;
+				};
+				normalBuffer.baseY = 10;
+				vi.mocked(session.terminal.write).mockImplementation(() => {
+					if (normalBuffer.baseY === 10) {
+						return;
+					}
+					normalBuffer.baseY++;
+				});
+
+				mockPty.emit('data', '\x1b[Hredraw frame');
+				normalBuffer.baseY = 11;
+				mockPty.emit('data', 'plain continuation that scrolls');
+
+				expect(session.restoreScrollbackBaseLine).toBe(12);
+
+				vi.advanceTimersByTime(501);
+				normalBuffer.baseY = 20;
+				mockPty.emit('data', 'ordinary output after quiet window');
+
+				expect(session.restoreScrollbackBaseLine).toBe(12);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
 		it('should flush live session data after the restore snapshot completes', async () => {
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
