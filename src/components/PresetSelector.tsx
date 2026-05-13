@@ -48,19 +48,11 @@ const PresetSelector: React.FC<PresetSelectorProps> = ({
 		item => item.value === defaultPresetId,
 	);
 
-	useInput((input, key) => {
+	// ink-select-input v6+ handles number keys 1-9 natively, so only handle ESC here
+	// to avoid double-firing onSelect (which would create two sessions for one worktree).
+	useInput((_input, key) => {
 		if (key.escape) {
 			onCancel();
-			return;
-		}
-
-		// Number keys 1-9: immediate launch
-		if (/^[1-9]$/.test(input)) {
-			const idx = parseInt(input) - 1;
-			if (idx < presets.length && presets[idx]) {
-				onSelect(presets[idx]!.id);
-			}
-			return;
 		}
 	});
 
