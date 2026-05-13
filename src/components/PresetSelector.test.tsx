@@ -122,29 +122,15 @@ describe('PresetSelector component', () => {
 		expect(output).toContain('← Cancel');
 	});
 
-	it('pressing 1 calls onSelect with first preset id immediately', () => {
+	// Number key selection is handled by ink-select-input v6+ natively.
+	// PresetSelector's useInput only handles ESC to avoid double-firing onSelect
+	// (which would create two sessions for one worktree).
+	it('pressing number keys via useInput does NOT trigger onSelect', () => {
 		render(<PresetSelector onSelect={onSelect} onCancel={onCancel} />);
 		expect(capturedHandlers.inputHandler).not.toBeNull();
 		capturedHandlers.inputHandler!('1', makeKey());
-		expect(onSelect).toHaveBeenCalledWith('preset-1');
-		expect(onCancel).not.toHaveBeenCalled();
-	});
-
-	it('pressing 2 calls onSelect with second preset id immediately', () => {
-		render(<PresetSelector onSelect={onSelect} onCancel={onCancel} />);
 		capturedHandlers.inputHandler!('2', makeKey());
-		expect(onSelect).toHaveBeenCalledWith('preset-2');
-	});
-
-	it('pressing 3 calls onSelect with third preset id immediately', () => {
-		render(<PresetSelector onSelect={onSelect} onCancel={onCancel} />);
 		capturedHandlers.inputHandler!('3', makeKey());
-		expect(onSelect).toHaveBeenCalledWith('preset-3');
-	});
-
-	it('pressing a number beyond preset count does nothing', () => {
-		render(<PresetSelector onSelect={onSelect} onCancel={onCancel} />);
-		capturedHandlers.inputHandler!('9', makeKey());
 		expect(onSelect).not.toHaveBeenCalled();
 		expect(onCancel).not.toHaveBeenCalled();
 	});
