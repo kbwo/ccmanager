@@ -929,11 +929,15 @@ export class WorktreeService {
 				copyClaudeDirectory,
 			});
 
-			// Check if branch exists
-			const branchExists = yield* Effect.catchAll(
+			// Check if a LOCAL branch exists (refs/heads/ only).
+			// Using `git rev-parse --verify` without qualifying the ref would also
+			// match remote-tracking refs (e.g. refs/remotes/origin/<branch>), which
+			// causes `git worktree add` to create the worktree in detached-HEAD
+			// state instead of on a proper local branch.
+			const localBranchExists = yield* Effect.catchAll(
 				Effect.try({
 					try: () => {
-						execSync(`git rev-parse --verify ${branch}`, {
+						execSync(`git show-ref --verify --quiet refs/heads/${branch}`, {
 							cwd: self.rootPath,
 							encoding: 'utf8',
 						});
@@ -967,14 +971,22 @@ export class WorktreeService {
 				);
 			}
 
-			// Create the worktree command
+			// Create the worktree command.
+			// Three cases:
+			// 1. Local branch exists → attach worktree directly
+			// 2. No local branch, but remote-tracking branch exists → create
+			//    local branch from the remote ref (avoids detached HEAD)
+			// 3. Branch is brand-new → create from baseBranch
 			let command: string;
-			if (branchExists) {
+			if (localBranchExists) {
 				command = `git worktree add "${resolvedPath}" "${branch}"`;
 			} else {
-				// Resolve the base branch to its proper git reference
-				const resolvedBaseBranch = self.resolveBranchReference(baseBranch);
-				command = `git worktree add -b "${branch}" "${resolvedPath}" "${resolvedBaseBranch}"`;
+				const resolvedRef = self.resolveBranchReference(branch);
+				const isRemoteBranch = resolvedRef !== branch;
+				const startPoint = isRemoteBranch
+					? resolvedRef
+					: self.resolveBranchReference(baseBranch);
+				command = `git worktree add -b "${branch}" "${resolvedPath}" "${startPoint}"`;
 			}
 
 			// Execute the worktree creation command

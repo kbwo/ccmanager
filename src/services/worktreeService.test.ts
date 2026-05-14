@@ -793,8 +793,14 @@ branch refs/heads/feature
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('rev-parse --verify')) {
+					if (cmd.includes('show-ref --verify --quiet refs/heads/')) {
 						throw new Error('Branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\n';
+					}
+					if (cmd.includes('show-ref --verify --quiet refs/remotes/')) {
+						throw new Error('Remote branch not found');
 					}
 					if (cmd.includes('git worktree add')) {
 						return '';
@@ -817,14 +823,73 @@ branch refs/heads/feature
 			});
 		});
 
+		it('should create local branch from remote ref when only remote branch exists', async () => {
+			const executedCommands: string[] = [];
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					executedCommands.push(cmd);
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					// No local branch
+					if (cmd.includes('show-ref --verify --quiet refs/heads/')) {
+						throw new Error('Branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\n';
+					}
+					// Remote branch exists
+					if (
+						cmd ===
+						'git show-ref --verify --quiet refs/remotes/origin/feature/remote-only'
+					) {
+						return '';
+					}
+					if (cmd.includes('show-ref --verify --quiet refs/remotes/')) {
+						throw new Error('Remote branch not found');
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+				}
+				return '';
+			});
+
+			const effect = service.createWorktreeEffect(
+				'/path/to/worktree',
+				'feature/remote-only',
+				'main',
+			);
+			const result = await Effect.runPromise(effect);
+
+			expect(result.worktree).toMatchObject({
+				path: '/path/to/worktree',
+				branch: 'feature/remote-only',
+				isMainWorktree: false,
+			});
+
+			// Should use -b with the remote ref as start point, not baseBranch
+			const worktreeAddCmd = executedCommands.find(c =>
+				c.includes('git worktree add'),
+			);
+			expect(worktreeAddCmd).toContain('-b "feature/remote-only"');
+			expect(worktreeAddCmd).toContain('"origin/feature/remote-only"');
+		});
+
 		it('should return Effect that fails with GitError on git command failure', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('rev-parse --verify')) {
+					if (cmd.includes('show-ref --verify --quiet refs/heads/')) {
 						throw new Error('Branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\n';
+					}
+					if (cmd.includes('show-ref --verify --quiet refs/remotes/')) {
+						throw new Error('Remote branch not found');
 					}
 					if (cmd.includes('git worktree add')) {
 						const error: MockGitError = new Error(
@@ -878,8 +943,14 @@ branch refs/heads/feature
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('rev-parse --verify')) {
+					if (cmd.includes('show-ref --verify --quiet refs/heads/')) {
 						throw new Error('Branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\n';
+					}
+					if (cmd.includes('show-ref --verify --quiet refs/remotes/')) {
+						throw new Error('Remote branch not found');
 					}
 					if (cmd.includes('git worktree add')) {
 						throw new Error('git worktree add should not be called');
@@ -930,8 +1001,14 @@ branch refs/heads/feature
 					if (cmd === 'git rev-parse --git-common-dir') {
 						return '/fake/path/.git\n';
 					}
-					if (cmd.includes('rev-parse --verify')) {
+					if (cmd.includes('show-ref --verify --quiet refs/heads/')) {
 						throw new Error('Branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\n';
+					}
+					if (cmd.includes('show-ref --verify --quiet refs/remotes/')) {
+						throw new Error('Remote branch not found');
 					}
 					if (cmd.includes('git worktree add')) {
 						return '';
