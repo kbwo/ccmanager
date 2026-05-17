@@ -63,6 +63,8 @@ const Session: React.FC<SessionProps> = ({
 
 			// Check for return to menu shortcut
 			if (shortcutManager.matchesRawInput('returnToMenu', data)) {
+				isExitingRef.current = true;
+				sessionManager.setSessionActive(session.id, false);
 				// Disable any extended input modes that might have been enabled by the PTY
 				if (stdout) {
 					resetTerminalInputModes();
@@ -101,7 +103,7 @@ const Session: React.FC<SessionProps> = ({
 			restoredSession: ISession,
 			restoreSnapshot: string,
 		) => {
-			if (restoredSession.id === session.id) {
+			if (restoredSession.id === session.id && !isExitingRef.current) {
 				if (restoreSnapshot.length > 0) {
 					stdout.write(`\x1b[?7h${restoreSnapshot}\x1b[?7l`);
 				}
@@ -120,7 +122,11 @@ const Session: React.FC<SessionProps> = ({
 			resizedSession: ISession,
 			redrawPayload: string,
 		) => {
-			if (resizedSession.id === session.id && redrawPayload.length > 0) {
+			if (
+				resizedSession.id === session.id &&
+				redrawPayload.length > 0 &&
+				!isExitingRef.current
+			) {
 				stdout.write(redrawPayload);
 			}
 		};

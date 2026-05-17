@@ -32,7 +32,7 @@ import {preparePresetLaunch} from '../utils/presetPrompt.js';
 const {Terminal} = pkg;
 const TERMINAL_CONTENT_MAX_LINES = 300;
 const TERMINAL_SCROLLBACK_LINES = 5000;
-const TERMINAL_RESTORE_SCROLLBACK_LINES = 200;
+const TERMINAL_RESTORE_SCROLLBACK_LINES = TERMINAL_SCROLLBACK_LINES;
 // How long to suppress PTY → stdout forwarding after a viewport resize so the
 // child process's SIGWINCH-triggered re-emission of static content does not
 // duplicate already-displayed rows in the user's terminal.
@@ -45,6 +45,11 @@ const RESIZE_SUPPRESS_MS = 250;
 // streaming session still restores within a small bounded delay.
 const RESTORE_DEFER_QUIET_MS = 80;
 const RESTORE_DEFER_MAX_MS = 250;
+// Cursor-addressed redraws (progress bars, spinners, TUIs) can leave transient
+// rows in scrollback if the viewport scrolls before those rows are overwritten.
+// Keep a short generic redraw window so restore can skip that ghost-bearing
+// range without depending on any specific CLI output text.
+const REDRAW_SCROLLBACK_QUIET_MS = 500;
 
 export interface SessionCounts {
 	idle: number;
@@ -67,6 +72,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private resizeSuppressTimers: Map<string, NodeJS.Timeout> = new Map();
 	private restoreDeferTimers: Map<string, NodeJS.Timeout> = new Map();
 	private restoreDeferDeadlines: Map<string, number> = new Map();
+	private cursorRedrawSessions: Set<string> = new Set();
+	private cursorRedrawTimers: Map<string, NodeJS.Timeout> = new Map();
 
 	private async spawn(
 		command: string,
@@ -332,6 +339,50 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		);
 	}
 
+	private hasCursorAddressedRedraw(data: string): boolean {
+		return (
+			// CSI cursor movement/positioning, erase, and scroll controls.
+			/\x1b\[[0-?]*[ -/]*[ABCDEFGHJKSTX`abcdefg]/.test(data) ||
+			// DEC save/restore cursor.
+			/\x1b[78]/.test(data) ||
+			// Synchronized output mode usually brackets full-frame redraws.
+			/\x1b\[\?2026[hl]/.test(data)
+		);
+	}
+
+	private markCursorRedrawActive(session: Session): void {
+		this.cursorRedrawSessions.add(session.id);
+
+		const existing = this.cursorRedrawTimers.get(session.id);
+		if (existing !== undefined) {
+			clearTimeout(existing);
+		}
+
+		const timer = setTimeout(() => {
+			this.cursorRedrawTimers.delete(session.id);
+			this.cursorRedrawSessions.delete(session.id);
+		}, REDRAW_SCROLLBACK_QUIET_MS);
+		this.cursorRedrawTimers.set(session.id, timer);
+	}
+
+	private handleScrollbackGrowthDuringRedraw(
+		session: Session,
+		beforeBaseY: number,
+	): void {
+		const afterBaseY = session.terminal.buffer.normal.baseY;
+		if (
+			afterBaseY <= beforeBaseY ||
+			!this.cursorRedrawSessions.has(session.id)
+		) {
+			return;
+		}
+
+		session.restoreScrollbackBaseLine = Math.max(
+			session.restoreScrollbackBaseLine,
+			afterBaseY,
+		);
+	}
+
 	private getRestoreSnapshot(session: Session): string {
 		const activeBuffer = session.terminal.buffer.active;
 		if (activeBuffer.type !== 'normal') {
@@ -348,20 +399,6 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		const cursorRow = normalBuffer.cursorY + 1;
 		const cursorCol = normalBuffer.cursorX + 1;
-
-		// When the live viewport shows a transient footer (spinner activity,
-		// token stats, persistent shift+tab footer, etc.), the renderer keeps
-		// redrawing it in place and earlier copies have likely been pushed into
-		// scrollback by chat output scrolling beneath it. Replaying that
-		// scrollback would paint duplicated footer rows, so emit only the
-		// viewport in this case.
-		if (session.stateDetector.hasTransientRenderFooter(session.terminal)) {
-			const viewportSnapshot = session.serializer.serialize({
-				scrollback: 0,
-				excludeAltBuffer: true,
-			});
-			return `${viewportSnapshot}\x1b[${cursorRow};${cursorCol}H`;
-		}
 
 		const scrollbackStart = Math.max(
 			0,
@@ -592,8 +629,14 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private setupDataHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
+			const beforeBaseY = session.terminal.buffer.normal.baseY;
+			if (this.hasCursorAddressedRedraw(data)) {
+				this.markCursorRedrawActive(session);
+			}
+
 			// Write data to virtual terminal
 			session.terminal.write(data);
+			this.handleScrollbackGrowthDuringRedraw(session, beforeBaseY);
 
 			if (this.shouldResetRestoreScrollback(data)) {
 				session.restoreScrollbackBaseLine =
@@ -897,6 +940,15 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.restoreDeferDeadlines.delete(sessionId);
 	}
 
+	private clearCursorRedrawTracking(sessionId: string): void {
+		this.cursorRedrawSessions.delete(sessionId);
+		const timer = this.cursorRedrawTimers.get(sessionId);
+		if (timer !== undefined) {
+			clearTimeout(timer);
+			this.cursorRedrawTimers.delete(sessionId);
+		}
+	}
+
 	cancelAutoApproval(sessionId: string, reason = 'User input received'): void {
 		const session = this.sessions.get(sessionId);
 		if (!session) {
@@ -983,6 +1035,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 				clearTimeout(resizeTimer);
 				this.resizeSuppressTimers.delete(sessionId);
 			}
+			this.clearCursorRedrawTracking(sessionId);
 			this.cancelRestoreDefer(sessionId);
 			this.emit('sessionDestroyed', session);
 		}
@@ -1050,6 +1103,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 					clearTimeout(resizeTimer);
 					this.resizeSuppressTimers.delete(sessionId);
 				}
+				this.clearCursorRedrawTracking(sessionId);
 				this.cancelRestoreDefer(sessionId);
 				this.emit('sessionDestroyed', session);
 			},
