@@ -5,6 +5,7 @@ import {existsSync, statSync, Stats} from 'fs';
 import {configReader} from './config/configReader.js';
 import {Effect} from 'effect';
 import {GitError, ProcessError} from '../types/errors.js';
+import {AmbiguousBranchError} from '../types/index.js';
 
 // Mock child_process module
 vi.mock('child_process');
@@ -477,6 +478,93 @@ origin/feature/test
 		});
 	});
 
+	describe('resolveBranchReferenceEffect', () => {
+		it('should succeed with remote ref when single remote has the branch', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						)
+					) {
+						return '';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
+						throw new Error('Remote branch not found in upstream');
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const effect = (service as any).resolveBranchReferenceEffect(
+				'foo/bar-xyz',
+			);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			expect(result._tag).toBe('Right');
+			if (result._tag === 'Right') {
+				expect(result.right).toBe('origin/foo/bar-xyz');
+			}
+		});
+
+		it('should fail with AmbiguousBranchError (not Die) when multiple remotes have the branch', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (
+						cmd.includes('show-ref --verify --quiet refs/heads/foo/bar-xyz')
+					) {
+						throw new Error('Local branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nupstream\n';
+					}
+					if (
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/origin/foo/bar-xyz',
+						) ||
+						cmd.includes(
+							'show-ref --verify --quiet refs/remotes/upstream/foo/bar-xyz',
+						)
+					) {
+						return '';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const effect = (service as any).resolveBranchReferenceEffect(
+				'foo/bar-xyz',
+			);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			expect(result._tag).toBe('Left');
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(AmbiguousBranchError);
+				expect((result.left as AmbiguousBranchError)._tag).toBe(
+					'AmbiguousBranchError',
+				);
+				expect((result.left as AmbiguousBranchError).branchName).toBe(
+					'foo/bar-xyz',
+				);
+				expect((result.left as AmbiguousBranchError).matches).toHaveLength(2);
+			}
+		});
+	});
+
 	describe('hasClaudeDirectoryInBranchEffect', () => {
 		it('should return Effect with true when .claude directory exists in branch worktree', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
@@ -874,6 +962,48 @@ branch refs/heads/feature
 			);
 			expect(worktreeAddCmd).toContain('-b "feature/remote-only"');
 			expect(worktreeAddCmd).toContain('"origin/feature/remote-only"');
+		});
+
+		it('should return Effect Left with AmbiguousBranchError when branch exists in multiple remotes', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd.includes('show-ref --verify --quiet refs/heads/')) {
+						throw new Error('Branch not found');
+					}
+					if (cmd === 'git remote') {
+						return 'origin\nkbwo-fork\n';
+					}
+					if (cmd.includes('show-ref --verify --quiet refs/remotes/')) {
+						return ''; // Both remotes have the branch
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.createWorktreeEffect(
+				'/path/to/worktree',
+				'feature/feed-mention',
+				'main',
+			);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			expect(result._tag).toBe('Left');
+			if (result._tag === 'Left') {
+				expect(result.left).toBeInstanceOf(AmbiguousBranchError);
+				expect((result.left as AmbiguousBranchError)._tag).toBe(
+					'AmbiguousBranchError',
+				);
+				expect((result.left as AmbiguousBranchError).branchName).toBe(
+					'feature/feed-mention',
+				);
+				expect((result.left as AmbiguousBranchError).matches).toHaveLength(2);
+				expect(
+					(result.left as AmbiguousBranchError).matches.map(m => m.remote),
+				).toEqual(['origin', 'kbwo-fork']);
+			}
 		});
 
 		it('should return Effect that fails with GitError on git command failure', async () => {
