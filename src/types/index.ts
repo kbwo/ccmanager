@@ -4,7 +4,8 @@ import type {SerializeAddon} from '@xterm/addon-serialize';
 import {GitStatus} from '../utils/gitStatus.js';
 import {Mutex, SessionStateData} from '../utils/mutex.js';
 import type {StateDetector} from '../services/stateDetector/types.js';
-import type {ProcessError} from './errors.js';
+import type {Effect} from 'effect';
+import type {GitError, FileSystemError, ProcessError} from './errors.js';
 
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
@@ -321,6 +322,7 @@ export interface RemoteBranchMatch {
 }
 
 export class AmbiguousBranchError extends Error {
+	readonly _tag = 'AmbiguousBranchError' as const;
 	branchName: string;
 	matches: RemoteBranchMatch[];
 
@@ -337,11 +339,7 @@ export class AmbiguousBranchError extends Error {
 }
 
 export interface IWorktreeService {
-	getWorktreesEffect(): import('effect').Effect.Effect<
-		Worktree[],
-		import('../types/errors.js').GitError,
-		never
-	>;
+	getWorktreesEffect(): Effect.Effect<Worktree[], GitError, never>;
 	getGitRootPath(): string;
 	createWorktreeEffect(
 		worktreePath: string,
@@ -349,29 +347,19 @@ export interface IWorktreeService {
 		baseBranch: string,
 		copySessionData?: boolean,
 		copyClaudeDirectory?: boolean,
-	): import('effect').Effect.Effect<
+	): Effect.Effect<
 		CreateWorktreeResult,
-		| import('../types/errors.js').GitError
-		| import('../types/errors.js').FileSystemError
-		| import('../types/errors.js').ProcessError,
+		GitError | FileSystemError | ProcessError | AmbiguousBranchError,
 		never
 	>;
 	deleteWorktreeEffect(
 		worktreePath: string,
 		options?: {deleteBranch?: boolean},
-	): import('effect').Effect.Effect<
-		void,
-		import('../types/errors.js').GitError,
-		never
-	>;
+	): Effect.Effect<void, GitError, never>;
 	mergeWorktreeEffect(
 		sourceBranch: string,
 		targetBranch: string,
 		operation?: 'merge' | 'rebase',
 		mergeConfig?: MergeConfig,
-	): import('effect').Effect.Effect<
-		void,
-		import('../types/errors.js').GitError,
-		never
-	>;
+	): Effect.Effect<void, GitError, never>;
 }

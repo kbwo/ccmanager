@@ -29,7 +29,6 @@ import {
 	GitProject,
 	MenuAction,
 	AmbiguousBranchError,
-	RemoteBranchMatch,
 } from '../types/index.js';
 import {type AppError, type ProcessError} from '../types/errors.js';
 import {configReader} from '../services/config/configReader.js';
@@ -380,37 +379,6 @@ const App: React.FC<AppProps> = ({
 		};
 	}, [view, pendingMenuSessionLaunch, startSessionForWorktree]);
 
-	// Helper function to parse ambiguous branch error and create AmbiguousBranchError
-	const parseAmbiguousBranchError = (
-		errorMessage: string,
-	): AmbiguousBranchError | null => {
-		const pattern =
-			/Ambiguous branch '(.+?)' found in multiple remotes: (.+?)\. Please specify which remote to use\./;
-		const match = errorMessage.match(pattern);
-
-		if (!match) {
-			return null;
-		}
-
-		const branchName = match[1]!;
-		const remoteRefsText = match[2]!;
-		const remoteRefs = remoteRefsText.split(', ');
-
-		// Parse remote refs into RemoteBranchMatch objects
-		const matches: RemoteBranchMatch[] = remoteRefs.map(fullRef => {
-			const parts = fullRef.split('/');
-			const remote = parts[0]!;
-			const branch = parts.slice(1).join('/');
-			return {
-				remote,
-				branch,
-				fullRef,
-			};
-		});
-
-		return new AmbiguousBranchError(branchName, matches);
-	};
-
 	// Helper function to handle worktree creation results
 	const handleWorktreeCreationResult = (
 		result: {success: boolean; error?: string; warning?: string},
@@ -451,21 +419,8 @@ const App: React.FC<AppProps> = ({
 			return;
 		}
 
-		const errorMessage = result.error || 'Failed to create worktree';
-		const ambiguousError = parseAmbiguousBranchError(errorMessage);
-
-		if (ambiguousError) {
-			// Handle ambiguous branch error
-			setPendingWorktreeCreation({
-				...creationData,
-				ambiguousError,
-			});
-			navigateWithClear('remote-branch-selector');
-		} else {
-			// Handle regular error
-			setError(errorMessage);
-			setView('new-worktree');
-		}
+		setError(result.error || 'Failed to create worktree');
+		setView('new-worktree');
 	};
 
 	const handleMenuAction = async (action: MenuAction) => {
@@ -643,9 +598,26 @@ const App: React.FC<AppProps> = ({
 			),
 		);
 
-		// Transform Effect result to legacy format for handleWorktreeCreationResult
 		if (result._tag === 'Left') {
-			// Handle error using pattern matching on _tag
+			if (result.left._tag === 'AmbiguousBranchError') {
+				setPendingWorktreeCreation({
+					path: targetPath,
+					branch,
+					baseBranch: request.baseBranch,
+					copySessionData: request.copySessionData,
+					copyClaudeDirectory: request.copyClaudeDirectory,
+					presetId:
+						request.creationMode === 'prompt' ? request.presetId : undefined,
+					initialPrompt:
+						request.creationMode === 'prompt'
+							? request.initialPrompt
+							: undefined,
+					ambiguousError: result.left,
+				});
+				navigateWithClear('remote-branch-selector');
+				return;
+			}
+
 			const errorMessage = formatPreCreationHookError(result.left);
 			if (result.left._tag === 'ProcessError') {
 				setError(null);
@@ -733,7 +705,12 @@ const App: React.FC<AppProps> = ({
 		);
 
 		if (result._tag === 'Left') {
-			// Handle error using pattern matching on _tag
+			if (result.left._tag === 'AmbiguousBranchError') {
+				setError(result.left.message);
+				setView('new-worktree');
+				return;
+			}
+
 			const errorMessage = formatPreCreationHookError(result.left);
 			if (result.left._tag === 'ProcessError') {
 				setError(null);

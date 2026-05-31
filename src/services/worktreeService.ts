@@ -185,6 +185,15 @@ export class WorktreeService {
 		}
 	}
 
+	private resolveBranchReferenceEffect(
+		branchName: string,
+	): Effect.Effect<string, AmbiguousBranchError> {
+		return Effect.try({
+			try: () => this.resolveBranchReference(branchName),
+			catch: error => error as AmbiguousBranchError,
+		});
+	}
+
 	/**
 	 * SYNCHRONOUS HELPER: Gets all git remotes for this repository.
 	 *
@@ -895,7 +904,7 @@ export class WorktreeService {
 		copyClaudeDirectory = false,
 	): Effect.Effect<
 		CreateWorktreeResult,
-		GitError | FileSystemError | ProcessError,
+		GitError | FileSystemError | ProcessError | AmbiguousBranchError,
 		never
 	> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -981,11 +990,11 @@ export class WorktreeService {
 			if (localBranchExists) {
 				command = `git worktree add "${resolvedPath}" "${branch}"`;
 			} else {
-				const resolvedRef = self.resolveBranchReference(branch);
+				const resolvedRef = yield* self.resolveBranchReferenceEffect(branch);
 				const isRemoteBranch = resolvedRef !== branch;
 				const startPoint = isRemoteBranch
 					? resolvedRef
-					: self.resolveBranchReference(baseBranch);
+					: yield* self.resolveBranchReferenceEffect(baseBranch);
 				command = `git worktree add -b "${branch}" "${resolvedPath}" "${startPoint}"`;
 			}
 
