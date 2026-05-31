@@ -190,7 +190,12 @@ export class WorktreeService {
 	): Effect.Effect<string, AmbiguousBranchError> {
 		return Effect.try({
 			try: () => this.resolveBranchReference(branchName),
-			catch: error => error as AmbiguousBranchError,
+			catch: error => {
+				if (error instanceof AmbiguousBranchError) return error;
+				// resolveBranchReference only re-throws AmbiguousBranchError; all
+				// other errors are swallowed internally. This path is unreachable.
+				throw error;
+			},
 		});
 	}
 
@@ -989,6 +994,11 @@ export class WorktreeService {
 			let command: string;
 			if (localBranchExists) {
 				command = `git worktree add "${resolvedPath}" "${branch}"`;
+			} else if (baseBranch.endsWith(`/${branch}`)) {
+				// baseBranch is already a remote-tracking ref for branch
+				// (e.g. "origin/feature/x" after the user resolved an ambiguity).
+				// Use it directly to avoid re-triggering AmbiguousBranchError.
+				command = `git worktree add -b "${branch}" "${resolvedPath}" "${baseBranch}"`;
 			} else {
 				const resolvedRef = yield* self.resolveBranchReferenceEffect(branch);
 				const isRemoteBranch = resolvedRef !== branch;

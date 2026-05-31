@@ -1006,6 +1006,50 @@ branch refs/heads/feature
 			}
 		});
 
+		it('should succeed when baseBranch is already a resolved remote ref for branch (retry after disambiguation)', async () => {
+			const executedCommands: string[] = [];
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					executedCommands.push(cmd);
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					// No local branch
+					if (cmd.includes('show-ref --verify --quiet refs/heads/')) {
+						throw new Error('Branch not found');
+					}
+					if (cmd.includes('git worktree add')) {
+						return '';
+					}
+				}
+				return '';
+			});
+
+			// Simulate the retry call: user selected "origin/feature/feed-mention",
+			// which is passed as baseBranch.
+			const effect = service.createWorktreeEffect(
+				'/path/to/worktree',
+				'feature/feed-mention',
+				'origin/feature/feed-mention',
+			);
+			const result = await Effect.runPromise(Effect.either(effect));
+
+			expect(result._tag).toBe('Right');
+
+			// Should use baseBranch directly as startPoint without calling show-ref
+			const worktreeAddCmd = executedCommands.find(c =>
+				c.includes('git worktree add'),
+			);
+			expect(worktreeAddCmd).toContain('-b "feature/feed-mention"');
+			expect(worktreeAddCmd).toContain('"origin/feature/feed-mention"');
+			// show-ref for remotes must NOT be called (no re-resolution)
+			expect(
+				executedCommands.some(
+					c => c.includes('show-ref') && c.includes('refs/remotes/'),
+				),
+			).toBe(false);
+		});
+
 		it('should return Effect that fails with GitError on git command failure', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
