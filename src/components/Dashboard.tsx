@@ -44,6 +44,7 @@ interface DashboardProps {
 	projectsDir: string;
 	onSelectSession: (session: ISession, project: GitProject) => void;
 	onSelectProject: (project: GitProject) => void;
+	onSessionAction?: (session: ISession, project: GitProject) => void;
 	error: string | null;
 	onDismissError: () => void;
 	version: string;
@@ -147,6 +148,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 	projectsDir,
 	onSelectSession,
 	onSelectProject,
+	onSessionAction,
 	error,
 	onDismissError,
 	version,
@@ -163,6 +165,11 @@ const Dashboard: React.FC<DashboardProps> = ({
 		[],
 	);
 	const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
+	const [highlightedSession, setHighlightedSession] = useState<ISession | null>(
+		null,
+	);
+	const [highlightedProject, setHighlightedProject] =
+		useState<GitProject | null>(null);
 
 	const displayError = error || loadError;
 
@@ -364,9 +371,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 				);
 				const isMain = wt.isMainWorktree ? ' (main)' : '';
 				const worktreeSessionCount = sessionEntries.filter(
-					e => e.worktree.path === entry.worktree.path && e.projectPath === entry.projectPath,
+					e =>
+						e.worktree.path === entry.worktree.path &&
+						e.projectPath === entry.projectPath,
 				).length;
-				const sessionSuffix = displaySuffix(entry.session, worktreeSessionCount > 1);
+				const sessionSuffix = displaySuffix(
+					entry.session,
+					worktreeSessionCount > 1,
+				);
 				const baseLabel = `${entry.projectName} :: ${branchName}${isMain}${sessionSuffix}${status}`;
 
 				let fileChanges = '';
@@ -596,6 +608,11 @@ const Dashboard: React.FC<DashboardProps> = ({
 		}
 
 		switch (keyPressed) {
+			case ' ':
+				if (highlightedSession && highlightedProject && onSessionAction) {
+					onSessionAction(highlightedSession, highlightedProject);
+				}
+				break;
 			case 'r':
 				refreshAll();
 				break;
@@ -663,6 +680,16 @@ const Dashboard: React.FC<DashboardProps> = ({
 							const item = items.find(i => i.value === raw?.value);
 							if (!item) return;
 							handleSelect(item);
+						}}
+						onHighlight={raw => {
+							const item = items.find(i => i.value === raw?.value);
+							if (item?.type === 'session') {
+								setHighlightedSession(item.session);
+								setHighlightedProject(item.project);
+							} else {
+								setHighlightedSession(null);
+								setHighlightedProject(null);
+							}
 						}}
 						isFocused={!displayError}
 						limit={limit}
