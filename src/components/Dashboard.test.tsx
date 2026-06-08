@@ -3,6 +3,33 @@ import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {GitProject} from '../types/index.js';
 
+const capturedHandlers: {
+	inputHandlers: Array<(input: string, key: Record<string, boolean>) => void>;
+	onHighlight: ((item: {value: string; label: string}) => void) | null;
+} = {inputHandlers: [], onHighlight: null};
+
+const makeKey = (
+	overrides: Record<string, boolean> = {},
+): Record<string, boolean> => ({
+	upArrow: false,
+	downArrow: false,
+	leftArrow: false,
+	rightArrow: false,
+	pageDown: false,
+	pageUp: false,
+	home: false,
+	end: false,
+	return: false,
+	escape: false,
+	ctrl: false,
+	shift: false,
+	tab: false,
+	backspace: false,
+	delete: false,
+	meta: false,
+	...overrides,
+});
+
 // Mock bunTerminal to avoid native module loading issues
 vi.mock('../services/bunTerminal.js', () => ({
 	spawn: vi.fn(function () {
@@ -10,22 +37,33 @@ vi.mock('../services/bunTerminal.js', () => ({
 	}),
 }));
 
-// Import the actual component code but skip the useInput hook
+// Import the actual component code but capture useInput handlers
 vi.mock('ink', async () => {
 	const actual = await vi.importActual<typeof import('ink')>('ink');
 	return {
 		...actual,
-		useInput: vi.fn(),
+		useInput: vi.fn(
+			(handler: (input: string, key: Record<string, boolean>) => void) => {
+				capturedHandlers.inputHandlers.push(handler);
+			},
+		),
 	};
 });
 
-// Mock SelectInput to render items as simple text
+// Mock SelectInput to render items as simple text and capture onHighlight
 vi.mock('ink-select-input', async () => {
 	const React = await vi.importActual<typeof import('react')>('react');
 	const {Text, Box} = await vi.importActual<typeof import('ink')>('ink');
 
 	return {
-		default: ({items}: {items: Array<{label: string; value: string}>}) => {
+		default: ({
+			items,
+			onHighlight,
+		}: {
+			items: Array<{label: string; value: string}>;
+			onHighlight?: (item: {value: string; label: string}) => void;
+		}) => {
+			if (onHighlight) capturedHandlers.onHighlight = onHighlight;
 			return React.createElement(
 				Box,
 				{flexDirection: 'column'},
@@ -143,6 +181,8 @@ describe('Dashboard', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		capturedHandlers.inputHandlers = [];
+		capturedHandlers.onHighlight = null;
 		vi.mocked(projectManager.instance.discoverProjectsEffect).mockReturnValue(
 			Effect.succeed(mockProjects),
 		);
@@ -704,5 +744,432 @@ describe('Dashboard', () => {
 		const frame = lastFrame()!;
 		// shared-lib should appear first (index 0) because it's recent
 		expect(frame).toContain('0 ❯ shared-lib');
+	});
+
+	it('should show session name suffix in label when session has a name', async () => {
+		const mockSession = {
+			id: 'session-named',
+			worktreePath: '/projects/my-app/worktrees/feature-auth',
+			sessionNumber: 1,
+			sessionName: 'my-feature',
+			lastActivity: new Date(),
+			isActive: true,
+			stateMutex: {
+				getSnapshot: () => ({
+					state: 'busy' as const,
+					backgroundTaskCount: 0,
+					teamMemberCount: 0,
+				}),
+			},
+		};
+
+		vi.mocked(globalSessionOrchestrator.getProjectPaths).mockReturnValue([
+			'/projects/my-app',
+		]);
+		vi.mocked(globalSessionOrchestrator.getProjectSessions).mockReturnValue([
+			mockSession as never,
+		]);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: () =>
+					Effect.succeed([
+						{
+							path: '/projects/my-app/worktrees/feature-auth',
+							branch: 'feature/auth',
+							isMainWorktree: false,
+							hasSession: true,
+						},
+					]),
+				getGitRootPath: () => '/projects/my-app',
+			};
+		} as never);
+
+		const {lastFrame, rerender} = render(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 200));
+		rerender(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await vi.waitFor(
+			() => {
+				return lastFrame()?.includes('Active Sessions') ?? false;
+			},
+			{timeout: 3000},
+		);
+
+		expect(lastFrame()).toContain('my-app :: feature/auth: my-feature');
+	});
+
+	it('should show session number suffix when multiple unnamed sessions on same worktree', async () => {
+		const mockSessions = [
+			{
+				id: 'session-1',
+				worktreePath: '/projects/my-app/worktrees/feature-auth',
+				sessionNumber: 1,
+				lastActivity: new Date(),
+				isActive: true,
+				stateMutex: {
+					getSnapshot: () => ({
+						state: 'busy' as const,
+						backgroundTaskCount: 0,
+						teamMemberCount: 0,
+					}),
+				},
+			},
+			{
+				id: 'session-2',
+				worktreePath: '/projects/my-app/worktrees/feature-auth',
+				sessionNumber: 2,
+				lastActivity: new Date(),
+				isActive: true,
+				stateMutex: {
+					getSnapshot: () => ({
+						state: 'idle' as const,
+						backgroundTaskCount: 0,
+						teamMemberCount: 0,
+					}),
+				},
+			},
+		];
+
+		vi.mocked(globalSessionOrchestrator.getProjectPaths).mockReturnValue([
+			'/projects/my-app',
+		]);
+		vi.mocked(globalSessionOrchestrator.getProjectSessions).mockReturnValue(
+			mockSessions as never,
+		);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: () =>
+					Effect.succeed([
+						{
+							path: '/projects/my-app/worktrees/feature-auth',
+							branch: 'feature/auth',
+							isMainWorktree: false,
+							hasSession: true,
+						},
+					]),
+				getGitRootPath: () => '/projects/my-app',
+			};
+		} as never);
+
+		const {lastFrame, rerender} = render(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 200));
+		rerender(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await vi.waitFor(
+			() => {
+				return lastFrame()?.includes('Active Sessions') ?? false;
+			},
+			{timeout: 3000},
+		);
+
+		const frame = lastFrame()!;
+		expect(frame).toContain('#1');
+		expect(frame).toContain('#2');
+	});
+
+	it('should show no session suffix for single unnamed session', async () => {
+		const mockSession = {
+			id: 'session-single',
+			worktreePath: '/projects/my-app/worktrees/feature-auth',
+			sessionNumber: 1,
+			lastActivity: new Date(),
+			isActive: true,
+			stateMutex: {
+				getSnapshot: () => ({
+					state: 'busy' as const,
+					backgroundTaskCount: 0,
+					teamMemberCount: 0,
+				}),
+			},
+		};
+
+		vi.mocked(globalSessionOrchestrator.getProjectPaths).mockReturnValue([
+			'/projects/my-app',
+		]);
+		vi.mocked(globalSessionOrchestrator.getProjectSessions).mockReturnValue([
+			mockSession as never,
+		]);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: () =>
+					Effect.succeed([
+						{
+							path: '/projects/my-app/worktrees/feature-auth',
+							branch: 'feature/auth',
+							isMainWorktree: false,
+							hasSession: true,
+						},
+					]),
+				getGitRootPath: () => '/projects/my-app',
+			};
+		} as never);
+
+		const {lastFrame, rerender} = render(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 200));
+		rerender(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await vi.waitFor(
+			() => {
+				return lastFrame()?.includes('Active Sessions') ?? false;
+			},
+			{timeout: 3000},
+		);
+
+		const frame = lastFrame()!;
+		expect(frame).toContain('my-app :: feature/auth');
+		expect(frame).not.toContain('feature/auth:');
+		expect(frame).not.toContain('feature/auth #');
+	});
+
+	it('should call onSessionAction when space is pressed on highlighted session', async () => {
+		const mockOnSessionAction = vi.fn();
+		const mockSession = {
+			id: 'session-action',
+			worktreePath: '/projects/my-app/worktrees/feature-auth',
+			sessionNumber: 1,
+			lastActivity: new Date(),
+			isActive: true,
+			stateMutex: {
+				getSnapshot: () => ({
+					state: 'busy' as const,
+					backgroundTaskCount: 0,
+					teamMemberCount: 0,
+				}),
+			},
+		};
+
+		vi.mocked(globalSessionOrchestrator.getProjectPaths).mockReturnValue([
+			'/projects/my-app',
+		]);
+		vi.mocked(globalSessionOrchestrator.getProjectSessions).mockReturnValue([
+			mockSession as never,
+		]);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: () =>
+					Effect.succeed([
+						{
+							path: '/projects/my-app/worktrees/feature-auth',
+							branch: 'feature/auth',
+							isMainWorktree: false,
+							hasSession: true,
+						},
+					]),
+				getGitRootPath: () => '/projects/my-app',
+			};
+		} as never);
+
+		const {lastFrame, rerender} = render(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				onSessionAction={mockOnSessionAction}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 200));
+		rerender(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				onSessionAction={mockOnSessionAction}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await vi.waitFor(
+			() => {
+				return lastFrame()?.includes('Active Sessions') ?? false;
+			},
+			{timeout: 3000},
+		);
+
+		// Enable the useInput handler (Dashboard guards on process.stdin.setRawMode)
+		const origSetRawMode = process.stdin.setRawMode;
+		process.stdin.setRawMode = vi.fn() as never;
+
+		// Simulate highlighting a session item
+		expect(capturedHandlers.onHighlight).not.toBeNull();
+		capturedHandlers.onHighlight!({
+			value: 'session-session-action',
+			label: 'my-app :: feature/auth',
+		});
+
+		// Force re-render to flush state update — new useInput handler captures updated closure
+		rerender(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				onSessionAction={mockOnSessionAction}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		// Use the latest Dashboard handler (last in array — has updated highlightedSession state)
+		const latestHandler =
+			capturedHandlers.inputHandlers[capturedHandlers.inputHandlers.length - 1];
+		expect(latestHandler).toBeDefined();
+		latestHandler!(' ', makeKey());
+
+		expect(mockOnSessionAction).toHaveBeenCalledWith(
+			expect.objectContaining({id: 'session-action'}),
+			expect.objectContaining({path: '/projects/my-app'}),
+		);
+
+		process.stdin.setRawMode = origSetRawMode;
+	});
+
+	it('should not call onSessionAction when space is pressed with no highlighted session', async () => {
+		const mockOnSessionAction = vi.fn();
+		const mockSession = {
+			id: 'session-noop',
+			worktreePath: '/projects/my-app/worktrees/feature-auth',
+			sessionNumber: 1,
+			lastActivity: new Date(),
+			isActive: true,
+			stateMutex: {
+				getSnapshot: () => ({
+					state: 'busy' as const,
+					backgroundTaskCount: 0,
+					teamMemberCount: 0,
+				}),
+			},
+		};
+
+		vi.mocked(globalSessionOrchestrator.getProjectPaths).mockReturnValue([
+			'/projects/my-app',
+		]);
+		vi.mocked(globalSessionOrchestrator.getProjectSessions).mockReturnValue([
+			mockSession as never,
+		]);
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: () =>
+					Effect.succeed([
+						{
+							path: '/projects/my-app/worktrees/feature-auth',
+							branch: 'feature/auth',
+							isMainWorktree: false,
+							hasSession: true,
+						},
+					]),
+				getGitRootPath: () => '/projects/my-app',
+			};
+		} as never);
+
+		const {lastFrame, rerender} = render(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				onSessionAction={mockOnSessionAction}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 200));
+		rerender(
+			<Dashboard
+				projectsDir="/projects"
+				onSelectSession={mockOnSelectSession}
+				onSelectProject={mockOnSelectProject}
+				onSessionAction={mockOnSessionAction}
+				error={null}
+				onDismissError={mockOnDismissError}
+				version="3.8.1"
+			/>,
+		);
+
+		await vi.waitFor(
+			() => {
+				return lastFrame()?.includes('Active Sessions') ?? false;
+			},
+			{timeout: 3000},
+		);
+
+		// Enable the useInput handler (Dashboard guards on process.stdin.setRawMode)
+		const origSetRawMode = process.stdin.setRawMode;
+		process.stdin.setRawMode = vi.fn() as never;
+
+		// Do NOT call onHighlight — highlightedSession stays null
+		const dashboardHandler = capturedHandlers.inputHandlers.find(
+			handler => handler !== capturedHandlers.inputHandlers[0],
+		);
+		expect(dashboardHandler).toBeDefined();
+		dashboardHandler!(' ', makeKey());
+
+		expect(mockOnSessionAction).not.toHaveBeenCalled();
+
+		process.stdin.setRawMode = origSetRawMode;
 	});
 });
