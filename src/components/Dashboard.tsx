@@ -29,6 +29,7 @@ import {
 	calculateColumnPositions,
 	assembleSessionLabel,
 	formatRelativeDate,
+	displaySuffix,
 } from '../utils/worktreeUtils.js';
 import {
 	formatGitFileChanges,
@@ -362,7 +363,11 @@ const Dashboard: React.FC<DashboardProps> = ({
 					MAX_BRANCH_NAME_LENGTH,
 				);
 				const isMain = wt.isMainWorktree ? ' (main)' : '';
-				const baseLabel = `${entry.projectName} :: ${branchName}${isMain}${status}`;
+				const worktreeSessionCount = sessionEntries.filter(
+					e => e.worktree.path === entry.worktree.path && e.projectPath === entry.projectPath,
+				).length;
+				const sessionSuffix = displaySuffix(entry.session, worktreeSessionCount > 1);
+				const baseLabel = `${entry.projectName} :: ${branchName}${isMain}${sessionSuffix}${status}`;
 
 				let fileChanges = '';
 				let aheadBehind = '';

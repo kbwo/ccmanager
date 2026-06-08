@@ -171,7 +171,7 @@ function indexSessionsByWorktree(sessions: Session[]): {
 	return {byWorktreePath, maxAccessAt};
 }
 
-function displaySuffix(session: Session, multipleForWorktree: boolean): string {
+export function displaySuffix(session: Session, multipleForWorktree: boolean): string {
 	if (multipleForWorktree) {
 		return session.sessionName
 			? `: ${session.sessionName}`
