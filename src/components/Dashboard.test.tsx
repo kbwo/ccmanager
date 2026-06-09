@@ -654,6 +654,7 @@ describe('Dashboard', () => {
 
 		expect(lastFrame()).toContain('Controls:');
 		expect(lastFrame()).toContain('0-9 Quick Select');
+		expect(lastFrame()).toContain('Space-Session actions');
 		expect(lastFrame()).toContain('R-Refresh');
 		expect(lastFrame()).toContain('Q-Quit');
 	});

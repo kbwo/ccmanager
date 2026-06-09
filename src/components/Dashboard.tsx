@@ -721,8 +721,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select R-Refresh Q-Quit`
-							: 'Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search R-Refresh Q-Quit'}
+							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Space-Session actions (session rows only) R-Refresh Q-Quit`
+							: 'Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Space-Session actions (session rows only) R-Refresh Q-Quit'}
 				</Text>
 			</Box>
 		</Box>
