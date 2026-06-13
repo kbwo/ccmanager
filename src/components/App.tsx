@@ -858,6 +858,21 @@ const App: React.FC<AppProps> = ({
 		navigateWithClear('session');
 	};
 
+	const handleSessionActionFromDashboard = (
+		session: ISession,
+		project: GitProject,
+	) => {
+		const projectSessionManager =
+			globalSessionOrchestrator.getManagerForProject(project.path);
+		setSessionManager(projectSessionManager);
+		setWorktreeService(new WorktreeService(project.path));
+		setSessionActionsTarget({
+			session,
+			worktreePath: session.worktreePath,
+		});
+		navigateWithClear('session-actions');
+	};
+
 	const handleBackToProjectList = () => {
 		// Sessions persist in their project-specific managers
 		setSelectedProject(null);
@@ -885,6 +900,7 @@ const App: React.FC<AppProps> = ({
 				projectsDir={projectsDir}
 				onSelectSession={handleSelectSessionFromDashboard}
 				onSelectProject={handleSelectProject}
+				onSessionAction={handleSessionActionFromDashboard}
 				error={error}
 				onDismissError={() => setError(null)}
 				version={version}
