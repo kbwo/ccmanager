@@ -185,6 +185,20 @@ export class WorktreeService {
 		}
 	}
 
+	private resolveBranchReferenceEffect(
+		branchName: string,
+	): Effect.Effect<string, AmbiguousBranchError> {
+		return Effect.try({
+			try: () => this.resolveBranchReference(branchName),
+			catch: error => {
+				if (error instanceof AmbiguousBranchError) return error;
+				// resolveBranchReference only re-throws AmbiguousBranchError; all
+				// other errors are swallowed internally. This path is unreachable.
+				throw error;
+			},
+		});
+	}
+
 	/**
 	 * SYNCHRONOUS HELPER: Gets all git remotes for this repository.
 	 *
@@ -895,7 +909,7 @@ export class WorktreeService {
 		copyClaudeDirectory = false,
 	): Effect.Effect<
 		CreateWorktreeResult,
-		GitError | FileSystemError | ProcessError,
+		GitError | FileSystemError | ProcessError | AmbiguousBranchError,
 		never
 	> {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -980,12 +994,17 @@ export class WorktreeService {
 			let command: string;
 			if (localBranchExists) {
 				command = `git worktree add "${resolvedPath}" "${branch}"`;
+			} else if (baseBranch.endsWith(`/${branch}`)) {
+				// baseBranch is already a remote-tracking ref for branch
+				// (e.g. "origin/feature/x" after the user resolved an ambiguity).
+				// Use it directly to avoid re-triggering AmbiguousBranchError.
+				command = `git worktree add -b "${branch}" "${resolvedPath}" "${baseBranch}"`;
 			} else {
-				const resolvedRef = self.resolveBranchReference(branch);
+				const resolvedRef = yield* self.resolveBranchReferenceEffect(branch);
 				const isRemoteBranch = resolvedRef !== branch;
 				const startPoint = isRemoteBranch
 					? resolvedRef
-					: self.resolveBranchReference(baseBranch);
+					: yield* self.resolveBranchReferenceEffect(baseBranch);
 				command = `git worktree add -b "${branch}" "${resolvedPath}" "${startPoint}"`;
 			}
 
