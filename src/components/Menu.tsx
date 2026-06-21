@@ -21,7 +21,7 @@ import {projectManager} from '../services/projectManager.js';
 import {RecentProject} from '../types/index.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
-import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
+import {filterSessionItemsByQuery} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
@@ -212,15 +212,9 @@ const Menu: React.FC<MenuProps> = ({
 		});
 		const columnPositions = calculateColumnPositions(items);
 
-		// Filter worktrees based on search query
-		const filteredWorktrees = filterWorktreesByQuery(
-			items.map(item => item.worktree),
-			searchQuery,
-		);
-		const filteredWorktreeSet = new Set(filteredWorktrees);
-		const filteredItems = items.filter(item =>
-			filteredWorktreeSet.has(item.worktree),
-		);
+		// Filter session items based on search query, matching the name shown in
+		// the menu (branch name, " (main)", and session name) plus the path.
+		const filteredItems = filterSessionItemsByQuery(items, searchQuery);
 
 		// Build menu items with proper alignment
 		const menuItems: MenuItem[] = filteredItems.map(

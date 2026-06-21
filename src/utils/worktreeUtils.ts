@@ -20,6 +20,9 @@ export interface SessionItem {
 	worktree: Worktree;
 	session?: Session;
 	baseLabel: string;
+	// Name portion shown in the menu (branch + " (main)" + session name),
+	// without status icons or git status columns. Used for search matching.
+	searchableName: string;
 	fileChanges: string;
 	aheadBehind: string;
 	parentBranch: string;
@@ -237,6 +240,9 @@ function buildSessionItem(
 	const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
 	const isMain = wt.isMainWorktree ? ' (main)' : '';
 	const baseLabel = `${branchName}${isMain}${sessionSuffix}${status}`;
+	// Use the full (untruncated) branch name so search still matches the tail
+	// of long branch names; status icons are excluded so they don't match.
+	const searchableName = `${fullBranchName}${isMain}${sessionSuffix}`;
 	const {fileChanges, aheadBehind, parentBranch, error} = gitStatusColumns(
 		wt,
 		fullBranchName,
@@ -249,6 +255,7 @@ function buildSessionItem(
 		worktree: wt,
 		session,
 		baseLabel,
+		searchableName,
 		fileChanges,
 		aheadBehind,
 		parentBranch,
