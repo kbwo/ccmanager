@@ -290,6 +290,7 @@ describe('column alignment', () => {
 		{
 			worktree: {} as Worktree,
 			baseLabel: 'feature/test-branch',
+			searchableName: 'feature/test-branch',
 			fileChanges: '\x1b[32m+10\x1b[0m \x1b[31m-5\x1b[0m',
 			aheadBehind: '\x1b[33m↑2 ↓3\x1b[0m',
 			parentBranch: '',
@@ -305,6 +306,7 @@ describe('column alignment', () => {
 		{
 			worktree: {} as Worktree,
 			baseLabel: 'main',
+			searchableName: 'main',
 			fileChanges: '\x1b[32m+2\x1b[0m \x1b[31m-1\x1b[0m',
 			aheadBehind: '\x1b[33m↑1\x1b[0m',
 			parentBranch: '',

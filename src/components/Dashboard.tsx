@@ -386,6 +386,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 					worktree: wt,
 					session: entry.session,
 					baseLabel,
+					searchableName: `${entry.projectName} :: ${fullBranchName}${isMain}`,
 					fileChanges,
 					aheadBehind,
 					parentBranch,
