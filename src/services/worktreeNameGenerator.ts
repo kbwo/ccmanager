@@ -15,6 +15,15 @@ const JSON_SCHEMA = JSON.stringify({
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+// Generated branch names are short by construction. When `claude -p` returns
+// prose instead of a name (e.g. a refusal, or a request for an issue's
+// contents it cannot fetch), normalizing that text yields an unusually long,
+// many-segment slug. These bounds let us detect that case and reject it so the
+// caller falls back to a generated name instead of branching off a whole
+// sentence. They are also surfaced to the model in the prompt.
+const MAX_GENERATED_BRANCH_NAME_LENGTH = 60;
+const MAX_GENERATED_BRANCH_NAME_SEGMENTS = 10;
+
 const buildPrompt = (
 	userPrompt: string,
 	baseBranch: string,
@@ -25,7 +34,10 @@ Task prompt:
 ${userPrompt}
 
 Return a short git branch name using lowercase letters, numbers, hyphens, and forward slashes only.
+Use at most ${MAX_GENERATED_BRANCH_NAME_SEGMENTS} hyphen- or slash-separated words and keep it under ${MAX_GENERATED_BRANCH_NAME_LENGTH} characters.
 Do not include markdown, explanations, refs/heads/, or surrounding quotes.
+Always output a branch name. Never refuse, never ask for clarification, and never request more information or access.
+If the task prompt references context you cannot access (for example an issue number, ticket, or URL), do not mention that limitation: just produce a best-effort name from the words available in the task prompt itself.
 Examples: feature/add-prompt-mode, fix/worktree-loading-state`;
 
 const normalizeBranchName = (branchName: string): string => {
@@ -45,6 +57,19 @@ const normalizeBranchName = (branchName: string): string => {
 
 	if (!normalized) {
 		throw new Error('Generated branch name was empty');
+	}
+
+	if (normalized.length > MAX_GENERATED_BRANCH_NAME_LENGTH) {
+		throw new Error(
+			`Generated branch name was too long (${normalized.length} > ${MAX_GENERATED_BRANCH_NAME_LENGTH} chars); treating it as invalid output`,
+		);
+	}
+
+	const segmentCount = normalized.split(/[/-]/).filter(Boolean).length;
+	if (segmentCount > MAX_GENERATED_BRANCH_NAME_SEGMENTS) {
+		throw new Error(
+			`Generated branch name had too many words (${segmentCount} > ${MAX_GENERATED_BRANCH_NAME_SEGMENTS}); treating it as invalid output`,
+		);
 	}
 
 	return normalized;

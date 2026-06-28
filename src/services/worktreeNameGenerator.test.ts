@@ -39,6 +39,30 @@ describe('WorktreeNameGenerator output parsing', () => {
 
 		expect(value).toBe('fix/trim-worktree-name');
 	});
+
+	it('rejects prose refusals that overflow the length budget', () => {
+		// `claude -p` sometimes puts a refusal sentence into the branchName field
+		// instead of a name; the caller relies on this throwing to use a fallback.
+		expect(() =>
+			extractBranchNameFromOutput(
+				'{"branchName":"i can t generate an informed branch name without understanding issue 310 could you either grant permission for webfetch or paste the issue description"}',
+			),
+		).toThrow();
+	});
+
+	it('rejects names with too many words even when short', () => {
+		expect(() =>
+			extractBranchNameFromOutput('{"branchName":"a-b-c-d-e-f-g-h-i-j-k-l"}'),
+		).toThrow();
+	});
+
+	it('accepts a normal multi-word branch name', () => {
+		const value = extractBranchNameFromOutput(
+			'{"branchName":"feature/add-prompt-mode-toggle"}',
+		);
+
+		expect(value).toBe('feature/add-prompt-mode-toggle');
+	});
 });
 
 describe('deduplicateBranchName', () => {
