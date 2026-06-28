@@ -97,6 +97,25 @@ function getGitRepositoryName(projectPath: string): string {
 	}
 }
 
+/**
+ * Sanitize a branch name into the form used for a worktree directory name:
+ * slashes become dashes, characters outside [a-zA-Z0-9-_.] are stripped,
+ * leading/trailing dashes are removed, and the result is lowercased.
+ *
+ * This is the single source of truth for that mapping. It is reused both to
+ * generate worktree directories (see {@link generateWorktreeDirectory}) and to
+ * decide whether an existing directory name already conveys the branch name
+ * (see {@link formatWorktreeDirectorySuffix}), so a directory generated from a
+ * branch is reliably recognized as a match.
+ */
+export function sanitizeNameForDirectory(value: string): string {
+	return value
+		.replace(/\//g, '-') // Replace forward slashes with dashes
+		.replace(/[^a-zA-Z0-9-_.]+/g, '') // Remove special characters except dash, dot, underscore
+		.replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+		.toLowerCase(); // Convert to lowercase for consistency
+}
+
 export function generateWorktreeDirectory(
 	projectPath: string,
 	branchName: string,
@@ -113,13 +132,7 @@ export function generateWorktreeDirectory(
 		switch (name) {
 			case 'branch':
 			case 'branch-name':
-				// Sanitize branch name for filesystem
-				sanitizedBranch ??= branchName
-					.replace(/\//g, '-') // Replace forward slashes with dashes
-					.replace(/[^a-zA-Z0-9-_.]+/g, '') // Remove special characters except dash, dot, underscore
-					.replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
-					.toLowerCase(); // Convert to lowercase for consistency
-
+				sanitizedBranch ??= sanitizeNameForDirectory(branchName);
 				return sanitizedBranch;
 			case 'project':
 				projectName ??= getGitRepositoryName(projectPath);
@@ -131,17 +144,6 @@ export function generateWorktreeDirectory(
 
 	// Ensure the path is relative to the repository root
 	return path.normalize(directory);
-}
-
-// Normalize a branch name or directory name for comparison.
-// Mirrors the sanitization rules used by generateWorktreeDirectory so a
-// worktree directory generated from a branch name is recognized as a match.
-function normalizeForComparison(value: string): string {
-	return value
-		.replace(/\//g, '-')
-		.replace(/[^a-zA-Z0-9-_.]+/g, '')
-		.replace(/^-+|-+$/g, '')
-		.toLowerCase();
 }
 
 /**
@@ -163,10 +165,10 @@ export function formatWorktreeDirectorySuffix(
 	const dirName = path.basename(wt.path);
 	if (!dirName) return {displaySuffix: '', rawName: ''};
 
-	const normalizedDir = normalizeForComparison(dirName);
+	const normalizedDir = sanitizeNameForDirectory(dirName);
 	if (!normalizedDir) return {displaySuffix: '', rawName: ''};
 
-	const normalizedBranch = normalizeForComparison(fullBranchName);
+	const normalizedBranch = sanitizeNameForDirectory(fullBranchName);
 	if (normalizedDir === normalizedBranch) {
 		return {displaySuffix: '', rawName: ''};
 	}
@@ -174,7 +176,7 @@ export function formatWorktreeDirectorySuffix(
 	// Also suppress when the directory matches just the tail segment of the
 	// branch (e.g. branch "feature/foo" vs directory "foo").
 	const tail = extractBranchParts(fullBranchName).name;
-	if (tail && normalizeForComparison(tail) === normalizedDir) {
+	if (tail && sanitizeNameForDirectory(tail) === normalizedDir) {
 		return {displaySuffix: '', rawName: ''};
 	}
 
