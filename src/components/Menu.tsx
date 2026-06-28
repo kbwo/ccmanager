@@ -21,7 +21,13 @@ import {projectManager} from '../services/projectManager.js';
 import {RecentProject} from '../types/index.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
-import {filterSessionItemsByQuery} from '../utils/filterByQuery.js';
+import {
+	filterSessionItemsByQuery,
+	filterSessionItemsByState,
+	cycleSessionStateFilter,
+	getSessionStateFilterLabel,
+	SessionStateFilter,
+} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
@@ -107,6 +113,7 @@ const Menu: React.FC<MenuProps> = ({
 		Session | undefined
 	>(undefined);
 	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
+	const [stateFilter, setStateFilter] = useState<SessionStateFilter>('all');
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -213,8 +220,13 @@ const Menu: React.FC<MenuProps> = ({
 		const columnPositions = calculateColumnPositions(items);
 
 		// Filter session items based on search query, matching the name shown in
-		// the menu (branch name, " (main)", and session name) plus the path.
-		const filteredItems = filterSessionItemsByQuery(items, searchQuery);
+		// the menu (branch name, " (main)", and session name) plus the path, then
+		// narrow to the selected session state. The two filters are independent
+		// dimensions and compose: both can be active at once.
+		const filteredItems = filterSessionItemsByState(
+			filterSessionItemsByQuery(items, searchQuery),
+			stateFilter,
+		);
 
 		// Build menu items with proper alignment
 		const menuItems: MenuItem[] = filteredItems.map(
@@ -389,13 +401,14 @@ const Menu: React.FC<MenuProps> = ({
 		recentProjects,
 		searchQuery,
 		isSearchMode,
+		stateFilter,
 		autoApprovalToggleCounter,
 		sessionManager,
 		worktreeConfig.sortByLastSession,
 	]);
 
 	// Handle hotkeys
-	useInput((input, _key) => {
+	useInput((input, key) => {
 		// Skip in test environment to avoid stdin.ref error
 		if (!process.stdin.setRawMode) {
 			return;
@@ -415,6 +428,14 @@ const Menu: React.FC<MenuProps> = ({
 
 		// Don't process other keys if in search mode (handled by useSearchMode)
 		if (isSearchMode) {
+			return;
+		}
+
+		// Cycle the session-state filter: Tab forward, Shift+Tab backward.
+		if (key.tab) {
+			setStateFilter(prev =>
+				cycleSessionStateFilter(prev, key.shift ? 'prev' : 'next'),
+			);
 			return;
 		}
 
@@ -562,6 +583,29 @@ const Menu: React.FC<MenuProps> = ({
 				</Text>
 			</Box>
 
+			{/* Active filter indicators, shown directly above the list they narrow */}
+			{((searchQuery && !isSearchMode) || stateFilter !== 'all') && (
+				<Box marginBottom={1} flexDirection="column">
+					{searchQuery && !isSearchMode && (
+						<Text>
+							<Text dimColor>Filtered: </Text>
+							<Text color="cyan" bold>
+								&quot;{searchQuery}&quot;
+							</Text>
+						</Text>
+					)}
+					{stateFilter !== 'all' && (
+						<Text>
+							<Text dimColor>State filter: </Text>
+							<Text color="cyan" bold>
+								{getSessionStateFilterLabel(stateFilter)}
+							</Text>
+							<Text dimColor> (Tab to cycle, back to All clears it)</Text>
+						</Text>
+					)}
+				</Box>
+			)}
+
 			<SearchableList
 				isSearchMode={isSearchMode}
 				searchQuery={searchQuery}
@@ -622,12 +666,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Space-Session actions (session rows only) N-New M-Merge D-Delete ${
+							? `Controls: ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Tab-State Filter Space-Session actions (session rows only) N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Space-Session actions (session rows only) N-New M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Tab-State Filter Space-Session actions (session rows only) N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
