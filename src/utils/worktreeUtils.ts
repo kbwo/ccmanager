@@ -11,6 +11,7 @@ import {
 
 // Constants
 const MAX_BRANCH_NAME_LENGTH = 70; // Maximum characters for branch name display
+const MAX_WORKTREE_DIR_NAME_LENGTH = 30; // Maximum characters for the worktree directory name suffix
 const MIN_COLUMN_PADDING = 2; // Minimum spaces between columns
 
 /**
@@ -132,6 +133,55 @@ export function generateWorktreeDirectory(
 	return path.normalize(directory);
 }
 
+// Normalize a branch name or directory name for comparison.
+// Mirrors the sanitization rules used by generateWorktreeDirectory so a
+// worktree directory generated from a branch name is recognized as a match.
+function normalizeForComparison(value: string): string {
+	return value
+		.replace(/\//g, '-')
+		.replace(/[^a-zA-Z0-9-_.]+/g, '')
+		.replace(/^-+|-+$/g, '')
+		.toLowerCase();
+}
+
+/**
+ * Returns the worktree directory basename to show alongside the branch name,
+ * or an empty string when it would be redundant (main worktree, detached,
+ * or the directory name matches the branch).
+ *
+ * The visible suffix is truncated; the raw basename is also returned so
+ * callers that want to make it searchable can include it untruncated.
+ */
+export function formatWorktreeDirectorySuffix(
+	wt: Worktree,
+	fullBranchName: string,
+): {displaySuffix: string; rawName: string} {
+	if (wt.isMainWorktree) return {displaySuffix: '', rawName: ''};
+	if (!wt.branch) return {displaySuffix: '', rawName: ''};
+	if (!wt.path) return {displaySuffix: '', rawName: ''};
+
+	const dirName = path.basename(wt.path);
+	if (!dirName) return {displaySuffix: '', rawName: ''};
+
+	const normalizedDir = normalizeForComparison(dirName);
+	if (!normalizedDir) return {displaySuffix: '', rawName: ''};
+
+	const normalizedBranch = normalizeForComparison(fullBranchName);
+	if (normalizedDir === normalizedBranch) {
+		return {displaySuffix: '', rawName: ''};
+	}
+
+	// Also suppress when the directory matches just the tail segment of the
+	// branch (e.g. branch "feature/foo" vs directory "foo").
+	const tail = extractBranchParts(fullBranchName).name;
+	if (tail && normalizeForComparison(tail) === normalizedDir) {
+		return {displaySuffix: '', rawName: ''};
+	}
+
+	const visible = truncateString(dirName, MAX_WORKTREE_DIR_NAME_LENGTH);
+	return {displaySuffix: ` @ ${visible}`, rawName: dirName};
+}
+
 export function extractBranchParts(branchName: string): {
 	prefix?: string;
 	name: string;
@@ -239,10 +289,13 @@ function buildSessionItem(
 		: 'detached';
 	const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
 	const isMain = wt.isMainWorktree ? ' (main)' : '';
-	const baseLabel = `${branchName}${isMain}${sessionSuffix}${status}`;
+	const {displaySuffix: dirSuffix, rawName: rawDirName} =
+		formatWorktreeDirectorySuffix(wt, fullBranchName);
+	const baseLabel = `${branchName}${dirSuffix}${isMain}${sessionSuffix}${status}`;
 	// Use the full (untruncated) branch name so search still matches the tail
 	// of long branch names; status icons are excluded so they don't match.
-	const searchableName = `${fullBranchName}${isMain}${sessionSuffix}`;
+	const rawDirForSearch = rawDirName ? ` @ ${rawDirName}` : '';
+	const searchableName = `${fullBranchName}${rawDirForSearch}${isMain}${sessionSuffix}`;
 	const {fileChanges, aheadBehind, parentBranch, error} = gitStatusColumns(
 		wt,
 		fullBranchName,

@@ -223,8 +223,10 @@ describe('truncateString', () => {
 });
 
 describe('prepareSessionItems', () => {
+	// The directory basename here matches the sanitized branch tail so the
+	// worktree-directory suffix is suppressed in the basic baseLabel tests.
 	const mockWorktree: Worktree = {
-		path: '/path/to/worktree',
+		path: '/path/to/test-branch',
 		branch: 'feature/test-branch',
 		isMainWorktree: false,
 		hasSession: false,
@@ -233,7 +235,7 @@ describe('prepareSessionItems', () => {
 	// Simplified mock
 	const mockSession: Session = {
 		id: 'test-session',
-		worktreePath: '/path/to/worktree',
+		worktreePath: '/path/to/test-branch',
 		sessionNumber: 1,
 		command: 'claude',
 		fallbackArgs: undefined,
@@ -282,6 +284,128 @@ describe('prepareSessionItems', () => {
 		};
 		const items = prepareSessionItems([longBranch], []);
 		expect(items[0]?.baseLabel.length).toBeLessThanOrEqual(80); // 70 + status + default
+	});
+
+	describe('worktree directory suffix', () => {
+		it('shows the directory name when it differs from the branch', () => {
+			const wt: Worktree = {
+				path: '/repos/myproj/worktrees/login-api',
+				branch: 'feature/login',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([wt], []);
+			expect(items[0]?.baseLabel).toBe('feature/login @ login-api');
+		});
+
+		it('hides the directory name when the directory equals the branch tail', () => {
+			const wt: Worktree = {
+				path: '/repos/myproj/worktrees/foo',
+				branch: 'feature/foo',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([wt], []);
+			expect(items[0]?.baseLabel).toBe('feature/foo');
+		});
+
+		it('hides the directory name when it matches the sanitized full branch', () => {
+			const wt: Worktree = {
+				path: '/repos/myproj/worktrees/feature-foo',
+				branch: 'feature/foo',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([wt], []);
+			expect(items[0]?.baseLabel).toBe('feature/foo');
+		});
+
+		it('hides the directory name for the main worktree', () => {
+			const wt: Worktree = {
+				path: '/repos/myproj',
+				branch: 'main',
+				isMainWorktree: true,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([wt], []);
+			expect(items[0]?.baseLabel).toBe('main (main)');
+		});
+
+		it('truncates long directory names in the displayed label', () => {
+			const longDir =
+				'/repos/myproj/worktrees/this-is-a-very-long-directory-name-that-should-be-truncated';
+			const wt: Worktree = {
+				path: longDir,
+				branch: 'feature/short',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([wt], []);
+			// "feature/short @ " (16 chars) + up to MAX_WORKTREE_DIR_NAME_LENGTH (30)
+			const after = items[0]?.baseLabel.split(' @ ')[1] ?? '';
+			expect(after.length).toBeLessThanOrEqual(30);
+			expect(after.endsWith('...')).toBe(true);
+		});
+
+		it('keeps the untruncated directory basename in searchableName', () => {
+			const longDir =
+				'/repos/myproj/worktrees/this-is-a-very-long-directory-name-that-should-be-truncated';
+			const wt: Worktree = {
+				path: longDir,
+				branch: 'feature/short',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([wt], []);
+			expect(items[0]?.searchableName).toContain(
+				'this-is-a-very-long-directory-name-that-should-be-truncated',
+			);
+		});
+
+		it('places the directory suffix before session and status markers', () => {
+			const wt: Worktree = {
+				path: '/repos/myproj/worktrees/foo-api',
+				branch: 'feature/foo',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems(
+				[wt],
+				[
+					{
+						...mockSession,
+						worktreePath: '/repos/myproj/worktrees/foo-api',
+						sessionName: 'lab',
+					},
+				],
+			);
+			// Order must be: branch, dir suffix, (no main), session suffix, status.
+			expect(items[0]?.baseLabel).toMatch(
+				/^feature\/foo @ foo-api: lab \[.*Idle.*\]$/,
+			);
+		});
+
+		it('does not break column alignment when a dir suffix is appended', () => {
+			const items = prepareSessionItems(
+				[
+					{
+						path: '/repos/myproj/worktrees/foo-api',
+						branch: 'feature/foo',
+						isMainWorktree: false,
+						hasSession: false,
+					},
+					{
+						path: '/repos/myproj',
+						branch: 'main',
+						isMainWorktree: true,
+						hasSession: false,
+					},
+				],
+				[],
+			);
+			expect(items[0]?.lengths.base).toBe(items[0]?.baseLabel.length);
+			expect(items[1]?.lengths.base).toBe(items[1]?.baseLabel.length);
+		});
 	});
 });
 
