@@ -583,6 +583,29 @@ const Menu: React.FC<MenuProps> = ({
 				</Text>
 			</Box>
 
+			{/* Active filter indicators, shown directly above the list they narrow */}
+			{((searchQuery && !isSearchMode) || stateFilter !== 'all') && (
+				<Box marginBottom={1} flexDirection="column">
+					{searchQuery && !isSearchMode && (
+						<Text>
+							<Text dimColor>Filtered: </Text>
+							<Text color="cyan" bold>
+								&quot;{searchQuery}&quot;
+							</Text>
+						</Text>
+					)}
+					{stateFilter !== 'all' && (
+						<Text>
+							<Text dimColor>State filter: </Text>
+							<Text color="cyan" bold>
+								{getSessionStateFilterLabel(stateFilter)}
+							</Text>
+							<Text dimColor> (Tab to cycle, back to All clears it)</Text>
+						</Text>
+					)}
+				</Box>
+			)}
+
 			<SearchableList
 				isSearchMode={isSearchMode}
 				searchQuery={searchQuery}
@@ -639,20 +662,11 @@ const Menu: React.FC<MenuProps> = ({
 						</>
 					)}
 				</Text>
-				{stateFilter !== 'all' && (
-					<Text>
-						<Text dimColor>State filter: </Text>
-						<Text color="cyan" bold>
-							{getSessionStateFilterLabel(stateFilter)}
-						</Text>
-						<Text dimColor> (Tab to cycle, back to All clears it)</Text>
-					</Text>
-				)}
 				<Text dimColor>
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Filtered: "${searchQuery}" | ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Tab-State Filter Space-Session actions (session rows only) N-New M-Merge D-Delete ${
+							? `Controls: ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Tab-State Filter Space-Session actions (session rows only) N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
