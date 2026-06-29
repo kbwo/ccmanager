@@ -8,6 +8,12 @@ import {
 } from '../utils/gitStatus.js';
 import type {GitError} from '../types/errors.js';
 
+interface WorktreeStatusResult {
+	path: string;
+	statusExit: Exit.Exit<GitStatus, GitError>;
+	dateExit: Exit.Exit<Date, GitError>;
+}
+
 /**
  * Custom hook for polling git status and commit dates of worktrees with Effect-based execution
  *
@@ -15,6 +21,11 @@ import type {GitError} from '../types/errors.js';
  * using Effect.runPromiseExit and updates worktree state with results.
  * Both are fetched together so they appear at the same time.
  * Handles cancellation via AbortController.
+ *
+ * Each poll cycle fetches every worktree concurrently and commits the results in
+ * a single state update, skipping the update entirely when nothing changed. This
+ * keeps a poll cycle to at most one re-render of the consumer (the menu) instead
+ * of one per worktree, so background polling does not stutter keyboard navigation.
  *
  * @param worktrees - Array of worktrees to monitor
  * @param defaultBranch - Default branch for comparisons (null disables polling)
@@ -33,66 +44,69 @@ export function useGitStatus(
 			return;
 		}
 
-		const timeouts = new Map<string, NodeJS.Timeout>();
-		const activeRequests = new Map<string, AbortController>();
+		const activeRequests = new Set<AbortController>();
 		let isCleanedUp = false;
+		let cycleTimeout: NodeJS.Timeout | undefined;
 
 		const fetchStatus = async (
 			worktree: Worktree,
-			abortController: AbortController,
-		) => {
-			// Fetch git status and last commit date in parallel
-			const [statusExit, dateExit] = await Promise.all([
-				Effect.runPromiseExit(getGitStatusLimited(worktree.path), {
-					signal: abortController.signal,
-				}),
-				Effect.runPromiseExit(getLastCommitDateLimited(worktree.path), {
-					signal: abortController.signal,
-				}),
-			]);
+		): Promise<WorktreeStatusResult> => {
+			const abortController = new AbortController();
+			activeRequests.add(abortController);
 
-			// Update worktree state with both results at once
-			handleStatusExit(
-				statusExit,
-				dateExit,
-				worktree.path,
-				setWorktreesWithStatus,
-			);
+			try {
+				// Fetch git status and last commit date in parallel
+				const [statusExit, dateExit] = await Promise.all([
+					Effect.runPromiseExit(getGitStatusLimited(worktree.path), {
+						signal: abortController.signal,
+					}),
+					Effect.runPromiseExit(getLastCommitDateLimited(worktree.path), {
+						signal: abortController.signal,
+					}),
+				]);
+
+				return {path: worktree.path, statusExit, dateExit};
+			} finally {
+				activeRequests.delete(abortController);
+			}
 		};
 
-		const scheduleUpdate = (worktree: Worktree) => {
-			const abortController = new AbortController();
-			activeRequests.set(worktree.path, abortController);
+		const runCycle = async () => {
+			// Fetch all worktrees concurrently. The underlying Effects are already
+			// concurrency-limited, so this does not spawn an unbounded number of git
+			// subprocesses at once.
+			const results = await Promise.all(
+				worktrees.map(worktree => fetchStatus(worktree)),
+			);
 
-			fetchStatus(worktree, abortController)
-				.catch(() => {
-					// Ignore errors - the fetch failed or was aborted
-				})
-				.finally(() => {
-					const isActive = () =>
-						!isCleanedUp && !abortController.signal.aborted;
-					if (isActive()) {
-						const timeout = setTimeout(() => {
-							if (isActive()) {
-								scheduleUpdate(worktree);
-							}
-						}, updateInterval);
+			if (isCleanedUp) {
+				return;
+			}
 
-						timeouts.set(worktree.path, timeout);
+			// Apply every worktree's result in one state update so the consumer
+			// re-renders at most once per cycle.
+			applyStatusResults(results, setWorktreesWithStatus);
+
+			if (!isCleanedUp) {
+				cycleTimeout = setTimeout(() => {
+					if (!isCleanedUp) {
+						runCycle();
 					}
-				});
+				}, updateInterval);
+			}
 		};
 
 		setWorktreesWithStatus(worktrees);
 
-		// Start fetching for each worktree
-		worktrees.forEach(worktree => {
-			scheduleUpdate(worktree);
+		runCycle().catch(() => {
+			// Ignore errors - the fetch failed or was aborted
 		});
 
 		return () => {
 			isCleanedUp = true;
-			timeouts.forEach(timeout => clearTimeout(timeout));
+			if (cycleTimeout) {
+				clearTimeout(cycleTimeout);
+			}
 			activeRequests.forEach(controller => controller.abort());
 		};
 	}, [worktrees, defaultBranch, updateInterval]);
@@ -101,23 +115,56 @@ export function useGitStatus(
 }
 
 /**
- * Handle the Exit results from Effect.runPromiseExit and update worktree state
+ * Apply a cycle's worth of status results in a single state update.
  *
- * Updates both gitStatus and lastCommitDate in a single state update so they
- * appear at the same time in the UI.
+ * Builds the next worktree array by merging each result onto the matching
+ * worktree, but only when the result actually changes a field. When nothing
+ * changed, the previous array reference is returned so React skips the re-render
+ * (and any downstream items rebuild) entirely.
  *
- * @param statusExit - Exit result from git status Effect
- * @param dateExit - Exit result from commit date Effect
- * @param worktreePath - Path of the worktree being updated
+ * @param results - Per-worktree status/date Exit results for this cycle
  * @param setWorktreesWithStatus - State setter function
  */
-function handleStatusExit(
-	statusExit: Exit.Exit<GitStatus, GitError>,
-	dateExit: Exit.Exit<Date, GitError>,
-	worktreePath: string,
+function applyStatusResults(
+	results: WorktreeStatusResult[],
 	setWorktreesWithStatus: Dispatch<SetStateAction<Worktree[]>>,
 ): void {
-	// Build the update object from both results
+	const updatesByPath = new Map<string, Partial<Worktree>>();
+	for (const result of results) {
+		const update = buildStatusUpdate(result.statusExit, result.dateExit);
+		if (update) {
+			updatesByPath.set(result.path, update);
+		}
+	}
+
+	if (updatesByPath.size === 0) {
+		return;
+	}
+
+	setWorktreesWithStatus(prev => {
+		let changed = false;
+		const next = prev.map(wt => {
+			const update = updatesByPath.get(wt.path);
+			if (!update || isUpdateNoop(wt, update)) {
+				return wt;
+			}
+			changed = true;
+			return {...wt, ...update};
+		});
+		return changed ? next : prev;
+	});
+}
+
+/**
+ * Build the update object for a single worktree from its Exit results.
+ *
+ * @returns A partial worktree to merge, or null when there is nothing to update
+ *   (e.g. the status fetch was interrupted and the commit date failed).
+ */
+function buildStatusUpdate(
+	statusExit: Exit.Exit<GitStatus, GitError>,
+	dateExit: Exit.Exit<Date, GitError>,
+): Partial<Worktree> | null {
 	const update: Partial<Worktree> = {};
 	let hasUpdate = false;
 
@@ -128,9 +175,8 @@ function handleStatusExit(
 	} else if (Exit.isFailure(statusExit)) {
 		const failure = Cause.failureOption(statusExit.cause);
 		if (Option.isSome(failure)) {
-			const gitError = failure.value;
 			update.gitStatus = undefined;
-			update.gitStatusError = formatGitError(gitError);
+			update.gitStatusError = formatGitError(failure.value);
 			hasUpdate = true;
 		}
 	}
@@ -141,11 +187,50 @@ function handleStatusExit(
 	}
 	// Silently ignore commit date errors (e.g., empty repo)
 
-	if (hasUpdate) {
-		setWorktreesWithStatus(prev =>
-			prev.map(wt => (wt.path === worktreePath ? {...wt, ...update} : wt)),
-		);
+	return hasUpdate ? update : null;
+}
+
+/**
+ * Determine whether applying `update` to `wt` would change any field, so that
+ * no-op updates can be dropped before they trigger a re-render.
+ */
+function isUpdateNoop(wt: Worktree, update: Partial<Worktree>): boolean {
+	if (
+		'gitStatus' in update &&
+		!isSameGitStatus(wt.gitStatus, update.gitStatus)
+	) {
+		return false;
 	}
+	if (
+		'gitStatusError' in update &&
+		wt.gitStatusError !== update.gitStatusError
+	) {
+		return false;
+	}
+	if ('lastCommitDate' in update) {
+		const prevTime = wt.lastCommitDate?.getTime();
+		const nextTime = update.lastCommitDate?.getTime();
+		if (prevTime !== nextTime) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function isSameGitStatus(a?: GitStatus, b?: GitStatus): boolean {
+	if (a === b) {
+		return true;
+	}
+	if (!a || !b) {
+		return false;
+	}
+	return (
+		a.filesAdded === b.filesAdded &&
+		a.filesDeleted === b.filesDeleted &&
+		a.aheadCount === b.aheadCount &&
+		a.behindCount === b.behindCount &&
+		a.parentBranch === b.parentBranch
+	);
 }
 
 /**
