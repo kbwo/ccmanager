@@ -14,6 +14,68 @@ interface WorktreeStatusResult {
 	dateExit: Exit.Exit<Date, GitError>;
 }
 
+interface CachedStatus {
+	gitStatus?: GitStatus;
+	gitStatusError?: string;
+	lastCommitDate?: Date;
+}
+
+/**
+ * Module-level cache of the last fetched git status, keyed by worktree path.
+ *
+ * The menu is fully unmounted and remounted on every return to it (App renders
+ * `<Menu key={menuKey} />`, and the key changes on navigation), which would
+ * otherwise wipe this hook's state and force every worktree to flash
+ * "[fetching...]" and refetch from scratch each time. Seeding state from this
+ * cache shows each worktree's last known status instantly; background polling
+ * still refreshes it. Entries are intentionally not pruned so switching between
+ * projects keeps each project's cached status.
+ */
+const statusCache = new Map<string, CachedStatus>();
+
+/** Clear the module-level git-status cache. Intended for tests. */
+export function clearGitStatusCache(): void {
+	statusCache.clear();
+}
+
+/**
+ * Merge any cached status onto the given worktrees so a remount can show the
+ * last known status immediately instead of "[fetching...]". Returns the same
+ * array reference when nothing was cached, so React can skip a re-render.
+ */
+function hydrateFromCache(worktrees: Worktree[]): Worktree[] {
+	let changed = false;
+	const next = worktrees.map(wt => {
+		const cached = statusCache.get(wt.path);
+		if (!cached) {
+			return wt;
+		}
+		changed = true;
+		return {
+			...wt,
+			gitStatus: cached.gitStatus,
+			gitStatusError: cached.gitStatusError,
+			lastCommitDate: cached.lastCommitDate,
+		};
+	});
+	return changed ? next : worktrees;
+}
+
+/** Record a worktree's latest status update into the module-level cache. */
+function cacheStatusUpdate(path: string, update: Partial<Worktree>): void {
+	const next: CachedStatus = {...statusCache.get(path)};
+	if ('gitStatus' in update) {
+		next.gitStatus = update.gitStatus;
+	}
+	if ('gitStatusError' in update) {
+		next.gitStatusError = update.gitStatusError;
+	}
+	if ('lastCommitDate' in update) {
+		next.lastCommitDate = update.lastCommitDate;
+	}
+	statusCache.set(path, next);
+}
+
 /**
  * Custom hook for polling git status and commit dates of worktrees with Effect-based execution
  *
@@ -37,7 +99,9 @@ export function useGitStatus(
 	defaultBranch: string | null,
 	updateInterval = 5000,
 ): Worktree[] {
-	const [worktreesWithStatus, setWorktreesWithStatus] = useState(worktrees);
+	const [worktreesWithStatus, setWorktreesWithStatus] = useState(() =>
+		hydrateFromCache(worktrees),
+	);
 
 	useEffect(() => {
 		if (!defaultBranch) {
@@ -96,7 +160,7 @@ export function useGitStatus(
 			}
 		};
 
-		setWorktreesWithStatus(worktrees);
+		setWorktreesWithStatus(hydrateFromCache(worktrees));
 
 		runCycle().catch(() => {
 			// Ignore errors - the fetch failed or was aborted
@@ -134,6 +198,7 @@ function applyStatusResults(
 		const update = buildStatusUpdate(result.statusExit, result.dateExit);
 		if (update) {
 			updatesByPath.set(result.path, update);
+			cacheStatusUpdate(result.path, update);
 		}
 	}
 

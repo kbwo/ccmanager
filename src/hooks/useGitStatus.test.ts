@@ -3,7 +3,7 @@ import React from 'react';
 import {render, cleanup} from 'ink-testing-library';
 import {Text} from 'ink';
 import {Effect, Exit} from 'effect';
-import {useGitStatus} from './useGitStatus.js';
+import {useGitStatus, clearGitStatusCache} from './useGitStatus.js';
 import type {Worktree} from '../types/index.js';
 import {
 	getGitStatusLimited,
@@ -41,6 +41,9 @@ describe('useGitStatus', () => {
 
 	beforeEach(() => {
 		vi.useFakeTimers();
+		// The status cache is module-level and persists across tests; clear it so
+		// each test starts from a cold cache.
+		clearGitStatusCache();
 		mockGetGitStatus.mockClear();
 		mockGetLastCommitDate.mockClear();
 		// Default: return a date for all worktrees
@@ -87,6 +90,31 @@ describe('useGitStatus', () => {
 		// Should have correct status for each worktree
 		expect(hookResult[0]?.gitStatus).toEqual(gitStatus1);
 		expect(hookResult[1]?.gitStatus).toEqual(gitStatus2);
+	});
+
+	it('should hydrate from cache on remount so status shows immediately', async () => {
+		const worktrees = [createWorktree('/path1')];
+		const gitStatus1 = createGitStatus(7, 2);
+		mockGetGitStatus.mockReturnValue(Effect.succeed(gitStatus1));
+
+		let hookResult: Worktree[] = [];
+		const TestComponent = () => {
+			hookResult = useGitStatus(worktrees, 'main', 100);
+			return React.createElement(Text, null, 'test');
+		};
+
+		// First mount: fetch populates the module-level cache.
+		const first = render(React.createElement(TestComponent));
+		await vi.waitFor(() => {
+			expect(hookResult[0]?.gitStatus).toEqual(gitStatus1);
+		});
+		first.unmount();
+
+		// Remount: cached status must be present on the very first render, before
+		// any new fetch resolves, so the menu does not flash "[fetching...]".
+		hookResult = [];
+		render(React.createElement(TestComponent));
+		expect(hookResult[0]?.gitStatus).toEqual(gitStatus1);
 	});
 
 	it('should handle empty worktree array', () => {
