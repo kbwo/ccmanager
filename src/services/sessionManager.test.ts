@@ -1328,7 +1328,7 @@ describe('SessionManager', () => {
 			expect(session.restoreScrollbackBaseLine).toBe(0);
 		});
 
-		it('should skip scrollback that grows during cursor-addressed redraws', async () => {
+		it('should keep scrollback that grows during cursor-addressed redraws', async () => {
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
@@ -1349,47 +1349,7 @@ describe('SessionManager', () => {
 
 			mockPty.emit('data', '\x1b[Hredrawn status\n');
 
-			expect(session.restoreScrollbackBaseLine).toBe(12);
-		});
-
-		it('should keep cursor-addressed redraw tracking active for a short quiet window', async () => {
-			vi.useFakeTimers();
-			try {
-				vi.mocked(configReader.getDefaultPreset).mockReturnValue({
-					id: '1',
-					name: 'Main',
-					command: 'claude',
-				});
-				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
-
-				const session = await Effect.runPromise(
-					sessionManager.createSessionWithPresetEffect('/test/worktree'),
-				);
-				const normalBuffer = session.terminal.buffer.normal as unknown as {
-					baseY: number;
-				};
-				normalBuffer.baseY = 10;
-				vi.mocked(session.terminal.write).mockImplementation(() => {
-					if (normalBuffer.baseY === 10) {
-						return;
-					}
-					normalBuffer.baseY++;
-				});
-
-				mockPty.emit('data', '\x1b[Hredraw frame');
-				normalBuffer.baseY = 11;
-				mockPty.emit('data', 'plain continuation that scrolls');
-
-				expect(session.restoreScrollbackBaseLine).toBe(12);
-
-				vi.advanceTimersByTime(501);
-				normalBuffer.baseY = 20;
-				mockPty.emit('data', 'ordinary output after quiet window');
-
-				expect(session.restoreScrollbackBaseLine).toBe(12);
-			} finally {
-				vi.useRealTimers();
-			}
+			expect(session.restoreScrollbackBaseLine).toBe(0);
 		});
 
 		it('should flush live session data after the restore snapshot completes', async () => {
@@ -1564,7 +1524,7 @@ describe('SessionManager', () => {
 			}
 		});
 
-		it('should advance the restore baseline when transitioning out of busy', async () => {
+		it('should retain the restore baseline when transitioning out of busy', async () => {
 			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
 				id: '1',
 				name: 'Main',
@@ -1585,31 +1545,6 @@ describe('SessionManager', () => {
 				}
 			).updateSessionState.bind(sessionManager);
 			await updateState(session, 'idle');
-
-			expect(session.restoreScrollbackBaseLine).toBe(42);
-		});
-
-		it('should not advance the restore baseline on transitions that do not leave busy', async () => {
-			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
-				id: '1',
-				name: 'Main',
-				command: 'claude',
-			});
-			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
-
-			const session = await Effect.runPromise(
-				sessionManager.createSessionWithPresetEffect('/test/worktree'),
-			);
-			(session.terminal.buffer.normal as unknown as {baseY: number}).baseY = 42;
-			session.restoreScrollbackBaseLine = 5;
-			await session.stateMutex.update(data => ({...data, state: 'idle'}));
-
-			const updateState = (
-				sessionManager as unknown as {
-					updateSessionState: (s: Session, next: SessionState) => Promise<void>;
-				}
-			).updateSessionState.bind(sessionManager);
-			await updateState(session, 'busy');
 
 			expect(session.restoreScrollbackBaseLine).toBe(5);
 		});
