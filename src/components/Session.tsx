@@ -88,8 +88,14 @@ const Session: React.FC<SessionProps> = ({
 
 		stdin.on('data', handleStdinData);
 
-		// Clear screen when entering session
-		stdout.write('\x1B[2J\x1B[H');
+		// Clear the viewport and the host terminal's scrollback (\x1b[3J) when
+		// entering a session. The restore snapshot then rebuilds the whole
+		// canvas — scrollback included — from this session's headless buffer,
+		// so content left behind by the menu or other sessions can never
+		// appear when the user scrolls up. \x1b[2J runs first because some
+		// emulators (e.g. xterm.js-based ones) push the erased viewport into
+		// scrollback, which \x1b[3J must then discard.
+		stdout.write('\x1B[2J\x1B[3J\x1B[H');
 
 		// Restore the current terminal state from the headless xterm snapshot.
 		// The xterm serialize addon relies on auto-wrap (DECAWM) being enabled
