@@ -19,6 +19,7 @@ import type {
 	DevcontainerConfig,
 	MenuAction,
 } from '../types/index.js';
+import type {MenuSnapshot} from './Menu.js';
 import {ENV_VARS} from '../constants/env.js';
 import {ProcessError} from '../types/errors.js';
 
@@ -27,6 +28,8 @@ type AppComponent = typeof import('./App.js').default;
 type MenuMockProps = {
 	onMenuAction: (action: MenuAction) => void | Promise<void>;
 	onSelectRecentProject?: (project: GitProject) => void | Promise<void>;
+	initialSnapshot?: MenuSnapshot;
+	onSnapshotChange?: (snapshot: MenuSnapshot) => void;
 	error?: string | null;
 };
 
@@ -311,6 +314,67 @@ describe('App component view state', () => {
 });
 
 describe('App component loading state machine', () => {
+	it('updates the cached worktree snapshot after creating and deleting worktrees', async () => {
+		const {unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		menuProps!.onSnapshotChange?.({
+			worktrees: [
+				{
+					path: '/tmp/existing',
+					branch: 'existing',
+					isMainWorktree: true,
+					hasSession: false,
+				},
+			],
+			defaultBranch: 'main',
+		});
+		await flush();
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'newWorktree'}));
+		await waitForCondition(() => Boolean(newWorktreeProps));
+		await Promise.resolve(
+			newWorktreeProps!.onComplete({
+				creationMode: 'manual',
+				path: '/tmp/created',
+				branch: 'created',
+				baseBranch: 'main',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			}),
+		);
+		await waitForCondition(() =>
+			Boolean(
+				menuProps?.initialSnapshot?.worktrees.some(
+					worktree => worktree.path === '/tmp/created',
+				),
+			),
+		);
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'deleteWorktree'}));
+		await waitForCondition(() => Boolean(deleteWorktreeProps));
+		await Promise.resolve(
+			deleteWorktreeProps!.onComplete(['/tmp/created'], true),
+		);
+		await waitForCondition(
+			() =>
+				!menuProps?.initialSnapshot?.worktrees.some(
+					worktree => worktree.path === '/tmp/created',
+				),
+		);
+
+		expect(menuProps?.initialSnapshot?.worktrees).toEqual([
+			{
+				path: '/tmp/existing',
+				branch: 'existing',
+				isMainWorktree: true,
+				hasSession: false,
+			},
+		]);
+
+		unmount();
+	});
+
 	it('displays copying message while creating a worktree with session data', async () => {
 		let resolveWorktree: (() => void) | undefined;
 

@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useCallback} from 'react';
 import {useApp, useInput, Box, Text} from 'ink';
 import {Effect} from 'effect';
-import Menu from './Menu.js';
+import Menu, {type MenuSnapshot} from './Menu.js';
 import Dashboard from './Dashboard.js';
 import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
@@ -84,6 +84,9 @@ const App: React.FC<AppProps> = ({
 		null,
 	);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
+	const [menuSnapshots, setMenuSnapshots] = useState<
+		Record<string, MenuSnapshot>
+	>({});
 
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
@@ -129,6 +132,34 @@ const App: React.FC<AppProps> = ({
 	// State for streaming devcontainer up logs
 	const [devcontainerLogs, setDevcontainerLogs] = useState<string[]>([]);
 	const [canReturnFromHookError, setCanReturnFromHookError] = useState(false);
+	const menuSnapshotKey = selectedProject?.path ?? process.cwd();
+
+	const handleMenuSnapshotChange = useCallback(
+		(snapshot: MenuSnapshot) => {
+			setMenuSnapshots(previous => ({
+				...previous,
+				[menuSnapshotKey]: snapshot,
+			}));
+		},
+		[menuSnapshotKey],
+	);
+
+	const updateMenuSnapshot = useCallback(
+		(update: (snapshot: MenuSnapshot) => MenuSnapshot) => {
+			setMenuSnapshots(previous => {
+				const current = previous[menuSnapshotKey];
+				if (!current) {
+					return previous;
+				}
+
+				return {
+					...previous,
+					[menuSnapshotKey]: update(current),
+				};
+			});
+		},
+		[menuSnapshotKey],
+	);
 
 	useEffect(() => {
 		if (view !== 'worktree-hook-error') {
@@ -393,6 +424,21 @@ const App: React.FC<AppProps> = ({
 		},
 	) => {
 		if (result.success) {
+			updateMenuSnapshot(snapshot => ({
+				...snapshot,
+				worktrees: [
+					...snapshot.worktrees.filter(
+						worktree => worktree.path !== creationData.path,
+					),
+					{
+						path: creationData.path,
+						branch: creationData.branch,
+						isMainWorktree: false,
+						hasSession: false,
+					},
+				],
+			}));
+
 			if (result.warning) {
 				setError(null);
 				setWorktreeHookError(result.warning);
@@ -789,6 +835,13 @@ const App: React.FC<AppProps> = ({
 		}
 
 		if (!hasError) {
+			const deletedPaths = new Set(worktreePaths);
+			updateMenuSnapshot(snapshot => ({
+				...snapshot,
+				worktrees: snapshot.worktrees.filter(
+					worktree => !deletedPaths.has(worktree.path),
+				),
+			}));
 			// Success - return to menu
 			handleReturnToMenu();
 		} else {
@@ -891,6 +944,8 @@ const App: React.FC<AppProps> = ({
 				key={menuKey}
 				sessionManager={sessionManager}
 				worktreeService={worktreeService}
+				initialSnapshot={menuSnapshots[menuSnapshotKey]}
+				onSnapshotChange={handleMenuSnapshotChange}
 				onMenuAction={handleMenuAction}
 				onSelectRecentProject={handleSelectProject}
 				error={error}

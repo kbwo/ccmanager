@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
@@ -35,6 +35,8 @@ import {configReader} from '../services/config/configReader.js';
 interface MenuProps {
 	sessionManager: SessionManager;
 	worktreeService: WorktreeService;
+	initialSnapshot?: MenuSnapshot;
+	onSnapshotChange?: (snapshot: MenuSnapshot) => void;
 	onMenuAction: (action: MenuAction) => void;
 	onSelectRecentProject?: (project: GitProject) => void;
 	error?: string | null;
@@ -42,6 +44,12 @@ interface MenuProps {
 	projectName?: string;
 	multiProject?: boolean;
 	version: string;
+}
+
+export interface MenuSnapshot {
+	worktrees: Worktree[];
+	defaultBranch: string | null;
+	loadError?: string | null;
 }
 
 interface CommonItem {
@@ -91,6 +99,8 @@ const formatGitError = (error: GitError): string => {
 const Menu: React.FC<MenuProps> = ({
 	sessionManager,
 	worktreeService,
+	initialSnapshot,
+	onSnapshotChange,
 	onMenuAction,
 	onSelectRecentProject,
 	error,
@@ -99,9 +109,20 @@ const Menu: React.FC<MenuProps> = ({
 	multiProject = false,
 	version,
 }) => {
-	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>([]);
-	const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
-	const [loadError, setLoadError] = useState<string | null>(null);
+	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>(
+		() => initialSnapshot?.worktrees ?? [],
+	);
+	const [defaultBranch, setDefaultBranch] = useState<string | null>(
+		() => initialSnapshot?.defaultBranch ?? null,
+	);
+	const [loadError, setLoadError] = useState<string | null>(
+		() => initialSnapshot?.loadError ?? null,
+	);
+	const snapshotRef = useRef<MenuSnapshot>({
+		worktrees: initialSnapshot?.worktrees ?? [],
+		defaultBranch: initialSnapshot?.defaultBranch ?? null,
+		loadError: initialSnapshot?.loadError ?? null,
+	});
 	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [items, setItems] = useState<MenuItem[]>([]);
@@ -132,15 +153,14 @@ const Menu: React.FC<MenuProps> = ({
 	useEffect(() => {
 		let cancelled = false;
 
-		// Load worktrees and default branch using Effect composition
-		// Chain getWorktreesEffect and getDefaultBranchEffect using Effect.flatMap
-		const loadWorktreesAndBranch = Effect.flatMap(
-			worktreeService.getWorktreesEffect(),
-			worktrees =>
-				Effect.map(worktreeService.getDefaultBranchEffect(), defaultBranch => ({
-					worktrees,
-					defaultBranch,
-				})),
+		// These operations are independent. Run them concurrently so the initial
+		// menu load waits only for the slower command.
+		const loadWorktreesAndBranch = Effect.all(
+			{
+				worktrees: worktreeService.getWorktreesEffect(),
+				defaultBranch: worktreeService.getDefaultBranchEffect(),
+			},
+			{concurrency: 'unbounded'},
 		);
 
 		Effect.runPromise(
@@ -171,16 +191,37 @@ const Menu: React.FC<MenuProps> = ({
 						setBaseWorktrees(result.worktrees);
 						setDefaultBranch(result.defaultBranch);
 						setLoadError(null);
+						const snapshot = {
+							worktrees: result.worktrees,
+							defaultBranch: result.defaultBranch,
+							loadError: null,
+						};
+						snapshotRef.current = snapshot;
+						onSnapshotChange?.(snapshot);
 					} else {
 						// Handle GitError with pattern matching
-						setLoadError(formatGitError(result.error));
+						const loadError = formatGitError(result.error);
+						setLoadError(loadError);
+						const snapshot = {
+							...snapshotRef.current,
+							loadError,
+						};
+						snapshotRef.current = snapshot;
+						onSnapshotChange?.(snapshot);
 					}
 				}
 			})
 			.catch((err: unknown) => {
 				// This catch should not normally be reached with Effect.match
 				if (!cancelled) {
-					setLoadError(String(err));
+					const loadError = String(err);
+					setLoadError(loadError);
+					const snapshot = {
+						...snapshotRef.current,
+						loadError,
+					};
+					snapshotRef.current = snapshot;
+					onSnapshotChange?.(snapshot);
 				}
 			});
 
@@ -210,7 +251,7 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager, worktreeService, multiProject]);
+	}, [sessionManager, worktreeService, multiProject, onSnapshotChange]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout

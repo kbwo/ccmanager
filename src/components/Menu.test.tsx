@@ -276,6 +276,115 @@ describe('Menu component Effect-based error handling', () => {
 		expect(getWorktreesSpy).toHaveBeenCalled();
 		expect(getDefaultBranchSpy).toHaveBeenCalled();
 	});
+
+	it('should render a cached snapshot before its background refresh completes', async () => {
+		const {Effect} = await import('effect');
+		const cachedWorktree = {
+			path: '/test/cached',
+			branch: 'cached-branch',
+			isMainWorktree: true,
+			hasSession: false,
+		};
+		const refreshedWorktree = {
+			path: '/test/refreshed',
+			branch: 'refreshed-branch',
+			isMainWorktree: true,
+			hasSession: false,
+		};
+		let resolveWorktrees: (worktrees: (typeof refreshedWorktree)[]) => void;
+		const worktreesPromise = new Promise<(typeof refreshedWorktree)[]>(
+			resolve => {
+				resolveWorktrees = resolve;
+			},
+		);
+		const onSnapshotChange = vi.fn();
+
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.promise(() => worktreesPromise),
+		);
+		const getDefaultBranchSpy = vi
+			.spyOn(worktreeService, 'getDefaultBranchEffect')
+			.mockReturnValue(Effect.succeed('main'));
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				initialSnapshot={{
+					worktrees: [cachedWorktree],
+					defaultBranch: 'main',
+				}}
+				onSnapshotChange={onSnapshotChange}
+				onMenuAction={vi.fn()}
+				version="test"
+			/>,
+		);
+
+		// The cached rows are assembled in Menu's render effect, without waiting
+		// for the deferred Git refresh.
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(lastFrame()).toContain('cached-branch');
+		expect(getDefaultBranchSpy).toHaveBeenCalled();
+
+		resolveWorktrees!([refreshedWorktree]);
+		await new Promise(resolve => setTimeout(resolve, 20));
+
+		expect(lastFrame()).toContain('refreshed-branch');
+		expect(onSnapshotChange).toHaveBeenCalledWith({
+			worktrees: [refreshedWorktree],
+			defaultBranch: 'main',
+			loadError: null,
+		});
+	});
+
+	it('should retain cached worktrees when a background refresh fails', async () => {
+		const {Effect} = await import('effect');
+		const {GitError} = await import('../types/errors.js');
+		const cachedWorktree = {
+			path: '/test/cached',
+			branch: 'cached-branch',
+			isMainWorktree: true,
+			hasSession: false,
+		};
+		const onSnapshotChange = vi.fn();
+
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.fail(
+				new GitError({
+					command: 'git worktree list --porcelain',
+					exitCode: 1,
+					stderr: 'temporary failure',
+				}),
+			),
+		);
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
+		);
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				initialSnapshot={{
+					worktrees: [cachedWorktree],
+					defaultBranch: 'main',
+				}}
+				onSnapshotChange={onSnapshotChange}
+				onMenuAction={vi.fn()}
+				version="test"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 20));
+
+		expect(lastFrame()).toContain('cached-branch');
+		expect(lastFrame()).toContain('temporary failure');
+		expect(onSnapshotChange).toHaveBeenCalledWith({
+			worktrees: [cachedWorktree],
+			defaultBranch: 'main',
+			loadError: expect.stringContaining('temporary failure'),
+		});
+	});
 });
 
 describe('Menu component rendering', () => {
