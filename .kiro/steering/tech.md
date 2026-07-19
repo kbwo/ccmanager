@@ -74,8 +74,8 @@ npm install                     # Local development setup
 
 ### Development
 ```bash
-npm run dev                     # Watch mode with auto-rebuild
-npm run build                   # Compile TypeScript to dist/
+bun run dev                     # Watch mode with auto-rebuild
+bun run build                   # Compile TypeScript to dist/
 npm start                       # Run compiled application
 node dist/cli.js                # Direct execution
 ```
@@ -83,15 +83,15 @@ node dist/cli.js                # Direct execution
 ### Testing & Quality
 ```bash
 npm test                        # Run tests in watch mode
-npm run test                # Single test run
-npm run lint                    # Run ESLint
-npm run lint:fix                # Auto-fix linting issues
-npm run typecheck               # TypeScript type checking
+bun run test                # Single test run
+bun run lint                    # Run ESLint
+bun run lint:fix                # Auto-fix linting issues
+bun run typecheck               # TypeScript type checking
 ```
 
 ### Distribution
 ```bash
-npm run prepublishOnly          # Pre-publish checks (lint, typecheck, test, build)
+bun run prepublishOnly          # Pre-publish checks (lint, typecheck, test, build)
 npx ccmanager                   # Run without installation
 ```
 

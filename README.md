@@ -54,7 +54,7 @@ npm install -g ccmanager
 
 ```bash
 npm install
-npm run build
+bun run build
 npm start
 ```
 
@@ -353,17 +353,17 @@ For complete setup instructions and troubleshooting, see [docs/git-worktree-conf
 npm install
 
 # Run in development mode
-npm run dev
+bun run dev
 
 # Build
-npm run build
+bun run build
 
 # Run tests
 npm test
 
 # Run linter
-npm run lint
+bun run lint
 
 # Run type checker
-npm run typecheck
+bun run typecheck
 ```
