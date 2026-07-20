@@ -327,9 +327,10 @@ describe('Menu component Effect-based error handling', () => {
 		expect(getDefaultBranchSpy).toHaveBeenCalled();
 
 		resolveWorktrees!([refreshedWorktree]);
-		await new Promise(resolve => setTimeout(resolve, 20));
 
-		expect(lastFrame()).toContain('refreshed-branch');
+		await vi.waitFor(() => {
+			expect(lastFrame()).toContain('refreshed-branch');
+		});
 		expect(onSnapshotChange).toHaveBeenCalledWith({
 			worktrees: [refreshedWorktree],
 			defaultBranch: 'main',
