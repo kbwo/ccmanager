@@ -32,6 +32,7 @@ const createStrategyItems = (): {
 		cline: {label: 'Cline', value: 'cline'},
 		opencode: {label: 'OpenCode', value: 'opencode'},
 		kimi: {label: 'Kimi', value: 'kimi'},
+		shell: {label: 'Shell (no agent detection)', value: 'shell'},
 	};
 
 	return Object.values(strategies);
@@ -50,6 +51,7 @@ const DEFAULT_COMMANDS: Record<StateDetectionStrategy, string> = {
 	cline: 'cline',
 	opencode: 'opencode',
 	kimi: 'kimi',
+	shell: 'bash',
 };
 
 interface ConfigureCommandProps {
@@ -81,6 +83,8 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 			return 'OpenCode';
 		case 'kimi':
 			return 'Kimi';
+		case 'shell':
+			return 'Shell';
 		default:
 			return 'Claude';
 	}

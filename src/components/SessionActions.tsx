@@ -2,7 +2,7 @@ import React from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 
-export type SessionActionType = 'newSession' | 'rename' | 'kill';
+export type SessionActionType = 'newSession' | 'openShell' | 'rename' | 'kill';
 
 interface SessionActionsProps {
 	sessionLabel: string;
@@ -12,6 +12,7 @@ interface SessionActionsProps {
 
 const items: Array<{label: string; value: SessionActionType}> = [
 	{label: 'S  New session in same directory', value: 'newSession'},
+	{label: 'O  Open shell in this directory', value: 'openShell'},
 	{label: 'R  Rename this session', value: 'rename'},
 	{label: 'X  Close session', value: 'kill'},
 ];
@@ -30,6 +31,9 @@ const SessionActions: React.FC<SessionActionsProps> = ({
 		switch (input.toLowerCase()) {
 			case 's':
 				onSelect('newSession');
+				break;
+			case 'o':
+				onSelect('openShell');
 				break;
 			case 'r':
 				onSelect('rename');
@@ -52,7 +56,7 @@ const SessionActions: React.FC<SessionActionsProps> = ({
 				<SelectInput items={items} onSelect={item => onSelect(item.value)} />
 			</Box>
 			<Box marginTop={1}>
-				<Text dimColor>S/R/X or arrow keys + Enter | Escape to cancel</Text>
+				<Text dimColor>S/O/R/X or arrow keys + Enter | Escape to cancel</Text>
 			</Box>
 		</Box>
 	);

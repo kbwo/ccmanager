@@ -1111,6 +1111,21 @@ const App: React.FC<AppProps> = ({
 						{forceNew: true},
 					);
 					return;
+				case 'openShell':
+					setView('creating-session');
+					try {
+						const shellSession =
+							await sessionManager.createShellSession(worktreePath);
+						navigateToSession(shellSession);
+					} catch (err) {
+						setError(
+							`Failed to open shell: ${
+								err instanceof Error ? err.message : String(err)
+							}`,
+						);
+						navigateWithClear('menu');
+					}
+					return;
 				case 'rename':
 					setRenameTarget({
 						id: targetSession.id,

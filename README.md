@@ -14,6 +14,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Switch between sessions seamlessly
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
+- Open a plain shell in a worktree's directory (Session Actions → `O`)
 - **Copy Claude Code session data** between worktrees to maintain conversation context
 - Configurable keyboard shortcuts
 - Command presets with automatic fallback support

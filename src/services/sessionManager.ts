@@ -566,6 +566,29 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		});
 	}
 
+	/**
+	 * Create a plain shell session in the given worktree directory.
+	 *
+	 * Unlike agent sessions, this spawns the user's login shell (`$SHELL`, or
+	 * `/bin/sh` as a fallback) with no arguments and uses the always-idle
+	 * 'shell' detection strategy. It coexists with any agent session already
+	 * running in the same worktree.
+	 *
+	 * @param {string} worktreePath - Path to the worktree
+	 * @returns {Promise<Session>} The created shell session
+	 */
+	async createShellSession(worktreePath: string): Promise<Session> {
+		const shell = process.env['SHELL'] ?? '/bin/sh';
+		const ptyProcess = await this.spawn(shell, [], worktreePath);
+
+		return this.createSessionInternal(worktreePath, ptyProcess, {
+			isPrimaryCommand: false,
+			command: shell,
+			presetName: 'Shell',
+			detectionStrategy: 'shell',
+		});
+	}
+
 	private setupDataHandler(session: Session): void {
 		// This handler always runs for all data
 		session.process.onData((data: string) => {
