@@ -3,7 +3,22 @@ import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {useConfigEditor} from '../contexts/ConfigEditorContext.js';
 import {shortcutManager} from '../services/shortcutManager.js';
-import {DEFAULT_TIMEOUT_SECONDS} from '../constants/autoApproval.js';
+import {
+	DEFAULT_AUTO_APPROVAL_VERIFIER,
+	DEFAULT_MINIMAX_MODEL,
+	DEFAULT_MINIMAX_PROTOCOL,
+	DEFAULT_MINIMAX_REGION,
+	DEFAULT_TIMEOUT_SECONDS,
+	MINIMAX_MODELS,
+	MINIMAX_PROTOCOLS,
+	MINIMAX_REGIONS,
+} from '../constants/autoApproval.js';
+import type {
+	AutoApprovalVerifier,
+	MiniMaxModel,
+	MiniMaxProtocol,
+	MiniMaxRegion,
+} from '../types/index.js';
 import ConfigureCustomCommand from './ConfigureCustomCommand.js';
 import ConfigureTimeout from './ConfigureTimeout.js';
 import CustomCommandSummary from './CustomCommandSummary.js';
@@ -18,6 +33,11 @@ interface MenuItem {
 }
 
 type OtherView = 'main' | 'customCommand' | 'timeout';
+
+const nextValue = <T,>(values: readonly T[], value: T): T => {
+	const index = values.indexOf(value);
+	return values[(index + 1) % values.length]!;
+};
 
 const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	const configEditor = useConfigEditor();
@@ -37,6 +57,18 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 		autoApprovalConfig.timeout ?? DEFAULT_TIMEOUT_SECONDS,
 	);
 	const [timeoutDraft, setTimeoutDraft] = useState(timeout);
+	const [verifier, setVerifier] = useState<AutoApprovalVerifier>(
+		autoApprovalConfig.verifier ?? DEFAULT_AUTO_APPROVAL_VERIFIER,
+	);
+	const [minimaxModel, setMinimaxModel] = useState<MiniMaxModel>(
+		autoApprovalConfig.minimaxModel ?? DEFAULT_MINIMAX_MODEL,
+	);
+	const [minimaxRegion, setMinimaxRegion] = useState<MiniMaxRegion>(
+		autoApprovalConfig.minimaxRegion ?? DEFAULT_MINIMAX_REGION,
+	);
+	const [minimaxProtocol, setMinimaxProtocol] = useState<MiniMaxProtocol>(
+		autoApprovalConfig.minimaxProtocol ?? DEFAULT_MINIMAX_PROTOCOL,
+	);
 	// Show if inheriting from global (for project scope)
 	const isInheriting =
 		scope === 'project' && !configEditor.hasProjectOverride('autoApproval');
@@ -58,6 +90,26 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 	});
 
 	const menuItems: MenuItem[] = [
+		{
+			label: `Verifier: ${verifier === 'minimax' ? 'MiniMax' : 'Default CLI'}`,
+			value: 'verifier',
+		},
+		...(verifier === 'minimax'
+			? ([
+					{
+						label: `MiniMax Model: ${minimaxModel}`,
+						value: 'minimaxModel',
+					},
+					{
+						label: `MiniMax Region: ${minimaxRegion === 'global_en' ? 'Global' : 'CN'}`,
+						value: 'minimaxRegion',
+					},
+					{
+						label: `MiniMax Protocol: ${minimaxProtocol === 'openai' ? 'OpenAI-compatible' : 'Anthropic-compatible'}`,
+						value: 'minimaxProtocol',
+					},
+				] satisfies MenuItem[])
+			: []),
 		{
 			label: `Auto Approval (experimental): ${autoApprovalEnabled ? '✅ Enabled' : '❌ Disabled'}`,
 			value: 'toggleAutoApproval',
@@ -82,6 +134,18 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 
 	const handleSelect = (item: MenuItem) => {
 		switch (item.value) {
+			case 'verifier':
+				setVerifier(verifier === 'minimax' ? 'default' : 'minimax');
+				break;
+			case 'minimaxModel':
+				setMinimaxModel(nextValue(MINIMAX_MODELS, minimaxModel));
+				break;
+			case 'minimaxRegion':
+				setMinimaxRegion(nextValue(MINIMAX_REGIONS, minimaxRegion));
+				break;
+			case 'minimaxProtocol':
+				setMinimaxProtocol(nextValue(MINIMAX_PROTOCOLS, minimaxProtocol));
+				break;
 			case 'toggleAutoApproval':
 				setAutoApprovalEnabled(!autoApprovalEnabled);
 				break;
@@ -98,6 +162,10 @@ const ConfigureOther: React.FC<ConfigureOtherProps> = ({onComplete}) => {
 					enabled: autoApprovalEnabled,
 					customCommand: customCommand.trim() || undefined,
 					timeout,
+					verifier,
+					...(verifier === 'minimax'
+						? {minimaxModel, minimaxRegion, minimaxProtocol}
+						: {}),
 				});
 				onComplete();
 				break;

@@ -1,8 +1,24 @@
 import {Effect} from 'effect';
 import {ProcessError} from '../types/errors.js';
-import {AutoApprovalResponse} from '../types/index.js';
+import type {
+	AutoApprovalConfig,
+	AutoApprovalResponse,
+	MiniMaxModel,
+	MiniMaxProtocol,
+	MiniMaxRegion,
+} from '../types/index.js';
 import {configReader} from './config/configReader.js';
-import {DEFAULT_TIMEOUT_SECONDS} from '../constants/autoApproval.js';
+import {
+	DEFAULT_AUTO_APPROVAL_VERIFIER,
+	DEFAULT_MINIMAX_MODEL,
+	DEFAULT_MINIMAX_PROTOCOL,
+	DEFAULT_MINIMAX_REGION,
+	DEFAULT_TIMEOUT_SECONDS,
+	MINIMAX_ENDPOINTS,
+	MINIMAX_MODELS,
+	MINIMAX_PROTOCOLS,
+	MINIMAX_REGIONS,
+} from '../constants/autoApproval.js';
 import {logger} from '../utils/logger.js';
 import {
 	execFile,
@@ -411,10 +427,147 @@ export const checkDangerousPatterns = (
 const buildPrompt = (terminalOutput: string): string =>
 	PROMPT_TEMPLATE.replace(PLACEHOLDER.terminal, terminalOutput);
 
+const AUTO_APPROVAL_JSON_SCHEMA = {
+	type: 'object',
+	properties: {
+		needsPermission: {
+			type: 'boolean',
+			description: 'Whether user permission is needed before auto-approval',
+		},
+		reason: {
+			type: 'string',
+			description: 'Optional reason describing why user permission is needed',
+		},
+	},
+	required: ['needsPermission'],
+	additionalProperties: false,
+};
+
+const AUTO_APPROVAL_JSON_SCHEMA_TEXT = JSON.stringify(
+	AUTO_APPROVAL_JSON_SCHEMA,
+);
+
+const parseAutoApprovalResponse = (
+	responseText: string,
+): AutoApprovalResponse => {
+	const parsed: unknown = JSON.parse(responseText);
+	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+		throw new SyntaxError('Auto-approval response must be a JSON object');
+	}
+
+	const response = parsed as Record<string, unknown>;
+	const keys = Object.keys(response);
+	if (
+		!Object.prototype.hasOwnProperty.call(response, 'needsPermission') ||
+		typeof response['needsPermission'] !== 'boolean' ||
+		keys.some(key => key !== 'needsPermission' && key !== 'reason') ||
+		(response['reason'] !== undefined && typeof response['reason'] !== 'string')
+	) {
+		throw new SyntaxError(
+			'Auto-approval response does not match its JSON schema',
+		);
+	}
+
+	return response['reason'] === undefined
+		? {needsPermission: response['needsPermission']}
+		: {
+				needsPermission: response['needsPermission'],
+				reason: response['reason'],
+			};
+};
+
+const isMiniMaxModel = (value: unknown): value is MiniMaxModel =>
+	typeof value === 'string' &&
+	(MINIMAX_MODELS as readonly string[]).includes(value);
+
+const isMiniMaxRegion = (value: unknown): value is MiniMaxRegion =>
+	typeof value === 'string' &&
+	(MINIMAX_REGIONS as readonly string[]).includes(value);
+
+const isMiniMaxProtocol = (value: unknown): value is MiniMaxProtocol =>
+	typeof value === 'string' &&
+	(MINIMAX_PROTOCOLS as readonly string[]).includes(value);
+
+interface MiniMaxSettings {
+	model: MiniMaxModel;
+	region: MiniMaxRegion;
+	protocol: MiniMaxProtocol;
+	baseUrl: string;
+}
+
+const getMiniMaxSettings = (config: AutoApprovalConfig): MiniMaxSettings => {
+	const model = config.minimaxModel ?? DEFAULT_MINIMAX_MODEL;
+	const region = config.minimaxRegion ?? DEFAULT_MINIMAX_REGION;
+	const protocol = config.minimaxProtocol ?? DEFAULT_MINIMAX_PROTOCOL;
+
+	if (!isMiniMaxModel(model)) {
+		throw new Error('Unsupported MiniMax verifier model');
+	}
+	if (!isMiniMaxRegion(region)) {
+		throw new Error('Unsupported MiniMax verifier region');
+	}
+	if (!isMiniMaxProtocol(protocol)) {
+		throw new Error('Unsupported MiniMax verifier protocol');
+	}
+
+	return {
+		model,
+		region,
+		protocol,
+		baseUrl: MINIMAX_ENDPOINTS[region][protocol],
+	};
+};
+
+const getTextFromContent = (content: unknown): string => {
+	if (typeof content === 'string') return content;
+	if (!Array.isArray(content)) {
+		throw new Error('MiniMax verifier response did not contain text content');
+	}
+
+	const text = content
+		.map(block => {
+			if (
+				typeof block === 'object' &&
+				block !== null &&
+				'text' in block &&
+				typeof block.text === 'string'
+			) {
+				return block.text;
+			}
+			return '';
+		})
+		.join('');
+
+	if (!text) {
+		throw new Error('MiniMax verifier response did not contain text content');
+	}
+	return text;
+};
+
+const getMiniMaxResponseText = (
+	payload: unknown,
+	protocol: MiniMaxProtocol,
+): string => {
+	if (typeof payload !== 'object' || payload === null) {
+		throw new Error('MiniMax verifier response was not an object');
+	}
+
+	if (protocol === 'openai') {
+		const choices = (payload as {choices?: unknown}).choices;
+		if (!Array.isArray(choices) || choices.length === 0) {
+			throw new Error('MiniMax verifier response did not contain a choice');
+		}
+		const message = (choices[0] as {message?: {content?: unknown}})?.message;
+		return getTextFromContent(message?.content);
+	}
+
+	return getTextFromContent((payload as {content?: unknown}).content);
+};
+
 /**
  * Service to verify if auto-approval should be granted for pending states
- * Uses Claude Haiku model to analyze terminal output and determine if
- * user permission is required before proceeding
+ * Uses the configured verifier to determine if user permission is required
+ * before proceeding.
  */
 export class AutoApprovalVerifier {
 	private readonly model = 'haiku';
@@ -530,6 +683,87 @@ export class AutoApprovalVerifier {
 				}
 			});
 		});
+	}
+
+	private async runMiniMaxPrompt(
+		prompt: string,
+		jsonSchema: string,
+		config: AutoApprovalConfig,
+		signal?: AbortSignal,
+	): Promise<string> {
+		const settings = getMiniMaxSettings(config);
+		const apiKey = process.env['MINIMAX_API_KEY']?.trim();
+		if (!apiKey) {
+			throw new Error('MINIMAX_API_KEY is required for the MiniMax verifier');
+		}
+
+		const requestPrompt = `${prompt}\n\nReturn JSON matching this schema exactly:\n${jsonSchema}`;
+		const url =
+			settings.protocol === 'openai'
+				? `${settings.baseUrl}/chat/completions`
+				: `${settings.baseUrl}/v1/messages`;
+		const headers: Record<string, string> = {
+			'content-type': 'application/json',
+		};
+		if (settings.protocol === 'openai') {
+			headers['authorization'] = `Bearer ${apiKey}`;
+		} else {
+			headers['x-api-key'] = apiKey;
+			headers['anthropic-version'] = '2023-06-01';
+		}
+
+		const body =
+			settings.protocol === 'openai'
+				? {
+						model: settings.model,
+						messages: [{role: 'user', content: requestPrompt}],
+					}
+				: {
+						model: settings.model,
+						max_tokens: 1024,
+						messages: [{role: 'user', content: requestPrompt}],
+					};
+
+		const controller = new AbortController();
+		let timedOut = false;
+		const timeoutMs = getTimeoutMs();
+		const timeoutId = setTimeout(() => {
+			timedOut = true;
+			controller.abort();
+		}, timeoutMs);
+		const abortListener = () => controller.abort();
+
+		try {
+			if (signal) {
+				if (signal.aborted) throw createAbortError();
+				signal.addEventListener('abort', abortListener, {once: true});
+			}
+
+			const response = await globalThis.fetch(url, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify(body),
+				signal: controller.signal,
+			});
+			if (!response.ok) {
+				throw new Error(
+					`MiniMax verifier request failed with status ${response.status}`,
+				);
+			}
+
+			return getMiniMaxResponseText(await response.json(), settings.protocol);
+		} catch (error) {
+			if (signal?.aborted) throw createAbortError();
+			if (timedOut) {
+				throw new Error(
+					`MiniMax verifier request timed out after ${timeoutMs / 1000}s`,
+				);
+			}
+			throw error instanceof Error ? error : new Error(String(error));
+		} finally {
+			clearTimeout(timeoutId);
+			signal?.removeEventListener('abort', abortListener);
+		}
 	}
 
 	private async runCustomCommand(
@@ -653,23 +887,7 @@ export class AutoApprovalVerifier {
 				const autoApprovalConfig = configReader.getAutoApprovalConfig();
 				const customCommand = autoApprovalConfig.customCommand?.trim();
 				const prompt = buildPrompt(terminalOutput);
-
-				const jsonSchema = JSON.stringify({
-					type: 'object',
-					properties: {
-						needsPermission: {
-							type: 'boolean',
-							description:
-								'Whether user permission is needed before auto-approval',
-						},
-						reason: {
-							type: 'string',
-							description:
-								'Optional reason describing why user permission is needed',
-						},
-					},
-					required: ['needsPermission'],
-				});
+				const jsonSchema = AUTO_APPROVAL_JSON_SCHEMA_TEXT;
 
 				const signal = options?.signal;
 
@@ -677,16 +895,31 @@ export class AutoApprovalVerifier {
 					throw createAbortError();
 				}
 
-				const responseText = customCommand
-					? await this.runCustomCommand(
-							customCommand,
-							prompt,
-							terminalOutput,
-							signal,
-						)
-					: await this.runClaudePrompt(prompt, jsonSchema, signal);
+				let responseText: string;
+				if (customCommand) {
+					responseText = await this.runCustomCommand(
+						customCommand,
+						prompt,
+						terminalOutput,
+						signal,
+					);
+				} else if (autoApprovalConfig.verifier === 'minimax') {
+					responseText = await this.runMiniMaxPrompt(
+						prompt,
+						jsonSchema,
+						autoApprovalConfig,
+						signal,
+					);
+				} else if (
+					autoApprovalConfig.verifier === undefined ||
+					autoApprovalConfig.verifier === DEFAULT_AUTO_APPROVAL_VERIFIER
+				) {
+					responseText = await this.runClaudePrompt(prompt, jsonSchema, signal);
+				} else {
+					throw new Error('Unsupported auto-approval verifier');
+				}
 
-				return JSON.parse(responseText) as AutoApprovalResponse;
+				return parseAutoApprovalResponse(responseText);
 			},
 			catch: (error: unknown) =>
 				error instanceof Error ? error : new Error(String(error)),

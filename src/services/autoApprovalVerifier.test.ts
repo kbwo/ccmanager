@@ -12,7 +12,11 @@ import {
 	DANGEROUS_COMMAND_PATTERNS,
 } from './autoApprovalVerifier.js';
 
-const execFileMock = vi.fn();
+const {execFileMock, getAutoApprovalConfigMock, fetchMock} = vi.hoisted(() => ({
+	execFileMock: vi.fn(),
+	getAutoApprovalConfigMock: vi.fn(),
+	fetchMock: vi.fn(),
+}));
 
 vi.mock('child_process', () => ({
 	execFile: (...args: unknown[]) => execFileMock(...args),
@@ -20,13 +24,30 @@ vi.mock('child_process', () => ({
 
 vi.mock('./config/configReader.js', () => ({
 	configReader: {
-		getAutoApprovalConfig: vi.fn().mockReturnValue({enabled: false}),
+		getAutoApprovalConfig: getAutoApprovalConfigMock,
 	},
 }));
+
+const responseWithJson = (
+	payload: unknown,
+	ok = true,
+	status = 200,
+): {ok: boolean; status: number; json: () => Promise<unknown>} => ({
+	ok,
+	status,
+	json: vi.fn().mockResolvedValue(payload),
+});
+
+let originalMiniMaxApiKey: string | undefined;
 
 describe('AutoApprovalVerifier', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
+		getAutoApprovalConfigMock.mockReturnValue({enabled: false});
+		fetchMock.mockReset();
+		vi.stubGlobal('fetch', fetchMock);
+		originalMiniMaxApiKey = process.env['MINIMAX_API_KEY'];
+		delete process.env['MINIMAX_API_KEY'];
 		execFileMock.mockImplementation(
 			(
 				_cmd: string,
@@ -50,6 +71,12 @@ describe('AutoApprovalVerifier', () => {
 	});
 
 	afterEach(() => {
+		if (originalMiniMaxApiKey === undefined) {
+			delete process.env['MINIMAX_API_KEY'];
+		} else {
+			process.env['MINIMAX_API_KEY'] = originalMiniMaxApiKey;
+		}
+		vi.unstubAllGlobals();
 		vi.useRealTimers();
 		vi.clearAllMocks();
 	});
@@ -83,6 +110,122 @@ describe('AutoApprovalVerifier', () => {
 		);
 		expect(child.stdin.write).toHaveBeenCalledTimes(1);
 		expect(child.stdin.end).toHaveBeenCalledTimes(1);
+	});
+
+	it('uses the configured MiniMax OpenAI-compatible endpoint', async () => {
+		process.env['MINIMAX_API_KEY'] = 'test-key';
+		getAutoApprovalConfigMock.mockReturnValue({
+			enabled: false,
+			verifier: 'minimax',
+			minimaxModel: 'MiniMax-M3',
+			minimaxRegion: 'global_en',
+			minimaxProtocol: 'openai',
+		});
+		fetchMock.mockResolvedValue(
+			responseWithJson({
+				choices: [{message: {content: '{"needsPermission":false}'}}],
+			}),
+		);
+
+		const {autoApprovalVerifier} = await import('./autoApprovalVerifier.js');
+		const result = await Effect.runPromise(
+			autoApprovalVerifier.verifyNeedsPermission('safe output'),
+		);
+
+		expect(result).toEqual({needsPermission: false});
+		expect(execFileMock).not.toHaveBeenCalled();
+		expect(fetchMock).toHaveBeenCalledWith(
+			'https://api.minimax.io/v1/chat/completions',
+			expect.objectContaining({
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					authorization: 'Bearer test-key',
+				},
+			}),
+		);
+		const request = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as {
+			model: string;
+			messages: Array<{content: string}>;
+		};
+		expect(request.model).toBe('MiniMax-M3');
+		expect(request.messages[0]!.content).toContain('needsPermission');
+	});
+
+	it('uses the configured MiniMax Anthropic-compatible CN endpoint', async () => {
+		process.env['MINIMAX_API_KEY'] = 'test-key';
+		getAutoApprovalConfigMock.mockReturnValue({
+			enabled: false,
+			verifier: 'minimax',
+			minimaxModel: 'MiniMax-M2.7',
+			minimaxRegion: 'cn_zh',
+			minimaxProtocol: 'anthropic',
+		});
+		fetchMock.mockResolvedValue(
+			responseWithJson({
+				content: [
+					{type: 'text', text: '{"needsPermission":true,"reason":"Review"}'},
+				],
+			}),
+		);
+
+		const {autoApprovalVerifier} = await import('./autoApprovalVerifier.js');
+		const result = await Effect.runPromise(
+			autoApprovalVerifier.verifyNeedsPermission('unsafe output'),
+		);
+
+		expect(result).toEqual({needsPermission: true, reason: 'Review'});
+		expect(fetchMock).toHaveBeenCalledWith(
+			'https://api.minimaxi.com/anthropic/v1/messages',
+			expect.objectContaining({
+				headers: {
+					'content-type': 'application/json',
+					'x-api-key': 'test-key',
+					'anthropic-version': '2023-06-01',
+				},
+			}),
+		);
+		const request = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as {
+			model: string;
+		};
+		expect(request.model).toBe('MiniMax-M2.7');
+	});
+
+	it('fails closed when the MiniMax credential is missing', async () => {
+		getAutoApprovalConfigMock.mockReturnValue({
+			enabled: false,
+			verifier: 'minimax',
+		});
+
+		const {autoApprovalVerifier} = await import('./autoApprovalVerifier.js');
+		const result = await Effect.runPromise(
+			autoApprovalVerifier.verifyNeedsPermission('safe output'),
+		);
+
+		expect(result.needsPermission).toBe(true);
+		expect(result.reason).toContain('MINIMAX_API_KEY');
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('fails closed when MiniMax returns a response outside the JSON schema', async () => {
+		process.env['MINIMAX_API_KEY'] = 'test-key';
+		getAutoApprovalConfigMock.mockReturnValue({
+			enabled: false,
+			verifier: 'minimax',
+		});
+		fetchMock.mockResolvedValue(
+			responseWithJson({
+				choices: [{message: {content: '{"needsPermission":"false"}'}}],
+			}),
+		);
+
+		const {autoApprovalVerifier} = await import('./autoApprovalVerifier.js');
+		const result = await Effect.runPromise(
+			autoApprovalVerifier.verifyNeedsPermission('safe output'),
+		);
+
+		expect(result.needsPermission).toBe(true);
+		expect(result.reason).toContain('JSON');
 	});
 
 	it('returns true when Claude response indicates permission is needed', async () => {

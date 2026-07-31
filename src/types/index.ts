@@ -187,6 +187,10 @@ export interface ConfigurationData {
 		enabled: boolean; // Whether auto-approval is enabled
 		customCommand?: string; // Custom verification command; must output JSON matching AutoApprovalResponse
 		timeout?: number; // Timeout in seconds for auto-approval verification (default: DEFAULT_TIMEOUT_SECONDS)
+		verifier?: AutoApprovalVerifier;
+		minimaxModel?: MiniMaxModel;
+		minimaxRegion?: MiniMaxRegion;
+		minimaxProtocol?: MiniMaxProtocol;
 	};
 }
 
@@ -197,7 +201,16 @@ export interface AutoApprovalConfig {
 	enabled: boolean;
 	customCommand?: string;
 	timeout?: number;
+	verifier?: AutoApprovalVerifier;
+	minimaxModel?: MiniMaxModel;
+	minimaxRegion?: MiniMaxRegion;
+	minimaxProtocol?: MiniMaxProtocol;
 }
+
+export type AutoApprovalVerifier = 'default' | 'minimax';
+export type MiniMaxModel = 'MiniMax-M3' | 'MiniMax-M2.7';
+export type MiniMaxRegion = 'global_en' | 'cn_zh';
+export type MiniMaxProtocol = 'openai' | 'anthropic';
 
 export interface ProjectConfigurationData {
 	shortcuts?: ShortcutConfig;

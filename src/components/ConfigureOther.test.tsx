@@ -105,6 +105,7 @@ describe('ConfigureOther', () => {
 		);
 
 		expect(lastFrame()).toContain('Other & Experimental Settings');
+		expect(lastFrame()).toContain('Verifier: Default CLI');
 		expect(lastFrame()).toContain('Auto Approval (experimental): ✅ Enabled');
 		expect(lastFrame()).toContain('Custom auto-approval command: Empty');
 		expect(lastFrame()).toContain('Edit Custom Command');
@@ -127,5 +128,27 @@ describe('ConfigureOther', () => {
 		expect(lastFrame()).toContain('Custom auto-approval command:');
 		expect(lastFrame()).toContain('jq -n');
 		expect(lastFrame()).toContain('Edit Custom Command');
+	});
+
+	it('shows MiniMax verifier settings', () => {
+		mockFns.getAutoApprovalConfig.mockReturnValue({
+			enabled: true,
+			timeout: DEFAULT_TIMEOUT_SECONDS,
+			verifier: 'minimax',
+			minimaxModel: 'MiniMax-M2.7',
+			minimaxRegion: 'cn_zh',
+			minimaxProtocol: 'anthropic',
+		});
+
+		const {lastFrame} = render(
+			<ConfigEditorProvider scope="global">
+				<ConfigureOther onComplete={vi.fn()} />
+			</ConfigEditorProvider>,
+		);
+
+		expect(lastFrame()).toContain('Verifier: MiniMax');
+		expect(lastFrame()).toContain('MiniMax Model: MiniMax-M2.7');
+		expect(lastFrame()).toContain('MiniMax Region: CN');
+		expect(lastFrame()).toContain('MiniMax Protocol: Anthropic-compatible');
 	});
 });
