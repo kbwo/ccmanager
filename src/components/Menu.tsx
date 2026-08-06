@@ -124,7 +124,12 @@ const Menu: React.FC<MenuProps> = ({
 		loadError: initialSnapshot?.loadError ?? null,
 	});
 	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
-	const [sessions, setSessions] = useState<Session[]>([]);
+	// Seed from the in-memory session list so the cached snapshot renders with its
+	// sessions attached. Waiting for the async git load would leave every row
+	// session-less for that window, disabling the Space session-actions shortcut.
+	const [sessions, setSessions] = useState<Session[]>(() =>
+		sessionManager.getAllSessions(),
+	);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<
