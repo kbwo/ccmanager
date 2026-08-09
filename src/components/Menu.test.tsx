@@ -1,9 +1,33 @@
 import React from 'react';
 import {render} from 'ink-testing-library';
+import {useInput} from 'ink';
 import Menu from './Menu.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
+import {Session} from '../types/index.js';
 import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
+
+const makeKey = (
+	overrides: Record<string, boolean> = {},
+): Record<string, boolean> => ({
+	upArrow: false,
+	downArrow: false,
+	leftArrow: false,
+	rightArrow: false,
+	pageDown: false,
+	pageUp: false,
+	home: false,
+	end: false,
+	return: false,
+	escape: false,
+	ctrl: false,
+	shift: false,
+	tab: false,
+	backspace: false,
+	delete: false,
+	meta: false,
+	...overrides,
+});
 
 // Mock bunTerminal to avoid native module issues in tests
 vi.mock('../services/bunTerminal.js', () => ({
@@ -384,6 +408,73 @@ describe('Menu component Effect-based error handling', () => {
 			worktrees: [cachedWorktree],
 			defaultBranch: 'main',
 			loadError: expect.stringContaining('temporary failure'),
+		});
+	});
+
+	it('should handle the Space session-actions shortcut on a cached snapshot before the refresh completes', async () => {
+		const {Effect} = await import('effect');
+		const cachedWorktree = {
+			path: '/test/cached',
+			branch: 'cached-branch',
+			isMainWorktree: true,
+			hasSession: true,
+		};
+		const cachedSession = {
+			id: 'session-cached',
+			worktreePath: '/test/cached',
+			lastAccessedAt: 1,
+			stateMutex: {
+				getSnapshot: () => ({
+					state: 'idle',
+					backgroundTaskCount: 0,
+					teamMemberCount: 0,
+				}),
+			},
+		} as unknown as Session;
+
+		vi.spyOn(sessionManager, 'getAllSessions').mockReturnValue([cachedSession]);
+		// Never resolve the refresh, so only the cached snapshot is on screen.
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.promise(() => new Promise<never>(() => {})),
+		);
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
+		);
+
+		const onMenuAction = vi.fn();
+		vi.mocked(useInput).mockClear();
+
+		render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				initialSnapshot={{
+					worktrees: [cachedWorktree],
+					defaultBranch: 'main',
+				}}
+				onMenuAction={onMenuAction}
+				version="test"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		// Menu's hotkey handler bails out when raw mode is unavailable.
+		const origSetRawMode = process.stdin.setRawMode;
+		process.stdin.setRawMode = vi.fn() as never;
+		try {
+			const calls = vi.mocked(useInput).mock.calls;
+			const handler = calls[calls.length - 1]?.[0];
+			expect(handler).toBeDefined();
+			handler!(' ', makeKey() as never);
+		} finally {
+			process.stdin.setRawMode = origSetRawMode;
+		}
+
+		expect(onMenuAction).toHaveBeenCalledWith({
+			type: 'sessionActions',
+			session: cachedSession,
+			worktreePath: '/test/cached',
 		});
 	});
 });
