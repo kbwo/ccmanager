@@ -296,6 +296,43 @@ describe('ClaudeStateDetector', () => {
 			expect(state).toBe('waiting_input');
 		});
 
+		it('should detect waiting_input for Claude in Chrome permission prompt (Allow/Deny)', () => {
+			// Arrange - browser permission prompt without "Do you want" phrasing
+			terminal = createMockTerminal([
+				'──────────────────────────────',
+				' Claude in Chrome wants to create a browser window and read your tabs',
+				'',
+				' ❯ 1. Allow',
+				'   2. Deny (esc)',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
+		it('should detect waiting_input for Claude in Chrome navigation prompt (Allow all / Deny)', () => {
+			// Arrange - three-option variant with "Allow all actions" entry
+			terminal = createMockTerminal([
+				'──────────────────────────────',
+				' Claude in Chrome wants to navigate on example.com',
+				'',
+				' https://example.com/app',
+				'',
+				' ❯ 1. Allow',
+				'   2. Allow all actions on example.com for this session',
+				'   3. Deny (esc)',
+			]);
+
+			// Act
+			const state = detector.detectState(terminal, 'idle');
+
+			// Assert
+			expect(state).toBe('waiting_input');
+		});
+
 		it('should prioritize "esc to cancel" over "esc to interrupt" when both above prompt box', () => {
 			// Arrange
 			terminal = createMockTerminal([

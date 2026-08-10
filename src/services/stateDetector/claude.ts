@@ -150,6 +150,15 @@ export class ClaudeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		// Check for permission menus without question phrasing, e.g.
+		// "Claude in Chrome wants to navigate on example.com" with:
+		//   ❯ 1. Allow
+		//     2. Deny (esc)
+		// The numbered "Deny (esc)" option is the stable marker across variants.
+		if (/\d+\.\s*deny\s*\(esc\)/.test(fullLowerContent)) {
+			return 'waiting_input';
+		}
+
 		// Content above the prompt box only for busy detection
 		const abovePromptBox = this.getRecentContentAbovePromptBox(terminal, 30);
 		const aboveLowerContent = abovePromptBox.toLowerCase();
