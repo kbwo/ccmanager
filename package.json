@@ -71,7 +71,7 @@
 		"@xterm/addon-serialize": "^0.14.0",
 		"@xterm/headless": "^6.0.0",
 		"effect": "^3.18.2",
-		"ink": "^6.6.0",
+		"ink": "^7.0.1",
 		"ink-select-input": "^6.0.0",
 		"ink-text-input": "^6.0.0",
 		"meow": "^14.0.0",
