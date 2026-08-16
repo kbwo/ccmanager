@@ -8,6 +8,7 @@ import {GitHubCopilotStateDetector} from './github-copilot.js';
 import {ClineStateDetector} from './cline.js';
 import {OpenCodeStateDetector} from './opencode.js';
 import {KimiStateDetector} from './kimi.js';
+import {MCodeStateDetector} from './mcode.js';
 
 export function createStateDetector(
 	strategy: StateDetectionStrategy = 'claude',
@@ -29,6 +30,8 @@ export function createStateDetector(
 			return new OpenCodeStateDetector();
 		case 'kimi':
 			return new KimiStateDetector();
+		case 'mcode':
+			return new MCodeStateDetector();
 		default:
 			return new ClaudeStateDetector();
 	}

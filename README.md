@@ -130,6 +130,7 @@ CCManager supports multiple AI coding assistants with tailored state detection f
 | Cline CLI | `cline` | [github.com/cline/cline](https://github.com/cline/cline) |
 | OpenCode | `opencode` | [opencode.ai/docs](https://opencode.ai/docs) |
 | Kimi CLI | `kimi` | [kimi-cli.com](https://www.kimi-cli.com/en/) |
+| MiniMax Code (MCode) | `mcode` | [npmjs.com/package/@minimax-ai/code](https://www.npmjs.com/package/@minimax-ai/code) |
 
 Each assistant has its own state detection strategy to properly track:
 - **Idle**: Ready for new input
