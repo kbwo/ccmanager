@@ -6,6 +6,7 @@ import {
 	Worktree,
 	CreateWorktreeResult,
 	AmbiguousBranchError,
+	BaseBranchResolution,
 	RemoteBranchMatch,
 	MergeConfig,
 } from '../types/index.js';
@@ -197,6 +198,83 @@ export class WorktreeService {
 				throw error;
 			},
 		});
+	}
+
+	/**
+	 * Classifies a base branch picked in the UI, without throwing.
+	 *
+	 * Unlike resolveBranchReference(), this is meant to run right after the
+	 * user selects a base branch so that:
+	 * - a local branch is confirmed immediately (never routed to the
+	 *   ambiguous-remote confirmation), and
+	 * - an ambiguous branch (same name in multiple remotes) can be
+	 *   disambiguated right away instead of failing later at creation time.
+	 *
+	 * @param {string} branchName - Branch name or remote-qualified ref
+	 *   (e.g. "feature/x" or "origin/feature/x") selected as base branch
+	 * @returns {BaseBranchResolution} Classification result (see type docs)
+	 */
+	resolveBaseBranch(branchName: string): BaseBranchResolution {
+		// Local branch has the highest priority
+		try {
+			execSync(`git show-ref --verify --quiet refs/heads/${branchName}`, {
+				cwd: this.rootPath,
+				encoding: 'utf8',
+			});
+			return {kind: 'local', ref: branchName, localName: branchName};
+		} catch {
+			// Not a local branch, check remotes below
+		}
+
+		const remotes = this.getAllRemotes();
+
+		// Already remote-qualified (e.g. "origin/feature/x" selected from the
+		// remote section of the branch list): not ambiguous by construction.
+		for (const remote of remotes) {
+			const prefix = `${remote}/`;
+			if (!branchName.startsWith(prefix)) continue;
+			try {
+				execSync(`git show-ref --verify --quiet refs/remotes/${branchName}`, {
+					cwd: this.rootPath,
+					encoding: 'utf8',
+				});
+				return {
+					kind: 'remote',
+					ref: branchName,
+					localName: branchName.slice(prefix.length),
+				};
+			} catch {
+				// Not an existing remote-tracking ref; fall through to matching
+			}
+		}
+
+		const matches: RemoteBranchMatch[] = [];
+		for (const remote of remotes) {
+			try {
+				execSync(
+					`git show-ref --verify --quiet refs/remotes/${remote}/${branchName}`,
+					{
+						cwd: this.rootPath,
+						encoding: 'utf8',
+					},
+				);
+				matches.push({
+					remote,
+					branch: branchName,
+					fullRef: `${remote}/${branchName}`,
+				});
+			} catch {
+				// This remote doesn't have the branch, continue
+			}
+		}
+
+		if (matches.length === 1) {
+			return {kind: 'remote', ref: matches[0]!.fullRef, localName: branchName};
+		}
+		if (matches.length > 1) {
+			return {kind: 'ambiguous', branchName, matches};
+		}
+		return {kind: 'none', ref: branchName, localName: branchName};
 	}
 
 	/**
@@ -1000,7 +1078,16 @@ export class WorktreeService {
 				// Use it directly to avoid re-triggering AmbiguousBranchError.
 				command = `git worktree add -b "${branch}" "${resolvedPath}" "${baseBranch}"`;
 			} else {
-				const resolvedRef = yield* self.resolveBranchReferenceEffect(branch);
+				// The new branch name itself may match remote branches (checkout
+				// semantics: typing "feature/x" checks out origin/feature/x when it
+				// exists on exactly one remote). When the name exists on MULTIPLE
+				// remotes, don't fail with AmbiguousBranchError: the user already
+				// chose baseBranch explicitly, so create the new branch from
+				// baseBranch instead of asking which remote to track.
+				const resolvedRef = yield* Effect.catchAll(
+					self.resolveBranchReferenceEffect(branch),
+					() => Effect.succeed(branch),
+				);
 				const isRemoteBranch = resolvedRef !== branch;
 				const startPoint = isRemoteBranch
 					? resolvedRef

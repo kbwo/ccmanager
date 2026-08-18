@@ -378,6 +378,11 @@ describe('NewWorktree component Effect integration', () => {
 			return {
 				getAllBranchesEffect: vi.fn(() => Effect.succeed(mockBranches)),
 				getDefaultBranchEffect: vi.fn(() => Effect.succeed(mockDefaultBranch)),
+				resolveBaseBranch: vi.fn((name: string) => ({
+					kind: 'local',
+					ref: name,
+					localName: name,
+				})),
 			} as unknown as InstanceType<typeof WorktreeService>;
 		});
 
@@ -400,6 +405,46 @@ describe('NewWorktree component Effect integration', () => {
 		expect(output).toContain('How do you want to create the new worktree?');
 		expect(output).toContain('Choose the branch name yourself');
 		expect(output).toContain('Enter a prompt first');
+	});
+
+	it('should keep the base branch selection when the default branch is ambiguous across remotes', async () => {
+		const {Effect} = await import('effect');
+		const {WorktreeService} = await import('../services/worktreeService.js');
+		const {configReader} = await import('../services/config/configReader.js');
+
+		vi.spyOn(configReader, 'getWorktreeConfig').mockReturnValue({
+			autoDirectory: true,
+			autoDirectoryPattern: '../{project}-{branch}',
+			copySessionData: true,
+			autoUseDefaultBranch: true,
+		});
+
+		// Default branch has no local ref and exists on two remotes: it cannot
+		// be picked silently, so the base-branch step must not be skipped.
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.succeed(['main', 'develop'])),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
+				resolveBaseBranch: vi.fn(() => ({
+					kind: 'ambiguous',
+					branchName: 'main',
+					matches: [
+						{remote: 'origin', branch: 'main', fullRef: 'origin/main'},
+						{remote: 'upstream', branch: 'main', fullRef: 'upstream/main'},
+					],
+				})),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
+
+		const {lastFrame} = render(
+			<NewWorktree onComplete={vi.fn()} onCancel={vi.fn()} />,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		const output = lastFrame();
+		expect(output).toContain('Select base branch');
+		expect(output).not.toContain('How do you want to create the new worktree?');
 	});
 
 	it('should show base branch selection when autoUseDefaultBranch is disabled', async () => {

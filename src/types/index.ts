@@ -322,6 +322,22 @@ export interface RemoteBranchMatch {
 	fullRef: string; // e.g., "origin/foo/bar-xyz"
 }
 
+/**
+ * Result of classifying a base branch the user picked in the UI.
+ *
+ * - 'local': branch exists locally; `ref` is the branch name as-is.
+ * - 'remote': resolved to exactly one remote-tracking ref; `ref` is the full
+ *   ref (e.g. "origin/foo") and `localName` the short branch name to use when
+ *   creating a local branch from it.
+ * - 'ambiguous': branch exists in multiple remotes; the user must pick one.
+ * - 'none': nothing matched; pass `ref` through and let git report errors.
+ */
+export type BaseBranchResolution =
+	| {kind: 'local'; ref: string; localName: string}
+	| {kind: 'remote'; ref: string; localName: string}
+	| {kind: 'none'; ref: string; localName: string}
+	| {kind: 'ambiguous'; branchName: string; matches: RemoteBranchMatch[]};
+
 export class AmbiguousBranchError extends Error {
 	readonly _tag = 'AmbiguousBranchError' as const;
 	branchName: string;

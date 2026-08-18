@@ -9,8 +9,10 @@ import {WorktreeService} from '../services/worktreeService.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import SearchableList from './SearchableList.js';
+import RemoteBranchSelector from './RemoteBranchSelector.js';
 import {Effect} from 'effect';
 import type {AppError} from '../types/errors.js';
+import type {RemoteBranchMatch} from '../types/index.js';
 import {
 	describePromptInjection,
 	getPromptInjectionMethod,
@@ -47,6 +49,7 @@ export type NewWorktreeRequest =
 type Step =
 	| 'path'
 	| 'base-branch'
+	| 'remote-branch-confirm'
 	| 'creation-mode'
 	| 'branch-strategy'
 	| 'branch'
@@ -83,6 +86,13 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const [path, setPath] = useState('');
 	const [branch, setBranch] = useState('');
 	const [baseBranch, setBaseBranch] = useState('');
+	// Short branch name to use when creating a local branch from baseBranch
+	// (differs from baseBranch when baseBranch is a remote ref like "origin/x")
+	const [baseBranchLocalName, setBaseBranchLocalName] = useState('');
+	const [ambiguousBase, setAmbiguousBase] = useState<{
+		branchName: string;
+		matches: RemoteBranchMatch[];
+	} | null>(null);
 	const [copyClaudeDirectory, setCopyClaudeDirectory] = useState(true);
 	const [copySessionData, setCopySessionData] = useState(
 		worktreeConfig.copySessionData ?? true,
@@ -98,9 +108,14 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const [remoteBranches, setRemoteBranches] = useState<string[]>([]);
 	const [defaultBranch, setDefaultBranch] = useState<string>('main');
 
+	const worktreeService = useMemo(
+		() => new WorktreeService(projectPath),
+		[projectPath],
+	);
+
 	useEffect(() => {
 		let cancelled = false;
-		const service = new WorktreeService(projectPath);
+		const service = worktreeService;
 
 		const loadBranches = async () => {
 			const branchesEffect = includeRemoteBranches
@@ -144,10 +159,18 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					setIsLoadingBranches(false);
 
 					if (isAutoUseDefaultBranch && result.defaultBranch) {
-						setBaseBranch(result.defaultBranch);
-						setStep(currentStep =>
-							currentStep === 'base-branch' ? 'creation-mode' : currentStep,
-						);
+						const resolution = service.resolveBaseBranch(result.defaultBranch);
+						if (resolution.kind === 'ambiguous') {
+							// The default branch only exists on multiple remotes; we
+							// can't pick one silently, so keep the base-branch step and
+							// let the user choose explicitly.
+						} else {
+							setBaseBranch(resolution.ref);
+							setBaseBranchLocalName(resolution.localName);
+							setStep(currentStep =>
+								currentStep === 'base-branch' ? 'creation-mode' : currentStep,
+							);
+						}
 					}
 				}
 			}
@@ -163,7 +186,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [projectPath, isAutoUseDefaultBranch, includeRemoteBranches]);
+	}, [worktreeService, isAutoUseDefaultBranch, includeRemoteBranches]);
 
 	const allBranchItems: BranchItem[] = useMemo(() => {
 		const defaultRemoteSuffix = `/${defaultBranch}`;
@@ -226,6 +249,12 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	);
 
 	useInput((input, key) => {
+		if (step === 'remote-branch-confirm') {
+			// RemoteBranchSelector handles its own cancel shortcut (returns to
+			// the base-branch list); don't also cancel the whole wizard here.
+			return;
+		}
+
 		if (shortcutManager.matchesShortcut('cancel', input, key)) {
 			onCancel();
 		}
@@ -235,21 +264,58 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 		}
 	});
 
+	/**
+	 * Resolves the selected base branch right away. Returns true when the
+	 * selection is settled; returns false when the branch exists on multiple
+	 * remotes, in which case the remote-branch-confirm step is shown so the
+	 * user can disambiguate immediately (instead of failing later when the
+	 * worktree is actually created).
+	 */
+	const applyBaseBranchSelection = (name: string): boolean => {
+		const resolution = worktreeService.resolveBaseBranch(name);
+		if (resolution.kind === 'ambiguous') {
+			setAmbiguousBase({
+				branchName: resolution.branchName,
+				matches: resolution.matches,
+			});
+			setStep('remote-branch-confirm');
+			return false;
+		}
+		setBaseBranch(resolution.ref);
+		setBaseBranchLocalName(resolution.localName);
+		return true;
+	};
+
 	const handlePathSubmit = (value: string) => {
 		if (!value.trim()) return;
 
 		setPath(value.trim());
 		if (isAutoUseDefaultBranch && defaultBranch) {
-			setBaseBranch(defaultBranch);
-			setStep('creation-mode');
+			if (applyBaseBranchSelection(defaultBranch)) {
+				setStep('creation-mode');
+			}
 		} else {
 			setStep('base-branch');
 		}
 	};
 
 	const handleBaseBranchSelect = (item: {label: string; value: string}) => {
-		setBaseBranch(item.value);
+		if (applyBaseBranchSelection(item.value)) {
+			setStep('creation-mode');
+		}
+	};
+
+	const handleAmbiguousBaseSelect = (selectedRemoteRef: string) => {
+		if (!ambiguousBase) return;
+		setBaseBranch(selectedRemoteRef);
+		setBaseBranchLocalName(ambiguousBase.branchName);
+		setAmbiguousBase(null);
 		setStep('creation-mode');
+	};
+
+	const handleAmbiguousBaseCancel = () => {
+		setAmbiguousBase(null);
+		setStep('base-branch');
 	};
 
 	const handleCreationModeSelect = (item: {label: string; value: string}) => {
@@ -264,7 +330,10 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const handleBranchStrategySelect = (item: {label: string; value: string}) => {
 		const useExisting = item.value === 'existing';
 		if (useExisting) {
-			setBranch(baseBranch);
+			// Use the short branch name: when baseBranch is a remote ref
+			// (e.g. "origin/feature/x"), the local branch to attach/create is
+			// "feature/x", not a branch literally named "origin/feature/x".
+			setBranch(baseBranchLocalName || baseBranch);
 			setStep('copy-settings');
 		} else {
 			setStep('branch');
@@ -507,6 +576,15 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 				</Box>
 			)}
 
+			{step === 'remote-branch-confirm' && ambiguousBase && (
+				<RemoteBranchSelector
+					branchName={ambiguousBase.branchName}
+					matches={ambiguousBase.matches}
+					onSelect={handleAmbiguousBaseSelect}
+					onCancel={handleAmbiguousBaseCancel}
+				/>
+			)}
+
 			{step === 'creation-mode' && (
 				<Box flexDirection="column">
 					<Box marginBottom={1}>
@@ -709,11 +787,13 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 				</Box>
 			)}
 
-			<Box marginTop={1}>
-				<Text dimColor>
-					Press {shortcutManager.getShortcutDisplay('cancel')} to cancel
-				</Text>
-			</Box>
+			{step !== 'remote-branch-confirm' && (
+				<Box marginTop={1}>
+					<Text dimColor>
+						Press {shortcutManager.getShortcutDisplay('cancel')} to cancel
+					</Text>
+				</Box>
+			)}
 		</Box>
 	);
 };
