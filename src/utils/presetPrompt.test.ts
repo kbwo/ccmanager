@@ -102,6 +102,18 @@ describe('presetPrompt', () => {
 		});
 	});
 
+	it('uses the final argument for MCode presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'mcode', args: [], detectionStrategy: 'mcode'},
+				'fix the failing tests',
+			),
+		).toEqual({
+			args: ['fix the failing tests'],
+			method: 'final-arg',
+		});
+	});
+
 	describe('describePromptInjection', () => {
 		it('describes final-arg for claude', () => {
 			expect(
@@ -173,6 +185,15 @@ describe('presetPrompt', () => {
 					detectionStrategy: 'kimi',
 				}),
 			).toContain('-p');
+		});
+
+		it('describes final-arg for MCode', () => {
+			expect(
+				describePromptInjection({
+					command: 'mcode',
+					detectionStrategy: 'mcode',
+				}),
+			).toContain('final command argument');
 		});
 	});
 
@@ -247,6 +268,15 @@ describe('presetPrompt', () => {
 					detectionStrategy: 'kimi',
 				}),
 			).toBe('flag');
+		});
+
+		it('returns final-arg for MCode', () => {
+			expect(
+				getPromptInjectionMethod({
+					command: 'mcode',
+					detectionStrategy: 'mcode',
+				}),
+			).toBe('final-arg');
 		});
 
 		it('falls back to claude strategy when detectionStrategy is not set', () => {

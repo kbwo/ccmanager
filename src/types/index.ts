@@ -23,7 +23,8 @@ export type StateDetectionStrategy =
 	| 'github-copilot'
 	| 'cline'
 	| 'opencode'
-	| 'kimi';
+	| 'kimi'
+	| 'mcode';
 
 export interface Worktree {
 	path: string;
