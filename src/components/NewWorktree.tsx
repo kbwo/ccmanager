@@ -158,19 +158,19 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 					setDefaultBranch(result.defaultBranch);
 					setIsLoadingBranches(false);
 
-					if (isAutoUseDefaultBranch && result.defaultBranch) {
-						const resolution = service.resolveBaseBranch(result.defaultBranch);
-						if (resolution.kind === 'ambiguous') {
-							// The default branch only exists on multiple remotes; we
-							// can't pick one silently, so keep the base-branch step and
-							// let the user choose explicitly.
-						} else {
-							setBaseBranch(resolution.ref);
-							setBaseBranchLocalName(resolution.localName);
-							setStep(currentStep =>
-								currentStep === 'base-branch' ? 'creation-mode' : currentStep,
-							);
-						}
+					// When the default branch is ambiguous across remotes we can't
+					// pick one silently, so keep the base-branch step and let the
+					// user choose.
+					const resolution =
+						isAutoUseDefaultBranch && result.defaultBranch
+							? service.resolveBaseBranch(result.defaultBranch)
+							: null;
+					if (resolution && resolution.kind !== 'ambiguous') {
+						setBaseBranch(resolution.ref);
+						setBaseBranchLocalName(resolution.localName);
+						setStep(currentStep =>
+							currentStep === 'base-branch' ? 'creation-mode' : currentStep,
+						);
 					}
 				}
 			}
