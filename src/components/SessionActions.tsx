@@ -6,6 +6,7 @@ export type SessionActionType = 'newSession' | 'rename' | 'kill';
 
 interface SessionActionsProps {
 	sessionLabel: string;
+	worktreePath: string;
 	onSelect: (action: SessionActionType) => void;
 	onCancel: () => void;
 }
@@ -18,6 +19,7 @@ const items: Array<{label: string; value: SessionActionType}> = [
 
 const SessionActions: React.FC<SessionActionsProps> = ({
 	sessionLabel,
+	worktreePath,
 	onSelect,
 	onCancel,
 }) => {
@@ -45,8 +47,9 @@ const SessionActions: React.FC<SessionActionsProps> = ({
 			<Text bold color="cyan">
 				Session Actions
 			</Text>
-			<Box marginTop={1}>
+			<Box marginTop={1} flexDirection="column">
 				<Text dimColor>{sessionLabel}</Text>
+				<Text dimColor>Directory: {worktreePath}</Text>
 			</Box>
 			<Box marginTop={1}>
 				<SelectInput items={items} onSelect={item => onSelect(item.value)} />

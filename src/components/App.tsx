@@ -1094,8 +1094,8 @@ const App: React.FC<AppProps> = ({
 	if (view === 'session-actions' && sessionActionsTarget) {
 		const {session: targetSession, worktreePath} = sessionActionsTarget;
 		const label = targetSession.sessionName
-			? `${worktreePath} : ${targetSession.sessionName}`
-			: `${worktreePath} #${targetSession.sessionNumber}`;
+			? targetSession.sessionName
+			: `Session #${targetSession.sessionNumber}`;
 
 		const handleSessionAction = async (action: SessionActionType) => {
 			setSessionActionsTarget(null);
@@ -1128,6 +1128,7 @@ const App: React.FC<AppProps> = ({
 		return (
 			<SessionActions
 				sessionLabel={label}
+				worktreePath={worktreePath}
 				onSelect={handleSessionAction}
 				onCancel={() => {
 					setSessionActionsTarget(null);
