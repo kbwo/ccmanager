@@ -37,7 +37,7 @@ Edit `~/.config/ccmanager/config.json`:
 ## Pattern Syntax
 
 The pattern supports the following placeholders:
-- `{branch}` or `{branch-name}`: Replaced with the sanitized branch name
+- `{branch}`: Replaced with the sanitized branch name
 - `{project}`: Replaced with the Git repository name (main working directory basename)
 
 ## Branch Name Sanitization

@@ -116,6 +116,22 @@ CCManager supports per-project configuration by placing a `.ccmanager.json` file
 
 For detailed configuration options and examples, see [docs/project-config.md](docs/project-config.md).
 
+### Configuring with an AI coding agent
+
+This repository doubles as a plugin marketplace providing the **`ccmanager-config`** skill, which teaches Claude Code or Codex the whole configuration schema and ships a validator for it:
+
+```bash
+# Claude Code
+claude plugin marketplace add kbwo/ccmanager
+claude plugin install ccmanager-config@ccmanager
+
+# Codex CLI
+codex plugin marketplace add kbwo/ccmanager
+codex plugin add ccmanager-config@ccmanager
+```
+
+Then just ask — "set this repo up to run codex in ccmanager", "notify me when a session is waiting for input", "why is my `.ccmanager.json` being ignored?". See [plugins/ccmanager-config/README.md](plugins/ccmanager-config/README.md).
+
 ## Supported AI Assistants
 
 CCManager supports multiple AI coding assistants with tailored state detection for each:
