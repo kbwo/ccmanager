@@ -1,0 +1,18 @@
+{
+	"$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+	"name": "ccmanager",
+	"description": "Plugins that help you work with CCManager, the TUI session manager for AI coding agents across git worktrees",
+	"owner": {
+		"name": "kbwo",
+		"url": "https://github.com/kbwo"
+	},
+	"plugins": [
+		{
+			"name": "ccmanager-config",
+			"description": "Writes, reviews, and fixes CCManager configuration files (.ccmanager.json and the global config.json): command presets, status/worktree hooks, worktree auto-directory patterns, merge arguments, shortcuts, and auto-approval.",
+			"source": "./plugins/ccmanager-config",
+			"category": "productivity",
+			"homepage": "https://github.com/kbwo/ccmanager/tree/main/plugins/ccmanager-config"
+		}
+	]
+}
