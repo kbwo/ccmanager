@@ -6,6 +6,7 @@ import Dashboard from './Dashboard.js';
 import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
+import DeleteConfirmation from './DeleteConfirmation.js';
 import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
@@ -36,7 +37,10 @@ import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
 import {projectManager} from '../services/projectManager.js';
-import {generateWorktreeDirectory} from '../utils/worktreeUtils.js';
+import {
+	generateWorktreeDirectory,
+	isDeletableWorktree,
+} from '../utils/worktreeUtils.js';
 
 type View =
 	| 'menu'
@@ -48,6 +52,7 @@ type View =
 	| 'creating-session'
 	| 'creating-session-preset'
 	| 'delete-worktree'
+	| 'confirm-delete-worktree'
 	| 'deleting-worktree'
 	| 'merge-worktree'
 	| 'configuration'
@@ -96,9 +101,17 @@ const App: React.FC<AppProps> = ({
 		name?: string;
 	} | null>(null);
 	const [sessionActionsTarget, setSessionActionsTarget] = useState<{
-		session: ISession;
 		worktreePath: string;
+		session?: ISession;
+		// Present only when the actions menu was opened from a menu row, which is
+		// the only entry point that knows the worktree; the Dashboard opens it
+		// from a session alone and therefore offers no worktree deletion.
+		worktree?: Worktree;
 	} | null>(null);
+	// Worktree awaiting confirmation of the per-row delete action
+	const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(
+		null,
+	);
 	const [selectedProject, setSelectedProject] = useState<GitProject | null>(
 		null,
 	); // Store selected project in multi-project mode
@@ -498,8 +511,9 @@ const App: React.FC<AppProps> = ({
 				return;
 			case 'sessionActions':
 				setSessionActionsTarget({
+					worktreePath: action.worktree.path,
 					session: action.session,
-					worktreePath: action.worktreePath,
+					worktree: action.worktree,
 				});
 				navigateWithClear('session-actions');
 				return;
@@ -798,6 +812,11 @@ const App: React.FC<AppProps> = ({
 	const handleDeleteWorktrees = async (
 		worktreePaths: string[],
 		deleteBranch: boolean,
+		options?: {
+			// Where to send the user when a deletion fails. Defaults to the
+			// multi-select delete screen, which is where this flow starts.
+			onError?: () => void;
+		},
 	) => {
 		// Set loading context before showing loading view
 		setLoadingContext({deleteBranch});
@@ -846,7 +865,11 @@ const App: React.FC<AppProps> = ({
 			handleReturnToMenu();
 		} else {
 			// Show error
-			setView('delete-worktree');
+			if (options?.onError) {
+				options.onError();
+			} else {
+				setView('delete-worktree');
+			}
 		}
 	};
 
@@ -1092,10 +1115,16 @@ const App: React.FC<AppProps> = ({
 	}
 
 	if (view === 'session-actions' && sessionActionsTarget) {
-		const {session: targetSession, worktreePath} = sessionActionsTarget;
-		const label = targetSession.sessionName
-			? `${worktreePath} : ${targetSession.sessionName}`
-			: `${worktreePath} #${targetSession.sessionNumber}`;
+		const {
+			session: targetSession,
+			worktreePath,
+			worktree: targetWorktree,
+		} = sessionActionsTarget;
+		const label = !targetSession
+			? worktreePath
+			: targetSession.sessionName
+				? `${worktreePath} : ${targetSession.sessionName}`
+				: `${worktreePath} #${targetSession.sessionNumber}`;
 
 		const handleSessionAction = async (action: SessionActionType) => {
 			setSessionActionsTarget(null);
@@ -1112,6 +1141,7 @@ const App: React.FC<AppProps> = ({
 					);
 					return;
 				case 'rename':
+					if (!targetSession) return;
 					setRenameTarget({
 						id: targetSession.id,
 						name: targetSession.sessionName,
@@ -1119,8 +1149,14 @@ const App: React.FC<AppProps> = ({
 					navigateWithClear('rename-session');
 					return;
 				case 'kill':
+					if (!targetSession) return;
 					sessionManager.destroySession(targetSession.id);
 					handleReturnToMenu();
+					return;
+				case 'deleteWorktree':
+					if (!targetWorktree) return;
+					setWorktreeToDelete(targetWorktree);
+					navigateWithClear('confirm-delete-worktree');
 					return;
 			}
 		};
@@ -1128,9 +1164,35 @@ const App: React.FC<AppProps> = ({
 		return (
 			<SessionActions
 				sessionLabel={label}
+				hasSession={!!targetSession}
+				canDeleteWorktree={
+					!!targetWorktree && isDeletableWorktree(targetWorktree)
+				}
 				onSelect={handleSessionAction}
 				onCancel={() => {
 					setSessionActionsTarget(null);
+					handleReturnToMenu();
+				}}
+			/>
+		);
+	}
+
+	if (view === 'confirm-delete-worktree' && worktreeToDelete) {
+		const target = worktreeToDelete;
+
+		return (
+			<DeleteConfirmation
+				worktrees={[target]}
+				onConfirm={deleteBranch => {
+					setWorktreeToDelete(null);
+					void handleDeleteWorktrees([target.path], deleteBranch, {
+						// The multi-select delete screen was never opened in this flow,
+						// so surface the failure on the menu instead.
+						onError: handleReturnToMenu,
+					});
+				}}
+				onCancel={() => {
+					setWorktreeToDelete(null);
 					handleReturnToMenu();
 				}}
 			/>

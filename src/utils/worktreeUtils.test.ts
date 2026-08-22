@@ -6,6 +6,7 @@ import {
 	prepareSessionItems,
 	calculateColumnPositions,
 	assembleSessionLabel,
+	isDeletableWorktree,
 } from './worktreeUtils.js';
 import {Worktree, Session} from '../types/index.js';
 import {execSync} from 'child_process';
@@ -464,5 +465,54 @@ describe('column alignment', () => {
 		// Check alignment by stripping ANSI codes
 		const plain = result.replace(/\x1b\[[0-9;]*m/g, '');
 		expect(plain.indexOf('+10 -5')).toBe(21); // Should start at column 21
+	});
+});
+
+describe('isDeletableWorktree', () => {
+	it('should reject the main worktree', () => {
+		expect(
+			isDeletableWorktree(
+				{path: '/repo', isMainWorktree: true},
+				'/somewhere/else',
+			),
+		).toBe(false);
+	});
+
+	it('should reject the worktree holding the current working directory', () => {
+		expect(
+			isDeletableWorktree(
+				{path: '/repo/worktrees/feature', isMainWorktree: false},
+				'/repo/worktrees/feature',
+			),
+		).toBe(false);
+	});
+
+	it('should reject a worktree that is an ancestor of the current working directory', () => {
+		expect(
+			isDeletableWorktree(
+				{path: '/repo/worktrees/feature', isMainWorktree: false},
+				'/repo/worktrees/feature/src/components',
+			),
+		).toBe(false);
+	});
+
+	it('should accept a sibling worktree with a shared path prefix', () => {
+		// '/repo/worktrees/feature-2' starts with the '/repo/worktrees/feature'
+		// string but is a different directory, so it stays deletable.
+		expect(
+			isDeletableWorktree(
+				{path: '/repo/worktrees/feature', isMainWorktree: false},
+				'/repo/worktrees/feature-2',
+			),
+		).toBe(true);
+	});
+
+	it('should accept an unrelated linked worktree', () => {
+		expect(
+			isDeletableWorktree(
+				{path: '/repo/worktrees/feature', isMainWorktree: false},
+				'/repo',
+			),
+		).toBe(true);
 	});
 });

@@ -1,5 +1,4 @@
 import React, {useState, useEffect} from 'react';
-import path from 'path';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
@@ -11,6 +10,7 @@ import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
+import {isDeletableWorktree} from '../utils/worktreeUtils.js';
 
 interface DeleteWorktreeProps {
 	projectPath?: string;
@@ -59,19 +59,9 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				);
 
 				if (!cancelled) {
-					// Filter out main worktree and current working directory worktree
-					const resolvedCwd = path.resolve(process.cwd());
-					const deletableWorktrees = allWorktrees.filter(wt => {
-						if (wt.isMainWorktree) return false;
-						const resolvedPath = path.resolve(wt.path);
-						if (
-							resolvedCwd === resolvedPath ||
-							resolvedCwd.startsWith(resolvedPath + path.sep)
-						) {
-							return false;
-						}
-						return true;
-					});
+					const deletableWorktrees = allWorktrees.filter(wt =>
+						isDeletableWorktree(wt),
+					);
 					setWorktrees(deletableWorktrees);
 					setIsLoading(false);
 				}

@@ -473,8 +473,62 @@ describe('Menu component Effect-based error handling', () => {
 
 		expect(onMenuAction).toHaveBeenCalledWith({
 			type: 'sessionActions',
+			worktree: cachedWorktree,
 			session: cachedSession,
-			worktreePath: '/test/cached',
+		});
+	});
+
+	it('should open the actions menu with Space on a worktree row that has no session', async () => {
+		const {Effect} = await import('effect');
+		const sessionlessWorktree = {
+			path: '/test/no-session',
+			branch: 'feature/no-session',
+			isMainWorktree: false,
+			hasSession: false,
+		};
+
+		vi.spyOn(sessionManager, 'getAllSessions').mockReturnValue([]);
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed([sessionlessWorktree]),
+		);
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
+		);
+
+		const onMenuAction = vi.fn();
+		vi.mocked(useInput).mockClear();
+
+		render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				initialSnapshot={{
+					worktrees: [sessionlessWorktree],
+					defaultBranch: 'main',
+				}}
+				onMenuAction={onMenuAction}
+				version="test"
+			/>,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		// Menu's hotkey handler bails out when raw mode is unavailable.
+		const origSetRawMode = process.stdin.setRawMode;
+		process.stdin.setRawMode = vi.fn() as never;
+		try {
+			const calls = vi.mocked(useInput).mock.calls;
+			const handler = calls[calls.length - 1]?.[0];
+			expect(handler).toBeDefined();
+			handler!(' ', makeKey() as never);
+		} finally {
+			process.stdin.setRawMode = origSetRawMode;
+		}
+
+		expect(onMenuAction).toHaveBeenCalledWith({
+			type: 'sessionActions',
+			worktree: sessionlessWorktree,
+			session: undefined,
 		});
 	});
 });

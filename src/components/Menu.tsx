@@ -126,15 +126,15 @@ const Menu: React.FC<MenuProps> = ({
 	const worktrees = useGitStatus(baseWorktrees, defaultBranch);
 	// Seed from the in-memory session list so the cached snapshot renders with its
 	// sessions attached. Waiting for the async git load would leave every row
-	// session-less for that window, disabling the Space session-actions shortcut.
+	// session-less for that window, hiding the session entries of the Space
+	// actions menu.
 	const [sessions, setSessions] = useState<Session[]>(() =>
 		sessionManager.getAllSessions(),
 	);
 	const [items, setItems] = useState<MenuItem[]>([]);
 	const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
-	const [highlightedWorktreePath, setHighlightedWorktreePath] = useState<
-		string | null
-	>(null);
+	const [highlightedWorktree, setHighlightedWorktree] =
+		useState<Worktree | null>(null);
 	const [highlightedSession, setHighlightedSession] = useState<
 		Session | undefined
 	>(undefined);
@@ -420,20 +420,23 @@ const Menu: React.FC<MenuProps> = ({
 		}
 		setItems(menuItems);
 
-		// Ensure highlighted worktree path is valid for hotkey support
-		setHighlightedWorktreePath(prev => {
-			if (
-				prev &&
-				menuItems.some(
-					item => item.type === 'worktree' && item.worktree.path === prev,
-				)
-			) {
-				return prev;
+		// Ensure highlighted worktree is valid for hotkey support
+		setHighlightedWorktree(prev => {
+			const stillListed = prev
+				? menuItems.find(
+						item =>
+							item.type === 'worktree' && item.worktree.path === prev.path,
+					)
+				: undefined;
+			if (stillListed && stillListed.type === 'worktree') {
+				// Re-read the item so the highlighted worktree keeps up with
+				// refreshed git status instead of pinning the stale object.
+				return stillListed.worktree;
 			}
 			const first = menuItems.find(item => item.type === 'worktree');
 			if (first && first.type === 'worktree') {
 				setHighlightedSession(first.session);
-				return first.worktree.path;
+				return first.worktree;
 			}
 			setHighlightedSession(undefined);
 			return null;
@@ -521,18 +524,21 @@ const Menu: React.FC<MenuProps> = ({
 		switch (keyPressed) {
 			case 'a':
 				// Toggle auto-approval for the currently highlighted worktree
-				if (configReader.isAutoApprovalEnabled() && highlightedWorktreePath) {
-					sessionManager.toggleAutoApprovalForWorktree(highlightedWorktreePath);
+				if (configReader.isAutoApprovalEnabled() && highlightedWorktree) {
+					sessionManager.toggleAutoApprovalForWorktree(
+						highlightedWorktree.path,
+					);
 					setAutoApprovalToggleCounter(c => c + 1);
 				}
 				break;
 			case ' ':
-				// Open session actions for highlighted session
-				if (highlightedSession && highlightedWorktreePath) {
+				// Open the row actions for the highlighted worktree. Rows without a
+				// session open the same menu with only the worktree-level entries.
+				if (highlightedWorktree) {
 					onMenuAction({
 						type: 'sessionActions',
+						worktree: highlightedWorktree,
 						session: highlightedSession,
-						worktreePath: highlightedWorktreePath,
 					});
 				}
 				break;
@@ -673,7 +679,7 @@ const Menu: React.FC<MenuProps> = ({
 						const item = items.find(i => i.value === raw?.value);
 						if (!item) return;
 						if (item.type === 'worktree') {
-							setHighlightedWorktreePath(item.worktree.path);
+							setHighlightedWorktree(item.worktree);
 							setHighlightedSession(item.session);
 						}
 					}}
@@ -712,12 +718,12 @@ const Menu: React.FC<MenuProps> = ({
 					{isSearchMode
 						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
 						: searchQuery
-							? `Controls: ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Tab-State Filter Space-Session actions (session rows only) N-New M-Merge D-Delete ${
+							? `Controls: ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Tab-State Filter Space-Worktree actions N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
 								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Tab-State Filter Space-Session actions (session rows only) N-New M-Merge D-Delete ${
+							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Tab-State Filter Space-Worktree actions N-New M-Merge D-Delete ${
 									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
 								}${
 									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'

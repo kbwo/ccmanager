@@ -85,9 +85,12 @@ export type MenuAction =
 	| {type: 'renameSession'; session: Session}
 	| {type: 'killSession'; sessionId: string}
 	| {
+			// Row-level actions opened with Space. `session` is absent for a
+			// worktree row that has no session yet; the actions menu then offers
+			// only the worktree-level entries.
 			type: 'sessionActions';
-			session: Session;
-			worktreePath: string;
+			worktree: Worktree;
+			session?: Session;
 	  }
 	| {type: 'deleteWorktree'}
 	| {type: 'mergeWorktree'}

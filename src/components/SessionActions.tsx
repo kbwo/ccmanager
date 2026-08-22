@@ -2,48 +2,76 @@ import React from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 
-export type SessionActionType = 'newSession' | 'rename' | 'kill';
+export type SessionActionType =
+	| 'newSession'
+	| 'rename'
+	| 'kill'
+	| 'deleteWorktree';
 
 interface SessionActionsProps {
 	sessionLabel: string;
+	/**
+	 * Whether the row this menu was opened from has a running session. Session
+	 * specific actions (rename, close) are hidden when it does not.
+	 */
+	hasSession?: boolean;
+	/**
+	 * Whether the worktree of this row may be deleted; see isDeletableWorktree.
+	 * The delete entry is hidden rather than shown-and-rejected so no
+	 * unselectable option appears.
+	 */
+	canDeleteWorktree?: boolean;
 	onSelect: (action: SessionActionType) => void;
 	onCancel: () => void;
 }
 
-const items: Array<{label: string; value: SessionActionType}> = [
-	{label: 'S  New session in same directory', value: 'newSession'},
-	{label: 'R  Rename this session', value: 'rename'},
-	{label: 'X  Close session', value: 'kill'},
-];
+const buildItems = (
+	hasSession: boolean,
+	canDeleteWorktree: boolean,
+): Array<{label: string; value: SessionActionType}> => {
+	const items: Array<{label: string; value: SessionActionType}> = [
+		{label: 'S  New session in this worktree', value: 'newSession'},
+	];
+
+	if (hasSession) {
+		items.push({label: 'R  Rename this session', value: 'rename'});
+		items.push({label: 'X  Close session', value: 'kill'});
+	}
+
+	if (canDeleteWorktree) {
+		items.push({label: 'D  Delete this worktree', value: 'deleteWorktree'});
+	}
+
+	return items;
+};
 
 const SessionActions: React.FC<SessionActionsProps> = ({
 	sessionLabel,
+	hasSession = true,
+	canDeleteWorktree = false,
 	onSelect,
 	onCancel,
 }) => {
+	const items = buildItems(hasSession, canDeleteWorktree);
+
 	useInput((input, key) => {
 		if (key.escape) {
 			onCancel();
 			return;
 		}
 
-		switch (input.toLowerCase()) {
-			case 's':
-				onSelect('newSession');
-				break;
-			case 'r':
-				onSelect('rename');
-				break;
-			case 'x':
-				onSelect('kill');
-				break;
+		const shortcut = items.find(
+			item => item.label[0]?.toLowerCase() === input.toLowerCase(),
+		);
+		if (shortcut) {
+			onSelect(shortcut.value);
 		}
 	});
 
 	return (
 		<Box flexDirection="column" padding={1}>
 			<Text bold color="cyan">
-				Session Actions
+				{hasSession ? 'Session Actions' : 'Worktree Actions'}
 			</Text>
 			<Box marginTop={1}>
 				<Text dimColor>{sessionLabel}</Text>
@@ -52,7 +80,10 @@ const SessionActions: React.FC<SessionActionsProps> = ({
 				<SelectInput items={items} onSelect={item => onSelect(item.value)} />
 			</Box>
 			<Box marginTop={1}>
-				<Text dimColor>S/R/X or arrow keys + Enter | Escape to cancel</Text>
+				<Text dimColor>
+					{items.map(item => item.label[0]).join('/')} or arrow keys + Enter |
+					Escape to cancel
+				</Text>
 			</Box>
 		</Box>
 	);

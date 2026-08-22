@@ -461,3 +461,33 @@ export function assembleSessionLabel(
 
 	return label;
 }
+
+/**
+ * Whether a worktree may be deleted by CCManager.
+ *
+ * Two worktrees are off limits:
+ * - the main worktree, because git refuses to remove it and the repository
+ *   would be left without a checkout;
+ * - the worktree that contains the current working directory, because removing
+ *   the directory CCManager is running in breaks the running process.
+ *
+ * Single source of truth for the rule, shared by the multi-select delete screen
+ * and the per-row delete action.
+ */
+export function isDeletableWorktree(
+	worktree: Pick<Worktree, 'path' | 'isMainWorktree'>,
+	cwd: string = process.cwd(),
+): boolean {
+	if (worktree.isMainWorktree) return false;
+
+	const resolvedCwd = path.resolve(cwd);
+	const resolvedPath = path.resolve(worktree.path);
+	if (
+		resolvedCwd === resolvedPath ||
+		resolvedCwd.startsWith(resolvedPath + path.sep)
+	) {
+		return false;
+	}
+
+	return true;
+}
