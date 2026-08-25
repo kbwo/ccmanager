@@ -20,6 +20,7 @@ import {
 	executeWorktreePostCreationHook,
 	executeWorktreePreCreationHook,
 } from '../utils/hookExecutor.js';
+import {copyWorktreeIncludeFiles} from '../utils/worktreeInclude.js';
 import {configReader} from './config/configReader.js';
 import {logger} from '../utils/logger.js';
 
@@ -521,6 +522,32 @@ export class WorktreeService {
 						cause: String(error),
 					}),
 			});
+		});
+	}
+
+	/**
+	 * Effect-based copyWorktreeIncludeFiles operation.
+	 * Copies the gitignored files a `.worktreeinclude` file at the repository
+	 * root selects (see src/utils/worktreeInclude.ts) into the new worktree.
+	 * A no-op when no `.worktreeinclude` file exists, so this always runs
+	 * unconditionally rather than being gated by a config flag.
+	 *
+	 * @param {string} gitRoot - Absolute path to the main checkout
+	 * @param {string} targetWorktreePath - Path of the newly created worktree
+	 * @returns {Effect.Effect<void, FileSystemError, never>} Effect that completes successfully or fails with FileSystemError
+	 */
+	private copyWorktreeIncludeFilesEffect(
+		gitRoot: string,
+		targetWorktreePath: string,
+	): Effect.Effect<void, FileSystemError, never> {
+		return Effect.try({
+			try: () => copyWorktreeIncludeFiles(gitRoot, targetWorktreePath),
+			catch: (error: unknown) =>
+				new FileSystemError({
+					operation: 'write',
+					path: targetWorktreePath,
+					cause: String(error),
+				}),
 		});
 	}
 
@@ -1165,6 +1192,21 @@ export class WorktreeService {
 					},
 				);
 			}
+
+			// Copy files selected by a .worktreeinclude file, if one exists at
+			// the repository root. Runs unconditionally (no config flag) and
+			// before the post-creation hook, so hook commands can rely on the
+			// copied files (e.g. .env) already being in place.
+			yield* Effect.catchAll(
+				self.copyWorktreeIncludeFilesEffect(absoluteGitRoot, resolvedPath),
+				(error: unknown) => {
+					console.error(
+						'Warning: Failed to copy .worktreeinclude files:',
+						error,
+					);
+					return Effect.succeed(undefined);
+				},
+			);
 
 			// Execute post-creation hook if configured
 			const worktreeHooks = configReader.getWorktreeHooks();
