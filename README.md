@@ -15,6 +15,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
 - **Copy Claude Code session data** between worktrees to maintain conversation context
+- **`.worktreeinclude` support**: carry gitignored project files (`.env`, local certs) into newly created worktrees
 - Configurable keyboard shortcuts
 - Command presets with automatic fallback support
 - Configurable state detection strategies for different CLI tools
@@ -208,6 +209,17 @@ The default choice (copy or start fresh) will be pre-selected when creating new 
 - **Collaboration**: Share session state across team worktrees
 - **Context Preservation**: Maintain long conversations across multiple development branches
 
+
+## Copying Gitignored Files into New Worktrees
+
+A new Git worktree contains only tracked files, so gitignored files a project needs in order to run — `.env`, local certificates, generated local config — do not come along. If the repository root has a `.worktreeinclude` file (gitignore syntax) listing those files, CCManager copies them into every worktree it creates.
+
+- **Shared convention**: same file name and semantics as Claude Code, Conductor, OpenAI Codex, and `git-worktreeinclude`, so an existing `.worktreeinclude` works with CCManager unchanged
+- **No configuration**: the copy runs whenever a `.worktreeinclude` file exists
+- **Safe by construction**: a file is copied only if it both matches a pattern and is actually gitignored, so tracked files are never duplicated
+- **Hook-friendly**: files are copied before the post-creation worktree hook runs, so hook commands can rely on them
+
+For pattern syntax, the exact selection rule, and troubleshooting, see [docs/worktree-include.md](docs/worktree-include.md).
 
 ## Status Change Hooks
 
