@@ -1120,11 +1120,13 @@ const App: React.FC<AppProps> = ({
 			worktreePath,
 			worktree: targetWorktree,
 		} = sessionActionsTarget;
+		// A worktree row without a session has no session name to show; the
+		// worktree path is rendered on its own line by SessionActions.
 		const label = !targetSession
-			? worktreePath
+			? undefined
 			: targetSession.sessionName
-				? `${worktreePath} : ${targetSession.sessionName}`
-				: `${worktreePath} #${targetSession.sessionNumber}`;
+				? targetSession.sessionName
+				: `Session #${targetSession.sessionNumber}`;
 
 		const handleSessionAction = async (action: SessionActionType) => {
 			setSessionActionsTarget(null);
@@ -1164,6 +1166,7 @@ const App: React.FC<AppProps> = ({
 		return (
 			<SessionActions
 				sessionLabel={label}
+				worktreePath={worktreePath}
 				hasSession={!!targetSession}
 				canDeleteWorktree={
 					!!targetWorktree && isDeletableWorktree(targetWorktree)

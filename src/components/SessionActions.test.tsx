@@ -67,7 +67,8 @@ describe('SessionActions', () => {
 	it('should show session actions and the delete entry for a deletable worktree', () => {
 		const {lastFrame} = render(
 			<SessionActions
-				sessionLabel="/repo/worktrees/feature #1"
+				sessionLabel="Session #1"
+				worktreePath="/repo/worktrees/feature"
 				hasSession
 				canDeleteWorktree
 				onSelect={vi.fn()}
@@ -86,7 +87,7 @@ describe('SessionActions', () => {
 	it('should hide session-specific actions for a worktree without a session', () => {
 		const {lastFrame} = render(
 			<SessionActions
-				sessionLabel="/repo/worktrees/feature"
+				worktreePath="/repo/worktrees/feature"
 				hasSession={false}
 				canDeleteWorktree
 				onSelect={vi.fn()}
@@ -105,7 +106,8 @@ describe('SessionActions', () => {
 	it('should hide the delete entry when the worktree cannot be deleted', () => {
 		const {lastFrame} = render(
 			<SessionActions
-				sessionLabel="/repo #1"
+				sessionLabel="Session #1"
+				worktreePath="/repo"
 				hasSession
 				canDeleteWorktree={false}
 				onSelect={vi.fn()}
@@ -120,7 +122,7 @@ describe('SessionActions', () => {
 		const onSelect = vi.fn();
 		render(
 			<SessionActions
-				sessionLabel="/repo/worktrees/feature"
+				worktreePath="/repo/worktrees/feature"
 				hasSession={false}
 				canDeleteWorktree
 				onSelect={onSelect}
@@ -137,7 +139,8 @@ describe('SessionActions', () => {
 		const onSelect = vi.fn();
 		render(
 			<SessionActions
-				sessionLabel="/repo #1"
+				sessionLabel="Session #1"
+				worktreePath="/repo"
 				hasSession
 				canDeleteWorktree={false}
 				onSelect={onSelect}
@@ -157,7 +160,8 @@ describe('SessionActions', () => {
 		const onCancel = vi.fn();
 		render(
 			<SessionActions
-				sessionLabel="/repo #1"
+				sessionLabel="Session #1"
+				worktreePath="/repo"
 				hasSession
 				canDeleteWorktree
 				onSelect={vi.fn()}

@@ -32,6 +32,7 @@ const createStrategyItems = (): {
 		cline: {label: 'Cline', value: 'cline'},
 		opencode: {label: 'OpenCode', value: 'opencode'},
 		kimi: {label: 'Kimi', value: 'kimi'},
+		mcode: {label: 'MiniMax Code', value: 'mcode'},
 	};
 
 	return Object.values(strategies);
@@ -50,6 +51,7 @@ const DEFAULT_COMMANDS: Record<StateDetectionStrategy, string> = {
 	cline: 'cline',
 	opencode: 'opencode',
 	kimi: 'kimi',
+	mcode: 'mcode',
 };
 
 interface ConfigureCommandProps {
@@ -81,6 +83,8 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 			return 'OpenCode';
 		case 'kimi':
 			return 'Kimi';
+		case 'mcode':
+			return 'MiniMax Code';
 		default:
 			return 'Claude';
 	}

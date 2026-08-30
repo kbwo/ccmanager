@@ -9,7 +9,12 @@ export type SessionActionType =
 	| 'deleteWorktree';
 
 interface SessionActionsProps {
-	sessionLabel: string;
+	/**
+	 * Name of the session this menu was opened from. Absent for a worktree row
+	 * that has no session yet.
+	 */
+	sessionLabel?: string;
+	worktreePath: string;
 	/**
 	 * Whether the row this menu was opened from has a running session. Session
 	 * specific actions (rename, close) are hidden when it does not.
@@ -47,6 +52,7 @@ const buildItems = (
 
 const SessionActions: React.FC<SessionActionsProps> = ({
 	sessionLabel,
+	worktreePath,
 	hasSession = true,
 	canDeleteWorktree = false,
 	onSelect,
@@ -73,8 +79,9 @@ const SessionActions: React.FC<SessionActionsProps> = ({
 			<Text bold color="cyan">
 				{hasSession ? 'Session Actions' : 'Worktree Actions'}
 			</Text>
-			<Box marginTop={1}>
-				<Text dimColor>{sessionLabel}</Text>
+			<Box marginTop={1} flexDirection="column">
+				{sessionLabel && <Text dimColor>{sessionLabel}</Text>}
+				<Text dimColor>Directory: {worktreePath}</Text>
 			</Box>
 			<Box marginTop={1}>
 				<SelectInput items={items} onSelect={item => onSelect(item.value)} />
