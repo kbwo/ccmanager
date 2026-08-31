@@ -105,17 +105,22 @@ describe.skipIf(!canRunHarness())('return to menu shortcut (E2E)', () => {
 		},
 	);
 
-	// Reproduces https://github.com/kbwo/ccmanager/issues/327: the same Ctrl+E,
-	// reported by the kitty keyboard protocol with a lock-state bit in the
-	// modifier mask, is not recognised and is forwarded to the child process
-	// instead. These expectations describe the current, broken behaviour — when
-	// the issue is fixed both of them have to become `true`.
+	// https://github.com/kbwo/ccmanager/issues/327: the lock state is not part
+	// of the keypress the user made, so Ctrl+E has to work exactly the same
+	// whether or not Num Lock or Caps Lock happens to be on.
 	it(
-		'does not return to the menu when a lock-state bit is set (issue #327)',
-		{timeout: 300_000},
+		'returns to the menu on the kitty CSI-u form with the Num Lock bit set (issue #327)',
+		{timeout: 150_000},
 		() => {
-			expect(runHarness(SEQUENCES.csiUCtrlNumLock).returnedToMenu).toBe(false);
-			expect(runHarness(SEQUENCES.csiUCtrlCapsLock).returnedToMenu).toBe(false);
+			expect(runHarness(SEQUENCES.csiUCtrlNumLock).returnedToMenu).toBe(true);
+		},
+	);
+
+	it(
+		'returns to the menu on the kitty CSI-u form with the Caps Lock bit set (issue #327)',
+		{timeout: 150_000},
+		() => {
+			expect(runHarness(SEQUENCES.csiUCtrlCapsLock).returnedToMenu).toBe(true);
 		},
 	);
 });

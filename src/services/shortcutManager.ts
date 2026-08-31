@@ -2,6 +2,42 @@ import {ShortcutKey, ShortcutConfig} from '../types/index.js';
 import {Key} from 'ink';
 import {configReader} from './config/configReader.js';
 
+/**
+ * Bits that extended keyboard protocols add to the modifier mask of a keypress
+ * to report the *lock state* of the keyboard rather than a key the user is
+ * holding down. Laptops commonly boot with Num Lock on internally even without
+ * a numpad, so these bits show up on ordinary shortcuts and must be ignored
+ * when deciding which shortcut a keypress belongs to.
+ * https://github.com/kbwo/ccmanager/issues/327
+ */
+const CAPS_LOCK_BIT = 64;
+const NUM_LOCK_BIT = 128;
+const LOCK_STATE_BITS = CAPS_LOCK_BIT | NUM_LOCK_BIT;
+
+/**
+ * Kitty keyboard protocol (also used by WezTerm and Ghostty):
+ * `ESC [ <code point> ; <modifiers> u`.
+ * The code point may be followed by alternate key reports
+ * (`code:shifted:base`), the modifiers by an event type (`modifiers:event`,
+ * 1 press / 2 repeat / 3 release), and the whole sequence by a trailing field
+ * carrying the associated text code points — all optional.
+ * https://sw.kovidgoyal.net/kitty/keyboard-protocol/
+ */
+const CSI_U_SEQUENCE =
+	/\u001b\[(\d+)(?::\d+)*(?:;(\d+)(?::(\d+))?)?(?:;[\d:]+)?u/g;
+
+/** tmux and xterm with modifyOtherKeys: `ESC [ 27 ; <modifiers> ; <code point> ~`. */
+const MODIFY_OTHER_KEYS_SEQUENCE = /\u001b\[27;(\d+);(\d+)~/g;
+
+/**
+ * Reported by the setups in issues #82 and #107:
+ * `ESC [ 1 ; <modifiers> <letter>`.
+ */
+const CSI_LETTER_SEQUENCE = /\u001b\[1;(\d+)([A-Za-z])/g;
+
+/** Event types that mean the key went down; 3 (release) must not trigger. */
+const KEY_DOWN_EVENT_TYPES = new Set(['1', '2']);
+
 export class ShortcutManager {
 	private reservedKeys: ShortcutKey[] = [
 		{ctrl: true, key: 'c'},
@@ -80,40 +116,84 @@ export class ShortcutManager {
 			codes.add('\u001b');
 		}
 
-		// Kitty/xterm extended keyboard sequences (CSI <code>;<mod>u)
-		if (
-			shortcut.ctrl &&
-			!shortcut.alt &&
-			!shortcut.shift &&
-			shortcut.key.length === 1
-		) {
-			const lower = shortcut.key.toLowerCase();
-			const upperCode = lower.toUpperCase().charCodeAt(0);
-			const lowerCode = lower.charCodeAt(0);
-
-			// Include the CSI u format (ESC[<code>;5u) used by Kitty/WezTerm for Ctrl+letters.
-			if (upperCode >= 32 && upperCode <= 126) {
-				codes.add(`\u001b[${upperCode};5u`);
-			}
-			if (lowerCode !== upperCode && lowerCode >= 32 && lowerCode <= 126) {
-				codes.add(`\u001b[${lowerCode};5u`);
-			}
-			// Tmux/xterm with modifyOtherKeys emit ESC[27;5;<code>~ for the same shortcut.
-			if (upperCode >= 32 && upperCode <= 126) {
-				codes.add(`\u001b[27;5;${upperCode}~`);
-			}
-			if (lowerCode !== upperCode && lowerCode >= 32 && lowerCode <= 126) {
-				codes.add(`\u001b[27;5;${lowerCode}~`);
-			}
-			// Some setups (issue #82/#107 repros) send ESC[1;5<letter>; include both upper/lower.
-			const upperKey = lower.toUpperCase();
-			codes.add(`\u001b[1;5${upperKey}`);
-			if (upperKey !== lower) {
-				codes.add(`\u001b[1;5${lower}`);
-			}
-		}
+		// The extended keyboard sequences (CSI u, modifyOtherKeys, CSI 1;<mod><letter>)
+		// are deliberately not listed here: their modifier field varies with the
+		// keyboard's lock state, so they are matched by parsing the incoming bytes
+		// in matchesExtendedKeySequence() instead of by string comparison.
 
 		return Array.from(codes);
+	}
+
+	/**
+	 * Modifier bit mask of a shortcut, in the encoding shared by the extended
+	 * keyboard sequences: 1 shift, 2 alt, 4 ctrl.
+	 */
+	private getModifierMask(shortcut: ShortcutKey): number {
+		return (
+			(shortcut.shift ? 1 : 0) |
+			(shortcut.alt ? 2 : 0) |
+			(shortcut.ctrl ? 4 : 0)
+		);
+	}
+
+	/**
+	 * Read the modifier parameter of an extended keyboard sequence, which
+	 * terminals report as `1 + <bit mask>`, and drop the keyboard's lock state
+	 * from it. An absent parameter means "no modifiers"; anything unparseable
+	 * yields null, which matches no shortcut.
+	 */
+	private parseModifiers(parameter: string | undefined): number | null {
+		if (parameter === undefined || parameter === '') return 0;
+		const reported = Number.parseInt(parameter, 10);
+		if (!Number.isInteger(reported) || reported < 1) return null;
+		return (reported - 1) & ~LOCK_STATE_BITS;
+	}
+
+	/**
+	 * Match the extended keyboard sequences a terminal can send for a
+	 * Ctrl+<letter> shortcut. They carry the modifiers as a number, so they are
+	 * parsed instead of compared against pre-built strings: that number also
+	 * reports the Caps Lock and Num Lock state, which is not part of the
+	 * keypress and would otherwise keep the shortcut from ever matching
+	 * (https://github.com/kbwo/ccmanager/issues/327).
+	 */
+	private matchesExtendedKeySequence(
+		shortcut: ShortcutKey,
+		input: string,
+	): boolean {
+		if (!shortcut.ctrl || shortcut.alt || shortcut.shift) return false;
+		if (shortcut.key.length !== 1) return false;
+
+		const expectedModifiers = this.getModifierMask(shortcut);
+		const lowerKey = shortcut.key.toLowerCase();
+		const upperKey = lowerKey.toUpperCase();
+		// Terminals differ in whether they report the shifted or the unshifted
+		// code point for a Ctrl+letter press, so accept either.
+		const codePoints = new Set([
+			lowerKey.charCodeAt(0),
+			upperKey.charCodeAt(0),
+		]);
+
+		for (const match of input.matchAll(CSI_U_SEQUENCE)) {
+			const eventType = match[3];
+			if (eventType !== undefined && !KEY_DOWN_EVENT_TYPES.has(eventType)) {
+				continue;
+			}
+			if (this.parseModifiers(match[2]) !== expectedModifiers) continue;
+			if (codePoints.has(Number.parseInt(match[1]!, 10))) return true;
+		}
+
+		for (const match of input.matchAll(MODIFY_OTHER_KEYS_SEQUENCE)) {
+			if (this.parseModifiers(match[1]) !== expectedModifiers) continue;
+			if (codePoints.has(Number.parseInt(match[2]!, 10))) return true;
+		}
+
+		for (const match of input.matchAll(CSI_LETTER_SEQUENCE)) {
+			if (this.parseModifiers(match[1]) !== expectedModifiers) continue;
+			if (match[2]!.toLowerCase() === lowerKey) return true;
+		}
+
+		return false;
 	}
 
 	public matchesShortcut(
@@ -186,7 +266,11 @@ export class ShortcutManager {
 		if (!shortcut) return false;
 
 		const codes = this.getRawShortcutCodes(shortcut);
-		return codes.some(code => input === code || input.includes(code));
+		if (codes.some(code => input === code || input.includes(code))) {
+			return true;
+		}
+
+		return this.matchesExtendedKeySequence(shortcut, input);
 	}
 }
 
