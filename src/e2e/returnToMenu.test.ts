@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {execFileSync, spawnSync} from 'child_process';
+import {existsSync} from 'fs';
 import {fileURLToPath} from 'url';
 import {dirname, join} from 'path';
 
@@ -42,10 +43,13 @@ interface HarnessResult {
 	tail?: string;
 }
 
-const harnessPath = join(
-	dirname(fileURLToPath(import.meta.url)),
-	'returnToMenuPtyHarness.ts',
-);
+// `bun install` runs the build through the `prepare` script, so this test also
+// runs from the compiled `dist/` tree, where the harness sits next to it as
+// JavaScript rather than TypeScript.
+const testDir = dirname(fileURLToPath(import.meta.url));
+const harnessPath = existsSync(join(testDir, 'returnToMenuPtyHarness.ts'))
+	? join(testDir, 'returnToMenuPtyHarness.ts')
+	: join(testDir, 'returnToMenuPtyHarness.js');
 
 /**
  * The harness needs the `bun` runtime (for the PTY) and a Unix pseudo terminal,
