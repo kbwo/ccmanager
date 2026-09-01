@@ -21,6 +21,10 @@ export interface SessionItem {
 	worktree: Worktree;
 	session?: Session;
 	baseLabel: string;
+	// Session state tag such as "[○ Idle]" (empty when the row has no session).
+	// Kept out of baseLabel so it can be rendered as its own aligned column
+	// directly left of the last-commit date; see calculateColumnPositions.
+	status: string;
 	// Name portion shown in the menu (branch + " (main)" + session name),
 	// without status icons or git status columns. Used for search matching.
 	searchableName: string;
@@ -32,6 +36,7 @@ export interface SessionItem {
 	// Visible lengths (without ANSI codes) for alignment calculation
 	lengths: {
 		base: number;
+		status: number;
 		fileChanges: number;
 		aheadBehind: number;
 		parentBranch: number;
@@ -284,7 +289,7 @@ function buildSessionItem(
 ): SessionItem {
 	const stateData = session?.stateMutex.getSnapshot();
 	const status = stateData
-		? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
+		? `[${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
 		: '';
 	const fullBranchName = wt.branch
 		? wt.branch.replace('refs/heads/', '')
@@ -293,7 +298,7 @@ function buildSessionItem(
 	const isMain = wt.isMainWorktree ? ' (main)' : '';
 	const {displaySuffix: dirSuffix, rawName: rawDirName} =
 		formatWorktreeDirectorySuffix(wt, fullBranchName);
-	const baseLabel = `${branchName}${dirSuffix}${isMain}${sessionSuffix}${status}`;
+	const baseLabel = `${branchName}${dirSuffix}${isMain}${sessionSuffix}`;
 	// Use the full (untruncated) branch name so search still matches the tail
 	// of long branch names; status icons are excluded so they don't match.
 	const rawDirForSearch = rawDirName ? ` @ ${rawDirName}` : '';
@@ -310,6 +315,7 @@ function buildSessionItem(
 		worktree: wt,
 		session,
 		baseLabel,
+		status,
 		searchableName,
 		fileChanges,
 		aheadBehind,
@@ -318,6 +324,7 @@ function buildSessionItem(
 		error,
 		lengths: {
 			base: stripAnsi(baseLabel).length,
+			status: stripAnsi(status).length,
 			fileChanges: stripAnsi(fileChanges).length,
 			aheadBehind: stripAnsi(aheadBehind).length,
 			parentBranch: stripAnsi(parentBranch).length,
@@ -376,20 +383,66 @@ export function prepareSessionItems(
 }
 
 /**
- * Calculates column positions based on content widths.
+ * Column start positions for one rendered list, plus how the session state tag
+ * (e.g. "[○ Idle]") is placed.
  */
-export function calculateColumnPositions(items: SessionItem[]) {
+export interface ColumnPositions {
+	fileChanges: number;
+	aheadBehind: number;
+	parentBranch: number;
+	status: number;
+	lastCommitDate: number;
+	/**
+	 * true: the state tag gets its own column at `status`, so every row's tag
+	 * starts at the same horizontal position, directly left of the commit date.
+	 * false: the state tag is appended right after the branch name (the layout
+	 * used before this column existed), because the aligned layout would not fit
+	 * the terminal width given to calculateColumnPositions.
+	 */
+	alignStatus: boolean;
+}
+
+/**
+ * Visible width of the name portion when the state tag is appended to it
+ * instead of getting its own column.
+ */
+function inlineBaseLength(item: SessionItem): number {
+	return (
+		item.lengths.base + (item.lengths.status ? item.lengths.status + 1 : 0)
+	);
+}
+
+/**
+ * Calculates column positions based on content widths.
+ *
+ * `availableWidth` is the number of terminal columns the label may occupy
+ * (i.e. terminal width minus whatever prefix the caller prepends). When the
+ * aligned-status layout would not fit in it, the layout falls back to appending
+ * the state tag to the name, which is narrower. Omit it to always align.
+ */
+export function calculateColumnPositions(
+	items: SessionItem[],
+	availableWidth?: number,
+): ColumnPositions {
 	// Calculate maximum widths from pre-calculated lengths
 	let maxBranchLength = 0;
+	let maxInlineBranchLength = 0;
+	let maxStatusLength = 0;
 	let maxFileChangesLength = 0;
 	let maxAheadBehindLength = 0;
 	let maxParentBranchLength = 0;
+	let maxLastCommitDateLength = 0;
 
 	items.forEach(item => {
 		// Skip items with errors for alignment calculation
 		if (item.error) return;
 
 		maxBranchLength = Math.max(maxBranchLength, item.lengths.base);
+		maxInlineBranchLength = Math.max(
+			maxInlineBranchLength,
+			inlineBaseLength(item),
+		);
+		maxStatusLength = Math.max(maxStatusLength, item.lengths.status);
 		maxFileChangesLength = Math.max(
 			maxFileChangesLength,
 			item.lengths.fileChanges,
@@ -402,23 +455,37 @@ export function calculateColumnPositions(items: SessionItem[]) {
 			maxParentBranchLength,
 			item.lengths.parentBranch,
 		);
+		maxLastCommitDateLength = Math.max(
+			maxLastCommitDateLength,
+			item.lengths.lastCommitDate,
+		);
 	});
 
-	// Simple column positioning
-	const fileChangesColumn = maxBranchLength + MIN_COLUMN_PADDING;
-	const aheadBehindColumn =
-		fileChangesColumn + maxFileChangesLength + MIN_COLUMN_PADDING + 2;
-	const parentBranchColumn =
-		aheadBehindColumn + maxAheadBehindLength + MIN_COLUMN_PADDING + 2;
-	const lastCommitDateColumn =
-		parentBranchColumn + maxParentBranchLength + MIN_COLUMN_PADDING + 2;
-
-	return {
-		fileChanges: fileChangesColumn,
-		aheadBehind: aheadBehindColumn,
-		parentBranch: parentBranchColumn,
-		lastCommitDate: lastCommitDateColumn,
+	// Simple column positioning. `branchWidth` is how much room the name portion
+	// gets, `statusWidth` is 0 when the state tag rides along with the name.
+	const layout = (branchWidth: number, statusWidth: number) => {
+		const fileChanges = branchWidth + MIN_COLUMN_PADDING;
+		const aheadBehind =
+			fileChanges + maxFileChangesLength + MIN_COLUMN_PADDING + 2;
+		const parentBranch =
+			aheadBehind + maxAheadBehindLength + MIN_COLUMN_PADDING + 2;
+		const status =
+			parentBranch + maxParentBranchLength + MIN_COLUMN_PADDING + 2;
+		const lastCommitDate =
+			status + (statusWidth ? statusWidth + MIN_COLUMN_PADDING : 0);
+		return {fileChanges, aheadBehind, parentBranch, status, lastCommitDate};
 	};
+
+	const aligned = layout(maxBranchLength, maxStatusLength);
+	const fits =
+		availableWidth === undefined ||
+		aligned.lastCommitDate + maxLastCommitDateLength <= availableWidth;
+
+	if (fits) {
+		return {...aligned, alignStatus: true};
+	}
+
+	return {...layout(maxInlineBranchLength, 0), alignStatus: false};
 }
 
 // Pad string to column position
@@ -431,15 +498,22 @@ function padTo(str: string, visibleLength: number, column: number): string {
  */
 export function assembleSessionLabel(
 	item: SessionItem,
-	columns: ReturnType<typeof calculateColumnPositions>,
+	columns: ColumnPositions,
 ): string {
-	// If there's an error, just show the base label with error appended
+	const inlineStatus = item.status
+		? `${item.baseLabel} ${item.status}`
+		: item.baseLabel;
+
+	// If there's an error, just show the base label with error appended.
+	// Error rows carry no columns at all, so the state tag stays next to the name.
 	if (item.error) {
-		return `${item.baseLabel} ${item.error}`;
+		return `${inlineStatus} ${item.error}`;
 	}
 
-	let label = item.baseLabel;
-	let currentLength = item.lengths.base;
+	let label = columns.alignStatus ? item.baseLabel : inlineStatus;
+	let currentLength = columns.alignStatus
+		? item.lengths.base
+		: inlineBaseLength(item);
 
 	if (item.fileChanges) {
 		label = padTo(label, currentLength, columns.fileChanges) + item.fileChanges;
@@ -453,6 +527,10 @@ export function assembleSessionLabel(
 		label =
 			padTo(label, currentLength, columns.parentBranch) + item.parentBranch;
 		currentLength = columns.parentBranch + item.lengths.parentBranch;
+	}
+	if (columns.alignStatus && item.status) {
+		label = padTo(label, currentLength, columns.status) + item.status;
+		currentLength = columns.status + item.lengths.status;
 	}
 	if (item.lastCommitDate) {
 		label =

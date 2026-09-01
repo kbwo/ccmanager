@@ -7,6 +7,7 @@ import {
 	calculateColumnPositions,
 	assembleSessionLabel,
 	isDeletableWorktree,
+	type SessionItem,
 } from './worktreeUtils.js';
 import {Worktree, Session} from '../types/index.js';
 import {execSync} from 'child_process';
@@ -266,9 +267,12 @@ describe('prepareSessionItems', () => {
 		expect(items[0]?.baseLabel).toBe('feature/test-branch');
 	});
 
-	it('should include session status in label', () => {
+	it('should expose the session status separately from the name', () => {
 		const items = prepareSessionItems([mockWorktree], [mockSession]);
-		expect(items[0]?.baseLabel).toContain('[○ Idle]');
+		// The status tag is its own field so it can be rendered as an aligned
+		// column; it must not be baked into the name portion.
+		expect(items[0]?.status).toBe('[○ Idle]');
+		expect(items[0]?.baseLabel).toBe('feature/test-branch');
 	});
 
 	it('should mark main worktree', () => {
@@ -380,10 +384,9 @@ describe('prepareSessionItems', () => {
 					},
 				],
 			);
-			// Order must be: branch, dir suffix, (no main), session suffix, status.
-			expect(items[0]?.baseLabel).toMatch(
-				/^feature\/foo @ foo-api: lab \[.*Idle.*\]$/,
-			);
+			// Order must be: branch, dir suffix, (no main), session suffix.
+			expect(items[0]?.baseLabel).toBe('feature/foo @ foo-api: lab');
+			expect(items[0]?.status).toMatch(/^\[.*Idle.*\]$/);
 		});
 
 		it('does not break column alignment when a dir suffix is appended', () => {
@@ -415,6 +418,7 @@ describe('column alignment', () => {
 		{
 			worktree: {} as Worktree,
 			baseLabel: 'feature/test-branch',
+			status: '',
 			searchableName: 'feature/test-branch',
 			fileChanges: '\x1b[32m+10\x1b[0m \x1b[31m-5\x1b[0m',
 			aheadBehind: '\x1b[33m↑2 ↓3\x1b[0m',
@@ -422,6 +426,7 @@ describe('column alignment', () => {
 			lastCommitDate: '',
 			lengths: {
 				base: 19, // 'feature/test-branch'.length
+				status: 0,
 				fileChanges: 6, // '+10 -5'.length
 				aheadBehind: 5, // '↑2 ↓3'.length
 				parentBranch: 0,
@@ -431,6 +436,7 @@ describe('column alignment', () => {
 		{
 			worktree: {} as Worktree,
 			baseLabel: 'main',
+			status: '',
 			searchableName: 'main',
 			fileChanges: '\x1b[32m+2\x1b[0m \x1b[31m-1\x1b[0m',
 			aheadBehind: '\x1b[33m↑1\x1b[0m',
@@ -438,6 +444,7 @@ describe('column alignment', () => {
 			lastCommitDate: '',
 			lengths: {
 				base: 4, // 'main'.length
+				status: 0,
 				fileChanges: 5, // '+2 -1'.length
 				aheadBehind: 2, // '↑1'.length
 				parentBranch: 0,
@@ -514,5 +521,71 @@ describe('isDeletableWorktree', () => {
 				'/repo',
 			),
 		).toBe(true);
+	});
+});
+
+describe('session status column', () => {
+	const makeItem = (
+		baseLabel: string,
+		status: string,
+		lastCommitDate: string,
+	): SessionItem => ({
+		worktree: {} as Worktree,
+		baseLabel,
+		status,
+		searchableName: baseLabel,
+		fileChanges: '',
+		aheadBehind: '',
+		parentBranch: '',
+		lastCommitDate,
+		lengths: {
+			base: baseLabel.length,
+			status: status.length,
+			fileChanges: 0,
+			aheadBehind: 0,
+			parentBranch: 0,
+			lastCommitDate: lastCommitDate.length,
+		},
+	});
+
+	const items = [
+		makeItem('feature/a-very-long-branch-name', '[○ Idle]', '1d ago'),
+		makeItem('main', '[● Busy]', '3w ago'),
+	];
+
+	it('starts every status tag at the same column, just left of the date', () => {
+		const columns = calculateColumnPositions(items, 120);
+		expect(columns.alignStatus).toBe(true);
+
+		const labels = items.map(item => assembleSessionLabel(item, columns));
+		for (const [index, label] of labels.entries()) {
+			expect(label.indexOf(items[index]!.status)).toBe(columns.status);
+			expect(label.indexOf(items[index]!.lastCommitDate)).toBe(
+				columns.lastCommitDate,
+			);
+		}
+		// The gap between the tag and the date is only the column padding.
+		expect(columns.lastCommitDate - columns.status).toBe('[○ Idle]'.length + 2);
+	});
+
+	it('falls back to appending the status to the name when too narrow', () => {
+		const columns = calculateColumnPositions(items, 40);
+		expect(columns.alignStatus).toBe(false);
+
+		expect(assembleSessionLabel(items[0]!, columns)).toContain(
+			'feature/a-very-long-branch-name [○ Idle]',
+		);
+		expect(assembleSessionLabel(items[1]!, columns)).toContain('main [● Busy]');
+	});
+
+	it('keeps the status next to the name on rows showing a git error', () => {
+		const errored: SessionItem = {
+			...makeItem('main', '[○ Idle]', ''),
+			error: '[git error]',
+		};
+		const columns = calculateColumnPositions([...items, errored], 120);
+		expect(assembleSessionLabel(errored, columns)).toBe(
+			'main [○ Idle] [git error]',
+		);
 	});
 });

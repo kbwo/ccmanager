@@ -21,6 +21,7 @@ import {projectManager} from '../services/projectManager.js';
 import {RecentProject} from '../types/index.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
+import {useAvailableLabelWidth} from '../hooks/useAvailableLabelWidth.js';
 import {
 	filterSessionItemsByQuery,
 	filterSessionItemsByState,
@@ -155,6 +156,10 @@ const Menu: React.FC<MenuProps> = ({
 	// Get worktree configuration for sorting
 	const worktreeConfig = configReader.getWorktreeConfig();
 
+	// Room a row label may occupy; decides whether the session state tag gets
+	// its own aligned column or is appended to the branch name instead.
+	const availableLabelWidth = useAvailableLabelWidth();
+
 	useEffect(() => {
 		let cancelled = false;
 
@@ -263,7 +268,10 @@ const Menu: React.FC<MenuProps> = ({
 		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: worktreeConfig.sortByLastSession,
 		});
-		const columnPositions = calculateColumnPositions(items);
+		const columnPositions = calculateColumnPositions(
+			items,
+			availableLabelWidth,
+		);
 
 		// Filter session items based on search query, matching the name shown in
 		// the menu (branch name, " (main)", and session name) plus the path, then
@@ -454,6 +462,7 @@ const Menu: React.FC<MenuProps> = ({
 		autoApprovalToggleCounter,
 		sessionManager,
 		worktreeConfig.sortByLastSession,
+		availableLabelWidth,
 	]);
 
 	// Handle hotkeys
