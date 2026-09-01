@@ -114,6 +114,13 @@ const env: Record<string, string | undefined> = {
 	CCMANAGER_LOG_FILE: join(root, 'ccmanager.log'),
 };
 delete env['CCMANAGER_MULTI_PROJECT_ROOT'];
+// Ink stops painting frames to stdout when it believes it runs in CI: it keeps
+// the frame in memory and only writes it on unmount (`isInCi` branch in
+// `ink/build/ink.js`, fed by the `is-in-ci` package, which checks exactly these
+// two variables). This harness drives a real pseudo terminal and has to see the
+// menu as a user would, so the child must not inherit them from a CI runner.
+delete env['CI'];
+delete env['CONTINUOUS_INTEGRATION'];
 
 let output = '';
 const pty = spawn('bun', [cliEntry], {
