@@ -20,6 +20,7 @@ import type {
 	MenuAction,
 } from '../types/index.js';
 import type {MenuSnapshot} from './Menu.js';
+import type {SessionRecord} from '../services/sessionRestoreStore.js';
 import {ENV_VARS} from '../constants/env.js';
 import {ProcessError} from '../types/errors.js';
 
@@ -122,6 +123,28 @@ const projectManagerMock = {
 	addRecentProject: vi.fn(),
 };
 
+const listRestorableSessionsMock = vi.fn(
+	(_options?: {projectPath?: string}) => [] as SessionRecord[],
+);
+const restoreSessionsMock = vi.fn(
+	async (_records: SessionRecord[], _options: {multiProject: boolean}) => ({
+		restored: 0,
+		failures: [] as {record: SessionRecord; message: string}[],
+	}),
+);
+const discardRestorableSessionsMock = vi.fn((_records: SessionRecord[]) => {});
+
+const createSessionRecord = (
+	overrides: Partial<SessionRecord> = {},
+): SessionRecord => ({
+	id: 'record-1',
+	projectPath: '/repo',
+	worktreePath: '/repo/worktrees/feature',
+	ownerPid: 4242,
+	createdAt: 1,
+	...overrides,
+});
+
 const worktreeNameGeneratorMock = {
 	generateBranchNameEffect: vi.fn(() =>
 		Effect.succeed('fix/trim-worktree-name'),
@@ -163,6 +186,22 @@ vi.mock('../services/globalSessionOrchestrator.js', () => ({
 
 vi.mock('../services/projectManager.js', () => ({
 	projectManager: projectManagerMock,
+}));
+
+vi.mock('../services/sessionRestorer.js', () => ({
+	listRestorableSessions: (options?: {projectPath?: string}) =>
+		listRestorableSessionsMock(options),
+	restoreSessions: (
+		records: SessionRecord[],
+		options: {multiProject: boolean},
+	) => restoreSessionsMock(records, options),
+	discardRestorableSessions: (records: SessionRecord[]) =>
+		discardRestorableSessionsMock(records),
+	describeRecordPreset: () => 'Main',
+}));
+
+vi.mock('../utils/gitUtils.js', () => ({
+	getCurrentRepositoryRoot: () => '/repo',
 }));
 
 vi.mock('../services/config/configReader.js', () => ({
@@ -276,6 +315,11 @@ beforeEach(() => {
 	configReaderMock.getSelectPresetOnStart.mockReset();
 	configReaderMock.getSelectPresetOnStart.mockReturnValue(false);
 	projectManagerMock.addRecentProject.mockReset();
+	listRestorableSessionsMock.mockReset();
+	listRestorableSessionsMock.mockReturnValue([]);
+	restoreSessionsMock.mockReset();
+	restoreSessionsMock.mockResolvedValue({restored: 0, failures: []});
+	discardRestorableSessionsMock.mockReset();
 	worktreeNameGeneratorMock.generateBranchNameEffect.mockReset();
 	worktreeNameGeneratorMock.generateBranchNameEffect.mockImplementation(() =>
 		Effect.succeed('fix/trim-worktree-name'),
@@ -294,6 +338,84 @@ describe('App component view state', () => {
 		expect(lastFrame()).toContain('Menu View');
 
 		unmount();
+	});
+
+	it('offers to restore the sessions recorded by the previous run', async () => {
+		listRestorableSessionsMock.mockReturnValue([
+			createSessionRecord({sessionName: 'review'}),
+		]);
+
+		const {lastFrame, unmount} = render(<App version="test" />);
+		await flush(40);
+
+		expect(listRestorableSessionsMock).toHaveBeenCalledWith({
+			projectPath: '/repo',
+		});
+		expect(lastFrame()).toContain('Restore previous sessions');
+		expect(lastFrame()).toContain('feature');
+		expect(lastFrame()).toContain('review');
+
+		unmount();
+	});
+
+	it('restores the recorded sessions and then shows the menu', async () => {
+		const record = createSessionRecord();
+		listRestorableSessionsMock.mockReturnValue([record]);
+
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await flush(40);
+
+		stdin.write('\r');
+		await waitForCondition(() => restoreSessionsMock.mock.calls.length > 0);
+
+		expect(restoreSessionsMock).toHaveBeenCalledWith([record], {
+			multiProject: false,
+		});
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+		unmount();
+	});
+
+	it('forgets the recorded sessions when the restore offer is declined', async () => {
+		const record = createSessionRecord();
+		listRestorableSessionsMock.mockReturnValue([record]);
+
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await flush(40);
+
+		// Move from "Restore" to "Don't restore" before confirming.
+		stdin.write('\u001B[B');
+		await flush(10);
+		stdin.write('\r');
+		await waitForCondition(
+			() => discardRestorableSessionsMock.mock.calls.length > 0,
+		);
+
+		expect(discardRestorableSessionsMock).toHaveBeenCalledWith([record]);
+		expect(restoreSessionsMock).not.toHaveBeenCalled();
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+		unmount();
+	});
+
+	it('considers every recorded project in multi-project mode', async () => {
+		const original = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/tmp/projects';
+		listRestorableSessionsMock.mockReturnValue([createSessionRecord()]);
+
+		const {lastFrame, unmount} = render(<App multiProject version="test" />);
+		await flush(40);
+
+		expect(listRestorableSessionsMock).toHaveBeenCalledWith({});
+		expect(lastFrame()).toContain('Restore previous sessions');
+
+		unmount();
+
+		if (original === undefined) {
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		} else {
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = original;
+		}
 	});
 
 	it('renders the project list view first in multi-project mode', async () => {

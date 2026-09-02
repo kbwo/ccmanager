@@ -15,6 +15,7 @@ import LoadingSpinner from './LoadingSpinner.js';
 import type {NewWorktreeRequest} from './NewWorktree.js';
 import SessionRename from './SessionRename.js';
 import SessionActions, {type SessionActionType} from './SessionActions.js';
+import RestoreSessions from './RestoreSessions.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -32,6 +33,14 @@ import {
 	AmbiguousBranchError,
 } from '../types/index.js';
 import {type AppError, type ProcessError} from '../types/errors.js';
+import {formatErrorMessage} from '../utils/errorMessage.js';
+import {getCurrentRepositoryRoot} from '../utils/gitUtils.js';
+import type {SessionRecord} from '../services/sessionRestoreStore.js';
+import {
+	discardRestorableSessions,
+	listRestorableSessions,
+	restoreSessions,
+} from '../services/sessionRestorer.js';
 import {configReader} from '../services/config/configReader.js';
 import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
@@ -45,6 +54,8 @@ import {
 type View =
 	| 'menu'
 	| 'project-list'
+	| 'restore-sessions'
+	| 'restoring-sessions'
 	| 'session'
 	| 'new-worktree'
 	| 'creating-worktree'
@@ -74,14 +85,27 @@ const App: React.FC<AppProps> = ({
 	version,
 }) => {
 	const {exit} = useApp();
-	const [view, setView] = useState<View>(
-		multiProject ? 'project-list' : 'menu',
-	);
 	const [sessionManager, setSessionManager] = useState<SessionManager>(() =>
 		globalSessionOrchestrator.getManagerForProject(),
 	);
 	const [worktreeService, setWorktreeService] = useState(
 		() => new WorktreeService(),
+	);
+	// Sessions that were open when ccmanager last ran and can be started again.
+	// Single-project mode only considers the repository being opened;
+	// multi-project mode considers every recorded project at once.
+	const [restorableSessions, setRestorableSessions] = useState<SessionRecord[]>(
+		() =>
+			listRestorableSessions(
+				multiProject ? {} : {projectPath: getCurrentRepositoryRoot()},
+			),
+	);
+	const [view, setView] = useState<View>(() =>
+		restorableSessions.length > 0
+			? 'restore-sessions'
+			: multiProject
+				? 'project-list'
+				: 'menu',
 	);
 	const [activeSession, setActiveSession] = useState<ISession | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -201,22 +225,6 @@ const App: React.FC<AppProps> = ({
 		{isActive: view === 'worktree-hook-error'},
 	);
 
-	// Helper function to format error messages based on error type using _tag discrimination
-	const formatErrorMessage = (error: AppError): string => {
-		switch (error._tag) {
-			case 'ProcessError':
-				return `Process error: ${error.message}`;
-			case 'ConfigError':
-				return `Configuration error (${error.reason}): ${error.details}`;
-			case 'GitError':
-				return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
-			case 'FileSystemError':
-				return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
-			case 'ValidationError':
-				return `Validation failed for ${error.field}: ${error.constraint}`;
-		}
-	};
-
 	const formatPostCreationHookWarning = (error: ProcessError): string =>
 		`Post-creation hook failed: ${error.message}`;
 
@@ -303,6 +311,41 @@ const App: React.FC<AppProps> = ({
 			setView('session');
 		}, 10);
 	}, []);
+
+	// The view the app starts on once the restore offer is out of the way.
+	const initialView: View = multiProject ? 'project-list' : 'menu';
+
+	const handleRestorePreviousSessions = useCallback(() => {
+		const records = restorableSessions;
+		setRestorableSessions([]);
+		setView('restoring-sessions');
+
+		void (async () => {
+			const outcome = await restoreSessions(records, {
+				multiProject: !!multiProject,
+			});
+
+			if (outcome.failures.length > 0) {
+				setError(
+					`Could not restore ${outcome.failures.length} of ${records.length} sessions: ${outcome.failures
+						.map(
+							failure => `${failure.record.worktreePath} (${failure.message})`,
+						)
+						.join(', ')}`,
+				);
+			}
+
+			navigateWithClear(initialView, () => {
+				setMenuKey(prev => prev + 1);
+			});
+		})();
+	}, [restorableSessions, multiProject, initialView, navigateWithClear]);
+
+	const handleDiscardPreviousSessions = useCallback(() => {
+		discardRestorableSessions(restorableSessions);
+		setRestorableSessions([]);
+		navigateWithClear(initialView);
+	}, [restorableSessions, initialView, navigateWithClear]);
 
 	const startSessionForWorktree = useCallback(
 		async (
@@ -938,6 +981,25 @@ const App: React.FC<AppProps> = ({
 		});
 	};
 
+	if (view === 'restore-sessions') {
+		return (
+			<RestoreSessions
+				sessions={restorableSessions}
+				showProject={multiProject}
+				onRestore={handleRestorePreviousSessions}
+				onDiscard={handleDiscardPreviousSessions}
+			/>
+		);
+	}
+
+	if (view === 'restoring-sessions') {
+		return (
+			<Box flexDirection="column">
+				<LoadingSpinner message="Restoring previous sessions..." color="cyan" />
+			</Box>
+		);
+	}
+
 	if (view === 'project-list' && multiProject) {
 		const projectsDir = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 		if (!projectsDir) {
@@ -1099,10 +1161,7 @@ const App: React.FC<AppProps> = ({
 			<SessionRename
 				currentName={renameTarget.name}
 				onRename={name => {
-					const session = sessionManager.getSessionById(renameTarget.id);
-					if (session) {
-						session.sessionName = name;
-					}
+					sessionManager.renameSession(renameTarget.id, name);
 					setRenameTarget(null);
 					handleReturnToMenu();
 				}}

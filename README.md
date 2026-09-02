@@ -14,6 +14,7 @@ https://github.com/user-attachments/assets/15914a88-e288-4ac9-94d5-8127f2e19dbf
 - Switch between sessions seamlessly
 - Visual status indicators for session states (busy, waiting, idle)
 - Create, merge, and delete worktrees from within the app
+- **Restore sessions after a restart**: reopen the sessions that were running when CCManager last exited or crashed
 - **Copy Claude Code session data** between worktrees to maintain conversation context
 - **`.worktreeinclude` support**: carry gitignored project files (`.env`, local certs) into newly created worktrees
 - Configurable keyboard shortcuts
@@ -220,6 +221,31 @@ A new Git worktree contains only tracked files, so gitignored files a project ne
 - **Hook-friendly**: files are copied before the post-creation worktree hook runs, so hook commands can rely on them
 
 For pattern syntax, the exact selection rule, and troubleshooting, see [docs/worktree-include.md](docs/worktree-include.md).
+
+## Restoring Sessions After a Restart
+
+Closing CCManager kills the AI assistant processes it started, so reopening it normally means finding each worktree again and starting each session by hand. To avoid that, CCManager keeps a record of the sessions it currently has open, and on the next start offers to launch them again:
+
+```
+Restore previous sessions
+
+Found 2 sessions from the last time ccmanager ran. Start them again?
+
+  feature-login — Main
+  fix-timeout (review) — Codex
+
+> Restore
+  Don't restore
+```
+
+- **What is restored**: each session's command preset is run again in its worktree, under the name you had given it. The previous terminal output and the conversation held inside the assistant are *not* restored — restoring means starting the same command again, not resuming where it left off. (To carry conversation context into a *new* worktree, see [Session Data Copying](#session-data-copying).)
+- **Survives a crash**: the record is written as sessions come and go, not on exit, so a crash, a `kill -9`, or a closed terminal leaves it intact.
+- **Only sessions that were still open**: a session you killed, or one whose command exited on its own, is dropped from the record and is not offered.
+- **Declining is remembered**: choosing "Don't restore" forgets those sessions, so the offer does not come back on the next start.
+- **Scope**: normally only the repository you are opening is considered. In [Multi-Project Mode](#multi-project-mode) the sessions of every recorded project are offered together at startup.
+- **Other running instances**: sessions belonging to another CCManager that is still open are left alone, so they are not started a second time.
+
+The record lives in `~/.config/ccmanager/sessions.json` (`%APPDATA%\ccmanager\sessions.json` on Windows).
 
 ## Status Change Hooks
 

@@ -59,6 +59,7 @@ export interface Session {
 	stateCheckInterval: NodeJS.Timeout | undefined; // Interval for checking terminal state
 	isPrimaryCommand: boolean; // Track if process was started with main command args
 	presetName: string | undefined; // Name of the command preset used for this session
+	presetId: string | undefined; // ID of the command preset used for this session, used to launch the same command again on restore
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	/**

@@ -66,3 +66,21 @@ export function getGitRepositoryRoot(cwd: string): string | null {
 		return null;
 	}
 }
+
+/**
+ * Repository root of the directory ccmanager was started in.
+ *
+ * Cached after the first call: it cannot change while the process runs, and
+ * both the code that records sessions for restore and the code that looks them
+ * up need the exact same value to agree on which project a session belongs to.
+ */
+let currentRepositoryRoot: string | undefined;
+
+export function getCurrentRepositoryRoot(): string {
+	if (currentRepositoryRoot === undefined) {
+		const cwd = process.cwd();
+		currentRepositoryRoot = getGitRepositoryRoot(cwd) ?? path.resolve(cwd);
+	}
+
+	return currentRepositoryRoot;
+}

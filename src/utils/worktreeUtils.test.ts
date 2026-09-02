@@ -251,6 +251,7 @@ describe('prepareSessionItems', () => {
 		stateCheckInterval: undefined,
 		isPrimaryCommand: true,
 		presetName: undefined,
+		presetId: undefined,
 		detectionStrategy: 'claude',
 		devcontainerConfig: undefined,
 		stateMutex: new Mutex({
