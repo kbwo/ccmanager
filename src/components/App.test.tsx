@@ -592,6 +592,7 @@ describe('App component loading state machine', () => {
 			createdPath,
 			'claude',
 			'trim worktree name output',
+			undefined,
 		);
 		expect(sessionProps?.session).toEqual(mockSession);
 
@@ -831,6 +832,7 @@ describe('App component loading state machine', () => {
 			'/tmp/resolved-worktree',
 			'claude',
 			'trim worktree name output',
+			undefined,
 		);
 
 		unmount();
@@ -931,6 +933,97 @@ describe('App component loading state machine', () => {
 
 		expect(lastFrame()).toContain('Session View');
 		expect(sessionProps?.session).toEqual(mockSession);
+
+		unmount();
+	});
+});
+
+describe('starting an additional session on a worktree', () => {
+	it('prompts for a session name before creating another session on a worktree that already has one', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		const existingSession = {
+			id: 'session-existing',
+			sessionNumber: 1,
+			sessionName: undefined,
+		} as unknown as SessionType;
+
+		const worktree: Worktree = {
+			path: '/project/worktree',
+			branch: 'feature',
+			isMainWorktree: false,
+			hasSession: true,
+		};
+
+		await menuProps!.onMenuAction({
+			type: 'sessionActions',
+			worktree,
+			session: existingSession,
+		});
+		await flush(20);
+		await waitForCondition(
+			() => lastFrame()?.includes('Session Actions') ?? false,
+		);
+
+		// 'S' is the shortcut for "New session in this worktree".
+		stdin.write('S');
+		await flush(20);
+		await waitForCondition(() => lastFrame()?.includes('New Session') ?? false);
+
+		stdin.write('extra session');
+		await flush(20);
+		stdin.write('\r');
+
+		const sessionManager = sessionManagers[0]!;
+		await waitForCondition(
+			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
+		);
+
+		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+			worktree.path,
+			undefined,
+			undefined,
+			'extra session',
+		);
+
+		unmount();
+	});
+
+	it('does not prompt for a name when starting the first session on a worktree', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		const worktree: Worktree = {
+			path: '/project/worktree',
+			branch: 'feature',
+			isMainWorktree: false,
+			hasSession: false,
+		};
+
+		await menuProps!.onMenuAction({
+			type: 'sessionActions',
+			worktree,
+		});
+		await flush(20);
+		await waitForCondition(
+			() => lastFrame()?.includes('Worktree Actions') ?? false,
+		);
+
+		stdin.write('S');
+
+		const sessionManager = sessionManagers[0]!;
+		await waitForCondition(
+			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
+		);
+
+		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+			worktree.path,
+			undefined,
+			undefined,
+			undefined,
+		);
+		expect(lastFrame()).not.toContain('New Session');
 
 		unmount();
 	});

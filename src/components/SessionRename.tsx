@@ -4,12 +4,16 @@ import TextInput from 'ink-text-input';
 
 interface SessionRenameProps {
 	currentName?: string;
+	title?: string;
+	placeholder?: string;
 	onRename: (name?: string) => void;
 	onCancel: () => void;
 }
 
 const SessionRename: React.FC<SessionRenameProps> = ({
 	currentName,
+	title = 'Rename Session',
+	placeholder = 'Enter session name (empty to clear)',
 	onRename,
 	onCancel,
 }) => {
@@ -29,7 +33,7 @@ const SessionRename: React.FC<SessionRenameProps> = ({
 	return (
 		<Box flexDirection="column" padding={1}>
 			<Text bold color="cyan">
-				Rename Session
+				{title}
 			</Text>
 			<Box marginTop={1}>
 				<Text>Name: </Text>
@@ -37,7 +41,7 @@ const SessionRename: React.FC<SessionRenameProps> = ({
 					value={name}
 					onChange={setName}
 					onSubmit={handleSubmit}
-					placeholder="Enter session name (empty to clear)"
+					placeholder={placeholder}
 				/>
 			</Box>
 			<Box marginTop={1}>

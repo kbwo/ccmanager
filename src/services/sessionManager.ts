@@ -449,6 +449,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			presetId?: string;
 			detectionStrategy?: StateDetectionStrategy;
 			devcontainerConfig?: DevcontainerConfig;
+			sessionName?: string;
 		} = {},
 	): Promise<Session> {
 		const existingSessions = this.getSessionsForWorktree(worktreePath);
@@ -466,7 +467,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 			worktreePath,
 			sessionNumber: maxNumber + 1,
-			sessionName: undefined,
+			sessionName: options.sessionName,
 			command: options.command ?? 'claude',
 			fallbackArgs: options.fallbackArgs,
 			lastAccessedAt: Date.now(),
@@ -519,6 +520,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		worktreePath: string,
 		presetId?: string,
 		initialPrompt?: string,
+		sessionName?: string,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -540,6 +542,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						presetName: preset.name,
 						presetId: preset.id,
 						detectionStrategy: preset.detectionStrategy,
+						sessionName,
 					},
 				);
 
@@ -1080,6 +1083,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		presetId?: string,
 		initialPrompt?: string,
 		onLog?: (line: string) => void,
+		sessionName?: string,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -1158,6 +1162,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						presetId: preset.id,
 						detectionStrategy: preset.detectionStrategy,
 						devcontainerConfig,
+						sessionName,
 					},
 				);
 
