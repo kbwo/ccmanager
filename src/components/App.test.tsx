@@ -23,6 +23,7 @@ import type {MenuSnapshot} from './Menu.js';
 import type {SessionRecord} from '../services/sessionRestoreStore.js';
 import {ENV_VARS} from '../constants/env.js';
 import {ProcessError} from '../types/errors.js';
+import {DEFAULT_SHORTCUTS} from '../types/index.js';
 
 type AppComponent = typeof import('./App.js').default;
 
@@ -48,6 +49,10 @@ type NewWorktreeMockProps = {
 		autoDirectoryPattern?: string;
 	}) => void | Promise<void>;
 	onCancel: () => void | Promise<void>;
+};
+
+type DashboardMockProps = {
+	onSelectProject: (project: GitProject) => void | Promise<void>;
 };
 
 type DeleteWorktreeMockProps = {
@@ -80,6 +85,7 @@ type DeleteWorktreeEffect = (
 let App: AppComponent;
 
 let menuProps: MenuMockProps | undefined;
+let dashboardProps: DashboardMockProps | undefined;
 let newWorktreeProps: NewWorktreeMockProps | undefined;
 let deleteWorktreeProps: DeleteWorktreeMockProps | undefined;
 let sessionProps: SessionMockProps | undefined;
@@ -109,6 +115,9 @@ class MockSessionManager {
 
 const sessionManagers: MockSessionManager[] = [];
 
+const destroyAllSessionsMock = vi.fn();
+const getAllActiveSessionsMock = vi.fn(() => [] as SessionType[]);
+
 const getManagerForProjectMock = vi.fn((_: string | undefined) => {
 	const manager = new MockSessionManager();
 	sessionManagers.push(manager);
@@ -117,6 +126,7 @@ const getManagerForProjectMock = vi.fn((_: string | undefined) => {
 
 const configReaderMock = {
 	getSelectPresetOnStart: vi.fn(() => false),
+	getShortcuts: vi.fn(() => DEFAULT_SHORTCUTS),
 };
 
 const projectManagerMock = {
@@ -178,7 +188,8 @@ vi.mock('../services/sessionManager.js', () => ({
 vi.mock('../services/globalSessionOrchestrator.js', () => ({
 	globalSessionOrchestrator: {
 		getManagerForProject: getManagerForProjectMock,
-		destroyAllSessions: vi.fn(),
+		destroyAllSessions: destroyAllSessionsMock,
+		getAllActiveSessions: getAllActiveSessionsMock,
 		getProjectPaths: vi.fn(() => []),
 		getProjectSessions: vi.fn(() => []),
 	},
@@ -230,7 +241,10 @@ vi.mock(
 );
 vi.mock(
 	'./Dashboard.js',
-	createInkMock('Dashboard View', () => {}),
+	createInkMock<DashboardMockProps>(
+		'Dashboard View',
+		props => (dashboardProps = props),
+	),
 );
 vi.mock(
 	'./NewWorktree.js',
@@ -294,6 +308,7 @@ const waitForCondition = async (
 
 beforeEach(() => {
 	menuProps = undefined;
+	dashboardProps = undefined;
 	newWorktreeProps = undefined;
 	deleteWorktreeProps = undefined;
 	sessionProps = undefined;
@@ -312,6 +327,9 @@ beforeEach(() => {
 	deleteWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
 	sessionManagers.length = 0;
 	getManagerForProjectMock.mockClear();
+	destroyAllSessionsMock.mockClear();
+	getAllActiveSessionsMock.mockReset();
+	getAllActiveSessionsMock.mockReturnValue([]);
 	configReaderMock.getSelectPresetOnStart.mockReset();
 	configReaderMock.getSelectPresetOnStart.mockReturnValue(false);
 	projectManagerMock.addRecentProject.mockReset();
@@ -430,6 +448,92 @@ describe('App component view state', () => {
 		unmount();
 
 		if (original !== undefined) {
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = original;
+		}
+	});
+
+	it('asks for confirmation before exiting and returns to the menu on cancel', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'exit'}));
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Exit CCManager'),
+			1000,
+		);
+
+		// Default focus is "Cancel", so Enter alone must not exit.
+		await flush(50);
+		stdin.write('\r');
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Menu View'),
+			1000,
+		);
+
+		expect(destroyAllSessionsMock).not.toHaveBeenCalled();
+
+		unmount();
+	});
+
+	it('destroys sessions and exits once the user confirms', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'exit'}));
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Exit CCManager'),
+			1000,
+		);
+
+		// Move focus up from "Cancel" to "Exit", then confirm.
+		await flush(50);
+		stdin.write('\u001B[A');
+		await flush(50);
+		stdin.write('\r');
+		await waitForCondition(
+			() => destroyAllSessionsMock.mock.calls.length > 0,
+			2000,
+		);
+
+		unmount();
+	});
+
+	it('asks for confirmation before exiting from the project list in multi-project mode', async () => {
+		const original = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/tmp/projects';
+
+		const {lastFrame, stdin, unmount} = render(
+			<App multiProject version="test" />,
+		);
+		await waitForCondition(() => Boolean(dashboardProps));
+
+		await Promise.resolve(
+			dashboardProps!.onSelectProject({
+				name: 'Exit',
+				path: 'EXIT_APPLICATION',
+				relativePath: 'EXIT_APPLICATION',
+				isValid: true,
+			}),
+		);
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Exit CCManager'),
+			1000,
+		);
+
+		await flush(50);
+		stdin.write('\u001B[A');
+		await flush(50);
+		stdin.write('\r');
+		await waitForCondition(
+			() => destroyAllSessionsMock.mock.calls.length > 0,
+			2000,
+		);
+
+		unmount();
+
+		if (original === undefined) {
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		} else {
 			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = original;
 		}
 	});

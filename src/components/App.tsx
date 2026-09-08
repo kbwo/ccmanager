@@ -7,6 +7,7 @@ import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
 import DeleteConfirmation from './DeleteConfirmation.js';
+import Confirmation from './Confirmation.js';
 import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
@@ -24,6 +25,7 @@ import {
 	generateFallbackBranchName,
 } from '../services/worktreeNameGenerator.js';
 import {logger} from '../utils/logger.js';
+import {shortcutManager} from '../services/shortcutManager.js';
 import {
 	Worktree,
 	Session as ISession,
@@ -71,6 +73,7 @@ type View =
 	| 'remote-branch-selector'
 	| 'rename-session'
 	| 'session-actions'
+	| 'confirm-exit'
 	| 'clearing';
 
 interface AppProps {
@@ -140,6 +143,10 @@ const App: React.FC<AppProps> = ({
 		null,
 	); // Store selected project in multi-project mode
 	const [configScope, setConfigScope] = useState<ConfigScope>('global'); // Store config scope for configuration view
+	// Where to return to if the user cancels the exit confirmation
+	const [exitConfirmSource, setExitConfirmSource] = useState<
+		'menu' | 'project-list'
+	>('menu');
 	const [pendingMenuSessionLaunch, setPendingMenuSessionLaunch] = useState<{
 		worktree: Worktree;
 		presetId: string;
@@ -574,8 +581,8 @@ const App: React.FC<AppProps> = ({
 				if (multiProject && selectedProject) {
 					handleBackToProjectList();
 				} else {
-					globalSessionOrchestrator.destroyAllSessions();
-					exit();
+					setExitConfirmSource('menu');
+					navigateWithClear('confirm-exit');
 				}
 				return;
 			case 'selectWorktree':
@@ -923,8 +930,8 @@ const App: React.FC<AppProps> = ({
 	const handleSelectProject = (project: GitProject) => {
 		// Handle special exit case
 		if (project.path === 'EXIT_APPLICATION') {
-			globalSessionOrchestrator.destroyAllSessions();
-			exit();
+			setExitConfirmSource('project-list');
+			navigateWithClear('confirm-exit');
 			return;
 		}
 
@@ -967,6 +974,17 @@ const App: React.FC<AppProps> = ({
 			worktreePath: session.worktreePath,
 		});
 		navigateWithClear('session-actions');
+	};
+
+	const handleConfirmExit = () => {
+		globalSessionOrchestrator.destroyAllSessions();
+		exit();
+	};
+
+	const handleCancelExit = () => {
+		navigateWithClear(exitConfirmSource, () => {
+			setMenuKey(prev => prev + 1);
+		});
 	};
 
 	const handleBackToProjectList = () => {
@@ -1257,6 +1275,58 @@ const App: React.FC<AppProps> = ({
 					setWorktreeToDelete(null);
 					handleReturnToMenu();
 				}}
+			/>
+		);
+	}
+
+	if (view === 'confirm-exit') {
+		const activeSessionCount =
+			globalSessionOrchestrator.getAllActiveSessions().length;
+
+		const exitMessage = (
+			<Box flexDirection="column">
+				<Text>Are you sure you want to exit CCManager?</Text>
+				{activeSessionCount > 0 && (
+					<Box marginTop={1}>
+						<Text>
+							{activeSessionCount} active session
+							{activeSessionCount === 1 ? '' : 's'} will be terminated. They can
+							be restored the next time CCManager starts.
+						</Text>
+					</Box>
+				)}
+			</Box>
+		);
+
+		const exitHint = (
+			<Text dimColor>
+				Use ↑↓/j/k to navigate, Enter to select,{' '}
+				{shortcutManager.getShortcutDisplay('cancel')} to cancel
+			</Text>
+		);
+
+		return (
+			<Confirmation
+				title={
+					<Text bold color="yellow">
+						Exit CCManager
+					</Text>
+				}
+				message={exitMessage}
+				options={[
+					{label: 'Exit', value: 'exit', color: 'red'},
+					{label: 'Cancel', value: 'cancel', color: 'green'},
+				]}
+				onSelect={value => {
+					if (value === 'exit') {
+						handleConfirmExit();
+					} else {
+						handleCancelExit();
+					}
+				}}
+				initialIndex={1} // Default to Cancel for safety
+				hint={exitHint}
+				onCancel={handleCancelExit}
 			/>
 		);
 	}
