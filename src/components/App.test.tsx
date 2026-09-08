@@ -964,7 +964,7 @@ describe('starting an additional session on a worktree', () => {
 		await flush(20);
 		await waitForCondition(
 			() => lastFrame()?.includes('Session Actions') ?? false,
-			1000,
+			5000,
 		);
 
 		// 'S' is the shortcut for "New session in this worktree".
@@ -972,7 +972,7 @@ describe('starting an additional session on a worktree', () => {
 		await flush(20);
 		await waitForCondition(
 			() => lastFrame()?.includes('New Session') ?? false,
-			1000,
+			5000,
 		);
 
 		stdin.write('extra session');
@@ -982,7 +982,7 @@ describe('starting an additional session on a worktree', () => {
 		const sessionManager = sessionManagers[0]!;
 		await waitForCondition(
 			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
-			1000,
+			5000,
 		);
 
 		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
@@ -1013,7 +1013,7 @@ describe('starting an additional session on a worktree', () => {
 		await flush(20);
 		await waitForCondition(
 			() => lastFrame()?.includes('Worktree Actions') ?? false,
-			1000,
+			5000,
 		);
 
 		stdin.write('S');
@@ -1021,7 +1021,7 @@ describe('starting an additional session on a worktree', () => {
 		const sessionManager = sessionManagers[0]!;
 		await waitForCondition(
 			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
-			1000,
+			5000,
 		);
 
 		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
