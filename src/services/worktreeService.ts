@@ -916,6 +916,23 @@ export class WorktreeService {
 						worktrees[0]!.isMainWorktree = true;
 					}
 
+					// Detached worktrees have no branch. Resolve a human-readable ref
+					// (e.g. "heads/research/foo") so the UI can show which branch tip
+					// HEAD is detached at instead of just the literal word "detached".
+					for (const worktree of worktrees) {
+						if (worktree.branch) continue;
+						try {
+							worktree.detachedRef = execSync('git describe --all HEAD', {
+								cwd: worktree.path,
+								encoding: 'utf8',
+								stdio: ['ignore', 'pipe', 'ignore'],
+							}).trim();
+						} catch {
+							// No ref describes this commit (e.g. an orphan commit with no
+							// branch or tag pointing at it); leave detachedRef unset.
+						}
+					}
+
 					// Handle submodule paths: if the main worktree path contains .git/modules,
 					// replace it with the actual working directory (self.gitRootPath)
 					const mainWorktree = worktrees.find(w => w.isMainWorktree);

@@ -184,6 +184,19 @@ export function formatWorktreeDirectorySuffix(
 	return {displaySuffix: ` @ ${visible}`, rawName: dirName};
 }
 
+/**
+ * Single source of truth for turning a worktree's branch state into a
+ * display name: the branch name when checked out, or "detached <ref>"
+ * (e.g. "detached heads/research/foo") when in detached HEAD state and a
+ * ref could be resolved, falling back to the bare "detached" when not.
+ */
+export function getDisplayBranchName(
+	wt: Pick<Worktree, 'branch' | 'detachedRef'>,
+): string {
+	if (wt.branch) return wt.branch.replace('refs/heads/', '');
+	return wt.detachedRef ? `detached ${wt.detachedRef}` : 'detached';
+}
+
 export function extractBranchParts(branchName: string): {
 	prefix?: string;
 	name: string;
@@ -286,9 +299,7 @@ function buildSessionItem(
 	const status = stateData
 		? ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
 		: '';
-	const fullBranchName = wt.branch
-		? wt.branch.replace('refs/heads/', '')
-		: 'detached';
+	const fullBranchName = getDisplayBranchName(wt);
 	const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
 	const isMain = wt.isMainWorktree ? ' (main)' : '';
 	const {displaySuffix: dirSuffix, rawName: rawDirName} =

@@ -963,6 +963,80 @@ branch refs/heads/feature
 			});
 		});
 
+		it('should resolve a detachedRef via `git describe --all` for a detached worktree', async () => {
+			mockedExecSync.mockImplementation((cmd, options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/detached-wt
+HEAD efgh5678
+detached
+`;
+					}
+					if (cmd === 'git describe --all HEAD') {
+						expect((options as {cwd?: string})?.cwd).toBe(
+							'/fake/path/detached-wt',
+						);
+						return 'heads/research/ime-competition-ideas\n';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toHaveLength(2);
+			expect(result[1]).toMatchObject({
+				path: '/fake/path/detached-wt',
+				detachedRef: 'heads/research/ime-competition-ideas',
+			});
+			expect(result[1]?.branch).toBeUndefined();
+		});
+
+		it('should leave detachedRef unset when `git describe --all` cannot resolve a ref', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/detached-wt
+HEAD efgh5678
+detached
+`;
+					}
+					if (cmd === 'git describe --all HEAD') {
+						const error: MockGitError = new Error(
+							"fatal: No tags can describe 'efgh5678'.",
+						);
+						error.status = 128;
+						throw error;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result[1]).toMatchObject({
+				path: '/fake/path/detached-wt',
+			});
+			expect(result[1]?.branch).toBeUndefined();
+			expect(result[1]?.detachedRef).toBeUndefined();
+		});
+
 		it('should return Effect that fails with GitError when git command fails', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {

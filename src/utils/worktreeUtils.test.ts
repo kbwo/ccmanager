@@ -287,6 +287,31 @@ describe('prepareSessionItems', () => {
 		expect(items[0]?.baseLabel.length).toBeLessThanOrEqual(80); // 70 + status + default
 	});
 
+	describe('detached HEAD', () => {
+		it('falls back to the bare label when no ref could be resolved', () => {
+			const detached: Worktree = {
+				path: '/path/to/detached-wt',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([detached], []);
+			expect(items[0]?.baseLabel).toBe('detached');
+		});
+
+		it('shows the resolved ref alongside "detached"', () => {
+			const detached: Worktree = {
+				path: '/path/to/detached-wt',
+				detachedRef: 'heads/research/ime-competition-ideas',
+				isMainWorktree: false,
+				hasSession: false,
+			};
+			const items = prepareSessionItems([detached], []);
+			expect(items[0]?.baseLabel).toBe(
+				'detached heads/research/ime-competition-ideas',
+			);
+		});
+	});
+
 	describe('worktree directory suffix', () => {
 		it('shows the directory name when it differs from the branch', () => {
 			const wt: Worktree = {

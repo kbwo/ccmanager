@@ -29,6 +29,11 @@ export type StateDetectionStrategy =
 export interface Worktree {
 	path: string;
 	branch?: string;
+	// Set only when `branch` is absent (detached HEAD): the symbolic ref
+	// resolved via `git describe --all`, e.g. "heads/research/foo", so the
+	// menu can show which branch tip HEAD was detached at instead of just
+	// the literal word "detached".
+	detachedRef?: string;
 	isMainWorktree: boolean;
 	hasSession: boolean;
 	gitStatus?: GitStatus;
