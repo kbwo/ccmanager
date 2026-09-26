@@ -1,4 +1,5 @@
 import React from 'react';
+import {performance} from 'perf_hooks';
 import {render} from 'ink-testing-library';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import WorktreeCreationList, {formatElapsed} from './WorktreeCreationList.js';
@@ -30,7 +31,9 @@ describe('formatElapsed', () => {
 
 describe('WorktreeCreationList', () => {
 	beforeEach(() => {
-		vi.useFakeTimers();
+		// Fake only the clock and the list's ticker. React applies re-renders on
+		// later event-loop turns, which must keep running on real timers.
+		vi.useFakeTimers({toFake: ['Date', 'setInterval', 'clearInterval']});
 		vi.setSystemTime(NOW);
 	});
 
@@ -64,8 +67,13 @@ describe('WorktreeCreationList', () => {
 		const {lastFrame} = render(<WorktreeCreationList jobs={[job({})]} />);
 		expect(lastFrame()).toContain('(0s)');
 
-		await vi.advanceTimersByTimeAsync(1000);
+		vi.advanceTimersByTime(1000);
 
+		// Date is faked, so bound the wait with the real performance clock.
+		const deadline = performance.now() + 2000;
+		while (!lastFrame()?.includes('(1s)') && performance.now() < deadline) {
+			await new Promise(resolve => setTimeout(resolve, 5));
+		}
 		expect(lastFrame()).toContain('(1s)');
 	});
 });

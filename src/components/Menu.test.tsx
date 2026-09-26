@@ -848,13 +848,18 @@ describe('Menu background worktree creations', () => {
 
 		worktreeCreationTracker.finish(jobId);
 
-		await vi.waitFor(() => {
-			expect(lastFrame()).not.toContain(
-				'Creating worktrees in the background:',
-			);
-			expect(
-				vi.mocked(worktreeService.getWorktreesEffect).mock.calls.length,
-			).toBeGreaterThan(loadsBeforeFinish);
-		});
+		// The menu re-renders a few event-loop turns after the creation
+		// finishes, which can exceed waitFor's 1s default on a busy machine.
+		await vi.waitFor(
+			() => {
+				expect(lastFrame()).not.toContain(
+					'Creating worktrees in the background:',
+				);
+				expect(
+					vi.mocked(worktreeService.getWorktreesEffect).mock.calls.length,
+				).toBeGreaterThan(loadsBeforeFinish);
+			},
+			{timeout: 5000},
+		);
 	});
 });

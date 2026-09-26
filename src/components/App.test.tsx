@@ -239,9 +239,13 @@ beforeAll(async () => {
 
 const flush = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
+// The timeout only bounds how long a failing condition is retried; a passing
+// one returns as soon as it holds. It is generous because the view changes
+// under test take several event-loop turns, which can stretch past a few
+// hundred milliseconds when the machine is busy (e.g. parallel test files).
 const waitForCondition = async (
 	condition: () => boolean,
-	timeout = 200,
+	timeout = 2000,
 	interval = 5,
 ) => {
 	const deadline = Date.now() + timeout;
@@ -460,7 +464,6 @@ describe('App component loading state machine', () => {
 
 		await waitForCondition(
 			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
-			200,
 		);
 		await waitForCondition(
 			() => lastFrame()?.includes('Session View') ?? false,
@@ -702,7 +705,6 @@ describe('App component loading state machine', () => {
 
 		await waitForCondition(
 			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
-			200,
 		);
 
 		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
@@ -748,11 +750,20 @@ describe('App component loading state machine', () => {
 			return Promise.resolve(newWorktreeProps!.onComplete(request));
 		};
 
-		// Presses Return once the loading screen has stopped ignoring the key
-		// presses that arrive right after it opens.
-		const sendToBackground = async (stdin: {write: (data: string) => void}) => {
-			await flush(120);
-			stdin.write('\r');
+		// Presses Return until the menu is shown. The loading screen ignores
+		// keys for a short time after it opens, and on a busy machine that time
+		// can start late, so a single press at a fixed delay may be ignored.
+		const sendToBackground = async (
+			stdin: {write: (data: string) => void},
+			lastFrame: () => string | undefined,
+		) => {
+			await waitForCondition(() => {
+				if (lastFrame()?.includes('Menu View')) {
+					return true;
+				}
+				stdin.write('\r');
+				return false;
+			});
 		};
 
 		const manualRequest = {
@@ -776,8 +787,7 @@ describe('App component loading state machine', () => {
 					lastFrame()?.includes('Press Enter to return to the menu') ?? false,
 			);
 
-			await sendToBackground(stdin);
-			await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+			await sendToBackground(stdin, lastFrame);
 
 			creation.resolve?.(createdWorktree('/tmp/background', 'feature'));
 			await createPromise;
@@ -838,8 +848,7 @@ describe('App component loading state machine', () => {
 			});
 			await waitForCondition(() => Boolean(creation.resolve));
 
-			await sendToBackground(stdin);
-			await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+			await sendToBackground(stdin, lastFrame);
 
 			creation.resolve?.(
 				createdWorktree('/tmp/generated', 'fix/trim-worktree-name'),
@@ -866,8 +875,7 @@ describe('App component loading state machine', () => {
 			const createPromise = startCreation(manualRequest);
 			await waitForCondition(() => Boolean(creation.reject));
 
-			await sendToBackground(stdin);
-			await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+			await sendToBackground(stdin, lastFrame);
 
 			creation.reject?.(
 				new ProcessError({
