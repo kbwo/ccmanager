@@ -1,5 +1,6 @@
-import {execSync} from 'child_process';
-import {existsSync, statSync, cpSync} from 'fs';
+import {exec, execSync} from 'child_process';
+import {existsSync, statSync} from 'fs';
+import {cp} from 'fs/promises';
 import path from 'path';
 import {Effect, Either} from 'effect';
 import {
@@ -25,6 +26,31 @@ import {configReader} from './config/configReader.js';
 import {logger} from '../utils/logger.js';
 
 const CLAUDE_DIR = '.claude';
+
+/**
+ * Runs a shell command without blocking the event loop. Worktree creation uses
+ * this for its slow steps so the UI keeps rendering and accepting input while
+ * the creation continues in the background. A failure is rejected with the
+ * same `status`/`stdout`/`stderr` fields an `execSync` error carries, so
+ * callers can map both kinds of failure the same way.
+ */
+function execAsync(command: string, cwd: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		exec(command, {cwd, encoding: 'utf8'}, (error, stdout, stderr) => {
+			if (error) {
+				reject(
+					Object.assign(error, {
+						status: typeof error.code === 'number' ? error.code : undefined,
+						stdout,
+						stderr,
+					}),
+				);
+				return;
+			}
+			resolve(stdout);
+		});
+	});
+}
 
 /**
  * WorktreeService - Git worktree management with Effect-based error handling
@@ -305,21 +331,19 @@ export class WorktreeService {
 	}
 
 	/**
-	 * SYNCHRONOUS HELPER: Copies Claude Code session data between worktrees.
-	 *
-	 * This method remains synchronous and is wrapped in Effect.try when called from
-	 * createWorktreeEffect() (line ~676). This provides proper error handling while
-	 * keeping the implementation simple.
+	 * Copies Claude Code session data between worktrees. Asynchronous because
+	 * session histories can be large and a synchronous copy would freeze the UI
+	 * while a worktree is being created in the background.
 	 *
 	 * @private
 	 * @param {string} sourceWorktreePath - Source worktree path
 	 * @param {string} targetWorktreePath - Target worktree path
 	 * @throws {Error} When copy operation fails
 	 */
-	private copyClaudeSessionData(
+	private async copyClaudeSessionData(
 		sourceWorktreePath: string,
 		targetWorktreePath: string,
-	): void {
+	): Promise<void> {
 		try {
 			const projectsDirEither = getClaudeProjectsDir();
 			if (Either.isLeft(projectsDirEither)) {
@@ -343,7 +367,7 @@ export class WorktreeService {
 
 			// Only copy if source project exists
 			if (existsSync(sourceProjectDir)) {
-				cpSync(sourceProjectDir, targetProjectDir, {
+				await cp(sourceProjectDir, targetProjectDir, {
 					recursive: true,
 					force: true,
 					errorOnExist: false,
@@ -513,8 +537,8 @@ export class WorktreeService {
 
 			// Copy .claude directory to new worktree
 			const targetClaudeDir = path.join(worktreePath, CLAUDE_DIR);
-			yield* Effect.try({
-				try: () => cpSync(sourceClaudeDir, targetClaudeDir, {recursive: true}),
+			yield* Effect.tryPromise({
+				try: () => cp(sourceClaudeDir, targetClaudeDir, {recursive: true}),
 				catch: (error: unknown) =>
 					new FileSystemError({
 						operation: 'write',
@@ -540,7 +564,7 @@ export class WorktreeService {
 		gitRoot: string,
 		targetWorktreePath: string,
 	): Effect.Effect<void, FileSystemError, never> {
-		return Effect.try({
+		return Effect.tryPromise({
 			try: () => copyWorktreeIncludeFiles(gitRoot, targetWorktreePath),
 			catch: (error: unknown) =>
 				new FileSystemError({
@@ -1122,17 +1146,15 @@ export class WorktreeService {
 				command = `git worktree add -b "${branch}" "${resolvedPath}" "${startPoint}"`;
 			}
 
-			// Execute the worktree creation command
-			yield* Effect.try({
-				try: () => {
+			// Execute the worktree creation command. It checks out every tracked
+			// file, so it runs asynchronously to keep the UI responsive.
+			yield* Effect.tryPromise({
+				try: async () => {
 					logger.info('Executing git worktree add command', {
 						command,
 						cwd: absoluteGitRoot,
 					});
-					execSync(command, {
-						cwd: absoluteGitRoot,
-						encoding: 'utf8',
-					});
+					await execAsync(command, absoluteGitRoot);
 					logger.info('Git worktree add command succeeded', {
 						command,
 						cwd: absoluteGitRoot,
@@ -1155,7 +1177,7 @@ export class WorktreeService {
 
 			// Copy session data if requested
 			if (copySessionData) {
-				yield* Effect.try({
+				yield* Effect.tryPromise({
 					try: () => self.copyClaudeSessionData(self.rootPath, resolvedPath),
 					catch: (error: unknown) =>
 						new FileSystemError({

@@ -714,6 +714,180 @@ describe('App component loading state machine', () => {
 		unmount();
 	});
 
+	describe('sending a worktree creation to the background', () => {
+		// Keeps createWorktreeEffect pending until the test settles it, so the
+		// user can leave the waiting screen while the creation is still running.
+		const holdWorktreeCreation = () => {
+			const control: {
+				resolve?: (result: CreateWorktreeResult) => void;
+				reject?: (error: unknown) => void;
+			} = {};
+			createWorktreeEffectMock.mockImplementation(() =>
+				Effect.tryPromise({
+					try: () =>
+						new Promise<CreateWorktreeResult>((resolve, reject) => {
+							control.resolve = resolve;
+							control.reject = reject;
+						}),
+					catch: (error: unknown) => error as never,
+				}),
+			);
+			return control;
+		};
+
+		const createdWorktree = (path: string, branch: string) =>
+			({
+				worktree: {path, branch, isMainWorktree: false, hasSession: false},
+			}) as CreateWorktreeResult;
+
+		const startCreation = async (
+			request: Parameters<NewWorktreeMockProps['onComplete']>[0],
+		) => {
+			await Promise.resolve(menuProps!.onMenuAction({type: 'newWorktree'}));
+			await waitForCondition(() => Boolean(newWorktreeProps));
+			return Promise.resolve(newWorktreeProps!.onComplete(request));
+		};
+
+		// Presses Return once the loading screen has stopped ignoring the key
+		// presses that arrive right after it opens.
+		const sendToBackground = async (stdin: {write: (data: string) => void}) => {
+			await flush(120);
+			stdin.write('\r');
+		};
+
+		const manualRequest = {
+			creationMode: 'manual' as const,
+			path: '/tmp/background',
+			branch: 'feature',
+			baseBranch: 'main',
+			copySessionData: false,
+			copyClaudeDirectory: false,
+		};
+
+		it('returns to the menu on Return while the creation keeps running', async () => {
+			const creation = holdWorktreeCreation();
+			const {lastFrame, stdin, unmount} = render(<App version="test" />);
+			await waitForCondition(() => Boolean(menuProps));
+			menuProps!.onSnapshotChange?.({worktrees: [], defaultBranch: 'main'});
+
+			const createPromise = startCreation(manualRequest);
+			await waitForCondition(
+				() =>
+					lastFrame()?.includes('Press Enter to return to the menu') ?? false,
+			);
+
+			await sendToBackground(stdin);
+			await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+			creation.resolve?.(createdWorktree('/tmp/background', 'feature'));
+			await createPromise;
+			await waitForCondition(() =>
+				Boolean(
+					menuProps?.initialSnapshot?.worktrees.some(
+						worktree => worktree.path === '/tmp/background',
+					),
+				),
+			);
+
+			// Finishing in the background does not navigate away from the menu.
+			expect(lastFrame()).toContain('Menu View');
+			expect(menuProps?.error).toBeNull();
+
+			unmount();
+		});
+
+		it('ignores Esc and a Return pressed right after the loading screen opens', async () => {
+			const creation = holdWorktreeCreation();
+			const {lastFrame, stdin, unmount} = render(<App version="test" />);
+			await waitForCondition(() => Boolean(menuProps));
+
+			const createPromise = startCreation(manualRequest);
+			await waitForCondition(() => Boolean(creation.resolve));
+
+			// A Return left over from submitting the New Worktree form.
+			stdin.write('\r');
+			await flush(120);
+			// Esc means cancel elsewhere, so it must not send the creation away.
+			stdin.write('\u001B');
+			await flush(40);
+
+			expect(lastFrame()).toContain('Press Enter to return to the menu');
+
+			creation.resolve?.(createdWorktree('/tmp/background', 'feature'));
+			await createPromise;
+			await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+			unmount();
+		});
+
+		it('starts the prompt-first session without switching to it', async () => {
+			const creation = holdWorktreeCreation();
+			const {lastFrame, stdin, unmount} = render(<App version="test" />);
+			await waitForCondition(() => Boolean(menuProps));
+			const sessionManager = sessionManagers[0]!;
+
+			const createPromise = startCreation({
+				creationMode: 'prompt',
+				path: '/tmp/project',
+				projectPath: '/tmp/project',
+				baseBranch: 'main',
+				presetId: 'claude',
+				initialPrompt: 'trim worktree name output',
+				copySessionData: false,
+				copyClaudeDirectory: false,
+			});
+			await waitForCondition(() => Boolean(creation.resolve));
+
+			await sendToBackground(stdin);
+			await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+			creation.resolve?.(
+				createdWorktree('/tmp/generated', 'fix/trim-worktree-name'),
+			);
+			await createPromise;
+
+			expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+				'/tmp/generated',
+				'claude',
+				'trim worktree name output',
+			);
+			await flush(40);
+			expect(lastFrame()).toContain('Menu View');
+			expect(lastFrame()).not.toContain('Session View');
+
+			unmount();
+		});
+
+		it('reports a failed background creation on the menu', async () => {
+			const creation = holdWorktreeCreation();
+			const {lastFrame, stdin, unmount} = render(<App version="test" />);
+			await waitForCondition(() => Boolean(menuProps));
+
+			const createPromise = startCreation(manualRequest);
+			await waitForCondition(() => Boolean(creation.reject));
+
+			await sendToBackground(stdin);
+			await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+			creation.reject?.(
+				new ProcessError({
+					command: 'exit 1',
+					exitCode: 1,
+					message: 'Hook exited with code 1',
+				}),
+			);
+			await createPromise;
+			await waitForCondition(() => Boolean(menuProps?.error));
+
+			expect(menuProps?.error).toBe(
+				'Creating worktree feature failed: Pre-creation hook failed: Hook exited with code 1',
+			);
+			expect(lastFrame()).toContain('Menu View');
+
+			unmount();
+		});
+	});
+
 	it('displays branch deletion message while deleting worktrees', async () => {
 		let resolveDelete: (() => void) | undefined;
 

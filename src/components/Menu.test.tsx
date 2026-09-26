@@ -5,6 +5,7 @@ import Menu from './Menu.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
 import {Session} from '../types/index.js';
+import {worktreeCreationTracker} from '../services/worktreeCreationTracker.js';
 import {vi, describe, it, expect, beforeEach, afterEach} from 'vitest';
 
 const makeKey = (
@@ -782,5 +783,78 @@ describe('Menu component rendering', () => {
 		// Make sure they don't have number prefixes
 		expect(output).not.toContain('10 ❯ Project A');
 		expect(output).not.toContain('11 ❯ Project B');
+	});
+});
+
+describe('Menu background worktree creations', () => {
+	let sessionManager: SessionManager;
+	let worktreeService: WorktreeService;
+	const startedJobIds: string[] = [];
+
+	beforeEach(async () => {
+		const {Effect} = await import('effect');
+		sessionManager = new SessionManager();
+		worktreeService = new WorktreeService();
+		vi.spyOn(sessionManager, 'on').mockImplementation(() => sessionManager);
+		vi.spyOn(sessionManager, 'off').mockImplementation(() => sessionManager);
+		vi.spyOn(sessionManager, 'getAllSessions').mockReturnValue([]);
+		vi.spyOn(worktreeService, 'getWorktreesEffect').mockReturnValue(
+			Effect.succeed([]),
+		);
+		vi.spyOn(worktreeService, 'getDefaultBranchEffect').mockReturnValue(
+			Effect.succeed('main'),
+		);
+	});
+
+	afterEach(() => {
+		for (const id of startedJobIds.splice(0)) {
+			worktreeCreationTracker.finish(id);
+		}
+		vi.restoreAllMocks();
+	});
+
+	const startJob = (projectKey: string, branch: string) => {
+		const id = worktreeCreationTracker.start({
+			projectKey,
+			branch,
+			stage: 'creating',
+			copySessionData: false,
+			isPromptFlow: false,
+		});
+		startedJobIds.push(id);
+		return id;
+	};
+
+	it("lists this project's running creations and reloads worktrees when one finishes", async () => {
+		const jobId = startJob('/repo', 'feature/background');
+		startJob('/other-repo', 'feature/elsewhere');
+
+		const {lastFrame} = render(
+			<Menu
+				sessionManager={sessionManager}
+				worktreeService={worktreeService}
+				onMenuAction={vi.fn()}
+				projectKey="/repo"
+				version="test"
+			/>,
+		);
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		expect(lastFrame()).toContain('Creating worktrees in the background:');
+		expect(lastFrame()).toContain('feature/background: Creating worktree...');
+		expect(lastFrame()).not.toContain('feature/elsewhere');
+		const loadsBeforeFinish = vi.mocked(worktreeService.getWorktreesEffect).mock
+			.calls.length;
+
+		worktreeCreationTracker.finish(jobId);
+
+		await vi.waitFor(() => {
+			expect(lastFrame()).not.toContain(
+				'Creating worktrees in the background:',
+			);
+			expect(
+				vi.mocked(worktreeService.getWorktreesEffect).mock.calls.length,
+			).toBeGreaterThan(loadsBeforeFinish);
+		});
 	});
 });
