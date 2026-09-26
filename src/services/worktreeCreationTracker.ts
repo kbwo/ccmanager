@@ -15,6 +15,8 @@ export interface WorktreeCreationJob {
 	stage: WorktreeCreationStage;
 	copySessionData: boolean;
 	isPromptFlow: boolean;
+	/** When the creation started, in milliseconds since the epoch. */
+	startedAt: number;
 }
 
 /**
@@ -45,9 +47,9 @@ export class WorktreeCreationTracker extends EventEmitter {
 	private jobs = new Map<string, WorktreeCreationJob>();
 	private nextId = 1;
 
-	start(job: Omit<WorktreeCreationJob, 'id'>): string {
+	start(job: Omit<WorktreeCreationJob, 'id' | 'startedAt'>): string {
 		const id = `worktree-creation-${this.nextId++}`;
-		this.jobs.set(id, {...job, id});
+		this.jobs.set(id, {...job, id, startedAt: Date.now()});
 		this.emit('changed');
 		return id;
 	}

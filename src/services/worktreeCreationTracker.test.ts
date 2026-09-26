@@ -52,7 +52,11 @@ describe('WorktreeCreationTracker', () => {
 		tracker.finish(id);
 
 		expect(tracker.getJobs()).toEqual([]);
-		expect(onFinished).toHaveBeenCalledWith({...manualJob, id});
+		expect(onFinished).toHaveBeenCalledWith({
+			...manualJob,
+			id,
+			startedAt: expect.any(Number),
+		});
 	});
 
 	it('ignores updates and finishes for unknown jobs', () => {

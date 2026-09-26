@@ -33,11 +33,10 @@ import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.j
 import {configReader} from '../services/config/configReader.js';
 import {
 	worktreeCreationTracker,
-	describeWorktreeCreationStage,
 	type WorktreeCreationJob,
 } from '../services/worktreeCreationTracker.js';
 import {useWorktreeCreationJobs} from '../hooks/useWorktreeCreationJobs.js';
-import LoadingSpinner from './LoadingSpinner.js';
+import WorktreeCreationList from './WorktreeCreationList.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -728,15 +727,8 @@ const Menu: React.FC<MenuProps> = ({
 			</SearchableList>
 
 			{creationJobs.length > 0 && (
-				<Box marginTop={1} flexDirection="column">
-					<Text dimColor>Creating worktrees in the background:</Text>
-					{creationJobs.map(job => (
-						<LoadingSpinner
-							key={job.id}
-							message={`${job.branch ?? '(branch name pending)'}: ${describeWorktreeCreationStage(job)}`}
-							color="cyan"
-						/>
-					))}
+				<Box marginTop={1}>
+					<WorktreeCreationList jobs={creationJobs} />
 				</Box>
 			)}
 
