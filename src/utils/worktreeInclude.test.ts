@@ -83,7 +83,7 @@ describe('worktreeInclude', () => {
 	});
 
 	describe('copyWorktreeIncludeFiles', () => {
-		it('copies selected files into the target worktree, recreating nested directories', () => {
+		it('copies selected files into the target worktree, recreating nested directories', async () => {
 			fs.writeFileSync(path.join(gitRoot, '.gitignore'), '.env\ncerts/\n');
 			fs.writeFileSync(
 				path.join(gitRoot, '.worktreeinclude'),
@@ -99,7 +99,7 @@ describe('worktreeInclude', () => {
 			const targetWorktreePath = path.join(testDir, `target-${repoCount}`);
 			fs.mkdirSync(targetWorktreePath, {recursive: true});
 
-			copyWorktreeIncludeFiles(gitRoot, targetWorktreePath);
+			await copyWorktreeIncludeFiles(gitRoot, targetWorktreePath);
 
 			expect(
 				fs.readFileSync(path.join(targetWorktreePath, '.env'), 'utf8'),
@@ -112,7 +112,7 @@ describe('worktreeInclude', () => {
 			).toBe('cert');
 		});
 
-		it('does not overwrite a file that already exists at the destination', () => {
+		it('does not overwrite a file that already exists at the destination', async () => {
 			fs.writeFileSync(path.join(gitRoot, '.gitignore'), '.env\n');
 			fs.writeFileSync(path.join(gitRoot, '.worktreeinclude'), '.env\n');
 			fs.writeFileSync(path.join(gitRoot, '.env'), 'SOURCE');
@@ -121,20 +121,20 @@ describe('worktreeInclude', () => {
 			fs.mkdirSync(targetWorktreePath, {recursive: true});
 			fs.writeFileSync(path.join(targetWorktreePath, '.env'), 'EXISTING');
 
-			copyWorktreeIncludeFiles(gitRoot, targetWorktreePath);
+			await copyWorktreeIncludeFiles(gitRoot, targetWorktreePath);
 
 			expect(
 				fs.readFileSync(path.join(targetWorktreePath, '.env'), 'utf8'),
 			).toBe('EXISTING');
 		});
 
-		it('is a no-op when no .worktreeinclude file exists', () => {
+		it('is a no-op when no .worktreeinclude file exists', async () => {
 			const targetWorktreePath = path.join(testDir, `target-${repoCount}`);
 			fs.mkdirSync(targetWorktreePath, {recursive: true});
 
-			expect(() =>
+			await expect(
 				copyWorktreeIncludeFiles(gitRoot, targetWorktreePath),
-			).not.toThrow();
+			).resolves.toBeUndefined();
 			expect(fs.readdirSync(targetWorktreePath)).toEqual([]);
 		});
 	});

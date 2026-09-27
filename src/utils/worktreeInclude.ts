@@ -1,5 +1,6 @@
 import {execSync} from 'child_process';
-import {existsSync, statSync, mkdirSync, cpSync} from 'fs';
+import {existsSync, statSync} from 'fs';
+import {cp, mkdir} from 'fs/promises';
 import path from 'path';
 import {logger} from './logger.js';
 
@@ -83,14 +84,16 @@ export function resolveWorktreeIncludeFiles(gitRoot: string): string[] {
  * Copies the files a `.worktreeinclude` file selects from the main checkout
  * into a freshly created worktree. No-ops when no `.worktreeinclude` file
  * exists. Never overwrites a file that already exists at the destination.
+ * Copies asynchronously so a large selection does not freeze the UI while a
+ * worktree is being created in the background.
  *
  * @param gitRoot - Absolute path to the main checkout (repository root)
  * @param targetWorktreePath - Absolute path to the newly created worktree
  */
-export function copyWorktreeIncludeFiles(
+export async function copyWorktreeIncludeFiles(
 	gitRoot: string,
 	targetWorktreePath: string,
-): void {
+): Promise<void> {
 	const relativePaths = resolveWorktreeIncludeFiles(gitRoot);
 
 	for (const relativePath of relativePaths) {
@@ -111,7 +114,10 @@ export function copyWorktreeIncludeFiles(
 			continue;
 		}
 
-		mkdirSync(path.dirname(targetPath), {recursive: true});
-		cpSync(sourcePath, targetPath, {recursive: true, preserveTimestamps: true});
+		await mkdir(path.dirname(targetPath), {recursive: true});
+		await cp(sourcePath, targetPath, {
+			recursive: true,
+			preserveTimestamps: true,
+		});
 	}
 }

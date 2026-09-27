@@ -32,6 +32,12 @@ import {
 import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
+import {
+	worktreeCreationTracker,
+	type WorktreeCreationJob,
+} from '../services/worktreeCreationTracker.js';
+import {useWorktreeCreationJobs} from '../hooks/useWorktreeCreationJobs.js';
+import WorktreeCreationList from './WorktreeCreationList.js';
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -43,6 +49,11 @@ interface MenuProps {
 	error?: string | null;
 	onDismissError?: () => void;
 	projectName?: string;
+	/**
+	 * Project whose running worktree creations this menu lists (see
+	 * worktreeCreationTracker). When omitted, every running creation is listed.
+	 */
+	projectKey?: string;
 	multiProject?: boolean;
 	version: string;
 }
@@ -107,6 +118,7 @@ const Menu: React.FC<MenuProps> = ({
 	error,
 	onDismissError,
 	projectName,
+	projectKey,
 	multiProject = false,
 	version,
 }) => {
@@ -141,6 +153,22 @@ const Menu: React.FC<MenuProps> = ({
 	>(undefined);
 	const [autoApprovalToggleCounter, setAutoApprovalToggleCounter] = useState(0);
 	const [stateFilter, setStateFilter] = useState<SessionStateFilter>('all');
+	const creationJobs = useWorktreeCreationJobs(projectKey);
+	// Bumped when one of this project's creations finishes, to reload the
+	// worktree list so the new worktree appears without leaving the menu.
+	const [worktreeReloadCount, setWorktreeReloadCount] = useState(0);
+
+	useEffect(() => {
+		const handleFinished = (job: WorktreeCreationJob) => {
+			if (projectKey === undefined || job.projectKey === projectKey) {
+				setWorktreeReloadCount(count => count + 1);
+			}
+		};
+		worktreeCreationTracker.on('finished', handleFinished);
+		return () => {
+			worktreeCreationTracker.off('finished', handleFinished);
+		};
+	}, [projectKey]);
 
 	// Use the search mode hook
 	const {isSearchMode, searchQuery, selectedIndex, setSearchQuery} =
@@ -149,6 +177,9 @@ const Menu: React.FC<MenuProps> = ({
 		});
 
 	const limit = useDynamicLimit({
+		// Default fixed rows, plus the running-creations heading, its lines, and
+		// the margin above them.
+		fixedRows: 6 + (creationJobs.length > 0 ? creationJobs.length + 2 : 0),
 		isSearchMode,
 		hasError: !!(error || loadError),
 	});
@@ -261,7 +292,13 @@ const Menu: React.FC<MenuProps> = ({
 			sessionManager.off('sessionDestroyed', handleSessionChange);
 			sessionManager.off('sessionStateChanged', handleSessionChange);
 		};
-	}, [sessionManager, worktreeService, multiProject, onSnapshotChange]);
+	}, [
+		sessionManager,
+		worktreeService,
+		multiProject,
+		onSnapshotChange,
+		worktreeReloadCount,
+	]);
 
 	useEffect(() => {
 		// Prepare worktree items and calculate layout
@@ -697,6 +734,12 @@ const Menu: React.FC<MenuProps> = ({
 					limit={limit}
 				/>
 			</SearchableList>
+
+			{creationJobs.length > 0 && (
+				<Box marginTop={1}>
+					<WorktreeCreationList jobs={creationJobs} />
+				</Box>
+			)}
 
 			{(error || loadError) && (
 				<Box marginTop={1} paddingX={1} borderStyle="round" borderColor="red">
