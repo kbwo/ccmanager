@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (without v prefix)'
-        required: true
+        description: 'Version to publish (without v prefix). Leave empty to reuse the version of the most recent GitHub release.'
+        required: false
         type: string
 
 jobs:
@@ -23,12 +23,20 @@ jobs:
 
       - name: Get the version
         id: get_version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          VERSION="$INPUT_VERSION"
+          if [ -z "$VERSION" ]; then
+            LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' --repo "${{ github.repository }}")
+            VERSION="${LATEST_TAG#v}"
           fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::No version input given and no previous GitHub release found to reuse a version from." >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -54,7 +62,9 @@ jobs:
         run: bun run typecheck
 
       - name: Update versions
-        run: bun run scripts/build-binaries.ts --version=${{ steps.get_version.outputs.VERSION }}
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: bun run scripts/build-binaries.ts --version="$VERSION"
 
       - name: Build binaries for all platforms
         run: bun run build:binary:all
@@ -81,7 +91,9 @@ jobs:
           git config --local user.name "github-actions[bot]"
 
       - name: Commit and push version update
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
           git add package.json bun.lock npm/*/package.json
-          git commit -m "chore: update version to ${{ steps.get_version.outputs.VERSION }}"
+          git commit -m "chore: update version to $VERSION"
           git push origin HEAD:main

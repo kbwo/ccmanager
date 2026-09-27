@@ -446,8 +446,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			command?: string;
 			fallbackArgs?: string[];
 			presetName?: string;
+			presetId?: string;
 			detectionStrategy?: StateDetectionStrategy;
 			devcontainerConfig?: DevcontainerConfig;
+			sessionName?: string;
 		} = {},
 	): Promise<Session> {
 		const existingSessions = this.getSessionsForWorktree(worktreePath);
@@ -465,7 +467,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 			worktreePath,
 			sessionNumber: maxNumber + 1,
-			sessionName: undefined,
+			sessionName: options.sessionName,
 			command: options.command ?? 'claude',
 			fallbackArgs: options.fallbackArgs,
 			lastAccessedAt: Date.now(),
@@ -479,6 +481,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			stateCheckInterval: undefined, // Will be set in setupBackgroundHandler
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			presetName: options.presetName,
+			presetId: options.presetId,
 			detectionStrategy,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
@@ -517,6 +520,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		worktreePath: string,
 		presetId?: string,
 		initialPrompt?: string,
+		sessionName?: string,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -536,7 +540,9 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						command,
 						fallbackArgs: preset.fallbackArgs,
 						presetName: preset.name,
+						presetId: preset.id,
 						detectionStrategy: preset.detectionStrategy,
+						sessionName,
 					},
 				);
 
@@ -773,6 +779,21 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 	getSessionById(id: string): Session | undefined {
 		return this.sessions.get(id);
+	}
+
+	/**
+	 * Assign a user-facing name to a session. Goes through the manager rather
+	 * than mutating the session object directly so that listeners (currently the
+	 * restore record) learn about the new name.
+	 */
+	renameSession(sessionId: string, sessionName?: string): void {
+		const session = this.sessions.get(sessionId);
+		if (!session) {
+			return;
+		}
+
+		session.sessionName = sessionName;
+		this.emit('sessionRenamed', session);
 	}
 
 	getSessionsForWorktree(worktreePath: string): Session[] {
@@ -1062,6 +1083,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		presetId?: string,
 		initialPrompt?: string,
 		onLog?: (line: string) => void,
+		sessionName?: string,
 	): Effect.Effect<Session, ProcessError | ConfigError, never> {
 		return Effect.tryPromise({
 			try: async () => {
@@ -1137,8 +1159,10 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 						command: preset.command,
 						fallbackArgs: preset.fallbackArgs,
 						presetName: preset.name,
+						presetId: preset.id,
 						detectionStrategy: preset.detectionStrategy,
 						devcontainerConfig,
+						sessionName,
 					},
 				);
 

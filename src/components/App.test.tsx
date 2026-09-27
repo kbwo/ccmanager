@@ -20,8 +20,10 @@ import type {
 	MenuAction,
 } from '../types/index.js';
 import type {MenuSnapshot} from './Menu.js';
+import type {SessionRecord} from '../services/sessionRestoreStore.js';
 import {ENV_VARS} from '../constants/env.js';
 import {ProcessError} from '../types/errors.js';
+import {DEFAULT_SHORTCUTS} from '../types/index.js';
 
 type AppComponent = typeof import('./App.js').default;
 
@@ -47,6 +49,10 @@ type NewWorktreeMockProps = {
 		autoDirectoryPattern?: string;
 	}) => void | Promise<void>;
 	onCancel: () => void | Promise<void>;
+};
+
+type DashboardMockProps = {
+	onSelectProject: (project: GitProject) => void | Promise<void>;
 };
 
 type DeleteWorktreeMockProps = {
@@ -79,6 +85,7 @@ type DeleteWorktreeEffect = (
 let App: AppComponent;
 
 let menuProps: MenuMockProps | undefined;
+let dashboardProps: DashboardMockProps | undefined;
 let newWorktreeProps: NewWorktreeMockProps | undefined;
 let deleteWorktreeProps: DeleteWorktreeMockProps | undefined;
 let sessionProps: SessionMockProps | undefined;
@@ -108,6 +115,9 @@ class MockSessionManager {
 
 const sessionManagers: MockSessionManager[] = [];
 
+const destroyAllSessionsMock = vi.fn();
+const getAllActiveSessionsMock = vi.fn(() => [] as SessionType[]);
+
 const getManagerForProjectMock = vi.fn((_: string | undefined) => {
 	const manager = new MockSessionManager();
 	sessionManagers.push(manager);
@@ -116,11 +126,34 @@ const getManagerForProjectMock = vi.fn((_: string | undefined) => {
 
 const configReaderMock = {
 	getSelectPresetOnStart: vi.fn(() => false),
+	getShortcuts: vi.fn(() => DEFAULT_SHORTCUTS),
 };
 
 const projectManagerMock = {
 	addRecentProject: vi.fn(),
 };
+
+const listRestorableSessionsMock = vi.fn(
+	(_options?: {projectPath?: string}) => [] as SessionRecord[],
+);
+const restoreSessionsMock = vi.fn(
+	async (_records: SessionRecord[], _options: {multiProject: boolean}) => ({
+		restored: 0,
+		failures: [] as {record: SessionRecord; message: string}[],
+	}),
+);
+const discardRestorableSessionsMock = vi.fn((_records: SessionRecord[]) => {});
+
+const createSessionRecord = (
+	overrides: Partial<SessionRecord> = {},
+): SessionRecord => ({
+	id: 'record-1',
+	projectPath: '/repo',
+	worktreePath: '/repo/worktrees/feature',
+	ownerPid: 4242,
+	createdAt: 1,
+	...overrides,
+});
 
 const worktreeNameGeneratorMock = {
 	generateBranchNameEffect: vi.fn(() =>
@@ -155,7 +188,8 @@ vi.mock('../services/sessionManager.js', () => ({
 vi.mock('../services/globalSessionOrchestrator.js', () => ({
 	globalSessionOrchestrator: {
 		getManagerForProject: getManagerForProjectMock,
-		destroyAllSessions: vi.fn(),
+		destroyAllSessions: destroyAllSessionsMock,
+		getAllActiveSessions: getAllActiveSessionsMock,
 		getProjectPaths: vi.fn(() => []),
 		getProjectSessions: vi.fn(() => []),
 	},
@@ -163,6 +197,22 @@ vi.mock('../services/globalSessionOrchestrator.js', () => ({
 
 vi.mock('../services/projectManager.js', () => ({
 	projectManager: projectManagerMock,
+}));
+
+vi.mock('../services/sessionRestorer.js', () => ({
+	listRestorableSessions: (options?: {projectPath?: string}) =>
+		listRestorableSessionsMock(options),
+	restoreSessions: (
+		records: SessionRecord[],
+		options: {multiProject: boolean},
+	) => restoreSessionsMock(records, options),
+	discardRestorableSessions: (records: SessionRecord[]) =>
+		discardRestorableSessionsMock(records),
+	describeRecordPreset: () => 'Main',
+}));
+
+vi.mock('../utils/gitUtils.js', () => ({
+	getCurrentRepositoryRoot: () => '/repo',
 }));
 
 vi.mock('../services/config/configReader.js', () => ({
@@ -191,7 +241,10 @@ vi.mock(
 );
 vi.mock(
 	'./Dashboard.js',
-	createInkMock('Dashboard View', () => {}),
+	createInkMock<DashboardMockProps>(
+		'Dashboard View',
+		props => (dashboardProps = props),
+	),
 );
 vi.mock(
 	'./NewWorktree.js',
@@ -233,11 +286,33 @@ vi.mock('./LoadingSpinner.js', async () => {
 	};
 });
 
+const flush = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
+
 beforeAll(async () => {
 	App = (await import('./App.js')).default;
-});
 
-const flush = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
+	// Ink's useInput attaches its raw-mode input listener to the (fake) stdin
+	// asynchronously, in a useEffect. The first time any component in this
+	// worker process mounts a useInput consumer, React's effect scheduler
+	// needs to initialize, which can take longer than the fixed-duration
+	// flush()es the tests below use between rendering a view and writing to
+	// stdin — an early write then races ahead of the listener and is silently
+	// dropped (see the CI-only flakiness this caused: the same commit passed
+	// on the regular CI workflow but failed on the "Publish to npm" workflow,
+	// because it happened to land on a different test as the first one to hit
+	// this path). Mounting and unmounting a throwaway useInput consumer here
+	// pays that one-time cost up front, before any test relies on tight
+	// timing.
+	const {useInput: realUseInput} =
+		await vi.importActual<typeof import('ink')>('ink');
+	const Warmup = () => {
+		realUseInput(() => {});
+		return null;
+	};
+	const warmup = render(React.createElement(Warmup));
+	await flush(200);
+	warmup.unmount();
+});
 
 // The timeout only bounds how long a failing condition is retried; a passing
 // one returns as soon as it holds. It is generous because the view changes
@@ -259,6 +334,7 @@ const waitForCondition = async (
 
 beforeEach(() => {
 	menuProps = undefined;
+	dashboardProps = undefined;
 	newWorktreeProps = undefined;
 	deleteWorktreeProps = undefined;
 	sessionProps = undefined;
@@ -277,9 +353,17 @@ beforeEach(() => {
 	deleteWorktreeEffectMock.mockImplementation(() => Effect.succeed(undefined));
 	sessionManagers.length = 0;
 	getManagerForProjectMock.mockClear();
+	destroyAllSessionsMock.mockClear();
+	getAllActiveSessionsMock.mockReset();
+	getAllActiveSessionsMock.mockReturnValue([]);
 	configReaderMock.getSelectPresetOnStart.mockReset();
 	configReaderMock.getSelectPresetOnStart.mockReturnValue(false);
 	projectManagerMock.addRecentProject.mockReset();
+	listRestorableSessionsMock.mockReset();
+	listRestorableSessionsMock.mockReturnValue([]);
+	restoreSessionsMock.mockReset();
+	restoreSessionsMock.mockResolvedValue({restored: 0, failures: []});
+	discardRestorableSessionsMock.mockReset();
 	worktreeNameGeneratorMock.generateBranchNameEffect.mockReset();
 	worktreeNameGeneratorMock.generateBranchNameEffect.mockImplementation(() =>
 		Effect.succeed('fix/trim-worktree-name'),
@@ -300,6 +384,84 @@ describe('App component view state', () => {
 		unmount();
 	});
 
+	it('offers to restore the sessions recorded by the previous run', async () => {
+		listRestorableSessionsMock.mockReturnValue([
+			createSessionRecord({sessionName: 'review'}),
+		]);
+
+		const {lastFrame, unmount} = render(<App version="test" />);
+		await flush(40);
+
+		expect(listRestorableSessionsMock).toHaveBeenCalledWith({
+			projectPath: '/repo',
+		});
+		expect(lastFrame()).toContain('Restore previous sessions');
+		expect(lastFrame()).toContain('feature');
+		expect(lastFrame()).toContain('review');
+
+		unmount();
+	});
+
+	it('restores the recorded sessions and then shows the menu', async () => {
+		const record = createSessionRecord();
+		listRestorableSessionsMock.mockReturnValue([record]);
+
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await flush(40);
+
+		stdin.write('\r');
+		await waitForCondition(() => restoreSessionsMock.mock.calls.length > 0);
+
+		expect(restoreSessionsMock).toHaveBeenCalledWith([record], {
+			multiProject: false,
+		});
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+		unmount();
+	});
+
+	it('forgets the recorded sessions when the restore offer is declined', async () => {
+		const record = createSessionRecord();
+		listRestorableSessionsMock.mockReturnValue([record]);
+
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await flush(40);
+
+		// Move from "Restore" to "Don't restore" before confirming.
+		stdin.write('\u001B[B');
+		await flush(10);
+		stdin.write('\r');
+		await waitForCondition(
+			() => discardRestorableSessionsMock.mock.calls.length > 0,
+		);
+
+		expect(discardRestorableSessionsMock).toHaveBeenCalledWith([record]);
+		expect(restoreSessionsMock).not.toHaveBeenCalled();
+		await waitForCondition(() => lastFrame()?.includes('Menu View') ?? false);
+
+		unmount();
+	});
+
+	it('considers every recorded project in multi-project mode', async () => {
+		const original = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/tmp/projects';
+		listRestorableSessionsMock.mockReturnValue([createSessionRecord()]);
+
+		const {lastFrame, unmount} = render(<App multiProject version="test" />);
+		await flush(40);
+
+		expect(listRestorableSessionsMock).toHaveBeenCalledWith({});
+		expect(lastFrame()).toContain('Restore previous sessions');
+
+		unmount();
+
+		if (original === undefined) {
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		} else {
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = original;
+		}
+	});
+
 	it('renders the project list view first in multi-project mode', async () => {
 		const original = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
 		process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/tmp/projects';
@@ -312,6 +474,92 @@ describe('App component view state', () => {
 		unmount();
 
 		if (original !== undefined) {
+			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = original;
+		}
+	});
+
+	it('asks for confirmation before exiting and returns to the menu on cancel', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'exit'}));
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Exit CCManager'),
+			1000,
+		);
+
+		// Default focus is "Cancel", so Enter alone must not exit.
+		await flush(50);
+		stdin.write('\r');
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Menu View'),
+			1000,
+		);
+
+		expect(destroyAllSessionsMock).not.toHaveBeenCalled();
+
+		unmount();
+	});
+
+	it('destroys sessions and exits once the user confirms', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		await Promise.resolve(menuProps!.onMenuAction({type: 'exit'}));
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Exit CCManager'),
+			1000,
+		);
+
+		// Move focus up from "Cancel" to "Exit", then confirm.
+		await flush(50);
+		stdin.write('\u001B[A');
+		await flush(50);
+		stdin.write('\r');
+		await waitForCondition(
+			() => destroyAllSessionsMock.mock.calls.length > 0,
+			2000,
+		);
+
+		unmount();
+	});
+
+	it('asks for confirmation before exiting from the project list in multi-project mode', async () => {
+		const original = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		process.env[ENV_VARS.MULTI_PROJECT_ROOT] = '/tmp/projects';
+
+		const {lastFrame, stdin, unmount} = render(
+			<App multiProject version="test" />,
+		);
+		await waitForCondition(() => Boolean(dashboardProps));
+
+		await Promise.resolve(
+			dashboardProps!.onSelectProject({
+				name: 'Exit',
+				path: 'EXIT_APPLICATION',
+				relativePath: 'EXIT_APPLICATION',
+				isValid: true,
+			}),
+		);
+		await waitForCondition(
+			() => (lastFrame() ?? '').includes('Exit CCManager'),
+			1000,
+		);
+
+		await flush(50);
+		stdin.write('\u001B[A');
+		await flush(50);
+		stdin.write('\r');
+		await waitForCondition(
+			() => destroyAllSessionsMock.mock.calls.length > 0,
+			2000,
+		);
+
+		unmount();
+
+		if (original === undefined) {
+			delete process.env[ENV_VARS.MULTI_PROJECT_ROOT];
+		} else {
 			process.env[ENV_VARS.MULTI_PROJECT_ROOT] = original;
 		}
 	});
@@ -473,6 +721,7 @@ describe('App component loading state machine', () => {
 			createdPath,
 			'claude',
 			'trim worktree name output',
+			undefined,
 		);
 		expect(sessionProps?.session).toEqual(mockSession);
 
@@ -711,6 +960,7 @@ describe('App component loading state machine', () => {
 			'/tmp/resolved-worktree',
 			'claude',
 			'trim worktree name output',
+			undefined,
 		);
 
 		unmount();
@@ -859,6 +1109,7 @@ describe('App component loading state machine', () => {
 				'/tmp/generated',
 				'claude',
 				'trim worktree name output',
+				undefined,
 			);
 			await flush(40);
 			expect(lastFrame()).toContain('Menu View');
@@ -991,6 +1242,118 @@ describe('App component loading state machine', () => {
 
 		expect(lastFrame()).toContain('Session View');
 		expect(sessionProps?.session).toEqual(mockSession);
+
+		unmount();
+	});
+});
+
+describe('starting an additional session on a worktree', () => {
+	it('prompts for a session name before creating another session on a worktree that already has one', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		const existingSession = {
+			id: 'session-existing',
+			sessionNumber: 1,
+			sessionName: undefined,
+		} as unknown as SessionType;
+
+		const worktree: Worktree = {
+			path: '/project/worktree',
+			branch: 'feature',
+			isMainWorktree: false,
+			hasSession: true,
+		};
+
+		await menuProps!.onMenuAction({
+			type: 'sessionActions',
+			worktree,
+			session: existingSession,
+		});
+		await flush(20);
+		await waitForCondition(
+			() => lastFrame()?.includes('Session Actions') ?? false,
+			5000,
+		);
+
+		// SessionActions is the first component in this test to call Ink's
+		// useInput; it attaches its raw-mode input listener in a useEffect that
+		// runs asynchronously after this render, so a flush is needed here or
+		// the shortcut below can be written before the listener is attached and
+		// get silently dropped.
+		await flush(50);
+
+		// 'S' is the shortcut for "New session in this worktree".
+		stdin.write('S');
+		await flush(20);
+		await waitForCondition(
+			() => lastFrame()?.includes('New Session') ?? false,
+			5000,
+		);
+
+		stdin.write('extra session');
+		await flush(20);
+		stdin.write('\r');
+
+		const sessionManager = sessionManagers[0]!;
+		await waitForCondition(
+			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
+			5000,
+		);
+
+		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+			worktree.path,
+			undefined,
+			undefined,
+			'extra session',
+		);
+
+		unmount();
+	});
+
+	it('does not prompt for a name when starting the first session on a worktree', async () => {
+		const {lastFrame, stdin, unmount} = render(<App version="test" />);
+		await waitForCondition(() => Boolean(menuProps));
+
+		const worktree: Worktree = {
+			path: '/project/worktree',
+			branch: 'feature',
+			isMainWorktree: false,
+			hasSession: false,
+		};
+
+		await menuProps!.onMenuAction({
+			type: 'sessionActions',
+			worktree,
+		});
+		await flush(20);
+		await waitForCondition(
+			() => lastFrame()?.includes('Worktree Actions') ?? false,
+			5000,
+		);
+
+		// SessionActions is the first component in this test to call Ink's
+		// useInput; it attaches its raw-mode input listener in a useEffect that
+		// runs asynchronously after this render, so a flush is needed here or
+		// the shortcut below can be written before the listener is attached and
+		// get silently dropped.
+		await flush(50);
+
+		stdin.write('S');
+
+		const sessionManager = sessionManagers[0]!;
+		await waitForCondition(
+			() => sessionManager.createSessionWithPresetEffect.mock.calls.length > 0,
+			5000,
+		);
+
+		expect(sessionManager.createSessionWithPresetEffect).toHaveBeenCalledWith(
+			worktree.path,
+			undefined,
+			undefined,
+			undefined,
+		);
+		expect(lastFrame()).not.toContain('New Session');
 
 		unmount();
 	});

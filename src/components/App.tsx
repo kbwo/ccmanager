@@ -7,6 +7,7 @@ import Session from './Session.js';
 import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
 import DeleteConfirmation from './DeleteConfirmation.js';
+import Confirmation from './Confirmation.js';
 import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
 import PresetSelector from './PresetSelector.js';
@@ -15,6 +16,7 @@ import LoadingSpinner from './LoadingSpinner.js';
 import type {NewWorktreeRequest} from './NewWorktree.js';
 import SessionRename from './SessionRename.js';
 import SessionActions, {type SessionActionType} from './SessionActions.js';
+import RestoreSessions from './RestoreSessions.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -23,6 +25,7 @@ import {
 	generateFallbackBranchName,
 } from '../services/worktreeNameGenerator.js';
 import {logger} from '../utils/logger.js';
+import {shortcutManager} from '../services/shortcutManager.js';
 import {
 	Worktree,
 	Session as ISession,
@@ -33,6 +36,14 @@ import {
 	CreateWorktreeResult,
 } from '../types/index.js';
 import {type AppError, type ProcessError} from '../types/errors.js';
+import {formatErrorMessage} from '../utils/errorMessage.js';
+import {getCurrentRepositoryRoot} from '../utils/gitUtils.js';
+import type {SessionRecord} from '../services/sessionRestoreStore.js';
+import {
+	discardRestorableSessions,
+	listRestorableSessions,
+	restoreSessions,
+} from '../services/sessionRestorer.js';
 import {configReader} from '../services/config/configReader.js';
 import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
@@ -51,6 +62,8 @@ import {
 type View =
 	| 'menu'
 	| 'project-list'
+	| 'restore-sessions'
+	| 'restoring-sessions'
 	| 'session'
 	| 'new-worktree'
 	| 'creating-worktree'
@@ -65,7 +78,9 @@ type View =
 	| 'preset-selector'
 	| 'remote-branch-selector'
 	| 'rename-session'
+	| 'name-new-session'
 	| 'session-actions'
+	| 'confirm-exit'
 	| 'clearing';
 
 /** Everything needed to create one worktree once its branch name is known. */
@@ -96,14 +111,27 @@ const App: React.FC<AppProps> = ({
 	version,
 }) => {
 	const {exit} = useApp();
-	const [view, setView] = useState<View>(
-		multiProject ? 'project-list' : 'menu',
-	);
 	const [sessionManager, setSessionManager] = useState<SessionManager>(() =>
 		globalSessionOrchestrator.getManagerForProject(),
 	);
 	const [worktreeService, setWorktreeService] = useState(
 		() => new WorktreeService(),
+	);
+	// Sessions that were open when ccmanager last ran and can be started again.
+	// Single-project mode only considers the repository being opened;
+	// multi-project mode considers every recorded project at once.
+	const [restorableSessions, setRestorableSessions] = useState<SessionRecord[]>(
+		() =>
+			listRestorableSessions(
+				multiProject ? {} : {projectPath: getCurrentRepositoryRoot()},
+			),
+	);
+	const [view, setView] = useState<View>(() =>
+		restorableSessions.length > 0
+			? 'restore-sessions'
+			: multiProject
+				? 'project-list'
+				: 'menu',
 	);
 	const [activeSession, setActiveSession] = useState<ISession | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -118,10 +146,19 @@ const App: React.FC<AppProps> = ({
 	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
 		null,
 	); // Store selected worktree for preset selection
+	// Name entered for the session about to be created via the preset
+	// selector, carried alongside selectedWorktree until creation completes.
+	const [pendingSessionName, setPendingSessionName] = useState<
+		string | undefined
+	>(undefined);
 	const [renameTarget, setRenameTarget] = useState<{
 		id: string;
 		name?: string;
 	} | null>(null);
+	// Worktree awaiting a session name before an additional session is
+	// started on it (only used when the worktree already has a session).
+	const [pendingNewSessionWorktree, setPendingNewSessionWorktree] =
+		useState<Worktree | null>(null);
 	const [sessionActionsTarget, setSessionActionsTarget] = useState<{
 		worktreePath: string;
 		session?: ISession;
@@ -138,6 +175,10 @@ const App: React.FC<AppProps> = ({
 		null,
 	); // Store selected project in multi-project mode
 	const [configScope, setConfigScope] = useState<ConfigScope>('global'); // Store config scope for configuration view
+	// Where to return to if the user cancels the exit confirmation
+	const [exitConfirmSource, setExitConfirmSource] = useState<
+		'menu' | 'project-list'
+	>('menu');
 	const [pendingMenuSessionLaunch, setPendingMenuSessionLaunch] = useState<{
 		worktree: Worktree;
 		presetId: string;
@@ -247,22 +288,6 @@ const App: React.FC<AppProps> = ({
 		{isActive: view === 'creating-worktree'},
 	);
 
-	// Helper function to format error messages based on error type using _tag discrimination
-	const formatErrorMessage = (error: AppError): string => {
-		switch (error._tag) {
-			case 'ProcessError':
-				return `Process error: ${error.message}`;
-			case 'ConfigError':
-				return `Configuration error (${error.reason}): ${error.details}`;
-			case 'GitError':
-				return `Git command failed: ${error.command} (exit ${error.exitCode})\n${error.stderr}`;
-			case 'FileSystemError':
-				return `File ${error.operation} failed for ${error.path}: ${error.cause}`;
-			case 'ValidationError':
-				return `Validation failed for ${error.field}: ${error.constraint}`;
-		}
-	};
-
 	const formatPostCreationHookWarning = (error: ProcessError): string =>
 		`Post-creation hook failed: ${error.message}`;
 
@@ -277,6 +302,7 @@ const App: React.FC<AppProps> = ({
 			worktreePath: string,
 			presetId?: string,
 			initialPrompt?: string,
+			sessionName?: string,
 			// Off for sessions started in the background, whose devcontainer logs
 			// would otherwise leak into whatever loading screen is showing.
 			showDevcontainerLogs = true,
@@ -303,11 +329,13 @@ const App: React.FC<AppProps> = ({
 									});
 								}
 							: undefined,
+						sessionName,
 					)
 				: sessionManager.createSessionWithPresetEffect(
 						worktreePath,
 						presetId,
 						initialPrompt,
+						sessionName,
 					);
 
 			const result = await Effect.runPromise(Effect.either(sessionEffect));
@@ -357,6 +385,41 @@ const App: React.FC<AppProps> = ({
 		}, 10);
 	}, []);
 
+	// The view the app starts on once the restore offer is out of the way.
+	const initialView: View = multiProject ? 'project-list' : 'menu';
+
+	const handleRestorePreviousSessions = useCallback(() => {
+		const records = restorableSessions;
+		setRestorableSessions([]);
+		setView('restoring-sessions');
+
+		void (async () => {
+			const outcome = await restoreSessions(records, {
+				multiProject: !!multiProject,
+			});
+
+			if (outcome.failures.length > 0) {
+				setError(
+					`Could not restore ${outcome.failures.length} of ${records.length} sessions: ${outcome.failures
+						.map(
+							failure => `${failure.record.worktreePath} (${failure.message})`,
+						)
+						.join(', ')}`,
+				);
+			}
+
+			navigateWithClear(initialView, () => {
+				setMenuKey(prev => prev + 1);
+			});
+		})();
+	}, [restorableSessions, multiProject, initialView, navigateWithClear]);
+
+	const handleDiscardPreviousSessions = useCallback(() => {
+		discardRestorableSessions(restorableSessions);
+		setRestorableSessions([]);
+		navigateWithClear(initialView);
+	}, [restorableSessions, initialView, navigateWithClear]);
+
 	const startSessionForWorktree = useCallback(
 		async (
 			worktree: Worktree,
@@ -365,6 +428,7 @@ const App: React.FC<AppProps> = ({
 				initialPrompt?: string;
 				session?: ISession;
 				forceNew?: boolean;
+				sessionName?: string;
 			},
 		) => {
 			// If a specific session is provided, navigate to it directly
@@ -386,6 +450,7 @@ const App: React.FC<AppProps> = ({
 
 			if (!options?.presetId && configReader.getSelectPresetOnStart()) {
 				setSelectedWorktree(worktree);
+				setPendingSessionName(options?.sessionName);
 				navigateWithClear('preset-selector');
 				return;
 			}
@@ -398,6 +463,7 @@ const App: React.FC<AppProps> = ({
 				worktree.path,
 				options?.presetId,
 				options?.initialPrompt,
+				options?.sessionName,
 			);
 
 			if (!result.success) {
@@ -482,15 +548,13 @@ const App: React.FC<AppProps> = ({
 				navigateWithClear('new-worktree');
 				return;
 			case 'newSession':
-				await startSessionForWorktree(
-					{
-						path: action.worktreePath,
-						branch: '',
-						isMainWorktree: false,
-						hasSession: true,
-					},
-					{forceNew: true},
-				);
+				setPendingNewSessionWorktree({
+					path: action.worktreePath,
+					branch: '',
+					isMainWorktree: false,
+					hasSession: true,
+				});
+				navigateWithClear('name-new-session');
 				return;
 			case 'renameSession':
 				setRenameTarget({
@@ -525,8 +589,8 @@ const App: React.FC<AppProps> = ({
 				if (multiProject && selectedProject) {
 					handleBackToProjectList();
 				} else {
-					globalSessionOrchestrator.destroyAllSessions();
-					exit();
+					setExitConfirmSource('menu');
+					navigateWithClear('confirm-exit');
 				}
 				return;
 			case 'selectWorktree':
@@ -540,6 +604,8 @@ const App: React.FC<AppProps> = ({
 	const handlePresetSelected = async (presetId: string) => {
 		if (!selectedWorktree) return;
 
+		const sessionName = pendingSessionName;
+
 		// Set loading state before async operation
 		setView('creating-session-preset');
 
@@ -547,22 +613,27 @@ const App: React.FC<AppProps> = ({
 		const result = await createSessionWithEffect(
 			selectedWorktree.path,
 			presetId,
+			undefined,
+			sessionName,
 		);
 
 		if (!result.success) {
 			setError(result.errorMessage!);
 			setView('menu');
 			setSelectedWorktree(null);
+			setPendingSessionName(undefined);
 			return;
 		}
 
 		// Success case
 		navigateToSession(result.session!);
 		setSelectedWorktree(null);
+		setPendingSessionName(undefined);
 	};
 
 	const handlePresetSelectorCancel = () => {
 		setSelectedWorktree(null);
+		setPendingSessionName(undefined);
 		navigateWithClear('menu', () => {
 			setMenuKey(prev => prev + 1);
 		});
@@ -651,6 +722,7 @@ const App: React.FC<AppProps> = ({
 				worktree.path,
 				creationData.presetId,
 				creationData.initialPrompt,
+				undefined,
 				false,
 			);
 			if (!sessionResult.success) {
@@ -933,8 +1005,8 @@ const App: React.FC<AppProps> = ({
 	const handleSelectProject = (project: GitProject) => {
 		// Handle special exit case
 		if (project.path === 'EXIT_APPLICATION') {
-			globalSessionOrchestrator.destroyAllSessions();
-			exit();
+			setExitConfirmSource('project-list');
+			navigateWithClear('confirm-exit');
 			return;
 		}
 
@@ -979,6 +1051,17 @@ const App: React.FC<AppProps> = ({
 		navigateWithClear('session-actions');
 	};
 
+	const handleConfirmExit = () => {
+		globalSessionOrchestrator.destroyAllSessions();
+		exit();
+	};
+
+	const handleCancelExit = () => {
+		navigateWithClear(exitConfirmSource, () => {
+			setMenuKey(prev => prev + 1);
+		});
+	};
+
 	const handleBackToProjectList = () => {
 		// Sessions persist in their project-specific managers
 		setSelectedProject(null);
@@ -990,6 +1073,25 @@ const App: React.FC<AppProps> = ({
 			setMenuKey(prev => prev + 1);
 		});
 	};
+
+	if (view === 'restore-sessions') {
+		return (
+			<RestoreSessions
+				sessions={restorableSessions}
+				showProject={multiProject}
+				onRestore={handleRestorePreviousSessions}
+				onDiscard={handleDiscardPreviousSessions}
+			/>
+		);
+	}
+
+	if (view === 'restoring-sessions') {
+		return (
+			<Box flexDirection="column">
+				<LoadingSpinner message="Restoring previous sessions..." color="cyan" />
+			</Box>
+		);
+	}
 
 	if (view === 'project-list' && multiProject) {
 		const projectsDir = process.env[ENV_VARS.MULTI_PROJECT_ROOT];
@@ -1155,15 +1257,33 @@ const App: React.FC<AppProps> = ({
 			<SessionRename
 				currentName={renameTarget.name}
 				onRename={name => {
-					const session = sessionManager.getSessionById(renameTarget.id);
-					if (session) {
-						session.sessionName = name;
-					}
+					sessionManager.renameSession(renameTarget.id, name);
 					setRenameTarget(null);
 					handleReturnToMenu();
 				}}
 				onCancel={() => {
 					setRenameTarget(null);
+					handleReturnToMenu();
+				}}
+			/>
+		);
+	}
+
+	if (view === 'name-new-session' && pendingNewSessionWorktree) {
+		const worktree = pendingNewSessionWorktree;
+		return (
+			<SessionRename
+				title="New Session"
+				placeholder="Enter session name (optional)"
+				onRename={sessionName => {
+					setPendingNewSessionWorktree(null);
+					void startSessionForWorktree(worktree, {
+						forceNew: true,
+						sessionName,
+					});
+				}}
+				onCancel={() => {
+					setPendingNewSessionWorktree(null);
 					handleReturnToMenu();
 				}}
 			/>
@@ -1187,17 +1307,24 @@ const App: React.FC<AppProps> = ({
 		const handleSessionAction = async (action: SessionActionType) => {
 			setSessionActionsTarget(null);
 			switch (action) {
-				case 'newSession':
-					await startSessionForWorktree(
-						{
-							path: worktreePath,
-							branch: '',
-							isMainWorktree: false,
-							hasSession: true,
-						},
-						{forceNew: true},
-					);
+				case 'newSession': {
+					const newSessionWorktree = {
+						path: worktreePath,
+						branch: '',
+						isMainWorktree: false,
+						hasSession: true,
+					};
+					// Only prompt for a name when the worktree already has a
+					// session — starting the very first one keeps the old,
+					// no-prompt behavior.
+					if (targetSession) {
+						setPendingNewSessionWorktree(newSessionWorktree);
+						navigateWithClear('name-new-session');
+						return;
+					}
+					await startSessionForWorktree(newSessionWorktree, {forceNew: true});
 					return;
+				}
 				case 'rename':
 					if (!targetSession) return;
 					setRenameTarget({
@@ -1254,6 +1381,58 @@ const App: React.FC<AppProps> = ({
 					setWorktreeToDelete(null);
 					handleReturnToMenu();
 				}}
+			/>
+		);
+	}
+
+	if (view === 'confirm-exit') {
+		const activeSessionCount =
+			globalSessionOrchestrator.getAllActiveSessions().length;
+
+		const exitMessage = (
+			<Box flexDirection="column">
+				<Text>Are you sure you want to exit CCManager?</Text>
+				{activeSessionCount > 0 && (
+					<Box marginTop={1}>
+						<Text>
+							{activeSessionCount} active session
+							{activeSessionCount === 1 ? '' : 's'} will be terminated. They can
+							be restored the next time CCManager starts.
+						</Text>
+					</Box>
+				)}
+			</Box>
+		);
+
+		const exitHint = (
+			<Text dimColor>
+				Use ↑↓/j/k to navigate, Enter to select,{' '}
+				{shortcutManager.getShortcutDisplay('cancel')} to cancel
+			</Text>
+		);
+
+		return (
+			<Confirmation
+				title={
+					<Text bold color="yellow">
+						Exit CCManager
+					</Text>
+				}
+				message={exitMessage}
+				options={[
+					{label: 'Exit', value: 'exit', color: 'red'},
+					{label: 'Cancel', value: 'cancel', color: 'green'},
+				]}
+				onSelect={value => {
+					if (value === 'exit') {
+						handleConfirmExit();
+					} else {
+						handleCancelExit();
+					}
+				}}
+				initialIndex={1} // Default to Cancel for safety
+				hint={exitHint}
+				onCancel={handleCancelExit}
 			/>
 		);
 	}

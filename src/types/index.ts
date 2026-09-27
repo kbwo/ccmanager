@@ -29,6 +29,11 @@ export type StateDetectionStrategy =
 export interface Worktree {
 	path: string;
 	branch?: string;
+	// Set only when `branch` is absent (detached HEAD): the symbolic ref
+	// resolved via `git describe --all`, e.g. "heads/research/foo", so the
+	// menu can show which branch tip HEAD was detached at instead of just
+	// the literal word "detached".
+	detachedRef?: string;
 	isMainWorktree: boolean;
 	hasSession: boolean;
 	gitStatus?: GitStatus;
@@ -59,6 +64,7 @@ export interface Session {
 	stateCheckInterval: NodeJS.Timeout | undefined; // Interval for checking terminal state
 	isPrimaryCommand: boolean; // Track if process was started with main command args
 	presetName: string | undefined; // Name of the command preset used for this session
+	presetId: string | undefined; // ID of the command preset used for this session, used to launch the same command again on restore
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	/**

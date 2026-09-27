@@ -3,9 +3,8 @@
  * This module is for internal use within the config directory only.
  * External code should use ConfigEditor or ConfigReader instead.
  */
-import {homedir} from 'os';
 import {join} from 'path';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+import {existsSync, readFileSync, writeFileSync} from 'fs';
 import {
 	ConfigurationData,
 	StatusHookConfig,
@@ -18,6 +17,7 @@ import {
 	IConfigEditor,
 } from '../../types/index.js';
 import {DEFAULT_TIMEOUT_SECONDS} from '../../constants/autoApproval.js';
+import {ensureConfigDir} from '../../utils/configDir.js';
 
 class GlobalConfigManager implements IConfigEditor {
 	private configPath: string;
@@ -26,20 +26,7 @@ class GlobalConfigManager implements IConfigEditor {
 	private config: ConfigurationData = {};
 
 	constructor() {
-		// Determine config directory based on platform
-		const homeDir = homedir();
-		this.configDir =
-			process.platform === 'win32'
-				? join(
-						process.env['APPDATA'] || join(homeDir, 'AppData', 'Roaming'),
-						'ccmanager',
-					)
-				: join(homeDir, '.config', 'ccmanager');
-
-		// Ensure config directory exists
-		if (!existsSync(this.configDir)) {
-			mkdirSync(this.configDir, {recursive: true});
-		}
+		this.configDir = ensureConfigDir();
 
 		this.configPath = join(this.configDir, 'config.json');
 		this.legacyShortcutsPath = join(this.configDir, 'shortcuts.json');

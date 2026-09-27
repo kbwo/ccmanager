@@ -22,6 +22,7 @@ import {
 } from '../constants/statusIcons.js';
 import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
+import {useAvailableLabelWidth} from '../hooks/useAvailableLabelWidth.js';
 import {useGitStatus} from '../hooks/useGitStatus.js';
 import {
 	type SessionItem,
@@ -183,6 +184,10 @@ const Dashboard: React.FC<DashboardProps> = ({
 		isSearchMode,
 		hasError: !!displayError,
 	});
+
+	// Room a row label may occupy; decides whether the session state tag gets
+	// its own aligned column or is appended to the branch name instead.
+	const availableLabelWidth = useAvailableLabelWidth();
 
 	// Git status polling for session worktrees
 	const enrichedWorktrees = useGitStatus(
@@ -361,7 +366,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 					enrichedWorktrees.find(w => w.path === entry.worktree.path) ||
 					entry.worktree;
 				const stateData = entry.session.stateMutex.getSnapshot();
-				const status = ` [${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`;
+				const status = `[${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`;
 				const fullBranchName = wt.branch
 					? wt.branch.replace('refs/heads/', '')
 					: wt.path.split('/').pop() || 'detached';
@@ -379,7 +384,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 					entry.session,
 					worktreeSessionCount > 1,
 				);
-				const baseLabel = `${entry.projectName} :: ${branchName}${isMain}${sessionSuffix}${status}`;
+				const baseLabel = `${entry.projectName} :: ${branchName}${isMain}${sessionSuffix}`;
 
 				let fileChanges = '';
 				let aheadBehind = '';
@@ -403,6 +408,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 					worktree: wt,
 					session: entry.session,
 					baseLabel,
+					status,
 					searchableName: `${entry.projectName} :: ${fullBranchName}${isMain}`,
 					fileChanges,
 					aheadBehind,
@@ -413,6 +419,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 					error: itemError,
 					lengths: {
 						base: stripAnsi(baseLabel).length,
+						status: stripAnsi(status).length,
 						fileChanges: stripAnsi(fileChanges).length,
 						aheadBehind: stripAnsi(aheadBehind).length,
 						parentBranch: stripAnsi(parentBranch).length,
@@ -423,7 +430,10 @@ const Dashboard: React.FC<DashboardProps> = ({
 				};
 			});
 
-			const columns = calculateColumnPositions(sessionWorkItems);
+			const columns = calculateColumnPositions(
+				sessionWorkItems,
+				availableLabelWidth,
+			);
 
 			if (!isSearchMode) {
 				menuItems.push({
@@ -554,6 +564,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 		projectDisplayNames,
 		searchQuery,
 		isSearchMode,
+		availableLabelWidth,
 	]);
 
 	// Refresh handler

@@ -9,10 +9,10 @@ import {WorktreeService} from './worktreeService.js';
 import {ENV_VARS} from '../constants/env.js';
 import {promises as fs} from 'fs';
 import path from 'path';
-import {homedir} from 'os';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+import {existsSync, readFileSync, writeFileSync} from 'fs';
 import {Effect} from 'effect';
 import {FileSystemError, ConfigError} from '../types/errors.js';
+import {ensureConfigDir} from '../utils/configDir.js';
 
 interface DiscoveryTask {
 	path: string;
@@ -58,19 +58,7 @@ export class ProjectManager implements IProjectManager {
 		}
 
 		// Initialize recent projects
-		const homeDir = homedir();
-		this.configDir =
-			process.platform === 'win32'
-				? path.join(
-						process.env['APPDATA'] || path.join(homeDir, 'AppData', 'Roaming'),
-						'ccmanager',
-					)
-				: path.join(homeDir, '.config', 'ccmanager');
-
-		// Ensure config directory exists
-		if (!existsSync(this.configDir)) {
-			mkdirSync(this.configDir, {recursive: true});
-		}
+		this.configDir = ensureConfigDir();
 
 		this.dataPath = path.join(this.configDir, 'recent-projects.json');
 		this.loadRecentProjects();

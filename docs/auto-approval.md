@@ -35,7 +35,7 @@ Leave `"enabled": false` to turn it off. You can also add `"customCommand": "my-
   - Environment variables provided:
     - `DEFAULT_PROMPT`: the exact prompt text CCManager would have sent to Claude (includes the terminal output and instructions).
     - `TERMINAL_OUTPUT`: the captured terminal output (same content embedded in `DEFAULT_PROMPT`).
-  - Timeout: 60 seconds; if it hangs, CCManager kills it and falls back to manual approval.
+  - Timeout: `autoApproval.timeout` seconds (default 120); if it hangs, CCManager kills it and falls back to manual approval.
 - Expected output: the command must print JSON to stdout matching `{"needsPermission": true|false, "reason"?: "short string"}`. If parsing fails or the exit code is non‑zero, CCManager treats it as “permission needed”.
 - Tips:
   - Keep it lightweight; long-running analysis will delay your prompt.
@@ -53,7 +53,7 @@ Leave `"enabled": false` to turn it off. You can also add `"customCommand": "my-
 ## How It Works
 - **When it runs:** If a session enters a prompt state that normally waits for your input, CCManager marks it as “Auto-approval pending…” and grabs the most recent terminal output (up to 300 lines).
 - **Approval step:** By default CCManager runs `claude --model haiku -p --output-format json --json-schema …`, passing the captured terminal output into the prompt so Claude can judge whether the action needs your permission.
-- **Decision:** If Claude replies that permission is not needed and the session is still waiting, CCManager sends a carriage return (`\r`) to the session—equivalent to pressing Enter for you. If Claude says permission is needed, the check times out (60s), errors, or you press any key while it’s pending, auto approval stops and the session stays in manual approval with a short reason displayed.
+- **Decision:** If Claude replies that permission is not needed and the session is still waiting, CCManager sends a carriage return (`\r`) to the session—equivalent to pressing Enter for you. If Claude says permission is needed, the check times out (`autoApproval.timeout` seconds, default 120), errors, or you press any key while it’s pending, auto approval stops and the session stays in manual approval with a short reason displayed.
 - **Safety:** When the helper fails for any reason, CCManager defaults to requiring your approval instead of proceeding automatically.
 
 ## Things to Keep in Mind

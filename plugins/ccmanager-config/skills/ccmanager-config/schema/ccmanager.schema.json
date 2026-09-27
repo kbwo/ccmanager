@@ -1,0 +1,210 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/kbwo/ccmanager/blob/main/plugins/ccmanager-config/skills/ccmanager-config/schema/ccmanager.schema.json",
+	"title": "CCManager configuration",
+	"description": "Shape of `.ccmanager.json` (per-project, at the git repository root) and of the global `~/.config/ccmanager/config.json`. Both files accept the same keys. Canonical source of truth: `ConfigurationData` / `ProjectConfigurationData` in src/types/index.ts of kbwo/ccmanager (written against v4.2.3).",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"$schema": {
+			"type": "string",
+			"description": "Ignored by CCManager. Present only so editors can offer completion."
+		},
+		"shortcuts": {
+			"type": "object",
+			"description": "Key bindings for the session view. Only the `ctrl` modifier actually works; `alt` and `shift` are rejected at match time.",
+			"additionalProperties": false,
+			"properties": {
+				"returnToMenu": {"$ref": "#/definitions/shortcutKey"},
+				"cancel": {"$ref": "#/definitions/shortcutKey"}
+			}
+		},
+		"statusHooks": {
+			"type": "object",
+			"description": "Shell commands run when a session changes state.",
+			"additionalProperties": false,
+			"properties": {
+				"idle": {"$ref": "#/definitions/hook"},
+				"busy": {"$ref": "#/definitions/hook"},
+				"waiting_input": {"$ref": "#/definitions/hook"},
+				"pending_auto_approval": {"$ref": "#/definitions/hook"}
+			}
+		},
+		"worktreeHooks": {
+			"type": "object",
+			"description": "Shell commands run around worktree creation.",
+			"additionalProperties": false,
+			"properties": {
+				"pre_creation": {"$ref": "#/definitions/hook"},
+				"post_creation": {"$ref": "#/definitions/hook"}
+			}
+		},
+		"worktree": {
+			"type": "object",
+			"description": "Worktree creation and listing behaviour.",
+			"additionalProperties": false,
+			"properties": {
+				"autoDirectory": {
+					"type": "boolean",
+					"description": "Generate the worktree directory from the branch name instead of asking for it. Default false."
+				},
+				"autoDirectoryPattern": {
+					"type": "string",
+					"description": "Path template used when autoDirectory is true. Placeholders: {branch} and {project}. Default \"../{branch}\"."
+				},
+				"copySessionData": {
+					"type": "boolean",
+					"description": "Default answer for \"copy Claude Code session data into the new worktree?\". Default true."
+				},
+				"sortByLastSession": {
+					"type": "boolean",
+					"description": "Sort the worktree list by most recently opened session. Default false."
+				},
+				"autoUseDefaultBranch": {
+					"type": "boolean",
+					"description": "Skip the base-branch prompt and always branch off the repository default branch. Default false."
+				},
+				"includeRemoteBranches": {
+					"type": "boolean",
+					"description": "Offer remote branches in the base-branch picker. Default false."
+				}
+			}
+		},
+		"commandPresets": {
+			"type": "object",
+			"description": "The commands CCManager can start a session with.",
+			"additionalProperties": false,
+			"required": ["presets", "defaultPresetId"],
+			"properties": {
+				"presets": {
+					"type": "array",
+					"minItems": 1,
+					"items": {"$ref": "#/definitions/commandPreset"}
+				},
+				"defaultPresetId": {
+					"type": "string",
+					"description": "`id` of the preset used when no preset is chosen explicitly."
+				},
+				"selectPresetOnStart": {
+					"type": "boolean",
+					"description": "Show the preset picker before every new session. Default false."
+				}
+			}
+		},
+		"mergeConfig": {
+			"type": "object",
+			"description": "Extra arguments for the merge/rebase action in the worktree menu.",
+			"additionalProperties": false,
+			"properties": {
+				"mergeArgs": {
+					"type": "array",
+					"items": {"type": "string"},
+					"description": "Arguments inserted into `git merge <args> \"<source>\"`. Default [\"--no-ff\"]."
+				},
+				"rebaseArgs": {
+					"type": "array",
+					"items": {"type": "string"},
+					"description": "Arguments inserted into `git rebase <args> \"<target>\"`. Default []."
+				}
+			}
+		},
+		"autoApproval": {
+			"type": "object",
+			"description": "Experimental: let CCManager answer a waiting prompt for you by sending Enter.",
+			"additionalProperties": false,
+			"required": ["enabled"],
+			"properties": {
+				"enabled": {"type": "boolean"},
+				"customCommand": {
+					"type": "string",
+					"description": "Shell command replacing the built-in `claude` check. Must print {\"needsPermission\": boolean, \"reason\"?: string} on stdout."
+				},
+				"timeout": {
+					"type": "number",
+					"exclusiveMinimum": 0,
+					"description": "Seconds to wait for the verification command. Default 120."
+				}
+			}
+		}
+	},
+	"definitions": {
+		"shortcutKey": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["key"],
+			"properties": {
+				"key": {
+					"type": "string",
+					"description": "A single character, or the literal \"escape\"."
+				},
+				"ctrl": {"type": "boolean"},
+				"alt": {
+					"type": "boolean",
+					"description": "Accepted by the schema but never matched at runtime; do not use."
+				},
+				"shift": {
+					"type": "boolean",
+					"description": "Accepted by the schema but never matched at runtime; do not use."
+				}
+			}
+		},
+		"hook": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["command", "enabled"],
+			"properties": {
+				"command": {
+					"type": "string",
+					"description": "Runs through the shell, in the worktree directory for status and post_creation hooks, in the git root for pre_creation."
+				},
+				"enabled": {
+					"type": "boolean",
+					"description": "The hook is skipped entirely unless this is true."
+				}
+			}
+		},
+		"commandPreset": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "name", "command"],
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "Unique within `presets`; referenced by defaultPresetId."
+				},
+				"name": {
+					"type": "string",
+					"description": "Label shown in the preset picker."
+				},
+				"command": {
+					"type": "string",
+					"description": "Executable name, e.g. \"claude\", \"codex\", \"gemini\"."
+				},
+				"args": {
+					"type": "array",
+					"items": {"type": "string"},
+					"description": "One array element per argv entry, e.g. [\"--model\", \"opus\"]."
+				},
+				"fallbackArgs": {
+					"type": "array",
+					"items": {"type": "string"},
+					"description": "Retried once if the session fails to start with `args`."
+				},
+				"detectionStrategy": {
+					"type": "string",
+					"description": "How CCManager reads idle/busy/waiting state out of the terminal. Defaults to \"claude\".",
+					"enum": [
+						"claude",
+						"gemini",
+						"codex",
+						"cursor",
+						"github-copilot",
+						"cline",
+						"opencode",
+						"kimi"
+					]
+				}
+			}
+		}
+	}
+}

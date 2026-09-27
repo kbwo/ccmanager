@@ -17,6 +17,7 @@ const makeItem = (searchableName: string, path: string): SessionItem => ({
 		hasSession: false,
 	} as Worktree,
 	baseLabel: searchableName,
+	status: '',
 	searchableName,
 	fileChanges: '',
 	aheadBehind: '',
@@ -24,6 +25,7 @@ const makeItem = (searchableName: string, path: string): SessionItem => ({
 	lastCommitDate: '',
 	lengths: {
 		base: 0,
+		status: 0,
 		fileChanges: 0,
 		aheadBehind: 0,
 		parentBranch: 0,

@@ -264,6 +264,45 @@ describe('SessionManager', () => {
 			expect(mockPty.write).not.toHaveBeenCalled();
 		});
 
+		it('assigns the given session name to the created session', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+				args: [],
+			});
+
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect(
+					'/test/worktree',
+					undefined,
+					undefined,
+					'my session name',
+				),
+			);
+
+			expect(session.sessionName).toBe('my session name');
+		});
+
+		it('leaves the session name unset when none is given', async () => {
+			vi.mocked(configReader.getDefaultPreset).mockReturnValue({
+				id: '1',
+				name: 'Main',
+				command: 'claude',
+				args: [],
+			});
+
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			const session = await Effect.runPromise(
+				sessionManager.createSessionWithPresetEffect('/test/worktree'),
+			);
+
+			expect(session.sessionName).toBeUndefined();
+		});
+
 		it('should fall back to default preset if specified preset not found', async () => {
 			// Setup mocks
 			vi.mocked(configReader.getPresetByIdEffect).mockReturnValue(
