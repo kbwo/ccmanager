@@ -449,14 +449,14 @@ describe('column alignment', () => {
 			fileChanges: '\x1b[32m+10\x1b[0m \x1b[31m-5\x1b[0m',
 			aheadBehind: '\x1b[33m↑2 ↓3\x1b[0m',
 			parentBranch: '',
-			lastCommitDate: '',
+			lastModified: '',
 			lengths: {
 				base: 19, // 'feature/test-branch'.length
 				status: 0,
 				fileChanges: 6, // '+10 -5'.length
 				aheadBehind: 5, // '↑2 ↓3'.length
 				parentBranch: 0,
-				lastCommitDate: 0,
+				lastModified: 0,
 			},
 		},
 		{
@@ -467,14 +467,14 @@ describe('column alignment', () => {
 			fileChanges: '\x1b[32m+2\x1b[0m \x1b[31m-1\x1b[0m',
 			aheadBehind: '\x1b[33m↑1\x1b[0m',
 			parentBranch: '',
-			lastCommitDate: '',
+			lastModified: '',
 			lengths: {
 				base: 4, // 'main'.length
 				status: 0,
 				fileChanges: 5, // '+2 -1'.length
 				aheadBehind: 2, // '↑1'.length
 				parentBranch: 0,
-				lastCommitDate: 0,
+				lastModified: 0,
 			},
 		},
 	];
@@ -554,7 +554,7 @@ describe('session status column', () => {
 	const makeItem = (
 		baseLabel: string,
 		status: string,
-		lastCommitDate: string,
+		lastModified: string,
 	): SessionItem => ({
 		worktree: {} as Worktree,
 		baseLabel,
@@ -563,14 +563,14 @@ describe('session status column', () => {
 		fileChanges: '',
 		aheadBehind: '',
 		parentBranch: '',
-		lastCommitDate,
+		lastModified,
 		lengths: {
 			base: baseLabel.length,
 			status: status.length,
 			fileChanges: 0,
 			aheadBehind: 0,
 			parentBranch: 0,
-			lastCommitDate: lastCommitDate.length,
+			lastModified: lastModified.length,
 		},
 	});
 
@@ -586,12 +586,12 @@ describe('session status column', () => {
 		const labels = items.map(item => assembleSessionLabel(item, columns));
 		for (const [index, label] of labels.entries()) {
 			expect(label.indexOf(items[index]!.status)).toBe(columns.status);
-			expect(label.indexOf(items[index]!.lastCommitDate)).toBe(
-				columns.lastCommitDate,
+			expect(label.indexOf(items[index]!.lastModified)).toBe(
+				columns.lastModified,
 			);
 		}
 		// The gap between the tag and the date is only the column padding.
-		expect(columns.lastCommitDate - columns.status).toBe('[○ Idle]'.length + 2);
+		expect(columns.lastModified - columns.status).toBe('[○ Idle]'.length + 2);
 	});
 
 	it('falls back to appending the status to the name when too narrow', () => {

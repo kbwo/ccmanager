@@ -1,5 +1,4 @@
 import React, {useState, useEffect, useMemo} from 'react';
-import {statSync} from 'fs';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
@@ -13,6 +12,7 @@ import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
 import {
 	formatRelativeDate,
+	getLastModified,
 	isDeletableWorktree,
 } from '../utils/worktreeUtils.js';
 
@@ -84,15 +84,10 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		};
 	}, [projectPath]);
 
-	// ponytail: stats only the worktree's top-level directory, so an edit to a
-	// nested file does not move this time. Walk the tree if it proves too coarse.
 	const lastModifiedLabels = useMemo(() => {
 		const labels = worktrees.map(worktree => {
-			try {
-				return formatRelativeDate(statSync(worktree.path).mtime);
-			} catch {
-				return '-';
-			}
+			const lastModified = getLastModified(worktree.path);
+			return lastModified ? formatRelativeDate(lastModified) : '-';
 		});
 		const width = Math.max(0, ...labels.map(label => label.length));
 		return labels.map(label => label.padEnd(width));
