@@ -1,4 +1,5 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
+import {statSync} from 'fs';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
@@ -10,7 +11,10 @@ import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import {filterWorktreesByQuery} from '../utils/filterByQuery.js';
 import SearchableList from './SearchableList.js';
-import {isDeletableWorktree} from '../utils/worktreeUtils.js';
+import {
+	formatRelativeDate,
+	isDeletableWorktree,
+} from '../utils/worktreeUtils.js';
 
 interface DeleteWorktreeProps {
 	projectPath?: string;
@@ -80,6 +84,20 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		};
 	}, [projectPath]);
 
+	// ponytail: stats only the worktree's top-level directory, so an edit to a
+	// nested file does not move this time. Walk the tree if it proves too coarse.
+	const lastModifiedLabels = useMemo(() => {
+		const labels = worktrees.map(worktree => {
+			try {
+				return formatRelativeDate(statSync(worktree.path).mtime);
+			} catch {
+				return '-';
+			}
+		});
+		const width = Math.max(0, ...labels.map(label => label.length));
+		return labels.map(label => label.padEnd(width));
+	}, [worktrees]);
+
 	// Build menu items from worktrees, filtering by search query
 	useEffect(() => {
 		const filteredWorktrees = filterWorktreesByQuery(worktrees, searchQuery);
@@ -91,13 +109,13 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				: 'detached';
 			const isSelected = selectedIndices.has(originalIndex);
 			return {
-				label: `${isSelected ? '[✓]' : '[ ]'} ${branchName} (${worktree.path})`,
+				label: `${isSelected ? '[✓]' : '[ ]'} ${lastModifiedLabels[originalIndex]} ${branchName} (${worktree.path})`,
 				value: originalIndex.toString(),
 			};
 		});
 
 		setMenuItems(items);
-	}, [worktrees, searchQuery, selectedIndices]);
+	}, [worktrees, searchQuery, selectedIndices, lastModifiedLabels]);
 
 	const handleSelect = (item: {value: string}) => {
 		// Don't toggle on Enter - this will be used to confirm
@@ -201,7 +219,8 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 
 			<Box marginBottom={1}>
 				<Text dimColor>
-					Select worktrees to delete (Space to select, Enter to confirm):
+					Select worktrees to delete (Space to select, Enter to confirm). The
+					time is when each worktree directory was last modified:
 				</Text>
 			</Box>
 
