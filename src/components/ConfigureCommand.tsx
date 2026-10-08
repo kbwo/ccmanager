@@ -60,11 +60,7 @@ interface ConfigureCommandProps {
 
 type ViewMode = 'list' | 'edit' | 'add' | 'delete-confirm';
 type EditField =
-	| 'name'
-	| 'command'
-	| 'args'
-	| 'fallbackArgs'
-	| 'detectionStrategy';
+	'name' | 'command' | 'args' | 'fallbackArgs' | 'detectionStrategy';
 
 const formatDetectionStrategy = (strategy: string | undefined): string => {
 	const value = strategy || 'claude';

@@ -73,9 +73,7 @@ interface CommonDashboardItem {
 }
 
 type DashboardItem =
-	| SessionDashboardItem
-	| ProjectDashboardItem
-	| CommonDashboardItem;
+	SessionDashboardItem | ProjectDashboardItem | CommonDashboardItem;
 
 /** Session metadata for mapping sessions to projects and worktrees. */
 interface SessionEntry {
