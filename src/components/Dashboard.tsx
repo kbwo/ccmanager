@@ -413,8 +413,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 					fileChanges,
 					aheadBehind,
 					parentBranch,
-					lastCommitDate: wt.lastCommitDate
-						? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
+					lastModified: wt.lastModified
+						? `\x1b[90m${formatRelativeDate(wt.lastModified)}\x1b[0m`
 						: '',
 					error: itemError,
 					lengths: {
@@ -423,8 +423,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 						fileChanges: stripAnsi(fileChanges).length,
 						aheadBehind: stripAnsi(aheadBehind).length,
 						parentBranch: stripAnsi(parentBranch).length,
-						lastCommitDate: wt.lastCommitDate
-							? formatRelativeDate(wt.lastCommitDate).length
+						lastModified: wt.lastModified
+							? formatRelativeDate(wt.lastModified).length
 							: 0,
 					},
 				};

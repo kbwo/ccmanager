@@ -38,7 +38,7 @@ export interface Worktree {
 	hasSession: boolean;
 	gitStatus?: GitStatus;
 	gitStatusError?: string;
-	lastCommitDate?: Date;
+	lastModified?: Date;
 }
 
 export interface CreateWorktreeResult {
