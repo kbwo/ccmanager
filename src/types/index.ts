@@ -10,10 +10,7 @@ import type {GitError, FileSystemError, ProcessError} from './errors.js';
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState =
-	| 'idle'
-	| 'busy'
-	| 'waiting_input'
-	| 'pending_auto_approval';
+	'idle' | 'busy' | 'waiting_input' | 'pending_auto_approval';
 
 export type StateDetectionStrategy =
 	| 'claude'
