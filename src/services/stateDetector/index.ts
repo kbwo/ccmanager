@@ -9,6 +9,7 @@ import {ClineStateDetector} from './cline.js';
 import {OpenCodeStateDetector} from './opencode.js';
 import {KimiStateDetector} from './kimi.js';
 import {MCodeStateDetector} from './mcode.js';
+import {GrokStateDetector} from './grok.js';
 
 export function createStateDetector(
 	strategy: StateDetectionStrategy = 'claude',
@@ -32,6 +33,8 @@ export function createStateDetector(
 			return new KimiStateDetector();
 		case 'mcode':
 			return new MCodeStateDetector();
+		case 'grok':
+			return new GrokStateDetector();
 		default:
 			return new ClaudeStateDetector();
 	}

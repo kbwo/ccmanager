@@ -24,7 +24,8 @@ export type StateDetectionStrategy =
 	| 'cline'
 	| 'opencode'
 	| 'kimi'
-	| 'mcode';
+	| 'mcode'
+	| 'grok';
 
 export interface Worktree {
 	path: string;

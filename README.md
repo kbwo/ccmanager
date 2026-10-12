@@ -149,6 +149,7 @@ CCManager supports multiple AI coding assistants with tailored state detection f
 | OpenCode | `opencode` | [opencode.ai/docs](https://opencode.ai/docs) |
 | Kimi CLI | `kimi` | [kimi-cli.com](https://www.kimi-cli.com/en/) |
 | MiniMax Code (MCode) | `mcode` | [npmjs.com/package/@minimax-ai/code](https://www.npmjs.com/package/@minimax-ai/code) |
+| Grok Build | `grok` | [github.com/xai-org/grok-build](https://github.com/xai-org/grok-build) |
 
 Each assistant has its own state detection strategy to properly track:
 - **Idle**: Ready for new input
