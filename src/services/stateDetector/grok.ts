@@ -17,6 +17,27 @@ const PROMPT_HINTS = [
 	':accept / toggle', // MCP elicitation card
 ];
 
+// The permission prompt's reject option. Unlike the shortcuts bar hint, it
+// stays on screen after Esc moves keyboard focus to the transcript.
+// Source: crates/codegen/xai-grok-pager/src/views/permission_view.rs
+const PERMISSION_REJECT_ROW_PATTERN =
+	/\([○●]\) No, reject \(type to add feedback\)/;
+
+// Headers of the panes listing background commands (`▾ Tasks 2`) and
+// monitors / loops (`▾ Watchers 1`). `Subagents` is left out because it also
+// lists subagents the running turn is waiting on.
+// Source: `section_header` in crates/codegen/xai-grok-pager/src/views/dock/mod.rs
+const BACKGROUND_PANE_HEADER_PATTERN = /^\s*[▾▸] (?:Tasks|Watchers) (\d+)/gm;
+
+// Idle cue such as `1 command · 2 monitors still running`, read when no pane
+// header is on screen.
+// Source: `format_still_running` in
+// crates/codegen/xai-grok-pager/src/views/turn_status.rs
+const STILL_RUNNING_PATTERN = /((?:\d+ [a-z]+(?: · )?)+) still running/;
+
+const sum = (counts: Iterable<string>): number =>
+	[...counts].reduce((total, count) => total + Number(count), 0);
+
 // The turn status row replaces the spinner with a diamond for these.
 // Sources: `render_turn_status` in
 // crates/codegen/xai-grok-pager/src/views/turn_status.rs and
@@ -44,6 +65,7 @@ export class GrokStateDetector extends BaseStateDetector {
 		// on screen while the main turn is blocked on the user.
 		if (
 			PROMPT_SELECT_HINT_PATTERN.test(content) ||
+			PERMISSION_REJECT_ROW_PATTERN.test(content) ||
 			PROMPT_HINTS.some(hint => content.includes(hint)) ||
 			WAITING_STATUS_ROWS.some(row => content.includes(row)) ||
 			content.includes(TRUST_QUESTION)
@@ -58,8 +80,15 @@ export class GrokStateDetector extends BaseStateDetector {
 		return 'idle';
 	}
 
-	detectBackgroundTask(_terminal: Terminal): number {
-		return 0;
+	detectBackgroundTask(terminal: Terminal): number {
+		const content = this.getTerminalContent(terminal, 30);
+		const paneCounts = [...content.matchAll(BACKGROUND_PANE_HEADER_PATTERN)];
+		if (paneCounts.length > 0) {
+			return sum(paneCounts.map(match => match[1]!));
+		}
+
+		const cue = content.match(STILL_RUNNING_PATTERN)?.[1];
+		return sum(cue?.match(/\d+/g) ?? []);
 	}
 
 	detectTeamMembers(_terminal: Terminal): number {

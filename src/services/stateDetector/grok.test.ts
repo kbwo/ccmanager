@@ -26,9 +26,9 @@ describe('GrokStateDetector', () => {
 
 	it.each([
 		// permission prompt
-		'1/3:select  │  Tab:next option  │  Ctrl+o:always-approve  │  Ctrl+c:cancel  │  Esc:back',
+		'1/5:select  │  Tab:next option  │  ←/→:scope  │  e:edit pattern  │  Ctrl+o:always-approve  │  Ctrl+c:cancel',
 		// cancel-turn panel
-		'1/4:select  │  Tab:next choice  │  Enter:confirm  │  Esc:back',
+		'1/4:select  │  Tab:next choice  │  Enter:confirm  │  Esc:keep running',
 		// ask_user_question card
 		'Tab:next answer  │  Esc:back  │  x:dismiss',
 		// MCP elicitation card
@@ -37,6 +37,9 @@ describe('GrokStateDetector', () => {
 		'◆ Waiting on plan approval',
 		'◆ No plan written: approve or request changes',
 		'      Do you trust the contents of this directory?',
+		// permission prompt after Esc: only its option rows remain
+		'  4 (○) No, reject (type to add feedback)',
+		'  4 (●) No, reject (type to add feedback)',
 	])('detects "%s" as waiting_input', line => {
 		const terminal = createMockTerminal(['◆ Run rm -rf build', line]);
 
@@ -64,5 +67,21 @@ describe('GrokStateDetector', () => {
 		const terminal = createMockTerminal(lines);
 
 		expect(detector.detectState(terminal, 'busy')).toBe('idle');
+	});
+
+	it.each([
+		['   ▾ Tasks 1', 1],
+		['   ▸ Watchers 12', 12],
+		['   ▾ Subagents 2', 0],
+		['   ▾ Queued 1', 0],
+		['◎ 1 command still running', 1],
+		['◎ 1 command · 2 monitors · 1 loop · 3 subagents still running', 7],
+		['◎ 2 commands still running · send a message to interrupt', 2],
+		['◎ waiting · send a message to interrupt', 0],
+		['◆ Ran 3 tests, 2 still running', 0],
+	])('counts background work in "%s"', (line, expected) => {
+		const terminal = createMockTerminal(['◆ Started the dev server', line]);
+
+		expect(detector.detectBackgroundTask(terminal)).toBe(expected);
 	});
 });
