@@ -242,14 +242,12 @@ export class ProjectManager implements IProjectManager {
 				);
 			} catch (error) {
 				// Silently skip directories we can't read
-				if (
-					!(
-						typeof error === 'object' &&
-						error !== null &&
-						'code' in error &&
-						error.code === 'EACCES'
-					)
-				) {
+				if (!(
+					typeof error === 'object' &&
+					error !== null &&
+					'code' in error &&
+					error.code === 'EACCES'
+				)) {
 					console.error(`Error scanning directory ${dir}:`, error);
 				}
 			}

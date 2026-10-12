@@ -2,6 +2,9 @@ import React from 'react';
 import {useInput, type Key} from 'ink';
 import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
+import {mkdtempSync, rmSync, utimesSync} from 'fs';
+import {tmpdir} from 'os';
+import {join} from 'path';
 import {Effect} from 'effect';
 import DeleteWorktree from './DeleteWorktree.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -236,7 +239,8 @@ describe('DeleteWorktree - Effect Integration', () => {
 
 	describe('keyboard navigation', () => {
 		// Renders one worktree per branch and returns helpers to press keys
-		// and read the list rows, e.g. '>[✓] a' for the cursor row
+		// and read the list rows, e.g. '>[✓] a' for the cursor row (the
+		// last-modified column, '-' for these nonexistent paths, is dropped)
 		const renderList = async (branches: string[]) => {
 			const mockWorktrees: Worktree[] = branches.map(branch => ({
 				path: `/test/${branch}`,
@@ -268,7 +272,7 @@ describe('DeleteWorktree - Effect Integration', () => {
 					lastFrame()!
 						.split('\n')
 						.filter(line => line.includes(' (/test/'))
-						.map(line => line.split(' (/test/')[0]),
+						.map(line => line.split(' (/test/')[0]!.replace('] - ', '] ')),
 			};
 		};
 
@@ -350,5 +354,37 @@ describe('DeleteWorktree - Effect Integration', () => {
 				' [ ] e',
 			]);
 		});
+	});
+
+	it('should show the directory last-modified time before the branch name', async () => {
+		// GIVEN: A worktree directory last modified three days ago
+		const worktreePath = mkdtempSync(join(tmpdir(), 'ccmanager-delete-'));
+		const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+		utimesSync(worktreePath, threeDaysAgo, threeDaysAgo);
+
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: vi.fn(() =>
+					Effect.succeed([
+						{
+							path: worktreePath,
+							branch: 'feature-1',
+							isMainWorktree: false,
+							hasSession: false,
+						},
+					]),
+				),
+			} as Partial<WorktreeService> as WorktreeService;
+		});
+
+		// WHEN: Component is rendered
+		const {lastFrame} = render(
+			<DeleteWorktree onComplete={vi.fn()} onCancel={vi.fn()} />,
+		);
+		await new Promise(resolve => setTimeout(resolve, 50));
+		rmSync(worktreePath, {recursive: true});
+
+		// THEN: The relative time is shown ahead of the branch name
+		expect(lastFrame()).toContain('[ ] 3d ago feature-1');
 	});
 });

@@ -22,14 +22,14 @@ const makeItem = (searchableName: string, path: string): SessionItem => ({
 	fileChanges: '',
 	aheadBehind: '',
 	parentBranch: '',
-	lastCommitDate: '',
+	lastModified: '',
 	lengths: {
 		base: 0,
 		status: 0,
 		fileChanges: 0,
 		aheadBehind: 0,
 		parentBranch: 0,
-		lastCommitDate: 0,
+		lastModified: 0,
 	},
 });
 

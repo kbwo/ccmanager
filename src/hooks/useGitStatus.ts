@@ -1,23 +1,20 @@
 import {useEffect, useState, type Dispatch, type SetStateAction} from 'react';
 import {Effect, Exit, Cause, Option} from 'effect';
 import {Worktree} from '../types/index.js';
-import {
-	getGitStatusLimited,
-	getLastCommitDateLimited,
-	type GitStatus,
-} from '../utils/gitStatus.js';
+import {getGitStatusLimited, type GitStatus} from '../utils/gitStatus.js';
+import {getLastModified} from '../utils/worktreeUtils.js';
 import type {GitError} from '../types/errors.js';
 
 interface WorktreeStatusResult {
 	path: string;
 	statusExit: Exit.Exit<GitStatus, GitError>;
-	dateExit: Exit.Exit<Date, GitError>;
+	lastModified?: Date;
 }
 
 interface CachedStatus {
 	gitStatus?: GitStatus;
 	gitStatusError?: string;
-	lastCommitDate?: Date;
+	lastModified?: Date;
 }
 
 /**
@@ -55,7 +52,7 @@ function hydrateFromCache(worktrees: Worktree[]): Worktree[] {
 			...wt,
 			gitStatus: cached.gitStatus,
 			gitStatusError: cached.gitStatusError,
-			lastCommitDate: cached.lastCommitDate,
+			lastModified: cached.lastModified,
 		};
 	});
 	return changed ? next : worktrees;
@@ -70,16 +67,16 @@ function cacheStatusUpdate(path: string, update: Partial<Worktree>): void {
 	if ('gitStatusError' in update) {
 		next.gitStatusError = update.gitStatusError;
 	}
-	if ('lastCommitDate' in update) {
-		next.lastCommitDate = update.lastCommitDate;
+	if ('lastModified' in update) {
+		next.lastModified = update.lastModified;
 	}
 	statusCache.set(path, next);
 }
 
 /**
- * Custom hook for polling git status and commit dates of worktrees with Effect-based execution
+ * Custom hook for polling git status and last-modified times of worktrees with Effect-based execution
  *
- * Fetches git status and last commit date for each worktree at regular intervals
+ * Fetches git status and directory last-modified time for each worktree at regular intervals
  * using Effect.runPromiseExit and updates worktree state with results.
  * Both are fetched together so they appear at the same time.
  * Handles cancellation via AbortController.
@@ -92,7 +89,7 @@ function cacheStatusUpdate(path: string, update: Partial<Worktree>): void {
  * @param worktrees - Array of worktrees to monitor
  * @param defaultBranch - Default branch for comparisons (null disables polling)
  * @param updateInterval - Polling interval in milliseconds (default: 5000)
- * @returns Array of worktrees with updated gitStatus, gitStatusError, and lastCommitDate fields
+ * @returns Array of worktrees with updated gitStatus, gitStatusError, and lastModified fields
  */
 export function useGitStatus(
 	worktrees: Worktree[],
@@ -119,17 +116,16 @@ export function useGitStatus(
 			activeRequests.add(abortController);
 
 			try {
-				// Fetch git status and last commit date in parallel
-				const [statusExit, dateExit] = await Promise.all([
-					Effect.runPromiseExit(getGitStatusLimited(worktree.path), {
-						signal: abortController.signal,
-					}),
-					Effect.runPromiseExit(getLastCommitDateLimited(worktree.path), {
-						signal: abortController.signal,
-					}),
-				]);
+				const statusExit = await Effect.runPromiseExit(
+					getGitStatusLimited(worktree.path),
+					{signal: abortController.signal},
+				);
 
-				return {path: worktree.path, statusExit, dateExit};
+				return {
+					path: worktree.path,
+					statusExit,
+					lastModified: getLastModified(worktree.path),
+				};
 			} finally {
 				activeRequests.delete(abortController);
 			}
@@ -195,7 +191,7 @@ function applyStatusResults(
 ): void {
 	const updatesByPath = new Map<string, Partial<Worktree>>();
 	for (const result of results) {
-		const update = buildStatusUpdate(result.statusExit, result.dateExit);
+		const update = buildStatusUpdate(result.statusExit, result.lastModified);
 		if (update) {
 			updatesByPath.set(result.path, update);
 			cacheStatusUpdate(result.path, update);
@@ -224,11 +220,11 @@ function applyStatusResults(
  * Build the update object for a single worktree from its Exit results.
  *
  * @returns A partial worktree to merge, or null when there is nothing to update
- *   (e.g. the status fetch was interrupted and the commit date failed).
+ *   (e.g. the status fetch was interrupted and the directory could not be read).
  */
 function buildStatusUpdate(
 	statusExit: Exit.Exit<GitStatus, GitError>,
-	dateExit: Exit.Exit<Date, GitError>,
+	lastModified: Date | undefined,
 ): Partial<Worktree> | null {
 	const update: Partial<Worktree> = {};
 	let hasUpdate = false;
@@ -246,11 +242,10 @@ function buildStatusUpdate(
 		}
 	}
 
-	if (Exit.isSuccess(dateExit)) {
-		update.lastCommitDate = dateExit.value;
+	if (lastModified) {
+		update.lastModified = lastModified;
 		hasUpdate = true;
 	}
-	// Silently ignore commit date errors (e.g., empty repo)
 
 	return hasUpdate ? update : null;
 }
@@ -272,9 +267,9 @@ function isUpdateNoop(wt: Worktree, update: Partial<Worktree>): boolean {
 	) {
 		return false;
 	}
-	if ('lastCommitDate' in update) {
-		const prevTime = wt.lastCommitDate?.getTime();
-		const nextTime = update.lastCommitDate?.getTime();
+	if ('lastModified' in update) {
+		const prevTime = wt.lastModified?.getTime();
+		const nextTime = update.lastModified?.getTime();
 		if (prevTime !== nextTime) {
 			return false;
 		}

@@ -3,10 +3,7 @@ import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 
 export type SessionActionType =
-	| 'newSession'
-	| 'rename'
-	| 'kill'
-	| 'deleteWorktree';
+	'newSession' | 'rename' | 'kill' | 'deleteWorktree';
 
 interface SessionActionsProps {
 	/**
