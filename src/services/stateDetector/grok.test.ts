@@ -36,6 +36,7 @@ describe('GrokStateDetector', () => {
 		'◆ Waiting on answers for Which database?',
 		'◆ Waiting on plan approval',
 		'◆ No plan written: approve or request changes',
+		'      Do you trust the contents of this directory?',
 	])('detects "%s" as waiting_input', line => {
 		const terminal = createMockTerminal(['◆ Run rm -rf build', line]);
 

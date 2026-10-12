@@ -27,6 +27,10 @@ const WAITING_STATUS_ROWS = [
 	'◆ No plan written',
 ];
 
+// Folder trust question shown at startup, before any session exists.
+// Source: crates/codegen/xai-grok-pager/src/views/welcome/mod.rs
+const TRUST_QUESTION = 'Do you trust the contents of this directory';
+
 /**
  * State detector for Grok Build.
  * Command: grok
@@ -41,7 +45,8 @@ export class GrokStateDetector extends BaseStateDetector {
 		if (
 			PROMPT_SELECT_HINT_PATTERN.test(content) ||
 			PROMPT_HINTS.some(hint => content.includes(hint)) ||
-			WAITING_STATUS_ROWS.some(row => content.includes(row))
+			WAITING_STATUS_ROWS.some(row => content.includes(row)) ||
+			content.includes(TRUST_QUESTION)
 		) {
 			return 'waiting_input';
 		}
