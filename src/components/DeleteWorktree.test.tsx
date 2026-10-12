@@ -31,33 +31,8 @@ vi.mock('ink', async () => {
 	};
 });
 
-// Mock SelectInput to render items as simple text
-vi.mock('ink-select-input', async () => {
-	const React = await vi.importActual<typeof import('react')>('react');
-	const {Text, Box} = await vi.importActual<typeof import('ink')>('ink');
-
-	return {
-		default: ({
-			items,
-			initialIndex = 0,
-		}: {
-			items: Array<{label: string; value: string}>;
-			initialIndex?: number;
-		}) => {
-			return React.createElement(
-				Box,
-				{flexDirection: 'column'},
-				items.map((item: {label: string}, index: number) =>
-					React.createElement(
-						Text,
-						{key: index},
-						`${index === initialIndex ? '>' : ' '}${item.label}`,
-					),
-				),
-			);
-		},
-	};
-});
+// The test terminal has no height; show 5 rows so scrolling can be tested
+vi.mock('../hooks/useDynamicLimit.js', () => ({useDynamicLimit: () => 5}));
 
 describe('DeleteWorktree - Effect Integration', () => {
 	beforeEach(() => {
@@ -259,39 +234,121 @@ describe('DeleteWorktree - Effect Integration', () => {
 		expect(output).not.toContain('main');
 	});
 
-	it('should move the cursor to the next row after toggling with space', async () => {
-		const mockWorktrees: Worktree[] = ['feature-1', 'feature-2'].map(
-			branch => ({
+	describe('keyboard navigation', () => {
+		// Renders one worktree per branch and returns helpers to press keys
+		// and read the list rows, e.g. '>[✓] a' for the cursor row
+		const renderList = async (branches: string[]) => {
+			const mockWorktrees: Worktree[] = branches.map(branch => ({
 				path: `/test/${branch}`,
 				branch,
 				isMainWorktree: false,
 				hasSession: false,
-			}),
-		);
+			}));
 
-		vi.mocked(WorktreeService).mockImplementation(function () {
-			return {
-				getWorktreesEffect: vi.fn(() => Effect.succeed(mockWorktrees)),
-			} as Partial<WorktreeService> as WorktreeService;
-		});
+			vi.mocked(WorktreeService).mockImplementation(function () {
+				return {
+					getWorktreesEffect: vi.fn(() => Effect.succeed(mockWorktrees)),
+				} as Partial<WorktreeService> as WorktreeService;
+			});
 
-		const {lastFrame} = render(
-			<DeleteWorktree onComplete={vi.fn()} onCancel={vi.fn()} />,
-		);
-		await new Promise(resolve => setTimeout(resolve, 50));
-
-		// The component's own useInput is registered last in each render
-		const pressSpace = async () => {
-			vi.mocked(useInput).mock.calls.at(-1)![0](' ', {} as Key);
+			const {lastFrame} = render(
+				<DeleteWorktree onComplete={vi.fn()} onCancel={vi.fn()} />,
+			);
 			await new Promise(resolve => setTimeout(resolve, 50));
+
+			return {
+				// The component's own useInput is registered last in each render
+				press: async (input: string, key: Partial<Key> = {}, times = 1) => {
+					for (let i = 0; i < times; i++) {
+						vi.mocked(useInput).mock.calls.at(-1)![0](input, key as Key);
+						await new Promise(resolve => setTimeout(resolve, 20));
+					}
+				},
+				rows: () =>
+					lastFrame()!
+						.split('\n')
+						.filter(line => line.includes(' (/test/'))
+						.map(line => line.split(' (/test/')[0]),
+			};
 		};
 
-		await pressSpace();
-		expect(lastFrame()).toContain(' [✓] feature-1');
-		expect(lastFrame()).toContain('>[ ] feature-2');
+		it('should move the cursor to the next row after toggling with space', async () => {
+			const {press, rows} = await renderList(['a', 'b']);
 
-		// On the last row the cursor stays where it is
-		await pressSpace();
-		expect(lastFrame()).toContain('>[✓] feature-2');
+			await press(' ');
+			expect(rows()).toEqual([' [✓] a', '>[ ] b']);
+
+			// On the last row the cursor stays where it is
+			await press(' ');
+			expect(rows()).toEqual([' [✓] a', '>[✓] b']);
+		});
+
+		it('should keep the visible rows in place when space is pressed mid-list', async () => {
+			const {press, rows} = await renderList([
+				'a',
+				'b',
+				'c',
+				'd',
+				'e',
+				'f',
+				'g',
+				'h',
+			]);
+
+			// Scroll down to g (rows c-g visible), then back up to e
+			await press('', {downArrow: true}, 6);
+			await press('', {upArrow: true}, 2);
+			expect(rows()).toEqual([
+				' [ ] c',
+				' [ ] d',
+				'>[ ] e',
+				' [ ] f',
+				' [ ] g',
+			]);
+
+			await press(' ');
+			expect(rows()).toEqual([
+				' [ ] c',
+				' [ ] d',
+				' [✓] e',
+				'>[ ] f',
+				' [ ] g',
+			]);
+		});
+
+		it('should wrap around and jump with number keys', async () => {
+			const {press, rows} = await renderList(['a', 'b', 'c', 'd', 'e', 'f']);
+
+			// Up from the first row wraps to the last row
+			await press('k');
+			expect(rows()).toEqual([
+				' [ ] b',
+				' [ ] c',
+				' [ ] d',
+				' [ ] e',
+				'>[ ] f',
+			]);
+
+			// A number key moves to that visible row
+			await press('2');
+			expect(rows()).toEqual([
+				' [ ] b',
+				'>[ ] c',
+				' [ ] d',
+				' [ ] e',
+				' [ ] f',
+			]);
+
+			// Down from the last row wraps to the first row
+			await press('5');
+			await press('j');
+			expect(rows()).toEqual([
+				'>[ ] a',
+				' [ ] b',
+				' [ ] c',
+				' [ ] d',
+				' [ ] e',
+			]);
+		});
 	});
 });

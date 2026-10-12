@@ -1,6 +1,5 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
-import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
 import {Worktree} from '../types/index.js';
 import {WorktreeService} from '../services/worktreeService.js';
@@ -28,10 +27,9 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		new Set(),
 	);
 	const [confirmMode, setConfirmMode] = useState(false);
-	const [focusedIndex, setFocusedIndex] = useState(0);
-	// SelectInput owns its cursor and has no prop to move it, so it is
-	// remounted (via key) at the new position after each Space toggle.
-	const [advanceCount, setAdvanceCount] = useState(0);
+	// Row positions within menuItems: the cursor row and the first visible row
+	const [cursorRow, setCursorRow] = useState(0);
+	const [firstVisibleRow, setFirstVisibleRow] = useState(0);
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 
@@ -102,17 +100,32 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		setMenuItems(items);
 	}, [worktrees, searchQuery, selectedIndices]);
 
-	const handleSelect = (item: {value: string}) => {
-		// Don't toggle on Enter - this will be used to confirm
-		// We'll handle Space key separately for toggling
-		const index = parseInt(item.value, 10);
-		setFocusedIndex(index);
-	};
+	// A changed filter shows a different set of rows, so start from the top
+	useEffect(() => {
+		setCursorRow(0);
+		setFirstVisibleRow(0);
+	}, [searchQuery]);
 
-	const focusedPosition = Math.max(
-		0,
-		menuItems.findIndex(item => item.value === focusedIndex.toString()),
-	);
+	const rowCount = menuItems.length;
+	// limit is NaN when the terminal height is unknown; show every row then
+	const visibleRowCount = Math.min(limit, rowCount) || rowCount;
+	const cursor = Math.max(0, Math.min(cursorRow, rowCount - 1));
+	// Scroll only as far as needed to keep the given row visible
+	const scrollToShow = (row: number) =>
+		Math.max(
+			0,
+			Math.min(
+				Math.max(firstVisibleRow, row - visibleRowCount + 1),
+				row,
+				rowCount - visibleRowCount,
+			),
+		);
+	const firstVisible = scrollToShow(cursor);
+
+	const moveCursorTo = (row: number) => {
+		setCursorRow(row);
+		setFirstVisibleRow(scrollToShow(row));
+	};
 
 	useInput((input, key) => {
 		if (confirmMode) {
@@ -125,8 +138,19 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 			return;
 		}
 
-		if (input === ' ') {
+		if (rowCount > 0 && (input === 'k' || key.upArrow)) {
+			moveCursorTo((cursor - 1 + rowCount) % rowCount);
+		} else if (rowCount > 0 && (input === 'j' || key.downArrow)) {
+			moveCursorTo((cursor + 1) % rowCount);
+		} else if (/^[1-9]$/.test(input)) {
+			// Number keys jump to the Nth visible row
+			const row = firstVisible + parseInt(input, 10) - 1;
+			if (row < firstVisible + visibleRowCount) {
+				moveCursorTo(row);
+			}
+		} else if (input === ' ' && rowCount > 0) {
 			// Toggle selection on space
+			const focusedIndex = parseInt(menuItems[cursor]!.value, 10);
 			setSelectedIndices(prev => {
 				const newSet = new Set(prev);
 				if (newSet.has(focusedIndex)) {
@@ -137,10 +161,8 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				return newSet;
 			});
 			// Advance to the next row; stay put on the last one
-			const nextItem = menuItems[focusedPosition + 1];
-			if (nextItem) {
-				setFocusedIndex(parseInt(nextItem.value, 10));
-				setAdvanceCount(count => count + 1);
+			if (cursor < rowCount - 1) {
+				moveCursorTo(cursor + 1);
 			}
 		} else if (key.return && selectedIndices.size > 0) {
 			setConfirmMode(true);
@@ -229,34 +251,28 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				placeholder="Type to filter worktrees..."
 				noMatchMessage="No worktrees match your search"
 			>
-				<SelectInput
-					key={advanceCount}
-					initialIndex={focusedPosition}
-					items={menuItems}
-					onSelect={handleSelect}
-					onHighlight={(item: {value: string}) => {
-						const index = parseInt(item.value, 10);
-						setFocusedIndex(index);
-					}}
-					limit={limit}
-					indicatorComponent={({isSelected}) => (
-						<Text color={isSelected ? 'green' : undefined}>
-							{isSelected ? '>' : ' '}
-						</Text>
-					)}
-					itemComponent={({isSelected, label}) => {
-						const hasCheckmark = label.includes('[✓]');
-						return (
-							<Text
-								color={isSelected ? 'green' : undefined}
-								inverse={isSelected}
-								dimColor={!isSelected && !hasCheckmark}
-							>
-								{label}
-							</Text>
-						);
-					}}
-				/>
+				{/* Hand-written list: ink-select-input cannot have its cursor moved from outside, which Space needs */}
+				<Box flexDirection="column">
+					{menuItems
+						.slice(firstVisible, firstVisible + visibleRowCount)
+						.map((item, index) => {
+							const isCursorRow = firstVisible + index === cursor;
+							return (
+								<Box key={item.value}>
+									<Text color={isCursorRow ? 'green' : undefined}>
+										{isCursorRow ? '>' : ' '}
+									</Text>
+									<Text
+										color={isCursorRow ? 'green' : undefined}
+										inverse={isCursorRow}
+										dimColor={!isCursorRow && !item.label.includes('[✓]')}
+									>
+										{item.label}
+									</Text>
+								</Box>
+							);
+						})}
+				</Box>
 			</SearchableList>
 
 			<Box marginTop={1} flexDirection="column">
