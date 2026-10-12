@@ -1,4 +1,5 @@
 import React from 'react';
+import {useInput, type Key} from 'ink';
 import {render} from 'ink-testing-library';
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {Effect} from 'effect';
@@ -36,12 +37,22 @@ vi.mock('ink-select-input', async () => {
 	const {Text, Box} = await vi.importActual<typeof import('ink')>('ink');
 
 	return {
-		default: ({items}: {items: Array<{label: string; value: string}>}) => {
+		default: ({
+			items,
+			initialIndex = 0,
+		}: {
+			items: Array<{label: string; value: string}>;
+			initialIndex?: number;
+		}) => {
 			return React.createElement(
 				Box,
 				{flexDirection: 'column'},
 				items.map((item: {label: string}, index: number) =>
-					React.createElement(Text, {key: index}, item.label),
+					React.createElement(
+						Text,
+						{key: index},
+						`${index === initialIndex ? '>' : ' '}${item.label}`,
+					),
 				),
 			);
 		},
@@ -246,5 +257,41 @@ describe('DeleteWorktree - Effect Integration', () => {
 		const output = lastFrame();
 		expect(output).toContain('feature-1');
 		expect(output).not.toContain('main');
+	});
+
+	it('should move the cursor to the next row after toggling with space', async () => {
+		const mockWorktrees: Worktree[] = ['feature-1', 'feature-2'].map(
+			branch => ({
+				path: `/test/${branch}`,
+				branch,
+				isMainWorktree: false,
+				hasSession: false,
+			}),
+		);
+
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getWorktreesEffect: vi.fn(() => Effect.succeed(mockWorktrees)),
+			} as Partial<WorktreeService> as WorktreeService;
+		});
+
+		const {lastFrame} = render(
+			<DeleteWorktree onComplete={vi.fn()} onCancel={vi.fn()} />,
+		);
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		// The component's own useInput is registered last in each render
+		const pressSpace = async () => {
+			vi.mocked(useInput).mock.calls.at(-1)![0](' ', {} as Key);
+			await new Promise(resolve => setTimeout(resolve, 50));
+		};
+
+		await pressSpace();
+		expect(lastFrame()).toContain(' [✓] feature-1');
+		expect(lastFrame()).toContain('>[ ] feature-2');
+
+		// On the last row the cursor stays where it is
+		await pressSpace();
+		expect(lastFrame()).toContain('>[✓] feature-2');
 	});
 });

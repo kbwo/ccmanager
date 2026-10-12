@@ -29,6 +29,9 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 	);
 	const [confirmMode, setConfirmMode] = useState(false);
 	const [focusedIndex, setFocusedIndex] = useState(0);
+	// SelectInput owns its cursor and has no prop to move it, so it is
+	// remounted (via key) at the new position after each Space toggle.
+	const [advanceCount, setAdvanceCount] = useState(0);
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 
@@ -106,6 +109,11 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 		setFocusedIndex(index);
 	};
 
+	const focusedPosition = Math.max(
+		0,
+		menuItems.findIndex(item => item.value === focusedIndex.toString()),
+	);
+
 	useInput((input, key) => {
 		if (confirmMode) {
 			// Confirmation component handles input
@@ -128,6 +136,12 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				}
 				return newSet;
 			});
+			// Advance to the next row; stay put on the last one
+			const nextItem = menuItems[focusedPosition + 1];
+			if (nextItem) {
+				setFocusedIndex(parseInt(nextItem.value, 10));
+				setAdvanceCount(count => count + 1);
+			}
 		} else if (key.return && selectedIndices.size > 0) {
 			setConfirmMode(true);
 		} else if (shortcutManager.matchesShortcut('cancel', input, key)) {
@@ -216,6 +230,8 @@ const DeleteWorktree: React.FC<DeleteWorktreeProps> = ({
 				noMatchMessage="No worktrees match your search"
 			>
 				<SelectInput
+					key={advanceCount}
+					initialIndex={focusedPosition}
 					items={menuItems}
 					onSelect={handleSelect}
 					onHighlight={(item: {value: string}) => {
