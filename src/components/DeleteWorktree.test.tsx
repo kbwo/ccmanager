@@ -258,37 +258,47 @@ describe('DeleteWorktree - Effect Integration', () => {
 			const {lastFrame} = render(
 				<DeleteWorktree onComplete={vi.fn()} onCancel={vi.fn()} />,
 			);
-			await new Promise(resolve => setTimeout(resolve, 50));
+			const rows = () =>
+				lastFrame()!
+					.split('\n')
+					.filter(line => line.includes(' (/test/'))
+					.map(line => line.split(' (/test/')[0]!.replace('] - ', '] '));
+			// Rendering is asynchronous, so poll instead of sleeping
+			const expectRows = (expected: string[]) =>
+				vi.waitFor(() => expect(rows()).toEqual(expected));
+			await vi.waitFor(() => expect(rows()).not.toEqual([]));
 
 			return {
-				// The component's own useInput is registered last in each render
+				// The component's own useInput is registered last in each render.
+				// Each press waits for the re-render it causes, so the next press
+				// reaches the handler that has seen the new cursor position.
 				press: async (input: string, key: Partial<Key> = {}, times = 1) => {
+					const calls = vi.mocked(useInput).mock.calls;
 					for (let i = 0; i < times; i++) {
-						vi.mocked(useInput).mock.calls.at(-1)![0](input, key as Key);
-						await new Promise(resolve => setTimeout(resolve, 20));
+						const callCount = calls.length;
+						calls.at(-1)![0](input, key as Key);
+						await vi.waitFor(() =>
+							expect(calls.length).toBeGreaterThan(callCount),
+						);
 					}
 				},
-				rows: () =>
-					lastFrame()!
-						.split('\n')
-						.filter(line => line.includes(' (/test/'))
-						.map(line => line.split(' (/test/')[0]!.replace('] - ', '] ')),
+				expectRows,
 			};
 		};
 
 		it('should move the cursor to the next row after toggling with space', async () => {
-			const {press, rows} = await renderList(['a', 'b']);
+			const {press, expectRows} = await renderList(['a', 'b']);
 
 			await press(' ');
-			expect(rows()).toEqual([' [✓] a', '>[ ] b']);
+			await expectRows([' [✓] a', '>[ ] b']);
 
 			// On the last row the cursor stays where it is
 			await press(' ');
-			expect(rows()).toEqual([' [✓] a', '>[✓] b']);
+			await expectRows([' [✓] a', '>[✓] b']);
 		});
 
 		it('should keep the visible rows in place when space is pressed mid-list', async () => {
-			const {press, rows} = await renderList([
+			const {press, expectRows} = await renderList([
 				'a',
 				'b',
 				'c',
@@ -302,57 +312,34 @@ describe('DeleteWorktree - Effect Integration', () => {
 			// Scroll down to g (rows c-g visible), then back up to e
 			await press('', {downArrow: true}, 6);
 			await press('', {upArrow: true}, 2);
-			expect(rows()).toEqual([
-				' [ ] c',
-				' [ ] d',
-				'>[ ] e',
-				' [ ] f',
-				' [ ] g',
-			]);
+			await expectRows([' [ ] c', ' [ ] d', '>[ ] e', ' [ ] f', ' [ ] g']);
 
 			await press(' ');
-			expect(rows()).toEqual([
-				' [ ] c',
-				' [ ] d',
-				' [✓] e',
-				'>[ ] f',
-				' [ ] g',
-			]);
+			await expectRows([' [ ] c', ' [ ] d', ' [✓] e', '>[ ] f', ' [ ] g']);
 		});
 
 		it('should wrap around and jump with number keys', async () => {
-			const {press, rows} = await renderList(['a', 'b', 'c', 'd', 'e', 'f']);
+			const {press, expectRows} = await renderList([
+				'a',
+				'b',
+				'c',
+				'd',
+				'e',
+				'f',
+			]);
 
 			// Up from the first row wraps to the last row
 			await press('k');
-			expect(rows()).toEqual([
-				' [ ] b',
-				' [ ] c',
-				' [ ] d',
-				' [ ] e',
-				'>[ ] f',
-			]);
+			await expectRows([' [ ] b', ' [ ] c', ' [ ] d', ' [ ] e', '>[ ] f']);
 
 			// A number key moves to that visible row
 			await press('2');
-			expect(rows()).toEqual([
-				' [ ] b',
-				'>[ ] c',
-				' [ ] d',
-				' [ ] e',
-				' [ ] f',
-			]);
+			await expectRows([' [ ] b', '>[ ] c', ' [ ] d', ' [ ] e', ' [ ] f']);
 
 			// Down from the last row wraps to the first row
 			await press('5');
 			await press('j');
-			expect(rows()).toEqual([
-				'>[ ] a',
-				' [ ] b',
-				' [ ] c',
-				' [ ] d',
-				' [ ] e',
-			]);
+			await expectRows(['>[ ] a', ' [ ] b', ' [ ] c', ' [ ] d', ' [ ] e']);
 		});
 	});
 
