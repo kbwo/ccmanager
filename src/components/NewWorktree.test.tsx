@@ -31,13 +31,26 @@ vi.mock('./TextInputWrapper.js', async () => {
 	};
 });
 
+// Records the onSelect of the last rendered SelectInput so tests can advance steps
+const selectInputState = vi.hoisted(() => ({
+	onSelect: undefined as
+		((item: {label: string; value: string}) => void) | undefined,
+}));
+
 // Mock SelectInput to render items as simple text
 vi.mock('ink-select-input', async () => {
 	const React = await vi.importActual<typeof import('react')>('react');
 	const {Text, Box} = await vi.importActual<typeof import('ink')>('ink');
 
 	return {
-		default: ({items}: {items: Array<{label: string; value: string}>}) => {
+		default: ({
+			items,
+			onSelect,
+		}: {
+			items: Array<{label: string; value: string}>;
+			onSelect?: (item: {label: string; value: string}) => void;
+		}) => {
+			selectInputState.onSelect = onSelect;
 			return React.createElement(
 				Box,
 				{flexDirection: 'column'},
@@ -405,6 +418,44 @@ describe('NewWorktree component Effect integration', () => {
 		expect(output).toContain('How do you want to create the new worktree?');
 		expect(output).toContain('Choose the branch name yourself');
 		expect(output).toContain('Enter a prompt first');
+	});
+
+	it('should show number shortcuts in the preset selection of prompt-first creation', async () => {
+		const {Effect} = await import('effect');
+		const {WorktreeService} = await import('../services/worktreeService.js');
+		const {configReader} = await import('../services/config/configReader.js');
+
+		vi.spyOn(configReader, 'getWorktreeConfig').mockReturnValue({
+			autoDirectory: true,
+			autoDirectoryPattern: '../{project}-{branch}',
+			copySessionData: true,
+			autoUseDefaultBranch: true,
+		});
+
+		vi.mocked(WorktreeService).mockImplementation(function () {
+			return {
+				getAllBranchesEffect: vi.fn(() => Effect.succeed(['main'])),
+				getDefaultBranchEffect: vi.fn(() => Effect.succeed('main')),
+				resolveBaseBranch: vi.fn((name: string) => ({
+					kind: 'local',
+					ref: name,
+					localName: name,
+				})),
+			} as unknown as InstanceType<typeof WorktreeService>;
+		});
+
+		const {lastFrame} = render(
+			<NewWorktree onComplete={vi.fn()} onCancel={vi.fn()} />,
+		);
+
+		await new Promise(resolve => setTimeout(resolve, 100));
+		selectInputState.onSelect?.({label: '', value: 'prompt'});
+		await new Promise(resolve => setTimeout(resolve, 50));
+
+		const output = lastFrame();
+		expect(output).toContain('Select the preset to use for the first session:');
+		expect(output).toContain('[1] Claude (default)');
+		expect(output).toContain('1-9 Quick Select');
 	});
 
 	it('should keep the base branch selection when the default branch is ambiguous across remotes', async () => {
