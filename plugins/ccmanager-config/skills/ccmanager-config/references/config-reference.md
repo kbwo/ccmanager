@@ -95,6 +95,8 @@ auto-approval — is read with the wrong patterns and will be wrong.
 | Cline CLI | `cline` | `cline` |
 | OpenCode | `opencode` | `opencode` |
 | Kimi CLI | `kimi` | `kimi` |
+| MiniMax Code | `mcode` | `mcode` |
+| Grok Build | `grok` | `grok` |
 
 A wrapper script around one of these takes the strategy of the CLI it wraps.
 

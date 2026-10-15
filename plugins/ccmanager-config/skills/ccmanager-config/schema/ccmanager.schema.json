@@ -201,7 +201,9 @@
 						"github-copilot",
 						"cline",
 						"opencode",
-						"kimi"
+						"kimi",
+						"mcode",
+						"grok"
 					]
 				}
 			}

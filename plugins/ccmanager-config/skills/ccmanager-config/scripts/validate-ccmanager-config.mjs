@@ -162,6 +162,8 @@ const STRATEGY_BY_COMMAND = {
 	cline: 'cline',
 	opencode: 'opencode',
 	kimi: 'kimi',
+	mcode: 'mcode',
+	grok: 'grok',
 };
 
 function lintCommandPresets(config) {
