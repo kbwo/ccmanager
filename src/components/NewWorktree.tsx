@@ -10,6 +10,7 @@ import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import SearchableList from './SearchableList.js';
 import RemoteBranchSelector from './RemoteBranchSelector.js';
+import {formatPresetLabel} from './PresetSelector.js';
 import {Effect} from 'effect';
 import type {AppError} from '../types/errors.js';
 import type {RemoteBranchMatch} from '../types/index.js';
@@ -230,12 +231,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 
 	const presetItems = useMemo(
 		() =>
-			presetsConfig.presets.map(preset => ({
-				label: `${preset.name}${
-					preset.id === presetsConfig.defaultPresetId ? ' (default)' : ''
-				}\n    Command: ${preset.command}${
-					preset.args?.length ? ` ${preset.args.join(' ')}` : ''
-				}`,
+			presetsConfig.presets.map((preset, index) => ({
+				label: formatPresetLabel(preset, index, presetsConfig.defaultPresetId),
 				value: preset.id,
 			})),
 		[presetsConfig.defaultPresetId, presetsConfig.presets],
@@ -681,6 +678,9 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 							presetItems.findIndex(item => item.value === selectedPresetId),
 						)}
 					/>
+					<Box marginTop={1}>
+						<Text dimColor>↑↓ Navigate 1-9 Quick Select Enter Select</Text>
+					</Box>
 				</Box>
 			)}
 
