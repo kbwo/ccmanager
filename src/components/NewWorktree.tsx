@@ -230,8 +230,8 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 
 	const presetItems = useMemo(
 		() =>
-			presetsConfig.presets.map(preset => ({
-				label: `${preset.name}${
+			presetsConfig.presets.map((preset, index) => ({
+				label: `${index < 9 ? `[${index + 1}] ` : ''}${preset.name}${
 					preset.id === presetsConfig.defaultPresetId ? ' (default)' : ''
 				}\n    Command: ${preset.command}${
 					preset.args?.length ? ` ${preset.args.join(' ')}` : ''
@@ -681,6 +681,9 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 							presetItems.findIndex(item => item.value === selectedPresetId),
 						)}
 					/>
+					<Box marginTop={1}>
+						<Text dimColor>↑↓ Navigate 1-9 Quick Select Enter Select</Text>
+					</Box>
 				</Box>
 			)}
 
