@@ -9,6 +9,7 @@ import ConfigureCommand from './ConfigureCommand.js';
 import ConfigureMerge from './ConfigureMerge.js';
 import ConfigureOther from './ConfigureOther.js';
 import {shortcutManager} from '../services/shortcutManager.js';
+import {configReader} from '../services/config/configReader.js';
 import {ConfigScope} from '../types/index.js';
 import {ConfigEditorProvider} from '../contexts/ConfigEditorContext.js';
 
@@ -71,6 +72,10 @@ const ConfigurationContent: React.FC<{
 			value: 'other',
 		},
 		{
+			label: '🔄 Reload Config from Disk',
+			value: 'reload',
+		},
+		{
 			label: 'B ← Back to Main Menu',
 			value: 'back',
 		},
@@ -93,6 +98,10 @@ const ConfigurationContent: React.FC<{
 			setView('mergeConfig');
 		} else if (item.value === 'other') {
 			setView('other');
+		} else if (item.value === 'reload') {
+			// Pick up edits made outside this process (by hand or by another ccmanager)
+			configReader.reload();
+			onComplete();
 		}
 	};
 

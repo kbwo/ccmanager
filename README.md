@@ -116,6 +116,8 @@ Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.
 
 CCManager supports per-project configuration by placing a `.ccmanager.json` file in your git repository root. Project settings are merged with the global config (`~/.config/ccmanager/config.json`), with project settings always taking priority.
 
+Config files are read at startup. After editing them outside CCManager (by hand, or from another running CCManager), select **Reload Config from Disk** in the configuration screen to reload them.
+
 For detailed configuration options and examples, see [docs/project-config.md](docs/project-config.md).
 
 ### Configuring with an AI coding agent
