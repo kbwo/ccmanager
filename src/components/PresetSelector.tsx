@@ -2,6 +2,24 @@ import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
 import {configReader} from '../services/config/configReader.js';
+import type {CommandPreset} from '../types/index.js';
+
+// Shared by every preset list so labels and 1-9 shortcut numbers stay consistent
+export const formatPresetLabel = (
+	preset: CommandPreset,
+	index: number,
+	defaultPresetId: string,
+): string => {
+	const args = preset.args?.join(' ') || '';
+	const fallback = preset.fallbackArgs?.join(' ') || '';
+	const numberPrefix = index < 9 ? `[${index + 1}] ` : '';
+	let label = numberPrefix + preset.name;
+	if (preset.id === defaultPresetId) label += ' (default)';
+	label += `\n    Command: ${preset.command}`;
+	if (args) label += `\n    Args: ${args}`;
+	if (fallback) label += `\n    Fallback: ${fallback}`;
+	return label;
+};
 
 interface PresetSelectorProps {
 	onSelect: (presetId: string) => void;
@@ -16,21 +34,10 @@ const PresetSelector: React.FC<PresetSelectorProps> = ({
 	const [presets] = useState(presetsConfig.presets);
 	const defaultPresetId = presetsConfig.defaultPresetId;
 
-	const selectItems = presets.map((preset, index) => {
-		const isDefault = preset.id === defaultPresetId;
-		const args = preset.args?.join(' ') || '';
-		const fallback = preset.fallbackArgs?.join(' ') || '';
-		const numberPrefix = index < 9 ? `[${index + 1}] ` : '';
-		let label = numberPrefix + preset.name;
-		if (isDefault) label += ' (default)';
-		label += `\n    Command: ${preset.command}`;
-		if (args) label += `\n    Args: ${args}`;
-		if (fallback) label += `\n    Fallback: ${fallback}`;
-		return {
-			label,
-			value: preset.id,
-		};
-	});
+	const selectItems = presets.map((preset, index) => ({
+		label: formatPresetLabel(preset, index, defaultPresetId),
+		value: preset.id,
+	}));
 
 	// Add cancel option
 	selectItems.push({label: '← Cancel', value: 'cancel'});

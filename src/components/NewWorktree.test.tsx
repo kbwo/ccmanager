@@ -455,6 +455,7 @@ describe('NewWorktree component Effect integration', () => {
 		const output = lastFrame();
 		expect(output).toContain('Select the preset to use for the first session:');
 		expect(output).toContain('[1] Claude (default)');
+		expect(output).toContain('Args: --resume');
 		expect(output).toContain('1-9 Quick Select');
 	});
 

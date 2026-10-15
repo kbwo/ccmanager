@@ -10,6 +10,7 @@ import {useSearchMode} from '../hooks/useSearchMode.js';
 import {useDynamicLimit} from '../hooks/useDynamicLimit.js';
 import SearchableList from './SearchableList.js';
 import RemoteBranchSelector from './RemoteBranchSelector.js';
+import {formatPresetLabel} from './PresetSelector.js';
 import {Effect} from 'effect';
 import type {AppError} from '../types/errors.js';
 import type {RemoteBranchMatch} from '../types/index.js';
@@ -231,11 +232,7 @@ const NewWorktree: React.FC<NewWorktreeProps> = ({
 	const presetItems = useMemo(
 		() =>
 			presetsConfig.presets.map((preset, index) => ({
-				label: `${index < 9 ? `[${index + 1}] ` : ''}${preset.name}${
-					preset.id === presetsConfig.defaultPresetId ? ' (default)' : ''
-				}\n    Command: ${preset.command}${
-					preset.args?.length ? ` ${preset.args.join(' ')}` : ''
-				}`,
+				label: formatPresetLabel(preset, index, presetsConfig.defaultPresetId),
 				value: preset.id,
 			})),
 		[presetsConfig.defaultPresetId, presetsConfig.presets],
