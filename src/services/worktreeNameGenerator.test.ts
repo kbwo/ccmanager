@@ -1,10 +1,20 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
+import {Effect} from 'effect';
+import {EventEmitter} from 'events';
+import type {ChildProcess} from 'child_process';
+import type {Writable} from 'node:stream';
 import {
 	deduplicateBranchName,
 	extractBranchNameFromOutput,
 	generateFallbackBranchName,
 	worktreeNameGenerator as generator,
 } from './worktreeNameGenerator.js';
+
+const execFileMock = vi.fn();
+
+vi.mock('child_process', () => ({
+	execFile: (...args: unknown[]) => execFileMock(...args),
+}));
 
 describe('WorktreeNameGenerator output parsing', () => {
 	it('normalizes direct json branchName responses', async () => {
@@ -62,6 +72,30 @@ describe('WorktreeNameGenerator output parsing', () => {
 		);
 
 		expect(value).toBe('feature/add-prompt-mode-toggle');
+	});
+});
+
+describe('WorktreeNameGenerator.generateBranchNameEffect', () => {
+	it('fails the effect instead of throwing when the output is invalid', async () => {
+		execFileMock.mockImplementationOnce(
+			(
+				_cmd: string,
+				_args: string[],
+				_options: unknown,
+				callback: (error: Error | null, stdout: string) => void,
+			) => {
+				const child = new EventEmitter() as ChildProcess;
+				child.stdin = {write: vi.fn(), end: vi.fn()} as unknown as Writable;
+				setTimeout(() => callback(null, `{"branchName":"${'a'.repeat(64)}"}`));
+				return child;
+			},
+		);
+
+		const result = await Effect.runPromise(
+			Effect.either(generator.generateBranchNameEffect('prompt', 'main')),
+		);
+
+		expect(result._tag).toBe('Left');
 	});
 });
 
