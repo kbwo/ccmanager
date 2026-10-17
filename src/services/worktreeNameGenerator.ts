@@ -200,7 +200,13 @@ export class WorktreeNameGenerator {
 						if (settled) return;
 						settled = true;
 						clearTimeout(timeoutId);
-						handler();
+						// Handlers run in async callbacks, outside the Promise executor,
+						// so a throw would otherwise crash the process instead of rejecting.
+						try {
+							handler();
+						} catch (error) {
+							reject(error);
+						}
 					};
 
 					const timeoutId = setTimeout(() => {
