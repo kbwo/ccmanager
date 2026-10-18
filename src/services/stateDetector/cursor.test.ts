@@ -163,6 +163,26 @@ describe('CursorStateDetector', () => {
 		expect(state).toBe('waiting_input');
 	});
 
+	it('should detect waiting_input state for Ready to build? plan prompt', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			' │ Suggested Plan                     │',
+			' │                                    │',
+			' │ Ready to build?                    │',
+			' │                                    │',
+			' │  → 1. Yes, build locally (b)       │',
+			' │    2. Yes, build in cloud (c)      │',
+			' │    3. No, propose changes (p or Esc)│',
+			' └────────────────────────────────────┘',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
 	it('should detect busy state for ctrl+c to stop pattern', () => {
 		// Arrange
 		terminal = createMockTerminal([

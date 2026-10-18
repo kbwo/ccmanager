@@ -25,6 +25,7 @@ export class CursorStateDetector extends BaseStateDetector {
 			lowerContent.includes('skip (esc or n)') ||
 			lowerContent.includes('write to this file?') ||
 			lowerContent.includes('reject & propose changes') ||
+			lowerContent.includes('ready to build?') ||
 			(lowerContent.includes('add write(') &&
 				lowerContent.includes('allowlist'))
 		) {
