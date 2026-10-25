@@ -9,6 +9,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, "..");
 const NPM_DIR = join(ROOT_DIR, "npm");
 const ENTRY_POINT = join(ROOT_DIR, "src", "cli.tsx");
+// Compiled binaries cannot load a worker from disk, so it is embedded as an
+// extra entry point; src/utils/gitStatusClient.ts addresses it by this layout.
+const WORKER_ENTRY_POINT = join(ROOT_DIR, "src", "workers", "gitStatusWorker.ts");
 
 // Read version from package.json
 const PACKAGE_JSON = JSON.parse(readFileSync(join(ROOT_DIR, "package.json"), "utf-8"));
@@ -52,7 +55,7 @@ async function buildBinary(target: (typeof TARGETS)[number]) {
 	mkdirSync(outputDir, { recursive: true });
 
 	try {
-		await $`bun build ${ENTRY_POINT} --compile --target=${target.bunTarget} --outfile=${outputPath} --define CCMANAGER_VERSION='"${VERSION}"' --no-compile-autoload-dotenv --no-compile-autoload-bunfig`;
+		await $`bun build ${ENTRY_POINT} ${WORKER_ENTRY_POINT} --compile --target=${target.bunTarget} --outfile=${outputPath} --define CCMANAGER_VERSION='"${VERSION}"' --no-compile-autoload-dotenv --no-compile-autoload-bunfig`;
 		console.log(`  -> Created ${outputPath}`);
 		return true;
 	} catch (error) {

@@ -1,18 +1,8 @@
 import {useEffect, useState, type Dispatch, type SetStateAction} from 'react';
-import {Effect, Exit, Cause, Option} from 'effect';
 import {Worktree} from '../types/index.js';
-import {
-	getGitStatusLimited,
-	getLastCommitDateLimited,
-	type GitStatus,
-} from '../utils/gitStatus.js';
-import type {GitError} from '../types/errors.js';
-
-interface WorktreeStatusResult {
-	path: string;
-	statusExit: Exit.Exit<GitStatus, GitError>;
-	dateExit: Exit.Exit<Date, GitError>;
-}
+import type {GitStatus} from '../utils/gitStatus.js';
+import type {WorktreeStatusResult} from '../utils/gitStatusFetch.js';
+import {fetchGitStatuses} from '../utils/gitStatusClient.js';
 
 interface CachedStatus {
 	gitStatus?: GitStatus;
@@ -108,39 +98,17 @@ export function useGitStatus(
 			return;
 		}
 
-		const activeRequests = new Set<AbortController>();
+		const abortController = new AbortController();
 		let isCleanedUp = false;
 		let cycleTimeout: NodeJS.Timeout | undefined;
 
-		const fetchStatus = async (
-			worktree: Worktree,
-		): Promise<WorktreeStatusResult> => {
-			const abortController = new AbortController();
-			activeRequests.add(abortController);
-
-			try {
-				// Fetch git status and last commit date in parallel
-				const [statusExit, dateExit] = await Promise.all([
-					Effect.runPromiseExit(getGitStatusLimited(worktree.path), {
-						signal: abortController.signal,
-					}),
-					Effect.runPromiseExit(getLastCommitDateLimited(worktree.path), {
-						signal: abortController.signal,
-					}),
-				]);
-
-				return {path: worktree.path, statusExit, dateExit};
-			} finally {
-				activeRequests.delete(abortController);
-			}
-		};
-
 		const runCycle = async () => {
-			// Fetch all worktrees concurrently. The underlying Effects are already
-			// concurrency-limited, so this does not spawn an unbounded number of git
-			// subprocesses at once.
-			const results = await Promise.all(
-				worktrees.map(worktree => fetchStatus(worktree)),
+			// Fetch all worktrees concurrently, off this thread when a worker is
+			// available: starting git subprocesses blocks the thread that starts
+			// them, which would otherwise freeze keyboard navigation.
+			const results = await fetchGitStatuses(
+				worktrees.map(worktree => worktree.path),
+				abortController.signal,
 			);
 
 			if (isCleanedUp) {
@@ -171,7 +139,7 @@ export function useGitStatus(
 			if (cycleTimeout) {
 				clearTimeout(cycleTimeout);
 			}
-			activeRequests.forEach(controller => controller.abort());
+			abortController.abort();
 		};
 	}, [worktrees, defaultBranch, updateInterval]);
 
@@ -195,7 +163,7 @@ function applyStatusResults(
 ): void {
 	const updatesByPath = new Map<string, Partial<Worktree>>();
 	for (const result of results) {
-		const update = buildStatusUpdate(result.statusExit, result.dateExit);
+		const update = buildStatusUpdate(result);
 		if (update) {
 			updatesByPath.set(result.path, update);
 			cacheStatusUpdate(result.path, update);
@@ -221,33 +189,30 @@ function applyStatusResults(
 }
 
 /**
- * Build the update object for a single worktree from its Exit results.
+ * Build the update object for a single worktree from its fetch result.
  *
  * @returns A partial worktree to merge, or null when there is nothing to update
  *   (e.g. the status fetch was interrupted and the commit date failed).
  */
-function buildStatusUpdate(
-	statusExit: Exit.Exit<GitStatus, GitError>,
-	dateExit: Exit.Exit<Date, GitError>,
-): Partial<Worktree> | null {
+function buildStatusUpdate({
+	status,
+	lastCommitDate,
+}: WorktreeStatusResult): Partial<Worktree> | null {
 	const update: Partial<Worktree> = {};
 	let hasUpdate = false;
 
-	if (Exit.isSuccess(statusExit)) {
-		update.gitStatus = statusExit.value;
+	if (status.ok) {
+		update.gitStatus = status.value;
 		update.gitStatusError = undefined;
 		hasUpdate = true;
-	} else if (Exit.isFailure(statusExit)) {
-		const failure = Cause.failureOption(statusExit.cause);
-		if (Option.isSome(failure)) {
-			update.gitStatus = undefined;
-			update.gitStatusError = formatGitError(failure.value);
-			hasUpdate = true;
-		}
+	} else if (status.error !== null) {
+		update.gitStatus = undefined;
+		update.gitStatusError = status.error;
+		hasUpdate = true;
 	}
 
-	if (Exit.isSuccess(dateExit)) {
-		update.lastCommitDate = dateExit.value;
+	if (lastCommitDate !== null) {
+		update.lastCommitDate = new Date(lastCommitDate);
 		hasUpdate = true;
 	}
 	// Silently ignore commit date errors (e.g., empty repo)
@@ -296,21 +261,4 @@ function isSameGitStatus(a?: GitStatus, b?: GitStatus): boolean {
 		a.behindCount === b.behindCount &&
 		a.parentBranch === b.parentBranch
 	);
-}
-
-/**
- * Format GitError into a user-friendly error message
- *
- * @param error - GitError from failed git operation
- * @returns Formatted error message string
- */
-function formatGitError(error: GitError): string {
-	const exitCode = Number.isFinite(error.exitCode) ? error.exitCode : -1;
-	const details = [error.stderr, error.stdout]
-		.filter(part => typeof part === 'string' && part.trim().length > 0)
-		.map(part => part!.trim());
-	const detail = details[0] ?? '';
-	return detail
-		? `git command "${error.command}" failed (exit code ${exitCode}): ${detail}`
-		: `git command "${error.command}" failed (exit code ${exitCode})`;
 }
