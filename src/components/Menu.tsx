@@ -32,6 +32,10 @@ import {
 import SearchableList from './SearchableList.js';
 import {globalSessionOrchestrator} from '../services/globalSessionOrchestrator.js';
 import {configReader} from '../services/config/configReader.js';
+import {logger} from '../utils/logger.js';
+
+// Temporary: set CCMANAGER_PROFILE_MENU=1 to log Menu render/effect costs.
+const PROFILE = !!process.env['CCMANAGER_PROFILE_MENU'];
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -110,6 +114,9 @@ const Menu: React.FC<MenuProps> = ({
 	multiProject = false,
 	version,
 }) => {
+	if (PROFILE) {
+		logger.debug('[menu-profile] Menu render');
+	}
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>(
 		() => initialSnapshot?.worktrees ?? [],
 	);
@@ -248,6 +255,9 @@ const Menu: React.FC<MenuProps> = ({
 
 		// Listen for session changes
 		const handleSessionChange = () => {
+			if (PROFILE) {
+				logger.debug('[menu-profile] session event');
+			}
 			const allSessions = sessionManager.getAllSessions();
 			setSessions(allSessions);
 		};
@@ -264,6 +274,7 @@ const Menu: React.FC<MenuProps> = ({
 	}, [sessionManager, worktreeService, multiProject, onSnapshotChange]);
 
 	useEffect(() => {
+		const profileStart = PROFILE ? Date.now() : 0;
 		// Prepare worktree items and calculate layout
 		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: worktreeConfig.sortByLastSession,
@@ -427,6 +438,11 @@ const Menu: React.FC<MenuProps> = ({
 			}
 		}
 		setItems(menuItems);
+		if (PROFILE) {
+			logger.debug(
+				`[menu-profile] items effect: ${Date.now() - profileStart}ms, ${menuItems.length} items`,
+			);
+		}
 
 		// Ensure highlighted worktree is valid for hotkey support
 		setHighlightedWorktree(prev => {
