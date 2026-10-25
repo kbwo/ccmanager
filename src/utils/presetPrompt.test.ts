@@ -114,6 +114,18 @@ describe('presetPrompt', () => {
 		});
 	});
 
+	it('uses the final argument for Grok Build presets', () => {
+		expect(
+			preparePresetLaunch(
+				{command: 'grok', args: [], detectionStrategy: 'grok'},
+				'fix the failing tests',
+			),
+		).toEqual({
+			args: ['fix the failing tests'],
+			method: 'final-arg',
+		});
+	});
+
 	describe('describePromptInjection', () => {
 		it('describes final-arg for claude', () => {
 			expect(

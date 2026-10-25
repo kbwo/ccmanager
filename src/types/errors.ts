@@ -60,8 +60,4 @@ export class ValidationError extends Data.TaggedError('ValidationError')<{
  * Enables discriminated union type narrowing using _tag property
  */
 export type AppError =
-	| GitError
-	| FileSystemError
-	| ConfigError
-	| ProcessError
-	| ValidationError;
+	GitError | FileSystemError | ConfigError | ProcessError | ValidationError;

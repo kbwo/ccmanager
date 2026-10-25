@@ -1,9 +1,5 @@
 import {Effect, Exit, Cause, Option} from 'effect';
-import {
-	getGitStatusLimited,
-	getLastCommitDateLimited,
-	type GitStatus,
-} from './gitStatus.js';
+import {getGitStatusLimited, type GitStatus} from './gitStatus.js';
 import type {GitError} from '../types/errors.js';
 
 /**
@@ -15,20 +11,17 @@ import type {GitError} from '../types/errors.js';
  * nothing to report.
  */
 export type StatusOutcome =
-	| {ok: true; value: GitStatus}
-	| {ok: false; error: string | null};
+	{ok: true; value: GitStatus} | {ok: false; error: string | null};
 
 export interface WorktreeStatusResult {
 	path: string;
 	status: StatusOutcome;
-	/** ISO-8601 commit date, or null when it could not be read (e.g. empty repo). */
-	lastCommitDate: string | null;
 }
 
 /**
- * Fetch git status and last commit date for every path, concurrently (the
- * underlying Effects are concurrency-limited, so this does not spawn an
- * unbounded number of git subprocesses at once).
+ * Fetch git status for every path, concurrently (the underlying Effects are
+ * concurrency-limited, so this does not spawn an unbounded number of git
+ * subprocesses at once).
  *
  * Spawning those subprocesses blocks the calling thread, so callers that own a
  * UI should run this in a worker; see gitStatusClient.ts.
@@ -38,19 +31,12 @@ export async function fetchWorktreeStatuses(
 	signal?: AbortSignal,
 ): Promise<WorktreeStatusResult[]> {
 	return Promise.all(
-		paths.map(async path => {
-			const [statusExit, dateExit] = await Promise.all([
-				Effect.runPromiseExit(getGitStatusLimited(path), {signal}),
-				Effect.runPromiseExit(getLastCommitDateLimited(path), {signal}),
-			]);
-			return {
-				path,
-				status: toStatusOutcome(statusExit),
-				lastCommitDate: Exit.isSuccess(dateExit)
-					? dateExit.value.toISOString()
-					: null,
-			};
-		}),
+		paths.map(async path => ({
+			path,
+			status: toStatusOutcome(
+				await Effect.runPromiseExit(getGitStatusLimited(path), {signal}),
+			),
+		})),
 	);
 }
 

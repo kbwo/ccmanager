@@ -33,6 +33,7 @@ const createStrategyItems = (): {
 		opencode: {label: 'OpenCode', value: 'opencode'},
 		kimi: {label: 'Kimi', value: 'kimi'},
 		mcode: {label: 'MiniMax Code', value: 'mcode'},
+		grok: {label: 'Grok Build', value: 'grok'},
 	};
 
 	return Object.values(strategies);
@@ -52,6 +53,7 @@ const DEFAULT_COMMANDS: Record<StateDetectionStrategy, string> = {
 	opencode: 'opencode',
 	kimi: 'kimi',
 	mcode: 'mcode',
+	grok: 'grok',
 };
 
 interface ConfigureCommandProps {
@@ -60,11 +62,7 @@ interface ConfigureCommandProps {
 
 type ViewMode = 'list' | 'edit' | 'add' | 'delete-confirm';
 type EditField =
-	| 'name'
-	| 'command'
-	| 'args'
-	| 'fallbackArgs'
-	| 'detectionStrategy';
+	'name' | 'command' | 'args' | 'fallbackArgs' | 'detectionStrategy';
 
 const formatDetectionStrategy = (strategy: string | undefined): string => {
 	const value = strategy || 'claude';
@@ -85,6 +83,8 @@ const formatDetectionStrategy = (strategy: string | undefined): string => {
 			return 'Kimi';
 		case 'mcode':
 			return 'MiniMax Code';
+		case 'grok':
+			return 'Grok Build';
 		default:
 			return 'Claude';
 	}

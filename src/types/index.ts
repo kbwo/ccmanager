@@ -10,10 +10,7 @@ import type {GitError, FileSystemError, ProcessError} from './errors.js';
 export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState =
-	| 'idle'
-	| 'busy'
-	| 'waiting_input'
-	| 'pending_auto_approval';
+	'idle' | 'busy' | 'waiting_input' | 'pending_auto_approval';
 
 export type StateDetectionStrategy =
 	| 'claude'
@@ -24,16 +21,22 @@ export type StateDetectionStrategy =
 	| 'cline'
 	| 'opencode'
 	| 'kimi'
-	| 'mcode';
+	| 'mcode'
+	| 'grok';
 
 export interface Worktree {
 	path: string;
 	branch?: string;
+	// Set only when `branch` is absent (detached HEAD): the symbolic ref
+	// resolved via `git describe --all`, e.g. "heads/research/foo", so the
+	// menu can show which branch tip HEAD was detached at instead of just
+	// the literal word "detached".
+	detachedRef?: string;
 	isMainWorktree: boolean;
 	hasSession: boolean;
 	gitStatus?: GitStatus;
 	gitStatusError?: string;
-	lastCommitDate?: Date;
+	lastModified?: Date;
 }
 
 export interface CreateWorktreeResult {

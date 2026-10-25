@@ -1,7 +1,8 @@
 import {describe, it, expect, beforeEach, vi} from 'vitest';
 import {WorktreeService} from './worktreeService.js';
-import {execSync} from 'child_process';
-import {existsSync, statSync, cpSync, mkdirSync, Stats} from 'fs';
+import {exec, execSync, type ExecException} from 'child_process';
+import {existsSync, statSync, Stats} from 'fs';
+import {cp, mkdir} from 'fs/promises';
 import path from 'path';
 import {configReader} from './config/configReader.js';
 import {Effect} from 'effect';
@@ -13,6 +14,7 @@ vi.mock('child_process');
 
 // Mock fs module
 vi.mock('fs');
+vi.mock('fs/promises');
 
 // Mock worktreeConfigManager
 vi.mock('./worktreeConfigManager.js', () => ({
@@ -40,8 +42,9 @@ vi.mock('../utils/hookExecutor.js', () => ({
 const mockedExecSync = vi.mocked(execSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
-const mockedCpSync = vi.mocked(cpSync);
-const mockedMkdirSync = vi.mocked(mkdirSync);
+const mockedExec = vi.mocked(exec);
+const mockedCp = vi.mocked(cp);
+const mockedMkdir = vi.mocked(mkdir);
 const mockedGetWorktreeHooks = vi.mocked(configReader.getWorktreeHooks);
 
 // Mock error interface for git command errors
@@ -70,6 +73,31 @@ describe('WorktreeService', () => {
 			}
 			throw new Error('Command not mocked: ' + cmd);
 		});
+		// The slow git commands run through the asynchronous exec. Route them
+		// through the execSync mock so each test describes every git command's
+		// result in a single command handler, whichever API runs it.
+		mockedExec.mockImplementation(((
+			cmd: string,
+			options: unknown,
+			callback: (
+				error: ExecException | null,
+				stdout: string,
+				stderr: string,
+			) => void,
+		) => {
+			try {
+				const stdout = mockedExecSync(cmd, options as never);
+				callback(null, String(stdout ?? ''), '');
+			} catch (error) {
+				// exec reports the exit code as `code`, where execSync uses `status`.
+				const execError = error as ExecException & {
+					status?: number;
+					stderr?: string;
+				};
+				execError.code = execError.status;
+				callback(execError, '', execError.stderr ?? '');
+			}
+		}) as unknown as typeof exec);
 		// Default mock for getWorktreeHooks to return empty config
 		mockedGetWorktreeHooks.mockReturnValue({});
 		service = new WorktreeService('/fake/path');
@@ -963,6 +991,80 @@ branch refs/heads/feature
 			});
 		});
 
+		it('should resolve a detachedRef via `git describe --all` for a detached worktree', async () => {
+			mockedExecSync.mockImplementation((cmd, options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/detached-wt
+HEAD efgh5678
+detached
+`;
+					}
+					if (cmd === 'git describe --all HEAD') {
+						expect((options as {cwd?: string})?.cwd).toBe(
+							'/fake/path/detached-wt',
+						);
+						return 'heads/research/ime-competition-ideas\n';
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toHaveLength(2);
+			expect(result[1]).toMatchObject({
+				path: '/fake/path/detached-wt',
+				detachedRef: 'heads/research/ime-competition-ideas',
+			});
+			expect(result[1]?.branch).toBeUndefined();
+		});
+
+		it('should leave detachedRef unset when `git describe --all` cannot resolve a ref', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/detached-wt
+HEAD efgh5678
+detached
+`;
+					}
+					if (cmd === 'git describe --all HEAD') {
+						const error: MockGitError = new Error(
+							"fatal: No tags can describe 'efgh5678'.",
+						);
+						error.status = 128;
+						throw error;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result[1]).toMatchObject({
+				path: '/fake/path/detached-wt',
+			});
+			expect(result[1]?.branch).toBeUndefined();
+			expect(result[1]?.detachedRef).toBeUndefined();
+		});
+
 		it('should return Effect that fails with GitError when git command fails', async () => {
 			mockedExecSync.mockImplementation((cmd, _options) => {
 				if (typeof cmd === 'string') {
@@ -1107,11 +1209,11 @@ branch refs/heads/feature
 			const result = await Effect.runPromise(effect);
 
 			expect(result.worktree.path).toBe('/path/to/worktree');
-			expect(mockedMkdirSync).toHaveBeenCalledWith(
+			expect(mockedMkdir).toHaveBeenCalledWith(
 				path.dirname(path.join('/path/to/worktree', '.env')),
 				{recursive: true},
 			);
-			expect(mockedCpSync).toHaveBeenCalledWith(
+			expect(mockedCp).toHaveBeenCalledWith(
 				path.join('/fake/path', '.env'),
 				path.join('/path/to/worktree', '.env'),
 				{recursive: true, preserveTimestamps: true},

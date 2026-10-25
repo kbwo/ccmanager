@@ -12,8 +12,7 @@ import {
  */
 
 export type WorkerRequest =
-	| {type: 'fetch'; id: number; paths: string[]}
-	| {type: 'cancel'; id: number};
+	{type: 'fetch'; id: number; paths: string[]} | {type: 'cancel'; id: number};
 
 export interface WorkerResponse {
 	id: number;

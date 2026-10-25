@@ -13,8 +13,7 @@ const STATE_DETECTION_TICKS_FOR_ASYNC_UPDATE = 2;
 const detectStateMock = vi.fn();
 // Create a deferred promise pattern for controllable mock
 let verifyResolve:
-	| ((result: {needsPermission: boolean; reason?: string}) => void)
-	| null = null;
+	((result: {needsPermission: boolean; reason?: string}) => void) | null = null;
 const verifyNeedsPermissionMock = vi.fn(() =>
 	Effect.promise(
 		() =>

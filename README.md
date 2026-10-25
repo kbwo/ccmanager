@@ -116,6 +116,8 @@ Note: Shortcuts from `shortcuts.json` will be automatically migrated to `config.
 
 CCManager supports per-project configuration by placing a `.ccmanager.json` file in your git repository root. Project settings are merged with the global config (`~/.config/ccmanager/config.json`), with project settings always taking priority.
 
+Config files are read at startup. After editing them outside CCManager (by hand, or from another running CCManager), select **Reload Config from Disk** in the configuration screen to reload them.
+
 For detailed configuration options and examples, see [docs/project-config.md](docs/project-config.md).
 
 ### Configuring with an AI coding agent
@@ -149,6 +151,7 @@ CCManager supports multiple AI coding assistants with tailored state detection f
 | OpenCode | `opencode` | [opencode.ai/docs](https://opencode.ai/docs) |
 | Kimi CLI | `kimi` | [kimi-cli.com](https://www.kimi-cli.com/en/) |
 | MiniMax Code (MCode) | `mcode` | [npmjs.com/package/@minimax-ai/code](https://www.npmjs.com/package/@minimax-ai/code) |
+| Grok Build | `grok` | [github.com/xai-org/grok-build](https://github.com/xai-org/grok-build) |
 
 Each assistant has its own state detection strategy to properly track:
 - **Idle**: Ready for new input
@@ -190,6 +193,14 @@ When running the `claude` command with the default (`claude`) detection strategy
 - **Non-claude commands**: Other AI assistants (Gemini, Codex, etc.) are not affected.
 
 Setting `"teammateMode": "in-process"` in Claude Code's `settings.json` alone is not sufficient when running inside a tmux-like environment, which is why CCManager controls this via the CLI argument.
+
+
+## Creating Worktrees in the Background
+
+Creating a worktree (generating the branch name, `git worktree add`, copying files, running worktree hooks) can take a while in large repositories. The loading screen shown during creation can be left at any time:
+
+- **Wait**: stay on the loading screen and everything behaves as before — errors and hook failures are shown right away, and a prompt-first worktree opens its new session automatically.
+- **Continue in the background**: press `Enter` to return to the menu and keep working. The menu lists the creations still running for the project; when one finishes, the new worktree appears in the list. A prompt-first session is started without switching to it, and any failure is shown as an error on the menu.
 
 
 ## Session Data Copying

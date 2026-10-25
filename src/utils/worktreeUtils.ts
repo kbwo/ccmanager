@@ -1,4 +1,5 @@
 import path from 'path';
+import {statSync} from 'fs';
 import {execSync} from 'child_process';
 import stripAnsi from 'strip-ansi';
 import {Worktree, Session} from '../types/index.js';
@@ -23,7 +24,7 @@ export interface SessionItem {
 	baseLabel: string;
 	// Session state tag such as "[○ Idle]" (empty when the row has no session).
 	// Kept out of baseLabel so it can be rendered as its own aligned column
-	// directly left of the last-commit date; see calculateColumnPositions.
+	// directly left of the last-modified time; see calculateColumnPositions.
 	status: string;
 	// Name portion shown in the menu (branch + " (main)" + session name),
 	// without status icons or git status columns. Used for search matching.
@@ -31,7 +32,7 @@ export interface SessionItem {
 	fileChanges: string;
 	aheadBehind: string;
 	parentBranch: string;
-	lastCommitDate: string;
+	lastModified: string;
 	error?: string;
 	// Visible lengths (without ANSI codes) for alignment calculation
 	lengths: {
@@ -40,8 +41,22 @@ export interface SessionItem {
 		fileChanges: number;
 		aheadBehind: number;
 		parentBranch: number;
-		lastCommitDate: number;
+		lastModified: number;
 	};
+}
+
+/**
+ * When the worktree directory was last modified on the filesystem, or
+ * undefined when the directory cannot be read.
+ */
+export function getLastModified(worktreePath: string): Date | undefined {
+	// ponytail: stats only the worktree's top-level directory, so an edit to a
+	// nested file does not move this time. Walk the tree if it proves too coarse.
+	try {
+		return statSync(worktreePath).mtime;
+	} catch {
+		return undefined;
+	}
 }
 
 /**
@@ -189,6 +204,19 @@ export function formatWorktreeDirectorySuffix(
 	return {displaySuffix: ` @ ${visible}`, rawName: dirName};
 }
 
+/**
+ * Single source of truth for turning a worktree's branch state into a
+ * display name: the branch name when checked out, or "detached <ref>"
+ * (e.g. "detached heads/research/foo") when in detached HEAD state and a
+ * ref could be resolved, falling back to the bare "detached" when not.
+ */
+export function getDisplayBranchName(
+	wt: Pick<Worktree, 'branch' | 'detachedRef'>,
+): string {
+	if (wt.branch) return wt.branch.replace('refs/heads/', '');
+	return wt.detachedRef ? `detached ${wt.detachedRef}` : 'detached';
+}
+
 export function extractBranchParts(branchName: string): {
 	prefix?: string;
 	name: string;
@@ -291,9 +319,7 @@ function buildSessionItem(
 	const status = stateData
 		? `[${getStatusDisplay(stateData.state, stateData.backgroundTaskCount, stateData.teamMemberCount)}]`
 		: '';
-	const fullBranchName = wt.branch
-		? wt.branch.replace('refs/heads/', '')
-		: 'detached';
+	const fullBranchName = getDisplayBranchName(wt);
 	const branchName = truncateString(fullBranchName, MAX_BRANCH_NAME_LENGTH);
 	const isMain = wt.isMainWorktree ? ' (main)' : '';
 	const {displaySuffix: dirSuffix, rawName: rawDirName} =
@@ -307,8 +333,8 @@ function buildSessionItem(
 		wt,
 		fullBranchName,
 	);
-	const lastCommitDate = wt.lastCommitDate
-		? `\x1b[90m${formatRelativeDate(wt.lastCommitDate)}\x1b[0m`
+	const lastModified = wt.lastModified
+		? `\x1b[90m${formatRelativeDate(wt.lastModified)}\x1b[0m`
 		: '';
 
 	return {
@@ -320,7 +346,7 @@ function buildSessionItem(
 		fileChanges,
 		aheadBehind,
 		parentBranch,
-		lastCommitDate,
+		lastModified,
 		error,
 		lengths: {
 			base: stripAnsi(baseLabel).length,
@@ -328,7 +354,7 @@ function buildSessionItem(
 			fileChanges: stripAnsi(fileChanges).length,
 			aheadBehind: stripAnsi(aheadBehind).length,
 			parentBranch: stripAnsi(parentBranch).length,
-			lastCommitDate: stripAnsi(lastCommitDate).length,
+			lastModified: stripAnsi(lastModified).length,
 		},
 	};
 }
@@ -391,10 +417,10 @@ export interface ColumnPositions {
 	aheadBehind: number;
 	parentBranch: number;
 	status: number;
-	lastCommitDate: number;
+	lastModified: number;
 	/**
 	 * true: the state tag gets its own column at `status`, so every row's tag
-	 * starts at the same horizontal position, directly left of the commit date.
+	 * starts at the same horizontal position, directly left of the last-modified time.
 	 * false: the state tag is appended right after the branch name (the layout
 	 * used before this column existed), because the aligned layout would not fit
 	 * the terminal width given to calculateColumnPositions.
@@ -431,7 +457,7 @@ export function calculateColumnPositions(
 	let maxFileChangesLength = 0;
 	let maxAheadBehindLength = 0;
 	let maxParentBranchLength = 0;
-	let maxLastCommitDateLength = 0;
+	let maxLastModifiedLength = 0;
 
 	items.forEach(item => {
 		// Skip items with errors for alignment calculation
@@ -455,9 +481,9 @@ export function calculateColumnPositions(
 			maxParentBranchLength,
 			item.lengths.parentBranch,
 		);
-		maxLastCommitDateLength = Math.max(
-			maxLastCommitDateLength,
-			item.lengths.lastCommitDate,
+		maxLastModifiedLength = Math.max(
+			maxLastModifiedLength,
+			item.lengths.lastModified,
 		);
 	});
 
@@ -471,15 +497,15 @@ export function calculateColumnPositions(
 			aheadBehind + maxAheadBehindLength + MIN_COLUMN_PADDING + 2;
 		const status =
 			parentBranch + maxParentBranchLength + MIN_COLUMN_PADDING + 2;
-		const lastCommitDate =
+		const lastModified =
 			status + (statusWidth ? statusWidth + MIN_COLUMN_PADDING : 0);
-		return {fileChanges, aheadBehind, parentBranch, status, lastCommitDate};
+		return {fileChanges, aheadBehind, parentBranch, status, lastModified};
 	};
 
 	const aligned = layout(maxBranchLength, maxStatusLength);
 	const fits =
 		availableWidth === undefined ||
-		aligned.lastCommitDate + maxLastCommitDateLength <= availableWidth;
+		aligned.lastModified + maxLastModifiedLength <= availableWidth;
 
 	if (fits) {
 		return {...aligned, alignStatus: true};
@@ -532,9 +558,9 @@ export function assembleSessionLabel(
 		label = padTo(label, currentLength, columns.status) + item.status;
 		currentLength = columns.status + item.lengths.status;
 	}
-	if (item.lastCommitDate) {
+	if (item.lastModified) {
 		label =
-			padTo(label, currentLength, columns.lastCommitDate) + item.lastCommitDate;
+			padTo(label, currentLength, columns.lastModified) + item.lastModified;
 	}
 
 	return label;

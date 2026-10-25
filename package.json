@@ -1,6 +1,6 @@
 {
 	"name": "ccmanager",
-	"version": "4.4.2",
+	"version": "4.4.9",
 	"description": "TUI application for managing multiple Claude Code sessions across Git worktrees",
 	"license": "MIT",
 	"author": "Kodai Kabasawa",
@@ -41,11 +41,11 @@
 		"bin"
 	],
 	"optionalDependencies": {
-		"@kodaikabasawa/ccmanager-darwin-arm64": "4.4.2",
-		"@kodaikabasawa/ccmanager-darwin-x64": "4.4.2",
-		"@kodaikabasawa/ccmanager-linux-arm64": "4.4.2",
-		"@kodaikabasawa/ccmanager-linux-x64": "4.4.2",
-		"@kodaikabasawa/ccmanager-win32-x64": "4.4.2"
+		"@kodaikabasawa/ccmanager-darwin-arm64": "4.4.9",
+		"@kodaikabasawa/ccmanager-darwin-x64": "4.4.9",
+		"@kodaikabasawa/ccmanager-linux-arm64": "4.4.9",
+		"@kodaikabasawa/ccmanager-linux-x64": "4.4.9",
+		"@kodaikabasawa/ccmanager-win32-x64": "4.4.9"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.28.0",
@@ -79,8 +79,5 @@
 		"react-devtools-core": "^6.1.2",
 		"react-dom": "^19.2.3",
 		"strip-ansi": "^7.1.0"
-	},
-	"patchedDependencies": {
-		"string-width@8.1.0": "patches/string-width@8.1.0.patch"
 	}
 }

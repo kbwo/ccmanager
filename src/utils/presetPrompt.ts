@@ -44,7 +44,8 @@ export const getPromptInjectionMethod = (
 		strategy === 'codex' ||
 		strategy === 'cursor' ||
 		strategy === 'cline' ||
-		strategy === 'mcode'
+		strategy === 'mcode' ||
+		strategy === 'grok'
 	) {
 		return 'final-arg';
 	}

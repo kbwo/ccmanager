@@ -109,4 +109,42 @@ describe('OpenCodeStateDetector', () => {
 		// Assert
 		expect(state).toBe('waiting_input');
 	});
+
+	it('should detect waiting_input state for form prompt', () => {
+		// Arrange
+		terminal = createMockTerminal([
+			'Question',
+			'Which database should we use?',
+			'↑↓ select  enter submit  esc dismiss',
+			'esc interrupt',
+		]);
+
+		// Act
+		const state = detector.detectState(terminal, 'busy');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect waiting_input state for form prompt while editing', () => {
+		// Arrange
+		terminal = createMockTerminal(['enter done  esc close']);
+
+		// Act
+		const state = detector.detectState(terminal, 'busy');
+
+		// Assert
+		expect(state).toBe('waiting_input');
+	});
+
+	it('should detect busy state for "esc again to interrupt"', () => {
+		// Arrange
+		terminal = createMockTerminal(['⋯ esc again to interrupt']);
+
+		// Act
+		const state = detector.detectState(terminal, 'idle');
+
+		// Assert
+		expect(state).toBe('busy');
+	});
 });

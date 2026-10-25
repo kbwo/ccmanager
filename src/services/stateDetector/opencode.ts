@@ -11,6 +11,11 @@ export class OpenCodeStateDetector extends BaseStateDetector {
 			return 'waiting_input';
 		}
 
+		// Form prompt (question asked to the user) footer: "esc dismiss" / "esc close"
+		if (/esc (dismiss|close)/.test(content)) {
+			return 'waiting_input';
+		}
+
 		// Check for busy state - "esc interrupt" pattern indicates active processing
 		if (/esc.*interrupt/i.test(content)) {
 			return 'busy';

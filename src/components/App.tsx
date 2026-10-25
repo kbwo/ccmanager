@@ -1,6 +1,6 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {useApp, useInput, Box, Text} from 'ink';
-import {Effect} from 'effect';
+import {Effect, type Either} from 'effect';
 import Menu, {type MenuSnapshot} from './Menu.js';
 import Dashboard from './Dashboard.js';
 import Session from './Session.js';
@@ -33,6 +33,7 @@ import {
 	GitProject,
 	MenuAction,
 	AmbiguousBranchError,
+	CreateWorktreeResult,
 } from '../types/index.js';
 import {type AppError, type ProcessError} from '../types/errors.js';
 import {formatErrorMessage} from '../utils/errorMessage.js';
@@ -48,6 +49,11 @@ import {ConfigScope} from '../types/index.js';
 import {ENV_VARS} from '../constants/env.js';
 import {MULTI_PROJECT_ERRORS} from '../constants/error.js';
 import {projectManager} from '../services/projectManager.js';
+import {
+	worktreeCreationTracker,
+	describeWorktreeCreationStage,
+} from '../services/worktreeCreationTracker.js';
+import {useWorktreeCreationJobs} from '../hooks/useWorktreeCreationJobs.js';
 import {
 	generateWorktreeDirectory,
 	isDeletableWorktree,
@@ -76,6 +82,22 @@ type View =
 	| 'session-actions'
 	| 'confirm-exit'
 	| 'clearing';
+
+/** Everything needed to create one worktree once its branch name is known. */
+interface WorktreeCreationData {
+	path: string;
+	branch: string;
+	baseBranch: string;
+	copySessionData: boolean;
+	copyClaudeDirectory: boolean;
+	presetId?: string;
+	initialPrompt?: string;
+}
+
+type WorktreeCreationEither = Either.Either<
+	CreateWorktreeResult,
+	AppError | AmbiguousBranchError
+>;
 
 interface AppProps {
 	devcontainerConfig?: DevcontainerConfig;
@@ -164,28 +186,40 @@ const App: React.FC<AppProps> = ({
 	} | null>(null);
 
 	// State for remote branch disambiguation
-	const [pendingWorktreeCreation, setPendingWorktreeCreation] = useState<{
-		path: string;
-		branch: string;
-		baseBranch: string;
-		copySessionData: boolean;
-		copyClaudeDirectory: boolean;
-		presetId?: string;
-		initialPrompt?: string;
-		ambiguousError: AmbiguousBranchError;
-	} | null>(null);
+	const [pendingWorktreeCreation, setPendingWorktreeCreation] = useState<
+		(WorktreeCreationData & {ambiguousError: AmbiguousBranchError}) | null
+	>(null);
 
 	// State for loading context - track flags for message composition
 	const [loadingContext, setLoadingContext] = useState<{
-		copySessionData?: boolean;
 		deleteBranch?: boolean;
 		isPromptFlow?: boolean;
-		stage?: 'naming' | 'creating';
 	}>({});
+
+	// The worktree creation the user is watching on the 'creating-worktree'
+	// screen. Pressing Return clears it and returns to the menu: the creation keeps
+	// running, and because nobody is waiting on it any more it reports its
+	// outcome on the menu instead of navigating. Kept in a ref as well because
+	// the creation reads it after awaiting, when a render-time value is stale.
+	const waitingCreationJobIdRef = useRef<string | null>(null);
+	const [waitingCreationJobId, setWaitingCreationJobIdState] = useState<
+		string | null
+	>(null);
+	const setWaitingCreationJobId = useCallback((id: string | null) => {
+		waitingCreationJobIdRef.current = id;
+		setWaitingCreationJobIdState(id);
+	}, []);
+	const creationJobs = useWorktreeCreationJobs();
+	const waitingCreationJob = creationJobs.find(
+		job => job.id === waitingCreationJobId,
+	);
 
 	// State for streaming devcontainer up logs
 	const [devcontainerLogs, setDevcontainerLogs] = useState<string[]>([]);
-	const [canReturnFromHookError, setCanReturnFromHookError] = useState(false);
+	// False for a moment after entering a screen that reacts to a key press, so
+	// a key press left over from the previous screen (e.g. the Return that
+	// submitted the New Worktree form) does not trigger it immediately.
+	const [acceptsScreenInput, setAcceptsScreenInput] = useState(false);
 	const menuSnapshotKey = selectedProject?.path ?? process.cwd();
 
 	const handleMenuSnapshotChange = useCallback(
@@ -216,13 +250,13 @@ const App: React.FC<AppProps> = ({
 	);
 
 	useEffect(() => {
-		if (view !== 'worktree-hook-error') {
-			setCanReturnFromHookError(false);
+		setAcceptsScreenInput(false);
+		if (view !== 'worktree-hook-error' && view !== 'creating-worktree') {
 			return;
 		}
 
 		const timeout = setTimeout(() => {
-			setCanReturnFromHookError(true);
+			setAcceptsScreenInput(true);
 		}, 100);
 
 		return () => {
@@ -232,7 +266,7 @@ const App: React.FC<AppProps> = ({
 
 	useInput(
 		() => {
-			if (!canReturnFromHookError) {
+			if (!acceptsScreenInput) {
 				return;
 			}
 
@@ -240,6 +274,18 @@ const App: React.FC<AppProps> = ({
 			handleReturnToMenu();
 		},
 		{isActive: view === 'worktree-hook-error'},
+	);
+
+	useInput(
+		(_input, key) => {
+			if (!acceptsScreenInput || !key.return) {
+				return;
+			}
+
+			setWaitingCreationJobId(null);
+			handleReturnToMenu();
+		},
+		{isActive: view === 'creating-worktree'},
 	);
 
 	const formatPostCreationHookWarning = (error: ProcessError): string =>
@@ -257,25 +303,32 @@ const App: React.FC<AppProps> = ({
 			presetId?: string,
 			initialPrompt?: string,
 			sessionName?: string,
+			// Off for sessions started in the background, whose devcontainer logs
+			// would otherwise leak into whatever loading screen is showing.
+			showDevcontainerLogs = true,
 		): Promise<{
 			success: boolean;
 			session?: ISession;
 			errorMessage?: string;
 		}> => {
-			setDevcontainerLogs([]);
+			if (showDevcontainerLogs) {
+				setDevcontainerLogs([]);
+			}
 			const sessionEffect = devcontainerConfig
 				? sessionManager.createSessionWithDevcontainerEffect(
 						worktreePath,
 						devcontainerConfig,
 						presetId,
 						initialPrompt,
-						(line: string) => {
-							setDevcontainerLogs(prev => {
-								const next = [...prev, line];
-								// Keep only the last 10 lines to avoid unbounded growth
-								return next.length > 10 ? next.slice(-10) : next;
-							});
-						},
+						showDevcontainerLogs
+							? (line: string) => {
+									setDevcontainerLogs(prev => {
+										const next = [...prev, line];
+										// Keep only the last 10 lines to avoid unbounded growth
+										return next.length > 10 ? next.slice(-10) : next;
+									});
+								}
+							: undefined,
 						sessionName,
 					)
 				: sessionManager.createSessionWithPresetEffect(
@@ -489,65 +542,6 @@ const App: React.FC<AppProps> = ({
 		};
 	}, [view, pendingMenuSessionLaunch, startSessionForWorktree]);
 
-	// Helper function to handle worktree creation results
-	const handleWorktreeCreationResult = (
-		result: {success: boolean; error?: string; warning?: string},
-		creationData: {
-			path: string;
-			branch: string;
-			baseBranch: string;
-			copySessionData: boolean;
-			copyClaudeDirectory: boolean;
-			presetId?: string;
-			initialPrompt?: string;
-		},
-	) => {
-		if (result.success) {
-			updateMenuSnapshot(snapshot => ({
-				...snapshot,
-				worktrees: [
-					...snapshot.worktrees.filter(
-						worktree => worktree.path !== creationData.path,
-					),
-					{
-						path: creationData.path,
-						branch: creationData.branch,
-						isMainWorktree: false,
-						hasSession: false,
-					},
-				],
-			}));
-
-			if (result.warning) {
-				setError(null);
-				setWorktreeHookError(result.warning);
-				setView('worktree-hook-error');
-				return;
-			}
-
-			if (creationData.presetId && creationData.initialPrompt) {
-				setPendingMenuSessionLaunch({
-					worktree: {
-						path: creationData.path,
-						branch: creationData.branch,
-						isMainWorktree: false,
-						hasSession: false,
-					},
-					presetId: creationData.presetId,
-					initialPrompt: creationData.initialPrompt,
-				});
-				handleReturnToMenu();
-				return;
-			}
-
-			handleReturnToMenu();
-			return;
-		}
-
-		setError(result.error || 'Failed to create worktree');
-		setView('new-worktree');
-	};
-
 	const handleMenuAction = async (action: MenuAction) => {
 		switch (action.type) {
 			case 'newWorktree':
@@ -662,19 +656,197 @@ const App: React.FC<AppProps> = ({
 		});
 	};
 
+	const addCreatedWorktreeToMenuSnapshot = (created: WorktreeCreationData) => {
+		updateMenuSnapshot(snapshot => ({
+			...snapshot,
+			worktrees: [
+				...snapshot.worktrees.filter(
+					worktree => worktree.path !== created.path,
+				),
+				{
+					path: created.path,
+					branch: created.branch,
+					isMainWorktree: false,
+					hasSession: false,
+				},
+			],
+		}));
+	};
+
+	/**
+	 * Starts tracking a new worktree creation and shows the waiting screen for
+	 * it. The user can leave that screen with Return while the creation continues.
+	 */
+	const startWaitingForCreation = (
+		job: Parameters<typeof worktreeCreationTracker.start>[0],
+	): string => {
+		const jobId = worktreeCreationTracker.start(job);
+		setWaitingCreationJobId(jobId);
+		setView('creating-worktree');
+		return jobId;
+	};
+
+	/**
+	 * Reports the outcome of a creation the user sent to the background. The
+	 * user may be anywhere by now (another screen, a session, another project),
+	 * so this never navigates: problems surface through the error message the
+	 * menu shows, and the new worktree appears in the menu on its own because
+	 * the menu reloads when a creation finishes.
+	 */
+	const reportBackgroundCreationOutcome = async (
+		result: WorktreeCreationEither,
+		creationData: WorktreeCreationData,
+	) => {
+		if (result._tag === 'Left') {
+			const reason =
+				result.left._tag === 'AmbiguousBranchError'
+					? result.left.message
+					: formatPreCreationHookError(result.left);
+			setError(`Creating worktree ${creationData.branch} failed: ${reason}`);
+			return;
+		}
+
+		const {worktree, postCreationHookError} = result.right;
+		if (postCreationHookError) {
+			// Same rule as when waiting: a failed post-creation hook means the
+			// worktree may not be ready, so the prompt-first session is not started.
+			setError(
+				`Worktree ${creationData.branch} was created, but ${formatPostCreationHookWarning(postCreationHookError)}`,
+			);
+			return;
+		}
+
+		if (creationData.presetId && creationData.initialPrompt) {
+			// Start the session without switching to it; it shows up in the menu.
+			const sessionResult = await createSessionWithEffect(
+				worktree.path,
+				creationData.presetId,
+				creationData.initialPrompt,
+				undefined,
+				false,
+			);
+			if (!sessionResult.success) {
+				setError(sessionResult.errorMessage!);
+			}
+		}
+	};
+
+	/**
+	 * Creates the worktree for a tracked creation job and handles the outcome.
+	 * If the user is still waiting on the 'creating-worktree' screen, the
+	 * outcome navigates as usual; otherwise it is reported in the background.
+	 *
+	 * @param onAmbiguous - What to do when the base branch exists on several
+	 *   remotes: ask the user to pick one, or (when retrying after they already
+	 *   picked) show the error.
+	 */
+	const runWorktreeCreation = async (
+		jobId: string,
+		creationData: WorktreeCreationData,
+		onAmbiguous: 'select-remote' | 'show-error',
+	) => {
+		worktreeCreationTracker.update(jobId, {
+			branch: creationData.branch,
+			stage: 'creating',
+		});
+
+		const result = await Effect.runPromise(
+			Effect.either(
+				worktreeService.createWorktreeEffect(
+					creationData.path,
+					creationData.branch,
+					creationData.baseBranch,
+					creationData.copySessionData,
+					creationData.copyClaudeDirectory,
+				),
+			),
+		);
+		worktreeCreationTracker.finish(jobId);
+
+		if (result._tag === 'Right') {
+			addCreatedWorktreeToMenuSnapshot({
+				...creationData,
+				path: result.right.worktree.path,
+				branch: result.right.worktree.branch || creationData.branch,
+			});
+		}
+
+		if (waitingCreationJobIdRef.current !== jobId) {
+			await reportBackgroundCreationOutcome(result, creationData);
+			return;
+		}
+		setWaitingCreationJobId(null);
+
+		if (result._tag === 'Left') {
+			if (result.left._tag === 'AmbiguousBranchError') {
+				if (onAmbiguous === 'select-remote') {
+					setPendingWorktreeCreation({
+						...creationData,
+						ambiguousError: result.left,
+					});
+					navigateWithClear('remote-branch-selector');
+				} else {
+					setError(result.left.message);
+					setView('new-worktree');
+				}
+				return;
+			}
+
+			const errorMessage = formatPreCreationHookError(result.left);
+			if (result.left._tag === 'ProcessError') {
+				setError(null);
+				setWorktreeHookError(errorMessage);
+				setView('worktree-hook-error');
+				return;
+			}
+
+			setError(errorMessage);
+			setView('new-worktree');
+			return;
+		}
+
+		const {worktree: createdWorktree, postCreationHookError} = result.right;
+		if (postCreationHookError) {
+			setError(null);
+			setWorktreeHookError(
+				formatPostCreationHookWarning(postCreationHookError),
+			);
+			setView('worktree-hook-error');
+			return;
+		}
+
+		if (creationData.presetId && creationData.initialPrompt) {
+			setLoadingContext({isPromptFlow: true});
+			setPendingMenuSessionLaunch({
+				worktree: {
+					path: createdWorktree.path,
+					branch: createdWorktree.branch || creationData.branch,
+					isMainWorktree: false,
+					hasSession: false,
+				},
+				presetId: creationData.presetId,
+				initialPrompt: creationData.initialPrompt,
+			});
+		}
+
+		handleReturnToMenu();
+	};
+
 	const handleCreateWorktree = async (request: NewWorktreeRequest) => {
 		setError(null);
+
+		const isPromptFlow = request.creationMode === 'prompt';
+		const jobId = startWaitingForCreation({
+			projectKey: menuSnapshotKey,
+			branch: isPromptFlow ? undefined : request.branch,
+			stage: isPromptFlow ? 'naming' : 'creating',
+			copySessionData: request.copySessionData,
+			isPromptFlow,
+		});
 
 		let branch = request.creationMode === 'manual' ? request.branch : '';
 		let targetPath = request.path;
 		if (request.creationMode === 'prompt') {
-			setLoadingContext({
-				copySessionData: request.copySessionData,
-				isPromptFlow: true,
-				stage: 'naming',
-			});
-			setView('creating-worktree');
-
 			const allBranches = await Effect.runPromise(
 				Effect.either(worktreeService.getAllBranchesEffect()),
 			);
@@ -708,96 +880,19 @@ const App: React.FC<AppProps> = ({
 			}
 		}
 
-		// Set loading context before showing loading view
-		setLoadingContext({
-			copySessionData: request.copySessionData,
-			isPromptFlow: request.creationMode === 'prompt',
-			stage: 'creating',
-		});
-		setView('creating-worktree');
-
-		// Create the worktree using Effect
-		const result = await Effect.runPromise(
-			Effect.either(
-				worktreeService.createWorktreeEffect(
-					targetPath,
-					branch,
-					request.baseBranch,
-					request.copySessionData,
-					request.copyClaudeDirectory,
-				),
-			),
+		await runWorktreeCreation(
+			jobId,
+			{
+				path: targetPath,
+				branch,
+				baseBranch: request.baseBranch,
+				copySessionData: request.copySessionData,
+				copyClaudeDirectory: request.copyClaudeDirectory,
+				presetId: isPromptFlow ? request.presetId : undefined,
+				initialPrompt: isPromptFlow ? request.initialPrompt : undefined,
+			},
+			'select-remote',
 		);
-
-		if (result._tag === 'Left') {
-			if (result.left._tag === 'AmbiguousBranchError') {
-				setPendingWorktreeCreation({
-					path: targetPath,
-					branch,
-					baseBranch: request.baseBranch,
-					copySessionData: request.copySessionData,
-					copyClaudeDirectory: request.copyClaudeDirectory,
-					presetId:
-						request.creationMode === 'prompt' ? request.presetId : undefined,
-					initialPrompt:
-						request.creationMode === 'prompt'
-							? request.initialPrompt
-							: undefined,
-					ambiguousError: result.left,
-				});
-				navigateWithClear('remote-branch-selector');
-				return;
-			}
-
-			const errorMessage = formatPreCreationHookError(result.left);
-			if (result.left._tag === 'ProcessError') {
-				setError(null);
-				setWorktreeHookError(errorMessage);
-				setView('worktree-hook-error');
-				return;
-			}
-
-			handleWorktreeCreationResult(
-				{success: false, error: errorMessage},
-				{
-					path: targetPath,
-					branch,
-					baseBranch: request.baseBranch,
-					copySessionData: request.copySessionData,
-					copyClaudeDirectory: request.copyClaudeDirectory,
-					presetId:
-						request.creationMode === 'prompt' ? request.presetId : undefined,
-					initialPrompt:
-						request.creationMode === 'prompt'
-							? request.initialPrompt
-							: undefined,
-				},
-			);
-		} else {
-			// Success case
-			const {worktree: createdWorktree, postCreationHookError} = result.right;
-			handleWorktreeCreationResult(
-				{
-					success: true,
-					warning: postCreationHookError
-						? formatPostCreationHookWarning(postCreationHookError)
-						: undefined,
-				},
-				{
-					path: createdWorktree.path,
-					branch: createdWorktree.branch || branch,
-					baseBranch: request.baseBranch,
-					copySessionData: request.copySessionData,
-					copyClaudeDirectory: request.copyClaudeDirectory,
-					presetId:
-						request.creationMode === 'prompt' ? request.presetId : undefined,
-					initialPrompt:
-						request.creationMode === 'prompt'
-							? request.initialPrompt
-							: undefined,
-				},
-			);
-		}
 	};
 
 	const handleCancelNewWorktree = () => {
@@ -808,70 +903,29 @@ const App: React.FC<AppProps> = ({
 		if (!pendingWorktreeCreation) return;
 
 		// Clear the pending creation data
-		const creationData = pendingWorktreeCreation;
+		const creationData: WorktreeCreationData = {
+			path: pendingWorktreeCreation.path,
+			branch: pendingWorktreeCreation.branch,
+			baseBranch: selectedRemoteRef,
+			copySessionData: pendingWorktreeCreation.copySessionData,
+			copyClaudeDirectory: pendingWorktreeCreation.copyClaudeDirectory,
+			presetId: pendingWorktreeCreation.presetId,
+			initialPrompt: pendingWorktreeCreation.initialPrompt,
+		};
 		setPendingWorktreeCreation(null);
+		setError(null);
 
-		// Retry worktree creation with the resolved base branch
-		// Set loading context before showing loading view
-		setLoadingContext({
+		// Retry worktree creation with the selected remote reference as the base
+		const jobId = startWaitingForCreation({
+			projectKey: menuSnapshotKey,
+			branch: creationData.branch,
+			stage: 'creating',
 			copySessionData: creationData.copySessionData,
 			isPromptFlow: Boolean(
 				creationData.presetId && creationData.initialPrompt,
 			),
-			stage: 'creating',
 		});
-		setView('creating-worktree');
-		setError(null);
-
-		const result = await Effect.runPromise(
-			Effect.either(
-				worktreeService.createWorktreeEffect(
-					creationData.path,
-					creationData.branch,
-					selectedRemoteRef, // Use the selected remote reference
-					creationData.copySessionData,
-					creationData.copyClaudeDirectory,
-				),
-			),
-		);
-
-		if (result._tag === 'Left') {
-			if (result.left._tag === 'AmbiguousBranchError') {
-				setError(result.left.message);
-				setView('new-worktree');
-				return;
-			}
-
-			const errorMessage = formatPreCreationHookError(result.left);
-			if (result.left._tag === 'ProcessError') {
-				setError(null);
-				setWorktreeHookError(errorMessage);
-				setView('worktree-hook-error');
-				return;
-			}
-
-			setError(errorMessage);
-			setView('new-worktree');
-		} else {
-			const {worktree: createdWorktree, postCreationHookError} = result.right;
-			handleWorktreeCreationResult(
-				{
-					success: true,
-					warning: postCreationHookError
-						? formatPostCreationHookWarning(postCreationHookError)
-						: undefined,
-				},
-				{
-					path: createdWorktree.path,
-					branch: createdWorktree.branch || creationData.branch,
-					baseBranch: selectedRemoteRef,
-					copySessionData: creationData.copySessionData,
-					copyClaudeDirectory: creationData.copyClaudeDirectory,
-					presetId: creationData.presetId,
-					initialPrompt: creationData.initialPrompt,
-				},
-			);
-		}
+		await runWorktreeCreation(jobId, creationData, 'show-error');
 	};
 
 	const handleRemoteBranchSelectorCancel = () => {
@@ -1075,6 +1129,7 @@ const App: React.FC<AppProps> = ({
 				error={error}
 				onDismissError={() => setError(null)}
 				projectName={selectedProject?.name}
+				projectKey={menuSnapshotKey}
 				multiProject={multiProject}
 				version={version}
 			/>
@@ -1112,18 +1167,20 @@ const App: React.FC<AppProps> = ({
 	}
 
 	if (view === 'creating-worktree') {
-		// Compose message based on loading context
-		const message = loadingContext.isPromptFlow
-			? loadingContext.stage === 'naming'
-				? 'Generating branch name with Claude...'
-				: 'Creating worktree from generated branch name...'
-			: loadingContext.copySessionData
-				? 'Creating worktree and copying session data...'
-				: 'Creating worktree...';
+		// The job leaves the tracker a moment before this screen navigates away.
+		const message = waitingCreationJob
+			? describeWorktreeCreationStage(waitingCreationJob)
+			: 'Creating worktree...';
 
 		return (
 			<Box flexDirection="column">
 				<LoadingSpinner message={message} color="cyan" />
+				<Box marginTop={1}>
+					<Text dimColor>
+						Press Enter to return to the menu; creation continues in the
+						background
+					</Text>
+				</Box>
 			</Box>
 		);
 	}
