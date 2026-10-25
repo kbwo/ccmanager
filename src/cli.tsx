@@ -93,7 +93,7 @@ const appProps = {
 	version,
 };
 
-const app = render(<App {...appProps} />);
+const app = render(<App {...appProps} />, {incrementalRendering: true});
 
 // Clean up sessions on exit
 process.on('SIGINT', () => {
