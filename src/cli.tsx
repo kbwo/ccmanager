@@ -114,6 +114,18 @@ if (profileMenu) {
 	}) as typeof process.stdout.write;
 }
 
+if (profileMenu) {
+	// A 50ms timer that fires late means the main thread was busy.
+	let expected = Date.now() + 50;
+	setInterval(() => {
+		const lag = Date.now() - expected;
+		if (lag > 50) {
+			logger.debug(`[menu-profile] event loop lag ${lag}ms`);
+		}
+		expected = Date.now() + 50;
+	}, 50).unref();
+}
+
 const app = render(<App {...appProps} />, {
 	incrementalRendering: true,
 	...(profileMenu
