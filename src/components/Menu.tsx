@@ -170,11 +170,13 @@ const Menu: React.FC<MenuProps> = ({
 	// terminal on every keystroke when the frame is as tall as the terminal, so
 	// this must not undercount: header + description (each followed by a blank
 	// row), filter indicators, and the footer (blank row, status, controls that
-	// wrap at the terminal width).
+	// wrap at the terminal width), plus one spare row because Ink also treats a
+	// frame exactly as tall as the terminal as too tall.
 	const {stdout} = useStdout();
 	const filterRows =
 		(searchQuery && !isSearchMode ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0);
 	const fixedRows =
+		1 +
 		2 +
 		(projectName ? 1 : 0) +
 		2 +
