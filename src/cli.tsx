@@ -5,6 +5,7 @@ import meow from 'meow';
 import App from './components/App.js';
 import {worktreeConfigManager} from './services/worktreeConfigManager.js';
 import {globalSessionOrchestrator} from './services/globalSessionOrchestrator.js';
+import {logger} from './utils/logger.js';
 
 // Version is injected at build time via --define flag
 declare const CCMANAGER_VERSION: string;
@@ -93,7 +94,37 @@ const appProps = {
 	version,
 };
 
-const app = render(<App {...appProps} />, {incrementalRendering: true});
+// Temporary: with CCMANAGER_PROFILE_MENU=1, log Ink's frame cost and whether
+// each stdout write wipes the whole terminal (Ink does that when the frame is
+// at least as tall as the terminal).
+const profileMenu = !!process.env['CCMANAGER_PROFILE_MENU'];
+if (profileMenu) {
+	const originalWrite = process.stdout.write.bind(process.stdout);
+	process.stdout.write = ((chunk: string | Uint8Array, ...rest: never[]) => {
+		const text = typeof chunk === 'string' ? chunk : '';
+		const start = Date.now();
+		const result = (originalWrite as (c: unknown, ...r: unknown[]) => boolean)(
+			chunk,
+			...rest,
+		);
+		logger.debug(
+			`[menu-profile] stdout.write ${text.length} bytes, clearTerminal=${text.includes('\x1b[3J')}, rows=${process.stdout.rows}, took ${Date.now() - start}ms`,
+		);
+		return result;
+	}) as typeof process.stdout.write;
+}
+
+const app = render(<App {...appProps} />, {
+	incrementalRendering: true,
+	...(profileMenu
+		? {
+				onRender: ({renderTime}: {renderTime: number}) =>
+					logger.debug(
+						`[menu-profile] ink frame renderTime=${renderTime.toFixed(1)}ms`,
+					),
+			}
+		: {}),
+});
 
 // Clean up sessions on exit
 process.on('SIGINT', () => {
