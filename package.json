@@ -79,5 +79,8 @@
 		"react-devtools-core": "^6.1.2",
 		"react-dom": "^19.2.3",
 		"strip-ansi": "^7.1.0"
+	},
+	"patchedDependencies": {
+		"string-width@8.3.0": "patches/string-width@8.3.0.patch"
 	}
 }
