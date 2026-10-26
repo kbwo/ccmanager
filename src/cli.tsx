@@ -127,7 +127,7 @@ if (profileMenu) {
 }
 
 const app = render(<App {...appProps} />, {
-	incrementalRendering: true,
+	incrementalRendering: false,
 	...(profileMenu
 		? {
 				onRender: ({renderTime}: {renderTime: number}) =>
