@@ -1,4 +1,6 @@
 import {promisify} from 'util';
+import {readFile, readdir} from 'fs/promises';
+import {join, resolve} from 'path';
 import {execFile, type ExecException} from 'child_process';
 import {Effect, Either} from 'effect';
 import {pipe} from 'effect/Function';
@@ -69,10 +71,7 @@ export const getGitStatus = (
 			['diff', '--staged', '--shortstat'],
 			worktreePath,
 		);
-		const branchResult = yield* runGit(
-			['branch', '--show-current'],
-			worktreePath,
-		);
+		const currentBranch = yield* getCurrentBranch(worktreePath);
 		const parentBranch = yield* fetchParentBranch(worktreePath);
 
 		const diffStats = decodeGitStats(diffResult.stdout);
@@ -83,7 +82,7 @@ export const getGitStatus = (
 
 		const {aheadCount, behindCount} = yield* computeAheadBehind({
 			worktreePath,
-			currentBranch: branchResult.stdout.trim(),
+			currentBranch,
 			parentBranch,
 		});
 
@@ -185,6 +184,43 @@ function runGit(
 		error => handleExecFailure(command, error),
 	);
 }
+
+/**
+ * Same result as `git branch --show-current` (empty string when HEAD is
+ * detached), but read from the HEAD file: the status poll runs this for every
+ * worktree every cycle, and each git process spawn costs real CPU.
+ */
+async function readCurrentBranchFromHead(
+	worktreePath: string,
+): Promise<string> {
+	const dotGit = join(worktreePath, '.git');
+	let gitDir = dotGit;
+	try {
+		await readdir(dotGit);
+	} catch {
+		// Linked worktrees have a `.git` file pointing at their git directory.
+		const pointer = /^gitdir: (.+)$/m.exec(await readFile(dotGit, 'utf8'));
+		if (!pointer?.[1]) throw new Error('Unrecognized .git file');
+		gitDir = resolve(worktreePath, pointer[1].trim());
+	}
+
+	const head = await readFile(join(gitDir, 'HEAD'), 'utf8');
+	return /^ref: refs\/heads\/(.+)$/m.exec(head)?.[1]?.trim() ?? '';
+}
+
+export const getCurrentBranch = (
+	worktreePath: string,
+): Effect.Effect<string, GitError> =>
+	Effect.catchAll(
+		Effect.tryPromise({
+			try: () => readCurrentBranchFromHead(worktreePath),
+			catch: error => error,
+		}),
+		() =>
+			Effect.map(runGit(['branch', '--show-current'], worktreePath), result =>
+				result.stdout.trim(),
+			),
+	);
 
 function fetchParentBranch(worktreePath: string): Effect.Effect<string | null> {
 	return Effect.catchAll(getWorktreeParentBranch(worktreePath), () =>

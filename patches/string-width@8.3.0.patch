@@ -1,0 +1,41 @@
+diff --git a/index.js b/index.js
+index dd2a7cd83783dd1bc209832f99a3299fc7dc2174..166547ac10875b455ff6b34e9b742ca11a4560d2 100644
+--- a/index.js
++++ b/index.js
+@@ -27,6 +27,27 @@ const rgiEmojiRegex = /^\p{RGI_Emoji}$/v;
+ const unqualifiedKeycapRegex = /^[\d#*]\u20E3$/;
+ const extendedPictographicRegex = /\p{Extended_Pictographic}/gu;
+ 
++// ccmanager patch: under Bun (JavaScriptCore) one `\p{RGI_Emoji}` /v match costs
++// about 100µs, and Ink measures every line of the menu through here. A cluster
++// always gets the same answer, and the same few clusters repeat on every line,
++// so remember it.
++const EMOJI_CACHE_MAX_SIZE = 5000;
++const doubleWidthEmojiCache = new Map();
++
++function isDoubleWidthEmojiCluster(segment) {
++	let result = doubleWidthEmojiCache.get(segment);
++	if (result === undefined) {
++		result = rgiEmojiRegex.test(segment) || isDoubleWidthNonRgiEmojiSequence(segment);
++		if (doubleWidthEmojiCache.size >= EMOJI_CACHE_MAX_SIZE) {
++			doubleWidthEmojiCache.clear();
++		}
++
++		doubleWidthEmojiCache.set(segment, result);
++	}
++
++	return result;
++}
++
+ function isDoubleWidthNonRgiEmojiSequence(segment) {
+ 	// Real emoji clusters are < 30 chars; guard against pathological input
+ 	if (segment.length > 50) {
+@@ -180,7 +201,7 @@ export default function stringWidth(input, options = {}) {
+ 		}
+ 
+ 		// Emoji width logic
+-		if (rgiEmojiRegex.test(segment) || isDoubleWidthNonRgiEmojiSequence(segment)) {
++		if (isDoubleWidthEmojiCluster(segment)) {
+ 			width += 2;
+ 			continue;
+ 		}

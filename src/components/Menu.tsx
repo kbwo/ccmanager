@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useRef} from 'react';
-import {Box, Text, useInput} from 'ink';
+import {Box, Text, useInput, useStdout} from 'ink';
 import SelectInput from 'ink-select-input';
 import {Effect} from 'effect';
 import {Worktree, Session, GitProject, MenuAction} from '../types/index.js';
@@ -38,6 +38,10 @@ import {
 } from '../services/worktreeCreationTracker.js';
 import {useWorktreeCreationJobs} from '../hooks/useWorktreeCreationJobs.js';
 import WorktreeCreationList from './WorktreeCreationList.js';
+import {logger} from '../utils/logger.js';
+
+// Temporary: set CCMANAGER_PROFILE_MENU=1 to log Menu render/effect costs.
+const PROFILE = !!process.env['CCMANAGER_PROFILE_MENU'];
 
 interface MenuProps {
 	sessionManager: SessionManager;
@@ -122,6 +126,9 @@ const Menu: React.FC<MenuProps> = ({
 	multiProject = false,
 	version,
 }) => {
+	if (PROFILE) {
+		logger.debug('[menu-profile] Menu render');
+	}
 	const [baseWorktrees, setBaseWorktrees] = useState<Worktree[]>(
 		() => initialSnapshot?.worktrees ?? [],
 	);
@@ -176,10 +183,40 @@ const Menu: React.FC<MenuProps> = ({
 			isDisabled: !!error || !!loadError,
 		});
 
+	const controlsKeys = `${
+		configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
+	}${multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'} ${
+		projectName ? 'B-Back' : 'Q-Quit'
+	}`;
+	const controlsText = isSearchMode
+		? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
+		: searchQuery
+			? `Controls: ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Tab-State Filter Space-Worktree actions N-New M-Merge D-Delete ${controlsKeys}`
+			: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Tab-State Filter Space-Worktree actions N-New M-Merge D-Delete ${controlsKeys}`;
+
+	// Rows the menu draws outside the list. Ink wipes and redraws the whole
+	// terminal on every keystroke when the frame is as tall as the terminal, so
+	// this must not undercount: header + description (each followed by a blank
+	// row), filter indicators, and the footer (blank row, status, controls that
+	// wrap at the terminal width) and the background-creation list, plus one
+	// spare row because Ink also treats a frame exactly as tall as the terminal
+	// as too tall.
+	const {stdout} = useStdout();
+	const filterRows =
+		(searchQuery && !isSearchMode ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0);
+	const fixedRows =
+		1 +
+		2 +
+		(projectName ? 1 : 0) +
+		2 +
+		(filterRows > 0 ? filterRows + 1 : 0) +
+		2 +
+		Math.ceil(controlsText.length / Math.max(1, stdout.columns)) +
+		// Running-creations heading, one line per job, and the margin above them.
+		(creationJobs.length > 0 ? creationJobs.length + 2 : 0);
+
 	const limit = useDynamicLimit({
-		// Default fixed rows, plus the running-creations heading, its lines, and
-		// the margin above them.
-		fixedRows: 6 + (creationJobs.length > 0 ? creationJobs.length + 2 : 0),
+		fixedRows,
 		isSearchMode,
 		hasError: !!(error || loadError),
 	});
@@ -279,6 +316,9 @@ const Menu: React.FC<MenuProps> = ({
 
 		// Listen for session changes
 		const handleSessionChange = () => {
+			if (PROFILE) {
+				logger.debug('[menu-profile] session event');
+			}
 			const allSessions = sessionManager.getAllSessions();
 			setSessions(allSessions);
 		};
@@ -301,6 +341,7 @@ const Menu: React.FC<MenuProps> = ({
 	]);
 
 	useEffect(() => {
+		const profileStart = PROFILE ? Date.now() : 0;
 		// Prepare worktree items and calculate layout
 		const items = prepareSessionItems(worktrees, sessions, {
 			sortByLastSession: worktreeConfig.sortByLastSession,
@@ -464,6 +505,11 @@ const Menu: React.FC<MenuProps> = ({
 			}
 		}
 		setItems(menuItems);
+		if (PROFILE) {
+			logger.debug(
+				`[menu-profile] items effect: ${Date.now() - profileStart}ms, ${menuItems.length} items`,
+			);
+		}
 
 		// Ensure highlighted worktree is valid for hotkey support
 		setHighlightedWorktree(prev => {
@@ -766,21 +812,7 @@ const Menu: React.FC<MenuProps> = ({
 						</>
 					)}
 				</Text>
-				<Text dimColor>
-					{isSearchMode
-						? 'Search Mode: Type to filter, Enter to exit search, ESC to exit search'
-						: searchQuery
-							? `Controls: ↑↓ Navigate Enter Select | /-Search ESC-Clear 0-9 Quick Select Tab-State Filter Space-Worktree actions N-New M-Merge D-Delete ${
-									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
-								}${
-									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
-								} ${projectName ? 'B-Back' : 'Q-Quit'}`
-							: `Controls: ↑↓ Navigate Enter Select | Hotkeys: 0-9 Quick Select /-Search Tab-State Filter Space-Worktree actions N-New M-Merge D-Delete ${
-									configReader.isAutoApprovalEnabled() ? 'A-AutoApproval ' : ''
-								}${
-									multiProject ? 'C-Config' : 'P-ProjConfig C-GlobalConfig'
-								} ${projectName ? 'B-Back' : 'Q-Quit'}`}
-				</Text>
+				<Text dimColor>{controlsText}</Text>
 			</Box>
 		</Box>
 	);
