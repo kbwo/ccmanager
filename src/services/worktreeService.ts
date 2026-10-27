@@ -30,7 +30,9 @@ const CLAUDE_DIR = '.claude';
 /**
  * Runs a shell command without blocking the event loop. Worktree creation uses
  * this for its slow steps so the UI keeps rendering and accepting input while
- * the creation continues in the background. A failure is rejected with the
+ * the creation continues in the background, and the menu uses it to load the
+ * worktree list: a synchronous git call there freezes the first frame for as
+ * long as the git status polling keeps the machine busy. A failure is rejected with the
  * same `status`/`stdout`/`stderr` fields an `execSync` error carries, so
  * callers can map both kinds of failure the same way.
  */
@@ -608,16 +610,14 @@ export class WorktreeService {
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
 		const self = this;
 		return Effect.catchAll(
-			Effect.try({
-				try: () => {
+			Effect.tryPromise({
+				try: async () => {
 					// Try to get the default branch from origin
-					const defaultBranch = execSync(
-						"git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'",
-						{
-							cwd: self.rootPath,
-							encoding: 'utf8',
-							shell: '/bin/bash',
-						},
+					const defaultBranch = (
+						await execAsync(
+							"git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'",
+							self.rootPath,
+						)
 					).trim();
 					if (!defaultBranch) {
 						throw new Error('No default branch from symbolic-ref');
@@ -629,24 +629,21 @@ export class WorktreeService {
 			(_error: unknown) => {
 				// Fallback to checking for main/master branches
 				return Effect.catchAll(
-					Effect.try({
-						try: () => {
-							execSync('git rev-parse --verify main', {
-								cwd: self.rootPath,
-								encoding: 'utf8',
-							});
+					Effect.tryPromise({
+						try: async () => {
+							await execAsync('git rev-parse --verify main', self.rootPath);
 							return 'main';
 						},
 						catch: (error: unknown) => error,
 					}),
 					(_mainError: unknown) => {
 						return Effect.catchAll(
-							Effect.try({
-								try: () => {
-									execSync('git rev-parse --verify master', {
-										cwd: self.rootPath,
-										encoding: 'utf8',
-									});
+							Effect.tryPromise({
+								try: async () => {
+									await execAsync(
+										'git rev-parse --verify master',
+										self.rootPath,
+									);
 									return 'master';
 								},
 								catch: (error: unknown) => error,
@@ -880,12 +877,12 @@ export class WorktreeService {
 		const self = this;
 
 		return Effect.catchAll(
-			Effect.try({
-				try: () => {
-					const output = execSync('git worktree list --porcelain', {
-						cwd: self.rootPath,
-						encoding: 'utf8',
-					});
+			Effect.tryPromise({
+				try: async () => {
+					const output = await execAsync(
+						'git worktree list --porcelain',
+						self.rootPath,
+					);
 
 					const worktrees: Worktree[] = [];
 					const lines = output.trim().split('\n');
@@ -943,19 +940,20 @@ export class WorktreeService {
 					// Detached worktrees have no branch. Resolve a human-readable ref
 					// (e.g. "heads/research/foo") so the UI can show which branch tip
 					// HEAD is detached at instead of just the literal word "detached".
-					for (const worktree of worktrees) {
-						if (worktree.branch) continue;
-						try {
-							worktree.detachedRef = execSync('git describe --all HEAD', {
-								cwd: worktree.path,
-								encoding: 'utf8',
-								stdio: ['ignore', 'pipe', 'ignore'],
-							}).trim();
-						} catch {
-							// No ref describes this commit (e.g. an orphan commit with no
-							// branch or tag pointing at it); leave detachedRef unset.
-						}
-					}
+					await Promise.all(
+						worktrees
+							.filter(worktree => !worktree.branch)
+							.map(async worktree => {
+								try {
+									worktree.detachedRef = (
+										await execAsync('git describe --all HEAD', worktree.path)
+									).trim();
+								} catch {
+									// No ref describes this commit (e.g. an orphan commit with no
+									// branch or tag pointing at it); leave detachedRef unset.
+								}
+							}),
+					);
 
 					// Handle submodule paths: if the main worktree path contains .git/modules,
 					// replace it with the actual working directory (self.gitRootPath)
