@@ -218,13 +218,10 @@ describe('WorktreeService', () => {
 			const result = await Effect.runPromise(effect);
 
 			expect(result).toBe('main');
-			expect(execSync).toHaveBeenCalledWith(
+			expect(mockedExec).toHaveBeenCalledWith(
 				"git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'",
-				expect.objectContaining({
-					cwd: '/fake/path',
-					encoding: 'utf8',
-					shell: '/bin/bash',
-				}),
+				expect.objectContaining({cwd: '/fake/path', encoding: 'utf8'}),
+				expect.any(Function),
 			);
 		});
 
