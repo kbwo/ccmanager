@@ -1,0 +1,2 @@
+# gglint: no secrets in agent config files
+bun run gglint secrets --staged
