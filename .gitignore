@@ -9,3 +9,4 @@ npm/*/bin/ccmanager
 npm/*/bin/ccmanager.exe
 bin/ccmanager
 bin/ccmanager.exe
+.claude/settings.local.json
